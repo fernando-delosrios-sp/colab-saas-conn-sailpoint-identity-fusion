@@ -6,9 +6,14 @@ These scripts prepare the `docs/` tree for MkDocs and optional local builds.
 
 | Script                      | Purpose                                                                                                                 |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `prepare-docs.cjs`          | Runs `sync-docs-home.cjs` then `copy-license-for-docs.cjs` (used by `npm run docs:prepare`).                            |
-| `sync-docs-home.cjs`        | Writes `docs/home.md` from the root `README.md`, rewriting `](docs/` links to `](./` so they resolve inside `docs_dir`. |
-| `copy-license-for-docs.cjs` | Copies `LICENSE.txt` into `docs/LICENSE.txt` so the synced home page can link to it for MkDocs validation.              |
+| `prepare-docs.cjs`            | Runs `generate-config-docs.cjs`, `copy-license-for-docs.cjs`, `copy-changelog-for-docs.cjs`, and `check-lean-ctx-docs.cjs` (used by `npm run docs:prepare`). |
+| `generate-config-docs.cjs`    | Generates `docs/configuration/*.md` from `connector-spec.json`.                                                       |
+| `check-lean-ctx-docs.cjs`     | Fails if any file under `docs/` contains `lean-ctx: omitted` placeholder corruption.                                  |
+| `copy-license-for-docs.cjs`   | Copies `LICENSE.txt` into `docs/LICENSE.txt` so the home page can link to it for MkDocs validation.                |
+| `copy-changelog-for-docs.cjs` | Copies `CHANGELOG.md` into `docs/CHANGELOG.md` so the home page can link to it for MkDocs validation.              |
+| `slim-connector-spec-helpkeys.cjs` | One-off maintainer script to shorten `connector-spec.json` helpKey strings with links to Configuration reference. |
 | `docs-venv.cjs`             | Creates or uses `.venv`, installs `requirements-docs.txt`, and runs `mkdocs build` or `mkdocs serve`.                   |
+
+`sync-docs-home.cjs` is **retired** — Home is authored directly in `docs/index.md`.
 
 Publishing to GitHub Pages is handled in CI (`.github/workflows/deploy-docs-pages.yml`); use `npm run docs:*` only if you want a local virtualenv and preview.

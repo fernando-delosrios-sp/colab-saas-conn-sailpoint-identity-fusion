@@ -35,8 +35,9 @@ config.json
 .httpyac.json
 .env*
 .venv/
-docs/index.md
 docs/LICENSE.txt
+docs/CHANGELOG.md
+docs/configuration/
 
 # Logs
 logs/
@@ -47,3 +48,5 @@ test-data/recordings/
 tools.yaml
 .worktrees/
 .superpowers/
+
+

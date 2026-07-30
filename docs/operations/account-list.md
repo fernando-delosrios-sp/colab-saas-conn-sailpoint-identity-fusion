@@ -31,6 +31,7 @@ flowchart TD
 Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identities` → `process-decisions` → `managed-account-init` → `orphan-identity-hydration` → `correlated-sweep` → `record-unique-registration` → `uncorrelated-sweep` → `await-disable-ops` → `form-reconcile`.
 
 ### Phase 1 — Setup & Initialization
+
     - Loads all managed sources.
     - Acquires a **process lock** to prevent concurrent aggregations.
     - Checks for **Reset forms?**; when enabled, deletes all Fusion review form definitions and auto-disables the flag (aggregation continues unless account reset is also set).
@@ -42,6 +43,7 @@ Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identit
     - Initializes attribute counters.
 
 ### Phase 2 — Data Fetching (Parallel)
+
     - Fetches the following data in parallel to optimize performance:
         - Existing fusion accounts.
         - Identities (from ISC).
@@ -52,9 +54,10 @@ Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identit
     - Finished review forms emit **decision discovery** log lines (`… DECISION DISCOVERED`) and a `DETAIL action=fusion decisions discovered from forms` summary with a `decisions(…)` segment.
     - Managed machine accounts (`isMachine=true`) are discarded after fetch and never enter the work queue.
     - A warning is logged with discarded machine-account counts (per source and total).
-    - If `fusionReportOnAggregation` is enabled and the fusion owner identity was not loaded in the parallel fetch, it is fetched separately.
+        - If `fusionReportOnAggregation` is enabled and the fusion owner identity was not loaded in the parallel fetch, it is fetched separately.
 
 ### Phase 3 — Fusion Account Processing (Refresh)
+
     - Processes all _existing_ fusion accounts. This step "depletes" the matching managed accounts from the work queue (the map of all managed accounts).
     - For each account:
         - Identity layer is applied to match collected identities with Fusion accounts.
@@ -203,6 +206,7 @@ Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion
 ### Preventing Fusion account creation (empty nativeIdentity skip pattern)
 
 One can purposely generate an empty `nativeIdentity` (by designing attribute definitions that produce an empty fusion identity attribute) in conjunction with the "Skip accounts with a missing identifier" processing option. When the fusion identity attribute evaluates to empty and the skip option is enabled, the account is omitted from the output, effectively preventing specific managed accounts or identities from generating Fusion accounts.
+
 
 
 

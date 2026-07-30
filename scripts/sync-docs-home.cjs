@@ -55,6 +55,10 @@ function transformBlockquotesToAdmonitions(text) {
 
 const transformedReadme = transformBlockquotesToAdmonitions(rootReadme)
 
-const docsHome = transformedReadme.replace(/\]\(docs\//g, '](./').replace(/\]\(LICENSE\.txt\)/g, '](./LICENSE.txt)')
+const docsHome = transformedReadme
+    .replace(/\]\(docs\/README\.md\)/g, '](guides/index.md)')
+    .replace(/\]\(docs\//g, '](./')
+    .replace(/\]\(LICENSE\.txt\)/g, '](./LICENSE.txt)')
 
 fs.writeFileSync(docsHomePath, docsHome)
+

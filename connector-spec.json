@@ -66,21 +66,21 @@
                             "label": "Identity Security Cloud API URL",
                             "type": "url",
                             "required": true,
-                            "helpKey": "Base URL of your Identity Security Cloud tenant (format: https://<tenant>.api.identitynow.com)"
+                            "helpKey": "Base URL of your Identity Security Cloud tenant (format: https:// .api.identitynow.com). See [Identity Security Cloud API URL](configuration/connection.md#baseurl)."
                         },
                         {
                             "key": "clientId",
                             "label": "Personal Access Token ID",
                             "type": "text",
                             "required": true,
-                            "helpKey": "Enter the Client ID from your Personal Access Token. The token must have permissions to manage sources, identities, accounts, and forms"
+                            "helpKey": "Enter the Client ID from your Personal Access Token. See [Personal Access Token ID](configuration/connection.md#clientid)."
                         },
                         {
                             "key": "clientSecret",
                             "label": "Personal Access Token secret",
                             "type": "secret",
                             "required": true,
-                            "helpKey": "Enter the Client Secret from your Personal Access Token. This value is stored securely and should be rotated periodically"
+                            "helpKey": "Enter the Client Secret from your Personal Access Token. See [Personal Access Token secret](configuration/connection.md#clientsecret)."
                         }
                     ]
                 }
@@ -100,7 +100,7 @@
                             "label": "Include identities in the scope?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "When enabled, existing identities are included alongside accounts from your configured sources. Turn this on if you want to define attributes from identity data or use identities as a baseline for detecting potential matches"
+                            "helpKey": "When enabled, existing identities are included alongside accounts from your configured sources. See [Include identities in the scope?](configuration/source.md#includeidentities)."
                         },
                         {
                             "key": "identityScopeQuery",
@@ -109,7 +109,7 @@
                             "required": true,
                             "parentKey": "includeIdentities",
                             "parentValue": "true",
-                            "helpKey": "Filter which identities are included using a search query. Use * for all identities, or narrow results with filters like attributes.cloudLifecycleState:active or source.name:\"Workday\""
+                            "helpKey": "Filter which identities are included using a search query. See [Identity Scope Query](configuration/source.md#identityscopequery)."
                         }
                     ]
                 },
@@ -140,7 +140,7 @@
                                             "label": "Source name",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Enter the exact name of the source as it appears in Identity Security Cloud (case-sensitive)"
+                                            "helpKey": "Enter the exact name of the source as it appears in Identity Security Cloud (case-sensitive). See [Source name](configuration/source.md#name)."
                                         },
                                         {
                                             "key": "enabled",
@@ -148,7 +148,7 @@
                                             "type": "toggle",
                                             "value": "true",
                                             "required": false,
-                                            "helpKey": "Turn off to temporarily exclude this source from processing without removing it"
+                                            "helpKey": "Turn off to temporarily exclude this source from processing without removing it. See [Enabled](configuration/source.md#enabled)."
                                         },
                                         {
                                             "key": "sourceType",
@@ -156,7 +156,7 @@
                                             "type": "radio",
                                             "required": true,
                                             "value": "authoritative",
-                                            "helpKey": "Choose how accounts from this source are handled. 'Authoritative accounts' creates new Fusion accounts for non-matched entries (default). 'Records' processes accounts for Map & Define but does not create Fusion accounts for non-matched ones. 'Orphan accounts' skips non-matched accounts entirely, with an option to disable them",
+                                            "helpKey": "Choose how accounts from this source are handled. See [Source type](configuration/source.md#sourcetype).",
                                             "options": [
                                                 {
                                                     "label": "Authoritative accounts",
@@ -180,7 +180,7 @@
                                             "value": "false",
                                             "parentKey": "sourceType",
                                             "parentValue": "orphan",
-                                            "helpKey": "Automatically disable orphan accounts that no longer match any identity after aggregation"
+                                            "helpKey": "Automatically disable orphan accounts that no longer match any identity after aggregation. See [Disable non-matching accounts](configuration/source.md#disablenonmatchingaccounts)."
                                         },
                                         {
                                             "key": "deferredMatching",
@@ -190,7 +190,7 @@
                                             "value": "true",
                                             "parentKey": "sourceType",
                                             "parentValue": "authoritative",
-                                            "helpKey": "Deferred candidate matching: after identity scoring, also compare this account to other provisional Fusion accounts from the same source in this run. If the only strong match is a same-source deferred candidate, defer instead of creating another Fusion identity until a later aggregation. Off: skip that check and use normal non-matched handling. Only deferred candidates from this source are considered; cross-source checks are never performed."
+                                            "helpKey": "Deferred candidate matching: after identity scoring, also compare this account to other provisional Fusion accounts from the same source in this run. See [Deferred candidate matching](configuration/source.md#deferredmatching)."
                                         },
                                         {
                                             "key": "includeRecordAccountsForMatching",
@@ -200,28 +200,28 @@
                                             "value": "true",
                                             "parentKey": "sourceType",
                                             "parentValue": "record",
-                                            "helpKey": "Enable when record accounts should be matched against Fusion identities. Disable to skip Match; Map & Define and unique attributes still run."
+                                            "helpKey": "Enable when record accounts should be matched against Fusion identities. See [Include record accounts in Match](configuration/source.md#includerecordaccountsformatching)."
                                         },
                                         {
                                             "key": "accountFilter",
                                             "label": "Accounts API filter",
                                             "type": "text",
                                             "required": false,
-                                            "helpKey": "Server-side ISC account filter sent to the Accounts API (filters parameter). Use this to reduce records returned from ISC. Reference: https://developer.sailpoint.com/docs/api/v2025/list-accounts"
+                                            "helpKey": "Server-side ISC account filter sent to the Accounts API (filters parameter). See [Accounts API filter](configuration/source.md#accountfilter)."
                                         },
                                         {
                                             "key": "accountJmespathFilter",
                                             "label": "Accounts JMESPath filter",
                                             "type": "text",
                                             "required": false,
-                                            "helpKey": "Client-side JMESPath expression applied after accounts are fetched (page-wise as { accounts: [...] }). The expression must return an array of account objects to keep. Reference: https://jmespath.org/"
+                                            "helpKey": "Client-side JMESPath expression applied after accounts are fetched (page-wise as { accounts: [...] }). See [Accounts JMESPath filter](configuration/source.md#accountjmespathfilter)."
                                         },
                                         {
                                             "key": "accountLimit",
                                             "label": "Aggregation batch size",
                                             "type": "number",
                                             "required": false,
-                                            "helpKey": "Limit the number of accounts processed per run. Leave empty to process all accounts. Useful when loading large datasets for the first time"
+                                            "helpKey": "Limit the number of accounts processed per run. See [Aggregation batch size](configuration/source.md#accountlimit)."
                                         }
                                     ]
                                 },
@@ -234,7 +234,7 @@
                                             "type": "radio",
                                             "value": "none",
                                             "required": true,
-                                            "helpKey": "Choose when to pull the latest accounts from this source. 'Aggregate before processing' refreshes accounts first. 'Delayed aggregation' refreshes after processing completes. 'Do not aggregate' uses existing account data. Note: delimited file sources do not support aggregation",
+                                            "helpKey": "Choose when to pull the latest accounts from this source. See [Account aggregation mode](configuration/source.md#aggregationmode).",
                                             "options": [
                                                 {
                                                     "label": "Do not aggregate",
@@ -259,7 +259,7 @@
                                             "value": "10",
                                             "parentKey": "aggregationMode",
                                             "parentValue": "before",
-                                            "helpKey": "Maximum time to wait for this source's aggregation to finish when using Aggregate before processing. The connector checks task status every 30 seconds until completion or this timeout. Increase for very large sources."
+                                            "helpKey": "Maximum time to wait for this source's aggregation to finish when using Aggregate before processing. See [Aggregation wait timeout (minutes)](configuration/source.md#aggregationtimeout)."
                                         },
                                         {
                                             "key": "aggregationDelay",
@@ -270,7 +270,7 @@
                                             "value": "5",
                                             "parentKey": "aggregationMode",
                                             "parentValue": "delayed",
-                                            "helpKey": "How many minutes to wait after processing completes before refreshing accounts from this source"
+                                            "helpKey": "How many minutes to wait after processing completes before refreshing accounts from this source. See [Aggregation delay (minutes)](configuration/source.md#aggregationdelay)."
                                         },
                                         {
                                             "key": "optimizedAggregation",
@@ -280,7 +280,7 @@
                                             "required": false,
                                             "parentKey": "aggregationMode",
                                             "parentValue": "before",
-                                            "helpKey": "Only process accounts that have changed since the last run, improving performance. Disable this if you use reverse correlation, which requires all accounts to be reprocessed"
+                                            "helpKey": "Only process accounts that have changed since the last run, improving performance. See [Optimized aggregation](configuration/source.md#optimizedaggregation)."
                                         },
                                         {
                                             "key": "optimizedAggregation",
@@ -290,7 +290,7 @@
                                             "required": false,
                                             "parentKey": "aggregationMode",
                                             "parentValue": "delayed",
-                                            "helpKey": "Only process accounts that have changed since the last run, improving performance. Disable this if you use reverse correlation, which requires all accounts to be reprocessed"
+                                            "helpKey": "Only process accounts that have changed since the last run, improving performance. See [Optimized aggregation](configuration/source.md#optimizedaggregation)."
                                         }
                                     ]
                                 },
@@ -302,7 +302,7 @@
                                             "label": "Correlation mode",
                                             "type": "radio",
                                             "required": false,
-                                            "helpKey": "Choose how uncorrelated source accounts are linked to identities. 'Correlate missing accounts on aggregation' links them automatically during processing. 'Reverse correlation from managed source' creates/uses a dedicated identity attribute and correlation rule so ISC can match them. 'Do not correlate' leaves them unlinked",
+                                            "helpKey": "Choose how uncorrelated source accounts are linked to identities. See [Correlation mode](configuration/source.md#correlationmode).",
                                             "options": [
                                                 {
                                                     "label": "Do not correlate",
@@ -325,7 +325,7 @@
                                             "required": true,
                                             "parentKey": "correlationMode",
                                             "parentValue": "reverse",
-                                            "helpKey": "Friendly display label for the reverse-correlation attribute shown in Identity Security Cloud"
+                                            "helpKey": "Friendly display label for the reverse-correlation attribute shown in Identity Security Cloud. See [Correlation attribute display name](configuration/source.md#correlationdisplayname)."
                                         },
                                         {
                                             "key": "correlationAttribute",
@@ -334,7 +334,7 @@
                                             "required": true,
                                             "parentKey": "correlationMode",
                                             "parentValue": "reverse",
-                                            "helpKey": "Internal name for the attribute used to link accounts via reverse correlation. This must be unique and cannot overlap mapped/defined attributes or existing source schema attributes"
+                                            "helpKey": "Internal name for the attribute used to link accounts via reverse correlation. See [Correlation attribute name](configuration/source.md#correlationattribute)."
                                         }
                                     ]
                                 }
@@ -353,21 +353,21 @@
                             "type": "number",
                             "required": false,
                             "min": "1",
-                            "helpKey": "Number of processing history entries to keep per account. Older entries are removed automatically."
+                            "helpKey": "Number of processing history entries to keep per account. See [Maximum history messages](configuration/source.md#maxhistorymessages)."
                         },
                         {
                             "key": "deleteEmpty",
                             "label": "Delete accounts with no managed accounts left?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Automatically remove a Fusion account when all of its linked source accounts have been deleted. Useful for cleaning up after users leave the organization"
+                            "helpKey": "Automatically remove a Fusion account when all of its linked source accounts have been deleted. See [Delete accounts with no managed accounts left?](configuration/source.md#deleteempty)."
                         },
                         {
                             "key": "skipAccountsWithMissingId",
                             "label": "Skip accounts with missing ID?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Skip accounts that are missing a unique identity value. When disabled, missing identity or display attributes are automatically populated with fallback values (UUID and account name, respectively)."
+                            "helpKey": "Skip accounts that are missing a unique identity value. See [Skip accounts with missing ID?](configuration/source.md#skipaccountswithmissingid)."
                         },
                         {
                             "key": "cascadeAggregationEnabled",
@@ -375,7 +375,7 @@
                             "type": "toggle",
                             "value": "false",
                             "required": false,
-                            "helpKey": "When enabled, triggers aggregation of managed sources before fetching managed accounts during single account operations (e.g., accountRead). This ensures the most up-to-date account data is fetched before processing the fusion account. Errors during cascade aggregation are logged but do not stop the main process."
+                            "helpKey": "When enabled, triggers aggregation of managed sources before fetching managed accounts during single account operations (e.g., accountRead). See [Enable cascade aggregation for single account read](configuration/source.md#cascadeaggregationenabled)."
                         }
                     ]
                 }
@@ -395,7 +395,7 @@
                             "label": "Default attribute merge from multiple sources",
                             "type": "radio",
                             "required": true,
-                            "helpKey": "When multiple sources provide the same attribute, choose how to combine them. 'First found' uses the value from the highest-priority source. 'Keep a list' stores all values. 'Concatenate' joins values into a single text",
+                            "helpKey": "When multiple sources provide the same attribute, choose how to combine them. See [Default attribute merge from multiple sources](configuration/mapping.md#attributemerge).",
                             "options": [
                                 {
                                     "label": "First found",
@@ -432,14 +432,14 @@
                                             "label": "New attribute",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Name for this attribute on the Fusion account. This will appear in the account schema"
+                                            "helpKey": "Name for this attribute on the Fusion account. See [New attribute](configuration/mapping.md#newattribute)."
                                         },
                                         {
                                             "key": "existingAttributes",
                                             "label": "Existing attributes",
                                             "type": "list",
                                             "required": true,
-                                            "helpKey": "Source attribute names to pull values from. Names must match the source account attributes exactly (case-sensitive)"
+                                            "helpKey": "Source attribute names to pull values from. See [Existing attributes](configuration/mapping.md#existingattributes)."
                                         }
                                     ]
                                 },
@@ -451,7 +451,7 @@
                                             "label": "Default attribute merge from multiple sources",
                                             "type": "radio",
                                             "required": true,
-                                            "helpKey": "Override the default merge strategy for this specific attribute. Choose 'Source name' to always prefer the value from a specific source",
+                                            "helpKey": "Override the default merge strategy for this specific attribute. See [Default attribute merge from multiple sources](configuration/mapping.md#attributemerge).",
                                             "options": [
                                                 {
                                                     "label": "First found",
@@ -478,7 +478,7 @@
                                             "parentKey": "attributeMerge",
                                             "parentValue": "source",
                                             "required": true,
-                                            "helpKey": "Name of the source whose value should be used for this attribute when available. You can also use $originSource to dynamically use the current origin source name."
+                                            "helpKey": "Name of the source whose value should be used for this attribute when available. See [Source name](configuration/mapping.md#source)."
                                         }
                                     ]
                                 }
@@ -519,20 +519,20 @@
                                             "label": "Attribute Name",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Name for this defined attribute on the Fusion account"
+                                            "helpKey": "Name for this defined attribute on the Fusion account. See [Attribute Name](configuration/definition.md#name)."
                                         },
                                         {
                                             "key": "expression",
                                             "label": "Apache Velocity expression",
                                             "type": "textarea",
                                             "required": true,
-                                            "helpKey": "Velocity template that defines the attribute value. Reference any mapped attribute by name (e.g. $firstname, $lastname, $email). $account is the origin snapshot (managed match, or identity-origin row when the origin is Identities). $accounts[0] is the first snapshot in the ordered list and may differ from $account because $accounts follows the configured source order, not the origin. Managed account snapshots in $accounts / $sources / $account include source (id, name) and schema (id = native identity, name = display); identity-origin $account rows use source.name = Identities (no source.id). Available helpers: $String, $Math, $Datefns, $Normalize, $AddressParse, $JSON, $MD5 (see the section help for the full method list). Example: #set($i=$firstname.substring(0, 1))$i$lastname produces 'jsmith' from 'John Smith'"
+                                            "helpKey": "Velocity template that defines the attribute value. See [Apache Velocity expression](configuration/definition.md#expression)."
                                         },
                                         {
                                             "key": "static",
                                             "label": "Static",
                                             "type": "toggle",
-                                            "helpKey": "When enabled, the attribute is evaluated only when it has no value. Existing values are never recalculated unless the account is fully reset. This option overrides Refresh on each aggregation if both are enabled."
+                                            "helpKey": "When enabled, the attribute is evaluated only when it has no value. See [Static](configuration/definition.md#static)."
                                         },
                                         {
                                             "key": "refresh",
@@ -540,7 +540,7 @@
                                             "parentKey": "static",
                                             "parentValue": "false",
                                             "type": "toggle",
-                                            "helpKey": "When enabled, the value is recalculated on every aggregation. When disabled, it is only recalculated when underlying source data changes. If Static is also enabled, Static takes precedence."
+                                            "helpKey": "When enabled, the value is recalculated on every aggregation. See [Refresh on each aggregation?](configuration/definition.md#refresh)."
                                         }
                                     ]
                                 },
@@ -552,7 +552,7 @@
                                             "label": "Case selection",
                                             "type": "select",
                                             "required": true,
-                                            "helpKey": "Convert the defined value to a specific letter case",
+                                            "helpKey": "Convert the defined value to a specific letter case. See [Case selection](configuration/definition.md#case).",
                                             "options": [
                                                 {
                                                     "label": "Do not change",
@@ -576,19 +576,19 @@
                                             "key": "normalize",
                                             "label": "Normalize special characters?",
                                             "type": "toggle",
-                                            "helpKey": "Replace accented and special characters with their plain equivalents (e.g. e instead of e with acute)"
+                                            "helpKey": "Replace accented and special characters with their plain equivalents (e.g. See [Normalize special characters?](configuration/definition.md#normalize)."
                                         },
                                         {
                                             "key": "spaces",
                                             "label": "Remove spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove all spaces from the defined value"
+                                            "helpKey": "Remove all spaces from the defined value. See [Remove spaces?](configuration/definition.md#spaces)."
                                         },
                                         {
                                             "key": "trim",
                                             "label": "Trim leading and trailing spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value"
+                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value. See [Trim leading and trailing spaces?](configuration/definition.md#trim)."
                                         },
                                         {
                                             "key": "maxLength",
@@ -596,7 +596,7 @@
                                             "type": "number",
                                             "required": false,
                                             "min": "1",
-                                            "helpKey": "Limit the defined value to this many characters. Leave empty for no limit"
+                                            "helpKey": "Limit the defined value to this many characters. See [Maximum length](configuration/definition.md#maxlength)."
                                         }
                                     ]
                                 }
@@ -615,7 +615,7 @@
                             "type": "number",
                             "required": false,
                             "min": "1",
-                            "helpKey": "Maximum number of tries to find a value that is not already taken. Increase if you have a very large number of existing accounts."
+                            "helpKey": "Maximum number of tries to find a value that is not already taken. See [Maximum attempts for unique definition](configuration/definition.md#maxattempts)."
                         },
                         {
                             "key": "uniqueAttributeDefinitions",
@@ -639,27 +639,27 @@
                                             "label": "Attribute Name",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Name for this unique attribute on the Fusion account"
+                                            "helpKey": "Name for this unique attribute on the Fusion account. See [Attribute Name](configuration/definition.md#name)."
                                         },
                                         {
                                             "key": "expression",
                                             "label": "Apache Velocity expression",
                                             "type": "textarea",
                                             "required": true,
-                                            "helpKey": "Velocity template that defines the unique value (required). Use $counter for an automatic number suffix (e.g. jsmith1, jsmith2) — in collision mode $counter renders empty on the first try and as a zero-padded suffix on subsequent attempts (see Minimum counter digits); include $counter explicitly when your expression uses Velocity directives (#if, #set, #end) because the auto-append is skipped in that case. Use $UUID for a fresh v4 random unique ID (include $UUID in the expression for UUID generation). Use $isUnique(value) inside the expression to test whether a candidate value (after this definition's output transforms) is currently free — pick between candidate formats before falling back to $counter. Managed snapshots expose source (id, name) and schema (id, name) on $account / $accounts. Example: #set($i=$firstname.substring(0, 1))$i$lastname$counter"
+                                            "helpKey": "Velocity template that defines the unique value (required). See [Apache Velocity expression](configuration/definition.md#expression)."
                                         },
                                         {
                                             "key": "digits",
                                             "label": "Minimum counter digits ($counter)",
                                             "type": "number",
                                             "required": true,
-                                            "helpKey": "Minimum number of digits for the counter, padded with leading zeros. For example, 3 digits produces 001, 002, etc."
+                                            "helpKey": "Minimum number of digits for the counter, padded with leading zeros. See [Minimum counter digits ($counter)](configuration/definition.md#digits)."
                                         },
                                         {
                                             "key": "useIncrementalCounter",
                                             "label": "Use incremental counter?",
                                             "type": "toggle",
-                                            "helpKey": "Always assign the next number in sequence instead of only adding a number when there is a conflict. Useful for defining sequential IDs like employee numbers"
+                                            "helpKey": "Always assign the next number in sequence instead of only adding a number when there is a conflict. See [Use incremental counter?](configuration/definition.md#useincrementalcounter)."
                                         },
                                         {
                                             "key": "counterStart",
@@ -668,7 +668,7 @@
                                             "parentKey": "useIncrementalCounter",
                                             "parentValue": "true",
                                             "required": true,
-                                            "helpKey": "The first number the counter will use. For example, set to 1000 to start numbering from 1000"
+                                            "helpKey": "The first number the counter will use. See [Counter start value](configuration/definition.md#counterstart)."
                                         }
                                     ]
                                 },
@@ -680,7 +680,7 @@
                                             "label": "Case selection",
                                             "type": "select",
                                             "required": true,
-                                            "helpKey": "Convert the defined value to a specific letter case",
+                                            "helpKey": "Convert the defined value to a specific letter case. See [Case selection](configuration/definition.md#case).",
                                             "options": [
                                                 {
                                                     "label": "Do not change",
@@ -704,19 +704,19 @@
                                             "key": "normalize",
                                             "label": "Normalize special characters?",
                                             "type": "toggle",
-                                            "helpKey": "Replace accented and special characters with their plain equivalents (e.g. e instead of e with acute)"
+                                            "helpKey": "Replace accented and special characters with their plain equivalents (e.g. See [Normalize special characters?](configuration/definition.md#normalize)."
                                         },
                                         {
                                             "key": "spaces",
                                             "label": "Remove spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove all spaces from the defined value"
+                                            "helpKey": "Remove all spaces from the defined value. See [Remove spaces?](configuration/definition.md#spaces)."
                                         },
                                         {
                                             "key": "trim",
                                             "label": "Trim leading and trailing spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value"
+                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value. See [Trim leading and trailing spaces?](configuration/definition.md#trim)."
                                         },
                                         {
                                             "key": "maxLength",
@@ -724,7 +724,7 @@
                                             "type": "number",
                                             "required": false,
                                             "min": "1",
-                                            "helpKey": "Limit the defined value to this many characters. Leave empty for no limit"
+                                            "helpKey": "Limit the defined value to this many characters. See [Maximum length](configuration/definition.md#maxlength)."
                                         }
                                     ]
                                 }
@@ -748,14 +748,14 @@
                             "label": "Manual review match score [0-100]",
                             "type": "number",
                             "required": true,
-                            "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match. Mandatory rules must still meet their own minimums."
+                            "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match. See [Manual review match score [0-100]](configuration/matching.md#fusionmanualreviewscore)."
                         },
                         {
                             "key": "fusionEnableAutoMerge",
                             "label": "Enable automatic merge",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "When enabled, merge the managed account into the matched Fusion identity without a review form if the combined score meets or exceeds the automatic merge match score. Merge and correlation behave like a merge-with-existing review, but the fusion account receives the Auto status entitlement only (not Authorized)."
+                            "helpKey": "When enabled, merge the managed account into the matched Fusion identity without a review form if the combined score meets or exceeds the automatic merge match score. See [Enable automatic merge](configuration/matching.md#fusionenableautomerge)."
                         },
                         {
                             "key": "fusionAutoMergeScore",
@@ -764,7 +764,7 @@
                             "required": true,
                             "parentKey": "fusionEnableAutoMerge",
                             "parentValue": "true",
-                            "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically merged. Must be greater than the manual review score. If this condition is not met, the connector will fail to initialize with a configuration error."
+                            "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically merged. See [Automatic merge match score [0-100]](configuration/matching.md#fusionautomergescore)."
                         },
                         {
                             "key": "matchingConfigs",
@@ -787,14 +787,14 @@
                                             "label": "Attribute",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "The identity attribute to compare when looking for matches (e.g. firstname, lastname, email)"
+                                            "helpKey": "The identity attribute to compare when looking for matches (e.g. See [Attribute](configuration/matching.md#attribute)."
                                         },
                                         {
                                             "key": "algorithm",
                                             "label": "Matching algorithm",
                                             "type": "select",
                                             "required": true,
-                                            "helpKey": "Algorithm used to compare values. 'Enhanced Name Matcher' excels at strict formatting and accents. 'Jaro-Winkler' is highly tolerant of typographical errors. 'LIG3' balances gaps, missing fragments, and character variations. 'Dice' is forgiving of total word reordering. 'Double Metaphone' captures English phonetic similarity. 'Binary' returns 100 for identical strings and 0 for any difference (case- and whitespace-sensitive). 'Custom Algorithm (Velocity)' runs your Velocity template once per comparison; it must output a numeric score from 0 to 100",
+                                            "helpKey": "Algorithm used to compare values. See [Matching algorithm](configuration/matching.md#algorithm).",
                                             "options": [
                                                 {
                                                     "label": "Enhanced Name Matcher",
@@ -843,35 +843,35 @@
                                             "required": true,
                                             "parentKey": "algorithm",
                                             "parentValue": "custom",
-                                            "helpKey": "Apache Velocity template evaluated for each account/identity pair. Context: $accountValue (managed account attribute), $candidateValue (fusion identity attribute), $attribute (this rule's attribute name). Output must be a number from 0 to 100 (similarity score). Same Velocity helpers as attribute definitions ($Math, $Normalize, $MD5, etc.). Keep expressions efficient; this runs in the hot matching loop."
+                                            "helpKey": "Apache Velocity template evaluated for each account/identity pair. See [Custom match score (Velocity)](configuration/matching.md#customvelocityexpression)."
                                         },
                                         {
                                             "key": "fusionScore",
                                             "label": "Similarity threshold & weight [0-100]",
                                             "type": "number",
                                             "required": true,
-                                            "helpKey": "One setting, two roles: (1) minimum similarity (0-100) the rule must meet to pass, and (2) blend weight in the combined score—higher means stricter and more influence. Use 0 only for minimal weight; it is treated as weight 1 in the blend."
+                                            "helpKey": "One setting, two roles: (1) minimum similarity (0-100) the rule must meet to pass, and (2) blend weight in the combined score—higher means stricter and more influence. See [Similarity threshold & weight [0-100]](configuration/matching.md#fusionscore)."
                                         },
                                         {
                                             "key": "mandatory",
                                             "label": "Mandatory match",
                                             "type": "toggle",
                                             "required": false,
-                                            "helpKey": "When enabled, this rule must meet its minimum similarity for a potential match. Mandatory rules are always evaluated even when a value is missing (Skip match if missing does not apply), so absent data can fail the rule. Passing mandatory rules contribute to the weighted combined score like other rules."
+                                            "helpKey": "When enabled, this rule must meet its minimum similarity for a potential match. See [Mandatory match](configuration/matching.md#mandatory)."
                                         },
                                         {
                                             "key": "skipMatchIfMissing",
                                             "label": "Skip match if missing",
                                             "type": "toggle",
                                             "required": false,
-                                            "helpKey": "When enabled (default), this rule is skipped if either value is missing (null, undefined, or empty after trimming). When disabled, missing values are still compared and count toward the result."
+                                            "helpKey": "When enabled (default), this rule is skipped if either value is missing (null, undefined, or empty after trimming). See [Skip match if missing](configuration/matching.md#skipmatchifmissing)."
                                         },
                                         {
                                             "key": "skipMatchIfThresholdNotMet",
                                             "label": "Skip match if threshold not met",
                                             "type": "toggle",
                                             "required": false,
-                                            "helpKey": "When enabled, this rule is excluded from the weighted combined match score if its computed similarity is below its minimum similarity (Similarity threshold & weight). Skipped rules contribute zero weight and zero raw score, so the combined score is calculated from the remaining rules. Mandatory rules are always evaluated regardless of this toggle; a below-threshold mandatory rule still fails the candidate. Default: disabled."
+                                            "helpKey": "When enabled, this rule is excluded from the weighted combined match score if its computed similarity is below its minimum similarity (Similarity threshold & weight). See [Skip match if threshold not met](configuration/matching.md#skipmatchifthresholdnotmet)."
                                         }
                                     ]
                                 }
@@ -889,7 +889,7 @@
                             "label": "List of Fusion account attributes to include in form",
                             "type": "list",
                             "required": false,
-                            "helpKey": "Account attributes displayed on the review form to help reviewers compare potential matches. For example: name, email, department"
+                            "helpKey": "Account attributes displayed on the review form to help reviewers compare potential matches. See [List of Fusion account attributes to include in form](configuration/matching.md#fusionformattributes)."
                         },
                         {
                             "key": "fusionMaxCandidatesForForm",
@@ -898,35 +898,35 @@
                             "required": false,
                             "min": "1",
                             "max": "15",
-                            "helpKey": "Maximum number of potential identity matches shown on each manual review form. If more identities qualify, only the highest-scoring candidates are included (combined match score, then stable tie-break). Valid range: 1–15."
+                            "helpKey": "Maximum number of potential identity matches shown on each manual review form. See [Maximum candidates per review form](configuration/matching.md#fusionmaxcandidatesforform)."
                         },
                         {
                             "key": "fusionFormExpirationDays",
                             "label": "Manual review expiration days",
                             "type": "number",
                             "required": true,
-                            "helpKey": "Number of days a reviewer has to respond before the review form expires."
+                            "helpKey": "Number of days a reviewer has to respond before the review form expires. See [Manual review expiration days](configuration/matching.md#fusionformexpirationdays)."
                         },
                         {
                             "key": "fusionOwnerIsGlobalReviewer",
                             "label": "Owners are global reviewers?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Always add the source owner and any member of the source's assigned governance group as reviewers on every review form, ensuring someone is always assigned to review potential matches"
+                            "helpKey": "Always add the source owner and any member of the source's assigned governance group as reviewers on every review form, ensuring someone is always assigned to review potential matc. See [Owners are global reviewers?](configuration/matching.md#fusionownerisglobalreviewer)."
                         },
                         {
                             "key": "fusionReportOnAggregation",
                             "label": "Send report to owner on aggregation?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Send a summary report to the source owner after each run, including potential matches, processing outcomes, and source-type breakdown metrics"
+                            "helpKey": "Send a summary report to the source owner after each run, including potential matches, processing outcomes, and source-type breakdown metrics. See [Send report to owner on aggregation?](configuration/matching.md#fusionreportonaggregation)."
                         },
                         {
                             "key": "enableLocalization",
                             "label": "Enable localized user communications?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Translate emails, reports, and Fusion reviews to the recipient's preferred language. This depends on an identity language attribute."
+                            "helpKey": "Translate emails, reports, and Fusion reviews to the recipient's preferred language. See [Enable localized user communications?](configuration/matching.md#enablelocalization)."
                         },
                         {
                             "key": "defaultLanguage",
@@ -935,7 +935,7 @@
                             "required": false,
                             "parentKey": "enableLocalization",
                             "parentValue": "true",
-                            "helpKey": "The default language to use when the recipient's language cannot be determined.",
+                            "helpKey": "The default language to use when the recipient's language cannot be determined. See [Default Language](configuration/matching.md#defaultlanguage).",
                             "options": [
                                 {
                                     "label": "English",
@@ -986,7 +986,7 @@
                             "required": false,
                             "parentKey": "enableLocalization",
                             "parentValue": "true",
-                            "helpKey": "Identity attribute containing the user's preferred language. Recognizes common language formats (e.g. 'en', 'eng', 'english', 'en-US')."
+                            "helpKey": "Identity attribute containing the user's preferred language. See [Identity Language Attribute](configuration/matching.md#identitylanguageattribute)."
                         }
                     ]
                 }
@@ -1006,35 +1006,35 @@
                             "label": "Reset accounts?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "On the next aggregation only, clear all Fusion account data and emit zero accounts (rebuild from scratch on the following run). Does not delete source accounts or identities. Automatically turned off after it completes"
+                            "helpKey": "On the next aggregation only, clear all Fusion account data and emit zero accounts (rebuild from scratch on the following run). See [Reset accounts?](configuration/advanced.md#resetaccounts)."
                         },
                         {
                             "key": "resetForms",
                             "label": "Reset forms?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "On the next aggregation only, delete all Fusion review form definitions. Aggregation continues unless Reset accounts? is also enabled. Automatically turned off after it completes"
+                            "helpKey": "On the next aggregation only, delete all Fusion review form definitions. See [Reset forms?](configuration/advanced.md#resetforms)."
                         },
                         {
                             "key": "forceAttributeRefresh",
                             "label": "Force attribute refresh on next aggregation?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "On the next aggregation only, recalculate all computed Normal-type attributes even if no changes were detected. After that aggregation completes, this option is automatically turned off. This may increase processing time but ensures values stay up to date when you need a one-time refresh"
+                            "helpKey": "On the next aggregation only, recalculate all computed Normal-type attributes even if no changes were detected. See [Force attribute refresh on next aggregation?](configuration/advanced.md#forceattributerefresh)."
                         },
                         {
                             "key": "concurrencyCheckEnabled",
                             "label": "Enable concurrency check?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Safeguard against data conflicts if multiple aggregations overlap. Recommended to keep enabled"
+                            "helpKey": "Safeguard against data conflicts if multiple aggregations overlap. See [Enable concurrency check?](configuration/advanced.md#concurrencycheckenabled)."
                         },
                         {
                             "key": "externalLoggingEnabled",
                             "label": "Enable external logging?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Stream connector execution logs directly to external monitoring services like Splunk or Datadog for centralized troubleshooting"
+                            "helpKey": "Stream connector execution logs directly to external monitoring services like Splunk or Datadog for centralized troubleshooting. See [Enable external logging?](configuration/advanced.md#externalloggingenabled)."
                         },
                         {
                             "key": "externalLoggingUrl",
@@ -1043,7 +1043,7 @@
                             "required": false,
                             "parentKey": "externalLoggingEnabled",
                             "parentValue": "true",
-                            "helpKey": "The URL where logs should be sent (e.g. your Splunk or logging service endpoint)"
+                            "helpKey": "The URL where logs should be sent (e.g. See [External logging URL](configuration/advanced.md#externalloggingurl)."
                         },
                         {
                             "key": "externalLoggingLevel",
@@ -1052,7 +1052,7 @@
                             "required": false,
                             "parentKey": "externalLoggingEnabled",
                             "parentValue": "true",
-                            "helpKey": "Choose the detail level for external logs. 'Error' sends only critical issues. 'Debug' sends everything, which is useful for troubleshooting but produces more data",
+                            "helpKey": "Choose the detail level for external logs. See [External logging level](configuration/advanced.md#externallogginglevel).",
                             "options": [
                                 {
                                     "label": "Error",
@@ -1077,14 +1077,14 @@
                             "label": "Managed accounts batch size",
                             "type": "number",
                             "required": false,
-                            "helpKey": "Number of uncorrelated managed accounts processed in each match detection batch. Lower values reduce peak memory usage and may improve stability in constrained environments; higher values can improve throughput at the cost of more memory. Typical tuning range: 25-100."
+                            "helpKey": "Number of uncorrelated managed accounts processed in each match detection batch. See [Managed accounts batch size](configuration/advanced.md#managedaccountsbatchsize)."
                         },
                         {
                             "key": "scoringMaxConcurrency",
                             "label": "Scoring concurrency limit",
                             "type": "number",
                             "required": false,
-                            "helpKey": "Maximum concurrent identity-comparison scoring operations during managed-account analysis. Default 12. Higher values increase CPU and memory usage."
+                            "helpKey": "Maximum concurrent identity-comparison scoring operations during managed-account analysis. See [Scoring concurrency limit](configuration/advanced.md#scoringmaxconcurrency)."
                         }
                     ]
                 },
@@ -1098,7 +1098,7 @@
                             "label": "Provisioning timeout (seconds)",
                             "type": "number",
                             "required": true,
-                            "helpKey": "Maximum time (in seconds) to wait for a provisioning operation to complete. Increase this if you experience timeouts with large batches."
+                            "helpKey": "Maximum time (in seconds) to wait for a provisioning operation to complete. See [Provisioning timeout (seconds)](configuration/advanced.md#provisioningtimeout)."
                         },
                         {
                             "key": "maxConcurrentRequests",
@@ -1107,7 +1107,7 @@
                             "required": false,
                             "min": "1",
                             "max": "30",
-                            "helpKey": "How many HTTP requests can run at the same time. ISC allows roughly 100 requests per 10 seconds; default 20 balances throughput and 429 risk."
+                            "helpKey": "How many HTTP requests can run at the same time. See [Maximum concurrent requests](configuration/advanced.md#maxconcurrentrequests)."
                         },
                         {
                             "key": "parallelBatchSize",
@@ -1116,7 +1116,7 @@
                             "required": false,
                             "min": "1",
                             "max": "16",
-                            "helpKey": "Max in-flight parallel pages per pagination stream. The shared API queue still enforces maximum concurrent requests globally. Default 16."
+                            "helpKey": "Max in-flight parallel pages per pagination stream. See [Parallel pagination batch size](configuration/advanced.md#parallelbatchsize)."
                         },
                         {
                             "key": "requestsPerSecond",
@@ -1125,7 +1125,7 @@
                             "required": false,
                             "min": "1",
                             "max": "12",
-                            "helpKey": "Legacy rate hint: derives the sliding-window cap as requests per second × 10 seconds (max 100). ISC tenant limit is ~100 requests per 10 seconds. Lower if you see HTTP 429 errors."
+                            "helpKey": "Legacy rate hint: derives the sliding-window cap as requests per second × 10 seconds (max 100). See [Requests per second](configuration/advanced.md#requestspersecond)."
                         },
                         {
                             "key": "maxRetries",
@@ -1134,7 +1134,7 @@
                             "required": false,
                             "min": "0",
                             "max": "20",
-                            "helpKey": "How many times to retry a failed request before giving up."
+                            "helpKey": "How many times to retry a failed request before giving up. See [API request retries](configuration/advanced.md#maxretries)."
                         },
                         {
                             "key": "processingWait",
@@ -1142,7 +1142,7 @@
                             "type": "number",
                             "required": false,
                             "min": "10",
-                            "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts."
+                            "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts. See [Processing wait time (seconds)](configuration/advanced.md#processingwait)."
                         },
                         {
                             "key": "heartbeatInterval",
@@ -1150,14 +1150,14 @@
                             "type": "number",
                             "required": false,
                             "min": "5",
-                            "helpKey": "How often (in seconds) the connector emits STATUS and EVENT_SUMMARY lines during long operations. Lower values give faster visibility; higher values reduce log volume. Default 10 seconds."
+                            "helpKey": "How often (in seconds) the connector emits STATUS and EVENT_SUMMARY lines during long operations. See [Heartbeat interval (seconds)](configuration/advanced.md#heartbeatinterval)."
                         },
                         {
                             "key": "enablePriority",
                             "label": "Enable priority processing?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Process critical operations (like saving data) before less urgent ones (like logging). Recommended for best performance"
+                            "helpKey": "Process critical operations (like saving data) before less urgent ones (like logging). See [Enable priority processing?](configuration/advanced.md#enablepriority)."
                         }
                     ]
                 },
@@ -1171,7 +1171,7 @@
                             "label": "Enable proxy mode?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Offload processing workload to your own infrastructure by routing operations through a dedicated server, which is useful for highly restricted or specialized environments"
+                            "helpKey": "Offload processing workload to your own infrastructure by routing operations through a dedicated server, which is useful for highly restricted or specialized environments. See [Enable proxy mode?](configuration/advanced.md#proxyenabled)."
                         },
                         {
                             "key": "proxyUrl",
@@ -1180,7 +1180,7 @@
                             "required": false,
                             "parentKey": "proxyEnabled",
                             "parentValue": "true",
-                            "helpKey": "The URL of your proxy server that will handle connector operations"
+                            "helpKey": "The URL of your proxy server that will handle connector operations. See [Proxy URL](configuration/advanced.md#proxyurl)."
                         },
                         {
                             "key": "proxyPassword",
@@ -1189,7 +1189,7 @@
                             "required": true,
                             "parentKey": "proxyEnabled",
                             "parentValue": "true",
-                            "helpKey": "A shared secret used to authenticate with your proxy server. This must match the password configured on the proxy"
+                            "helpKey": "A shared secret used to authenticate with your proxy server. See [Proxy password](configuration/advanced.md#proxypassword)."
                         }
                     ]
                 }
