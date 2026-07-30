@@ -1,11 +1,23 @@
 site_name: Identity Fusion NG Documentation
 site_description: Identity Fusion NG usage guides and operations reference
+site_url: https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/
+repo_url: https://github.com/fernando-delosrios-sp/colab-saas-conn-sailpoint-identity-fusion
 site_dir: site
 docs_dir: docs
 exclude_docs: README.md
 
 theme:
     name: material
+    features:
+        - navigation.instant
+        - navigation.tracking
+        - navigation.sections
+        - navigation.expand
+        - navigation.top
+        - search.suggest
+        - search.highlight
+        - content.code.copy
+        - toc.follow
 
 nav:
     - Home: index.md
@@ -65,3 +77,4 @@ markdown_extensions:
     - admonition
     - pymdownx.details
     - pymdownx.superfences
+
