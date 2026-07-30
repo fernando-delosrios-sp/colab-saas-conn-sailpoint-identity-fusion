@@ -175,12 +175,16 @@ export class FusionAccount {
         if (account.uncorrelated !== undefined) {
             fa.layers.uncorrelated = account.uncorrelated
         }
-        fa.layers.isIdentity = account.uncorrelated === false
 
         if (account.attributes) {
             FusionAccount.applyAttributeCollections(fa, account)
             FusionAccount.applyOriginMetadata(fa, account, identityInfo)
         }
+
+        // Display override applies to identity-origin rows only when reloading persisted Fusion
+        // accounts. Managed-source correlation (account.uncorrelated on the source feed) is
+        // captured via isIdentity in fromManagedAccount / fromFusionDecision factories.
+        fa.layers.isIdentity = fa.fromIdentity
 
         return fa
     }
@@ -853,8 +857,3 @@ export class FusionAccount {
         }
     }
 }
-
-
-
-
-
