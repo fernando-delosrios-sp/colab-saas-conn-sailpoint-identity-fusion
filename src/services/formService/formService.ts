@@ -10,6 +10,7 @@ import { ClientService } from '../clientService'
 import { LogService } from '../logService'
 import { IdentityService } from '../identityService'
 import { EmailService } from '../emailService'
+import { resolveFormLocale, translate } from '../emailService/localization'
 import { SourceService } from '../sourceService'
 import { FusionRun } from '../../model/fusionRun'
 import { assert, softAssert } from '../../utils/assert'
@@ -78,6 +79,8 @@ export class FormService {
     private readonly fusionFormExpirationDays: number
     private readonly fusionFormAttributes?: string[]
     private readonly fusionMaxCandidatesForForm: number
+    private readonly enableLocalization: boolean
+    private readonly defaultLanguage?: string
     private readonly lifecycle: FormLifecycle
 
     // ------------------------------------------------------------------------
@@ -97,6 +100,8 @@ export class FormService {
         this.fusionFormExpirationDays = config.fusionFormExpirationDays
         this.fusionFormAttributes = config.fusionFormAttributes
         this.fusionMaxCandidatesForForm = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
+        this.enableLocalization = config.enableLocalization === true
+        this.defaultLanguage = config.defaultLanguage
         this.lifecycle = new FormLifecycle({
             client: this.client,
             log: this.log,
@@ -376,7 +381,8 @@ export class FormService {
         assert(formName, 'Form name is required')
 
         const formDefinition = await this.getOrCreateFormDefinition(formName, fusionAccount, candidates)
-        const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
+        const formLocale = resolveFormLocale({ enableLocalization: this.enableLocalization, defaultLanguage: this.defaultLanguage })
+        const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes, sourceType, formLocale)
         assert(formInput, 'Form input is required')
 
         const expire = calculateExpirationDate(this.fusionFormExpirationDays)
@@ -1035,8 +1041,9 @@ export class FormService {
         }
         const sourceType =
             this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
-        const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes, sourceType)
-        const formInputs = buildFormInputs(fusionAccount, candidates, this.fusionFormAttributes)
+        const formLocale = resolveFormLocale({ enableLocalization: this.enableLocalization, defaultLanguage: this.defaultLanguage })
+        const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes, sourceType, formLocale)
+        const formInputs = buildFormInputs(fusionAccount, candidates, this.fusionFormAttributes, formLocale)
         const formConditions = buildFormConditions(candidates, this.fusionFormAttributes)
         const owner = this.sources.fusionSourceOwner
 
@@ -1059,8 +1066,7 @@ export class FormService {
         const formDefinition: CustomFormsV2025ApiCreateFormDefinitionRequest = {
             body: {
                 name: formName,
-                description:
-                    'Review potential matching identity and decide whether to create a new identity or merge with an existing one',
+                description: translate('form_definition_description', formLocale),
                 owner,
                 formElements: formFields,
                 formInput: formInputs,

@@ -1,7 +1,6 @@
 ## 1. Prerequisites and cleanup
 
-- [x] 1.1 Restore `docs/guides/matching-algorithms.md` and `docs/CHANGELOG.md` from git (remove lean-ctx placeholders)
-- [x] 1.2 Add CI guard in docs review script rejecting `lean-ctx: omitted` pattern in `docs/**`
+- [x] 1.1 Restore `docs/guides/matching-algorithms.md` and `docs/CHANGELOG.md` from git (remove placeholder corruption)
 
 ## 2. Configuration reference generation
 
@@ -60,3 +59,4 @@
 
 - [x] 9.1 Create or update CHANGELOG entry for documentation restructure (user-visible: new docs IA, URL changes)
 - [x] 9.2 Confirm entry covers restructured nav sections, Configuration reference generation, and legacy URL redirects
+

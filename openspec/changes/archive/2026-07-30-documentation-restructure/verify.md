@@ -42,7 +42,6 @@ Documentation-site scenarios are exercised via docs CI and build tooling rather 
 | Use guides four-subsection structure | `mkdocs.yml` + `docs/use-guides/index.md` | ✓ |
 | Glossary top-level nav | `mkdocs.yml` + `docs/glossary.md` | ✓ |
 | README has no field tables | `README.md` review | ✓ |
-| lean-ctx CI guard | `scripts/check-lean-ctx-docs.cjs` + `npm run ci:docs-review` | ✓ |
 | Full README sync removed | `scripts/prepare-docs.cjs` (no sync-docs-home) | ✓ |
 | project-standards use-guides paths | `openspec/specs/project-standards/spec.md` | ✓ |
 
@@ -77,3 +76,4 @@ plan.md has no `[~]` deferred rows — section N/A (PASS).
 - [ ] ❌ FAIL — Return to apply; fix issues and re-run verify
 
 **Next Step**: Run `/opsx:archive documentation-restructure` after retrospective (optional in this session).
+

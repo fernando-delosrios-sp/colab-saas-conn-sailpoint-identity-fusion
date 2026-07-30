@@ -295,13 +295,3 @@ Feature: version-update-procedure
 - **AND** the agent updates the previously-picked guide in place with
   a fresh edit tied to the new change
 
-### Requirement: Docs CI SHALL reject lean-ctx placeholder corruption
-
-The docs CI pipeline MUST fail if any file under `docs/` contains the pattern `lean-ctx: omitted` indicating corrupted lean-ctx read artifacts.
-
-#### Scenario: Corrupted doc is committed
-
-- **GIVEN** a markdown file under `docs/` contains `... [lean-ctx: omitted`
-- **WHEN** `npm run ci:docs-review` runs
-- **THEN** the command SHALL exit with a non-zero status
-

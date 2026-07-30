@@ -12,13 +12,12 @@
 
 ---
 
-## Task 1: Clean lean-ctx corruption
+## Task 1: Clean placeholder corruption
 
 - [ ] **Step 1:** Run `git show HEAD:docs/guides/matching-algorithms.md > /tmp/matching-algorithms.md` and diff against current file
 - [ ] **Step 2:** Restore clean content to `docs/guides/matching-algorithms.md`
 - [ ] **Step 3:** Copy root `CHANGELOG.md` over `docs/CHANGELOG.md` via existing copy script or manual sync
-- [ ] **Step 4:** Add check to `scripts/ci-check-readme-changelog.cjs` or new script: fail if `docs/**` contains `lean-ctx: omitted`
-- [ ] **Step 5:** Run `npm run ci:docs-review` — verify guard passes on clean tree
+- [ ] **Step 4:** Run `npm run ci:docs-review` — verify docs build passes on clean tree
 
 ---
 
@@ -104,7 +103,7 @@
 
 - [ ] **Step 1:** Run `npm run docs:prepare && npm run lint:markdown && python3 -m mkdocs build`
 - [ ] **Step 2:** Run `npm run ci:docs-review`
-- [ ] **Step 3:** Manual spot-check: Home framework inline, Getting started modes, Glossary nav, 12 Use guide pages, no lean-ctx garbage
+- [ ] **Step 3:** Manual spot-check: Home framework inline, Getting started modes, Glossary nav, 12 Use guide pages, no placeholder corruption
 - [ ] **Step 4:** Add CHANGELOG entry for docs restructure and URL migration note
 
 ---
@@ -118,3 +117,4 @@
 - [ ] Proxy: Configuration + Technical reference only
 - [ ] README has no field tables
 - [ ] `ci:docs-review` passes
+

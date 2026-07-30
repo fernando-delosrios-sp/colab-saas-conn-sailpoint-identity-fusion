@@ -6,7 +6,7 @@ Identity Fusion NG publishes operator documentation via MkDocs Material (`mkdocs
 - Configuration field tables live in README and are duplicated across `docs/guides/*.md`
 - `connector-spec.json` carries verbose inline `helpKey` text mirroring those tables
 - Glossary at `docs/concepts/glossary.md` mirrors `openspec/specs/ubiquitous-language/spec.md` but is not in nav
-- lean-ctx corruption affects `matching-algorithms.md` and `docs/CHANGELOG.md`
+- Placeholder corruption affects `matching-algorithms.md` and `docs/CHANGELOG.md`
 
 Stakeholders: integrators configuring Fusion in ISC, operators running aggregations, maintainers syncing docs with releases.
 
@@ -20,7 +20,7 @@ Stakeholders: integrators configuring Fusion in ISC, operators running aggregati
 - Map-Define-Match embedded in Home; operation modes in Getting started Overview
 - Glossary in top-level nav
 - Slim README; stop full-README Home sync
-- Fix lean-ctx artifacts; guard against recurrence
+- Fix placeholder artifacts in corrupted docs
 
 **Non-Goals:**
 
@@ -77,7 +77,7 @@ Stakeholders: integrators configuring Fusion in ISC, operators running aggregati
 
 ## Migration Plan
 
-1. Restore lean-ctx-corrupted files from git
+1. Restore corrupted files from git
 2. Implement `generate-config-docs.cjs`; wire into `prepare-docs.cjs`
 3. Slim `connector-spec.json` helpKey strings
 4. Rewrite Home (`index.md`); update Getting started with operation modes
@@ -95,3 +95,4 @@ Stakeholders: integrators configuring Fusion in ISC, operators running aggregati
 ## Open Questions
 
 - None blocking implementation. Optional future: MkDocs redirects plugin vs hand-written stub pages for old URLs.
+

@@ -3,9 +3,7 @@
 ## Purpose
 
 The form service (`src/services/formService/`) builds the SailPoint form payloads that the connector sends when requesting access changes. It owns the friendly-algorithm name catalog (kept in sync with `connector-spec.json`), the request/response types (`src/services/formService/types.ts`), and the helpers that build, validate, and serialize form submissions. This spec defines the contract between the form definitions configured by integrators and the JSON the connector actually transmits to IdentityIQ / ISC.
-
 ## Requirements
-
 ### Requirement: Form payloads MUST be built from the configured form definitions
 
 The form service MUST construct outgoing form payloads from the operator-configured form definitions rather than synthesizing them ad-hoc. The friendly-algorithm name catalog MUST be kept in sync with `connector-spec.json` so that any algorithm name used in a form definition resolves to the same name the connector advertises.
@@ -122,4 +120,36 @@ When `getOrCreateFormDefinition` attempts to create a form definition and the IS
 - **WHEN** FormService handles the error in `getOrCreateFormDefinition`
 - **THEN** it SHALL invoke `getFormDefinitionByName('N')` again
 - **AND** if a definition is found, it SHALL be returned without rethrowing the create error
+
+### Requirement: Review forms SHALL localize to defaultLanguage when localization is enabled
+
+When `enableLocalization` is true, the form service MUST translate user-facing review form strings (section labels, descriptions, toggle labels, helpText, score display text) using `locales.ts` and `translate()`. The locale MUST come from `resolveFormLocale(config)` which uses `defaultLanguage` only — NOT `identityLanguageAttribute`. When localization is disabled, forms MUST remain English.
+
+#### Scenario: Localization enabled with French defaultLanguage
+
+- **GIVEN** `enableLocalization` is true and `defaultLanguage` is `fr`
+- **WHEN** `FormService` creates a fusion review form definition
+- **THEN** translatable form field labels and helpText MUST be French from `locales.ts`
+
+#### Scenario: Localization disabled
+
+- **GIVEN** `enableLocalization` is false
+- **WHEN** `FormService` creates a form definition
+- **THEN** form strings MUST be English
+
+#### Scenario: Unsupported defaultLanguage falls back to English
+
+- **GIVEN** `enableLocalization` is true and `defaultLanguage` is unsupported
+- **WHEN** a form definition is built
+- **THEN** strings MUST fall back to English via `translate()`
+
+### Requirement: Form locale dictionary keys SHALL cover all formBuilder user-facing strings
+
+`locales.ts` MUST define `form_*` keys for every user-facing literal in `formBuilder.ts` (toggle configs, section descriptions by source type, decision labels, identity select helpText, score fragments, parameterized headers). Each key MUST exist in all ten supported locales.
+
+#### Scenario: formBuilder uses translate for all user-facing strings
+
+- **GIVEN** localization is enabled with `defaultLanguage` `es`
+- **WHEN** `buildFormFields` runs with locale `es`
+- **THEN** no hardcoded English user-facing literals MUST remain outside `translate()` / `translateWithParams()`
 

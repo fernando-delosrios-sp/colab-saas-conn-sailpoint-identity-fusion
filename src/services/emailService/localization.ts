@@ -65,6 +65,15 @@ export function resolveIdentityLanguageRaw(
     return undefined
 }
 
+/** Returns the locale for review forms from defaultLanguage when localization is enabled. */
+export function resolveFormLocale(config: LocalizationConfig): string {
+    if (!isLocalizationEnabled(config)) {
+        return 'en'
+    }
+
+    return normalizeLanguageCode(config.defaultLanguage) || 'en'
+}
+
 /**
  * Resolves the effective locale for user communications from config and optional identity attributes.
  * Returns `'en'` when localization is disabled or no supported language is found.
@@ -125,3 +134,4 @@ export function decisionLabelKey(decisionType: string): string {
     if (decisionType === 'create-new-identity') return 'decision_create_new'
     return 'decision_no_match'
 }
+

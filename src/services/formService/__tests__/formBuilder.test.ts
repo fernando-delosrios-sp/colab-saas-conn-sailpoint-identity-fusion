@@ -1,4 +1,6 @@
-import { buildCandidateConditions, buildCandidateFields, buildFormConditions, buildFormInput, buildFormInputs } from '../formBuilder'
+import { buildCandidateConditions, buildCandidateFields, buildFormConditions, buildFormFields, buildFormInput, buildFormInputs } from '../formBuilder'
+import { SourceType } from '../../../model/config'
+import { resolveFormLocale } from '../../emailService/localization'
 import { buildCandidateList } from '../helpers'
 
 describe('formBuilder conditions', () => {
@@ -167,3 +169,53 @@ describe('buildFormInputs candidates alignment', () => {
         expect(flat.candidates).toBe('')
     })
 })
+
+describe('buildFormFields localization', () => {
+    const fusionAccount = {
+        sourceName: 'HR Source',
+        name: 'Jane Doe',
+        managedAccountId: 'acct-1',
+        attributes: { email: 'jane@example.com' },
+    } as any
+
+    const candidates = [
+        {
+            id: 'identity-1',
+            name: 'Jane Candidate',
+            attributes: { email: 'jane@example.com' },
+            scores: [],
+        },
+    ] as any
+
+    it('localizes form labels to French when locale is fr', () => {
+        const fields = buildFormFields(fusionAccount, candidates, ['Email'], SourceType.Authoritative, 'fr')
+        const decisions = fields.find((f) => f.key === 'identitiesSection')
+        const toggle = (decisions?.config as any)?.formElements?.[0]?.config?.columns?.[0]?.[0]
+        expect(toggle?.config?.label).toBe('Nouvelle identité')
+    })
+
+    it('localizes form labels to Spanish when locale is es', () => {
+        const fields = buildFormFields(fusionAccount, candidates, ['Email'], SourceType.Authoritative, 'es')
+        const decisions = fields.find((f) => f.key === 'identitiesSection')
+        const toggle = (decisions?.config as any)?.formElements?.[0]?.config?.columns?.[0]?.[0]
+        expect(toggle?.config?.label).toBe('Nueva identidad')
+    })
+
+    it('uses English labels when locale is en', () => {
+        const fields = buildFormFields(fusionAccount, candidates, ['Email'], SourceType.Authoritative, 'en')
+        const decisions = fields.find((f) => f.key === 'identitiesSection')
+        const toggle = (decisions?.config as any)?.formElements?.[0]?.config?.columns?.[0]?.[0]
+        expect(toggle?.config?.label).toBe('New identity')
+    })
+
+    it('uses English labels when localization is disabled even if defaultLanguage is fr', () => {
+        const locale = resolveFormLocale({ enableLocalization: false, defaultLanguage: 'fr' })
+        expect(locale).toBe('en')
+
+        const fields = buildFormFields(fusionAccount, candidates, ['Email'], SourceType.Authoritative, locale)
+        const decisions = fields.find((f) => f.key === 'identitiesSection')
+        const toggle = (decisions?.config as any)?.formElements?.[0]?.config?.columns?.[0]?.[0]
+        expect(toggle?.config?.label).toBe('New identity')
+    })
+})
+

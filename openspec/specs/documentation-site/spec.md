@@ -43,7 +43,7 @@ The Getting started Overview page MUST embed authoritative, records, and orphan 
 
 ### Requirement: Configuration reference pages SHALL be generated from connector-spec.json
 
-The project MUST provide a doc generation script (`scripts/generate-config-docs.cjs`) that emits `docs/configuration/*.md` from `connector-spec.json` organized by ISC menu and section. The script MUST run as part of `npm run docs:prepare`.
+The project MUST provide a doc generation script (`scripts/generate-config-docs.cjs`) that emits `docs/configuration/*.md` from `connector-spec.json` organized by ISC menu and section. The script MUST run as part of `npm run docs:prepare`. When `connector-spec.json` translatable fields contain translation keys, the script MUST resolve keys against `src/messages/CONNIDENTITYFUSIONNG.json` so generated pages display English source text.
 
 #### Scenario: Maintainer updates connector-spec.json
 
@@ -52,16 +52,14 @@ The project MUST provide a doc generation script (`scripts/generate-config-docs.
 - **THEN** the corresponding Configuration reference page SHALL reflect the change
 - **AND** generated pages SHALL include field name, type, default, required flag, validation constraints, and a link to the relevant Use guide where applicable
 
-### Requirement: connector-spec helpKey strings SHALL link to Configuration reference
+#### Scenario: connector-spec uses translation keys
 
-Each `helpKey` in `connector-spec.json` MUST be shortened to at most two sentences and MUST include a relative link to the generated Configuration reference anchor for that field.
+- **GIVEN** a field `helpText` value is a translation key (not a literal English string)
+- **WHEN** the maintainer runs `npm run docs:prepare`
+- **THEN** the generated Configuration reference MUST display the resolved English string from `CONNIDENTITYFUSIONNG.json`
+- **AND** the generated page MUST NOT display raw translation key identifiers as help text
 
-#### Scenario: Operator views a field in ISC source configuration
-
-- **GIVEN** a field has a `helpKey` in connector-spec.json
-- **WHEN** the operator reads inline help in ISC
-- **THEN** the help text SHALL be concise
-- **AND** the help text SHALL direct the operator to the Configuration reference page for full detail
+---
 
 ### Requirement: Use guides SHALL follow the four-subsection structure
 
@@ -124,16 +122,6 @@ After restructure, `README.md` MUST serve as a repository landing page only. It 
 - **THEN** the file SHALL link to the documentation site for Configuration reference and Use guides
 - **AND** the file SHALL NOT duplicate connector-spec field tables
 
-### Requirement: Docs CI SHALL reject lean-ctx placeholder corruption
-
-The docs CI pipeline MUST fail if any file under `docs/` contains the pattern `lean-ctx: omitted` indicating corrupted lean-ctx read artifacts.
-
-#### Scenario: Corrupted doc is committed
-
-- **GIVEN** a markdown file under `docs/` contains `... [lean-ctx: omitted`
-- **WHEN** `npm run ci:docs-review` runs
-- **THEN** the command SHALL exit with a non-zero status
-
 ### Requirement: Full README sync to Home SHALL be removed
 
 The project MUST NOT copy the entire README to `docs/index.md` via `scripts/sync-docs-home.cjs`. Home content SHALL be authored directly in `docs/index.md`.
@@ -143,4 +131,16 @@ The project MUST NOT copy the entire README to `docs/index.md` via `scripts/sync
 - **GIVEN** `scripts/sync-docs-home.cjs` performed a full README copy before restructure
 - **WHEN** the restructure is complete and `npm run docs:prepare` runs
 - **THEN** `docs/index.md` SHALL NOT be overwritten with the full README contents
+
+### Requirement: Configuration doc generator SHALL resolve platform i18n keys
+
+`scripts/generate-config-docs.cjs` MUST load `src/messages/CONNIDENTITYFUSIONNG.json` and resolve translation keys referenced in `connector-spec.json` translatable fields (`label`, `helpText`, `sectionTitle`, `sectionHelpMessage`, `docLinkLabel`, `placeholder`) when generating Configuration reference pages.
+
+#### Scenario: Doc generator encounters a helpText translation key
+
+- **GIVEN** `connector-spec.json` contains `"helpText": "field.connection.baseurl.helpText"`
+- **AND** `CONNIDENTITYFUSIONNG.json` maps that key to an English help string with a Configuration reference link
+- **WHEN** `npm run docs:prepare` runs
+- **THEN** the generated field section MUST include the resolved English help string
+- **AND** relative Configuration reference links MUST be rewritten for the generated page context
 

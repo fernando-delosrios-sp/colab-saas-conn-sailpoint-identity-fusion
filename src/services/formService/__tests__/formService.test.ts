@@ -1,6 +1,7 @@
 import { FormService } from '../formService'
 import { FusionRun } from '../../../model/fusionRun'
 import { FusionAccount } from '../../../model/account'
+import { SourceType } from '../../../model/config'
 import { analyzeFormInstances, extractAccountIdFromInstance } from '../formInstanceAnalyzer'
 
 /** Minimal client.call mock that supports sequential pagination used by form instance fetch. */
@@ -515,7 +516,7 @@ describe('FormService createFusionForm', () => {
         const sources = {
             fusionSourceId: 'fusion-src',
             fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
-            getSourceByNameSafe: vi.fn().mockReturnValue({ sourceType: 'Authoritative' }),
+            getSourceByNameSafe: vi.fn().mockReturnValue({ sourceType: SourceType.Authoritative }),
         }
 
         const fusionAccount = FusionAccount.fromManagedAccount({
@@ -564,6 +565,82 @@ describe('FormService createFusionForm', () => {
         expect(run.formsCreated).toBe(1)
         expect(run.formInstancesCreated).toBe(1)
         expect(createFormInstance).toHaveBeenCalledTimes(1)
+    })
+
+    it('builds English form definition when localization is disabled despite defaultLanguage fr', async () => {
+        FusionAccount.configure({ sources: ['Source A'] } as any)
+
+        const createFormDefinition = vi.fn().mockResolvedValue({ data: { id: 'form-def-1', name: 'Fusion Review' } })
+        const createFormInstance = vi.fn().mockResolvedValue({
+            data: { id: 'inst-1', standAloneFormUrl: 'https://review/1' },
+        })
+        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({ data: { results: [] } })
+        const searchFormInstancesByTenant = vi.fn().mockResolvedValue({ data: [] })
+
+        const customFormsMock = {
+            createFormDefinition,
+            createFormInstance,
+            searchFormDefinitionsByTenant,
+            searchFormInstancesByTenant,
+        }
+
+        const run = new FusionRun()
+        const sources = {
+            fusionSourceId: 'fusion-src',
+            fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
+            getSourceByNameSafe: vi.fn().mockReturnValue({ sourceType: SourceType.Authoritative }),
+        }
+
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'acct-1',
+            nativeIdentity: 'native-1',
+            name: 'Test User',
+            sourceId: 'source-a-id',
+            sourceName: 'Source A',
+            attributes: { email: 'user@example.com' },
+        } as any)
+        fusionAccount.addFusionMatch({
+            fusionIdentity: {
+                identityId: 'candidate-1',
+                attributes: { displayName: 'Candidate One', email: 'candidate@example.com' },
+            },
+            scores: [{ attribute: 'email', algorithm: 'lig3', score: 85, fusionScore: 50 }],
+        } as any)
+
+        const reviewer = FusionAccount.fromIdentity({
+            id: 'reviewer-1',
+            name: 'Reviewer',
+            attributes: { email: 'reviewer@example.com' },
+        } as any)
+
+        const service = new FormService(
+            {
+                fusionFormNamePattern: 'Fusion Review',
+                fusionFormExpirationDays: 7,
+                fusionFormAttributes: ['Email'],
+                fusionMaxCandidatesForForm: 10,
+                enableLocalization: false,
+                defaultLanguage: 'fr',
+            } as any,
+            { warn: vi.fn(), debug: vi.fn(), info: vi.fn() } as any,
+            {
+                customFormsApi: customFormsMock,
+                call: createFormClientCallMock(customFormsMock),
+            } as any,
+            sources as any,
+            undefined,
+            undefined,
+            run
+        )
+
+        await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        expect(createFormDefinition).toHaveBeenCalledTimes(1)
+        const formElements = createFormDefinition.mock.calls[0][0].body.formElements
+        const identitiesSection = formElements.find((element: { key?: string }) => element.key === 'identitiesSection')
+        const toggle = identitiesSection?.config?.formElements?.[0]?.config?.columns?.[0]?.[0]
+        expect(toggle?.config?.label).toBe('New identity')
+        expect(createFormDefinition.mock.calls[0][0].body.description).toContain('Review potential matching identity')
     })
 })
 
@@ -625,6 +702,7 @@ describe('formInstanceAnalyzer', () => {
         expect(result.instancesToProcess).toHaveLength(1)
     })
 })
+
 
 
 

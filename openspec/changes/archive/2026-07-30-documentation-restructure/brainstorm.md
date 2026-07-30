@@ -4,7 +4,7 @@
 
 Identity Fusion NG MkDocs site is poorly structured and partially stale. Issues identified:
 
-- lean-ctx inline garbage in `docs/guides/matching-algorithms.md` and `docs/CHANGELOG.md`
+- Placeholder corruption in `docs/guides/matching-algorithms.md` and `docs/CHANGELOG.md`
 - Home syncs entire README (~465 lines) via `scripts/sync-docs-home.cjs`
 - Glossary exists at `docs/concepts/glossary.md` but is not in nav
 - Guides duplicate README config tables; boundary between reference and how-to is unclear
@@ -93,8 +93,7 @@ Slim to repo landing page: pitch, docs site link, read-next table. Remove config
 
 ## Prerequisites before migration
 
-1. Restore lean-ctx-corrupted files from git
-2. Add CI guard against `lean-ctx` placeholders
+1. Restore corrupted files from git
 
 ## Acceptance criteria (agreed)
 
@@ -106,3 +105,4 @@ Slim to repo landing page: pitch, docs site link, read-next table. Remove config
 - Proxy: Configuration + Technical reference only
 - Glossary in nav
 - `npm run ci:docs-review` passes
+

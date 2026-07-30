@@ -5,6 +5,24 @@ import { IscApiAdapter } from '../clientService/iscApiAdapter'
 import { FusionConfig } from '../../model/config'
 import { createTestRegistry } from '../../operations/__tests__/harness/testRegistry'
 
+vi.mock('../clientService/sdkApiAdapter', () => ({
+    SdkApiAdapter: class MockSdkApiAdapter {
+        config = {}
+        accountsApi = {}
+        identitiesApi = {}
+        searchApi = {}
+        sourcesApi = {}
+        customFormsApi = {}
+        workflowsApi = {}
+        entitlementsApi = {}
+        transformsApi = {}
+        governanceGroupsApi = {}
+        taskManagementApi = {}
+        identityProfilesApi = {}
+        identityAttributesApi = {}
+    },
+}))
+
 function minimalConfig(overrides: Partial<FusionConfig> = {}): FusionConfig {
     return {
         sources: [{ name: 'fusion', correlationMode: 'none' }],
@@ -75,4 +93,5 @@ describe('ServiceRegistry.activateDryRunMode', () => {
         expect(inner.accountsApi.updateAccount).not.toHaveBeenCalled()
     })
 })
+
 

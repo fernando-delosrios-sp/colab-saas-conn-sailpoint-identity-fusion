@@ -5,6 +5,7 @@ import { SourceType } from '../../model/config'
 import { FusionAttribute } from '../../data/schema'
 import { capitalizeFirst } from '../../utils/attributes'
 import { trimStr } from '../../utils/safeRead'
+import { translate, translateWithParams } from '../emailService/localization'
 import { ALGORITHM_LABELS } from './constants'
 import { Candidate, Score } from './types'
 
@@ -62,27 +63,42 @@ function getManagedAccountIdentifier(fusionAccount: FusionAccount): string {
 /**
  * Formats match score rows for form defaults: Value (raw) and Score (weighted partial), or combined row.
  */
-function formatScoreDisplay(score: Score): string {
-    if (score.skipped) return 'Skipped (missing value)'
+function formatScoreDisplay(score: Score, locale = 'en'): string {
+    if (score.skipped) return translate('form_score_skipped', locale)
     const algo = String(score.algorithm ?? '')
     if (algo === 'weighted-mean' || algo === 'average') {
         const s = Number(score.score)
         const t = score.fusionScore
-        const scoreStr = Number.isFinite(s) ? String(parseFloat(s.toFixed(2))) : 'N/A'
-        if (t !== undefined && t !== null) return `Score: ${scoreStr} [${t}]`
-        return `Score: ${scoreStr}`
+        const scoreStr = Number.isFinite(s) ? String(parseFloat(s.toFixed(2))) : translate('not_available', locale)
+        if (t !== undefined && t !== null) {
+            return translateWithParams('form_score_only_with_fusion', locale, {
+                score: scoreStr,
+                fusionScore: String(t),
+            })
+        }
+        return translateWithParams('form_score_only', locale, { score: scoreStr })
     }
     const raw = Number(score.score)
     const w = score.weightedScore
     const t = score.fusionScore
     const rawStr = Number.isFinite(raw) ? parseFloat(raw.toFixed(2)) : undefined
     if (rawStr !== undefined && typeof w === 'number' && Number.isFinite(w)) {
-        return `Value: ${rawStr} | Score: ${parseFloat(w.toFixed(2))} [${t}]`
+        return translateWithParams('form_score_value_combined', locale, {
+            value: String(rawStr),
+            score: String(parseFloat(w.toFixed(2))),
+            fusionScore: String(t),
+        })
     }
     if (rawStr !== undefined && t !== undefined && t !== null) {
-        return `Value: ${rawStr} [${t}]`
+        return translateWithParams('form_score_value_fusion', locale, {
+            value: String(rawStr),
+            fusionScore: String(t),
+        })
     }
-    return `Value: ${rawStr ?? 'N/A'}`
+    if (rawStr !== undefined) {
+        return translateWithParams('form_score_value_only', locale, { value: String(rawStr) })
+    }
+    return translate('form_score_value_na', locale)
 }
 
 /**
@@ -99,26 +115,33 @@ function hasRenderableCandidateElements(candidate: Candidate, fusionFormAttribut
  * Returns the TOGGLE element config for the "New identity" / "No match" decision,
  * which varies by source type.
  */
-function getToggleConfig(sourceType: SourceType): ToggleConfig {
+function getToggleConfig(sourceType: SourceType, locale = 'en'): ToggleConfig {
     if (sourceType === SourceType.Authoritative) {
         return {
-            label: 'New identity',
+            label: translate('form_toggle_new_identity', locale),
             default: false,
-            trueLabel: 'True',
-            falseLabel: 'False',
-            helpText: 'Select this if the account is a new identity',
+            trueLabel: translate('form_toggle_true', locale),
+            falseLabel: translate('form_toggle_false', locale),
+            helpText: translate('form_toggle_help_new_identity', locale),
         }
     }
     return {
-        label: 'No match',
+        label: translate('form_toggle_no_match', locale),
         default: false,
-        trueLabel: 'True',
-        falseLabel: 'False',
+        trueLabel: translate('form_toggle_true', locale),
+        falseLabel: translate('form_toggle_false', locale),
         helpText:
             sourceType === SourceType.Record
-                ? 'Select this if the record does not match any existing identity'
-                : 'Select this if the orphan account does not match any existing identity',
+                ? translate('form_toggle_help_no_match_record', locale)
+                : translate('form_toggle_help_no_match_orphan', locale),
     }
+}
+
+function algorithmLabel(algorithmKey: string, locale: string): string {
+    const normalized = algorithmKey.replace(/-/g, '_')
+    const key = `algorithm_${normalized}`
+    const translated = translate(key, locale)
+    return translated !== key ? translated : ALGORITHM_LABELS[algorithmKey] ?? algorithmKey
 }
 
 // ============================================================================
@@ -131,7 +154,8 @@ function getToggleConfig(sourceType: SourceType): ToggleConfig {
 export const buildCandidateFields = (
     candidate: Candidate,
     _index: number,
-    fusionFormAttributes?: string[]
+    fusionFormAttributes?: string[],
+    locale = 'en'
 ): FormElementV2025[] => {
     if (!candidate?.id || !candidate.name) return []
 
@@ -158,9 +182,8 @@ export const buildCandidateFields = (
             key: `${candidateId}.scoreDetailsHeader`,
             elementType: 'DESCRIPTION',
             config: {
-                description:
-                    '<p style="text-align: center;"><span style="font-size: 18pt;"><strong>Fusion Score details</strong></span></p>',
-                label: 'Fusion Score Details',
+                description: translate('form_fusion_score_details_header', locale),
+                label: translate('form_fusion_score_details_label', locale),
                 showLabel: false,
             },
             validations: [],
@@ -171,7 +194,7 @@ export const buildCandidateFields = (
             const attrName = String(score.attribute)
             const attrKey = lowerFirst(attrName)
             const algorithmKey = String(score.algorithm ?? 'unknown')
-            const algorithm = ALGORITHM_LABELS[algorithmKey] ?? algorithmKey
+            const algorithm = algorithmLabel(algorithmKey, locale)
 
             candidateElements.push({
                 id: `${candidateId}.${attrKey}.${algorithmKey}.score`,
@@ -180,7 +203,7 @@ export const buildCandidateFields = (
                 config: {
                     label: capitalizeFirst(attrName),
                     helpText: algorithm,
-                    default: formatScoreDisplay(score),
+                    default: formatScoreDisplay(score, locale),
                 },
                 validations: [],
             })
@@ -286,7 +309,8 @@ export const buildFormInput = (
     fusionAccount: FusionAccount,
     candidates: Candidate[],
     fusionFormAttributes?: string[],
-    sourceType: SourceType = SourceType.Authoritative
+    sourceType: SourceType = SourceType.Authoritative,
+    locale = 'en'
 ): Record<string, string> => {
     const managedAccountIdentifier = getManagedAccountIdentifier(fusionAccount)
 
@@ -344,7 +368,7 @@ export const buildFormInput = (
             if (score.attribute && score.score !== undefined) {
                 const attrKey = lowerFirst(String(score.attribute))
                 const algorithmKey = String(score.algorithm ?? 'unknown')
-                formInput[`${candidateId}.${attrKey}.${algorithmKey}.score`] = formatScoreDisplay(score)
+                formInput[`${candidateId}.${attrKey}.${algorithmKey}.score`] = formatScoreDisplay(score, locale)
             }
         }
     }
@@ -359,7 +383,8 @@ export const buildFormFields = (
     fusionAccount: FusionAccount,
     candidates: Candidate[],
     fusionFormAttributes?: string[],
-    sourceType: SourceType = SourceType.Authoritative
+    sourceType: SourceType = SourceType.Authoritative,
+    locale = 'en'
 ): FormElementV2025[] => {
     const formFields: FormElementV2025[] = []
 
@@ -382,12 +407,9 @@ export const buildFormFields = (
 
     if (topSectionElements.length > 0) {
         const sectionDescriptions: Record<SourceType, string> = {
-            [SourceType.Authoritative]:
-                'A potential matching identity has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or choose to create a new identity.',
-            [SourceType.Record]:
-                'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
-            [SourceType.Orphan]:
-                'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
+            [SourceType.Authoritative]: translate('form_section_desc_authoritative', locale),
+            [SourceType.Record]: translate('form_section_desc_record', locale),
+            [SourceType.Orphan]: translate('form_section_desc_orphan', locale),
         }
 
         formFields.push({
@@ -398,7 +420,9 @@ export const buildFormFields = (
                 alignment: 'CENTER',
                 description: sectionDescriptions[sourceType],
                 formElements: topSectionElements,
-                label: `Fusion review required for ${fusionAccount.sourceName}`,
+                label: translateWithParams('form_review_required_header', locale, {
+                    sourceName: fusionAccount.sourceName ?? '',
+                }),
                 labelStyle: 'h2',
                 showLabel: true,
             },
@@ -430,7 +454,7 @@ export const buildFormFields = (
                                     id: 'newIdentity',
                                     key: 'newIdentity',
                                     elementType: 'TOGGLE',
-                                    config: getToggleConfig(sourceType),
+                                    config: getToggleConfig(sourceType, locale),
                                     validations: [],
                                 },
                             ],
@@ -451,10 +475,10 @@ export const buildFormFields = (
                                             dataSourceType: 'SEARCH_V2',
                                         },
                                         forceSelect: true,
-                                        label: 'Existing identity',
+                                        label: translate('form_existing_identity', locale),
                                         maximum: 1,
                                         required: false,
-                                        helpText: 'Select the identity the account is part of',
+                                        helpText: translate('form_existing_identity_help', locale),
                                         placeholder: null,
                                     },
                                     validations: [],
@@ -462,14 +486,14 @@ export const buildFormFields = (
                             ],
                         ],
                         description: '',
-                        label: 'Decisions',
+                        label: translate('form_decisions', locale),
                         labelStyle: 'h5',
                         showLabel: false,
                     },
                     validations: [],
                 },
             ],
-            label: 'Fusion decision',
+            label: translate('form_fusion_decision', locale),
             labelStyle: 'h3',
             showLabel: true,
         },
@@ -479,7 +503,7 @@ export const buildFormFields = (
     // Candidate sections: one per candidate
     candidates.forEach((candidate, index) => {
         if (!candidate?.id || !candidate.name) return
-        const candidateElements = buildCandidateFields(candidate, index, fusionFormAttributes)
+        const candidateElements = buildCandidateFields(candidate, index, fusionFormAttributes, locale)
 
         if (candidateElements.length > 0) {
             formFields.push({
@@ -489,7 +513,7 @@ export const buildFormFields = (
                 config: {
                     alignment: 'CENTER',
                     formElements: candidateElements,
-                    label: `${candidate.name} details`,
+                    label: translateWithParams('form_candidate_details', locale, { name: candidate.name }),
                     labelStyle: 'h4',
                     showLabel: true,
                 },
@@ -562,7 +586,8 @@ export const buildFormConditions = (candidates: Candidate[], fusionFormAttribute
 export const buildFormInputs = (
     fusionAccount: FusionAccount,
     candidates: Candidate[],
-    fusionFormAttributes?: string[]
+    fusionFormAttributes?: string[],
+    locale = 'en'
 ): FormDefinitionInputV2025[] => {
     const managedAccountIdentifier = getManagedAccountIdentifier(fusionAccount)
 
@@ -657,11 +682,12 @@ export const buildFormInputs = (
                 id: `${candidateId}.${attrKey}.${algorithmKey}.score`,
                 type: 'STRING',
                 label: `${candidateId}.${attrKey}.${algorithmKey}.score`,
-                description: formatScoreDisplay(score),
+                description: formatScoreDisplay(score, locale),
             })
         }
     }
 
     return formInputs
 }
+
 
