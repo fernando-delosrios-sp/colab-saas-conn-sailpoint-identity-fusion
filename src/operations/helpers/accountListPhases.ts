@@ -490,8 +490,8 @@ export async function reportEpilogue(
     serviceRegistry: ServiceRegistry,
     options: ReportEpilogueOptions
 ): Promise<unknown | undefined> {
-    const { log, timer } = serviceRegistry
-    const { isPersistent, dryRun, fetchResult, outputCount } = options
+    const { log } = serviceRegistry
+    const { isPersistent, dryRun, fetchResult, outputCount, timer } = options
     let deferredError: unknown
 
     log.epilogueStart('report')
@@ -518,6 +518,7 @@ export async function reportEpilogue(
     log.epilogueEnd('report')
     return deferredError
 }
+
 
 
 
