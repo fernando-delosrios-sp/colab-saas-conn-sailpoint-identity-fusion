@@ -93,6 +93,70 @@ export class FusionAccount {
     // Factory methods
     // ============================================================================
 
+    private static applyAttributeCollections(fa: FusionAccount, account: Account): void {
+        const statuses = attributeToSet(account.attributes!, FusionAttribute.Statuses)
+        if (statuses.has(StatusEntitlement.Baseline)) {
+            fa.collections._internal_sources.add(IDENTITIES_SOURCE_NAME)
+        }
+
+        fa._attributeBag.current = { ...account.attributes! }
+        fa._attributeBag.previous = { ...account.attributes! }
+
+        fa.collections._internal_missingAccountIds.clear()
+        const missingAccountIds = attributeToSet(account.attributes!, FusionAttribute.MissingAccounts)
+        for (const id of missingAccountIds) fa.collections._internal_missingAccountIds.add(id)
+
+        fa.collections._clearReviews()
+        const reviews = attributeToSet(account.attributes!, FusionAttribute.Reviews)
+        for (const r of reviews) fa.collections._internal_reviews.add(r)
+
+        const statusesSet = attributeToSet(account.attributes!, FusionAttribute.Statuses)
+        for (const s of statusesSet) fa.collections._internal_statuses.add(s)
+
+        const actionsSet = attributeToSet(account.attributes!, FusionAttribute.Actions)
+        for (const a of actionsSet) fa.collections._internal_actions.add(a)
+
+        const prevAccounts = attributeToSet(account.attributes!, FusionAttribute.Accounts)
+        fa.collections._setPreviousAccountIds(prevAccounts)
+    }
+
+    private static applyOriginMetadata(
+        fa: FusionAccount,
+        account: Account,
+        identityInfo: ReturnType<typeof buildIdentityInfo>
+    ): void {
+        const originSource = getAccountStringAttribute(account, FusionAttribute.OriginSource)
+        if (originSource) fa.layers.originSource = originSource
+
+        const originAccount = getAccountStringAttribute(account, FusionAttribute.OriginAccount)
+        if (originAccount) {
+            const normalizedOriginAccount = normalizeCompositeManagedAccountKey(originAccount)
+            const trimmedOriginAccount = originAccount.trim()
+            fa.layers.originAccount = normalizedOriginAccount ?? (trimmedOriginAccount || undefined)
+        }
+
+        const fromIdentity =
+            fa.layers.originSource === IDENTITIES_SOURCE_NAME ||
+            fa._attributeBag.current?.originSource === IDENTITIES_SOURCE_NAME ||
+            fa._attributeBag.current?.sourceOrigin === IDENTITIES_SOURCE_NAME
+        if (fromIdentity && !fa.collections.statusesSet.has(StatusEntitlement.Baseline)) {
+            fa.collections._internal_statuses.add(StatusEntitlement.Baseline)
+            fa.collections._internal_sources.add(IDENTITIES_SOURCE_NAME)
+        }
+
+        if (!identityInfo?.id) {
+            const identityId = getAccountStringAttribute(account, FusionAttribute.IdentityId)
+            if (identityId && identityId.trim().length > 0) {
+                fa.setIdentityIdAttribute(identityId.trim())
+            }
+        }
+
+        const historyAttr = getAccountAttribute(account, FusionAttribute.History)
+        if (Array.isArray(historyAttr) && historyAttr.length > 0) {
+            fa.collections.historyOps.importFromArray(historyAttr)
+        }
+    }
+
     static fromFusionAccount(account: Account): FusionAccount {
         const config = this.ensureConfig()
         const fa = new FusionAccount(config)
