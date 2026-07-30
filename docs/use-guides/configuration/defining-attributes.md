@@ -34,23 +34,23 @@ The **Define** step controls how attributes are generated using Apache Velocity 
 
 ## Per-attribute definition configuration
 
-For each attribute you want to generate, add an **Attribute Definition**:
+Add each attribute under **Normal Attribute Definitions** or **Unique Attribute Definitions**. Look up field keys, types, and defaults in the [Configuration reference](../../configuration/definition.md).
 
-| Field                                 | Type                | Purpose                                                                                       | Options / Example                                                                                                                                                                                                                                                 |
-| ------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Attribute Name**                    | String (required)   | Name of generated attribute                                                                   | `username`, `uuid`, `employeeNumber`, `fullName`, `formattedHireDate`                                                                                                                                                                                             |
-| **Apache Velocity expression**        | String (required)   | Template to compute value (required for both Normal and Unique)                               | `#set($i=$firstname.substring(0,1))$i$lastname` for Normal; same with `$counter` appended for Unique                                                                                                                                                              |
-| **Definition section**                | Required            | Add the definition under **Normal Attribute Definitions** or **Unique Attribute Definitions** | **Normal** (standard computed attribute) or **Unique** (must be unique across accounts). UUID and incremental counter are sub-modes of **Unique**: include `$UUID` in the expression for UUID generation; toggle **Use incremental counter?** for sequential IDs. |
-| **Case selection**                    | Dropdown (required) | Text case transformation                                                                      | Do not change, Lower case, Upper case, Capitalize                                                                                                                                                                                                                 |
-| **Counter start value**               | Integer             | Starting number when **Use incremental counter?** is on (Unique definitions only)             | 1, 1000, 50000                                                                                                                                                                                                                                                    |
-| **Minimum counter digits**            | Integer             | Zero-padding for the counter (Unique definitions only)                                        | 3 → `001`, `002`; 5 → `00001`                                                                                                                                                                                                                                     |
-| **Maximum length**                    | Integer (optional)  | Truncate to this length                                                                       | 20; counter preserved at end for Unique                                                                                                                                                                                                                           |
-| **Normalize special characters?**     | Boolean             | Remove special chars/quotes                                                                   | Yes for usernames/IDs                                                                                                                                                                                                                                             |
-| **Remove spaces?**                    | Boolean             | Remove all whitespace                                                                         | Yes for usernames/IDs                                                                                                                                                                                                                                             |
-| **Trim leading and trailing spaces?** | Boolean             | Strip leading/trailing whitespace                                                             | Yes for most attributes                                                                                                                                                                                                                                           |
-| **Use incremental counter?**          | Boolean (optional)  | Unique definitions only: when `true`, `$counter` always increments instead of resetting on collision | Yes for counters that must never reuse a value; No (default) for collision-based disambiguation                                                                                                                                                                   |
-| **Refresh on each aggregation?**      | Boolean             | Recalculate every aggregation (Normal definitions only)                                               | Yes if dynamic; No if stable                                                                                                                                                                                                                                      |
-| **Static**                            | Boolean             | Evaluate only when attribute has no value (Normal definitions only)                           | Yes for immutable attributes; overrides **Refresh on each aggregation?**                                                                                                                                                                                          |
+| You configure | Start here |
+| --- | --- |
+| Name, Velocity expression, static, refresh | [Normal definitions — Attribute Definition](../../configuration/definition.md#name) |
+| Case, normalize, spaces, trim, max length | [Transformations](../../configuration/definition.md#case) |
+| Unique IDs, counter, UUID, incremental counter | [Unique definitions](../../configuration/definition.md#maxattempts) |
+| Global unique retry cap | [Maximum attempts](../../configuration/definition.md#maxattempts) |
+
+**Common patterns:**
+
+| Goal | Section | Expression hint |
+| --- | --- | --- |
+| Full name (dynamic) | Normal | `$firstname $lastname` with **Refresh on each aggregation?** = Yes |
+| Username with collision handling | Unique | `#set($i=$firstname.substring(0,1))$i$lastname` + transforms |
+| Immutable UUID | Unique | `$UUID` |
+| Sequential employee number | Unique | `EMP-$counter` with **Use incremental counter?** = Yes |
 
 **Screenshot placeholder:** Attribute Definition with examples.
 Attribute definition example
@@ -185,125 +185,132 @@ Counter start: 1000, Digits: 5
 
 ## Apache Velocity context
 
-The **Apache Velocity expression** field provides a powerful templating language with access to utilities and data.
+The **Apache Velocity expression** field provides a templating language with access to utilities and data. For the complete API catalog, see [Velocity context reference](../../reference/velocity-context.md).
 
 ### Available data
 
-<!-- markdownlint-disable MD038 -->
+Templates combine mapped attributes, identity fields, and account snapshots. Definitions run **top to bottom** — each result is available to the next.
 
-| Source                                                | What you can access                                                                                                                                                                                                                                                                                                                                                                                                                 | Example                                                                           |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| **Mapped account attributes**                         | All attributes from Attribute Mapping                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `$jobTitle`, `$department`, `$email`                                              |
-| **Source account attributes**                         | Direct source attributes (if no mapping)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `$firstname`, `$lastname`, `$hireDate`                                            |
-<!-- prettier-ignore -->
-| **Identity attributes** | When Include identities = Yes. `$identity.name` is the root identity name. `$name` falls back to the identity name for identity-origin accounts when no mapped attribute named `name` exists. | `$identity.name`, `$identity.employeeNumber`, `$name` |
-| **$accounts**                                         | Managed account snapshots: source **`attributes`** plus nested **`source`** (`id`, `name` — managed accounts only for `id`), nested **`schema`** (`id` = native identity, `name` = display name), and **`IIQDisabled`**. The top-level **`$originAccount`** is the composite `sourceId::nativeIdentity` key for the origin row only. Ordered by configured source order, then account insertion order within each source, then unknown sources appended. If `mainAccount` contains a valid managed account key, that account is moved to index 0.                                                                                                     | `$accounts[0].source.name`, `$accounts[0].schema.name`, `$accounts[0].schema.id`  |
-| **$sources**                                          | Map of source name → list of managed account snapshots (the same shape as `$accounts[]` entries). Access with dot access, e.g. `$sources.SourceName`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `$sources.Workday`                                                              |
-| **$previous**                                         | Previous generated account state                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `$previous.username`                                                              |
-| **$originSource**                                     | Source that originally created the Fusion account (when available)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | `Identities`, `Workday`                                                           |
-| **$originAccount**                                    | String id of the identity or managed account that originally created the Fusion account (same as the `originAccount` attribute). For managed origins this is the composite `sourceId::nativeIdentity`; for identity origins this is the identity id.                                                                                                                                                                                                                                                                                                                                                                                                  | Use as a scalar in expressions                                                    |
-| **$account**                                          | Snapshot for the origin only: same shape as `$accounts[]` entries when the origin is a managed account; when the origin is **Identities** and identity attributes are available, identity-origin fields are used first (then synthetic identity row if needed). Use **`$originAccount`** for the composite key or identity id string. Rows from the Identities source use **`source.name`** = **`Identities`** (no `source.id`) and **`schema`** for display name and id; `$account.name` is also available for identity-origin rows. Note: `$account` is the origin snapshot — when `mainAccount` points elsewhere, `$accounts[0]` will differ from `$account`. | `$originAccount`, `$account.schema.name`, `$account.source.name`, `$account.name` |
-| **Special variables**                                 | `$counter` (Unique type, collision mode renders empty on first try, padded suffix on subsequent attempts; auto-append is skipped when the expression uses Velocity directives), `${UUID}` (Unique type, fresh v4 per attempt when referenced; collision resolution regenerates the UUID instead of auto-appending `$counter`), `$isUnique(value)` (Unique type, returns true if the value is not already registered)                                                                                                                                                                                                         | `$counter` in expression for Unique type                                          |
+```mermaid
+flowchart LR
+    subgraph inputs [What you can read]
+        M["Mapped attrs<br/>$email, $jobTitle"]
+        I["$identity"]
+        A["$accounts / $account"]
+        S["$sources"]
+        P["$previous"]
+    end
+    inputs --> V[Your expression]
+    V --> O[Defined value]
+```
 
-<!-- markdownlint-enable MD038 -->
+#### Quick reference
+
+| Access | Use it for | Example |
+| --- | --- | --- |
+| `$firstname`, `$email` | Mapped (or raw source) attributes | `$firstname $lastname` |
+| `$identity.*` | Identity fields when scope includes identities | `$identity.name` |
+| `$accounts[n]` | Managed accounts in source order | `$accounts[0].schema.id` |
+| `$sources.SourceName` | Accounts grouped by source | `$sources.Workday[0].jobTitle` |
+| `$account` | The **origin** snapshot only | `$account.schema.name` |
+| `$originAccount` | Origin key string | Managed: `sourceId::nativeId` |
+| `$previous.*` | Last generated Fusion state | `$previous.username` |
+
+#### Mapped attributes
+
+Reference mapped names after **Map** is configured: `$jobTitle`, `$department`, `$email`. Without mapping, use raw source names: `$firstname`, `$hireDate`.
+
+#### Identity attributes
+
+When **Include identities in the scope** is on:
+
+| Variable | Meaning |
+| --- | --- |
+| `$identity.name` | Root identity name |
+| `$identity.<attr>` | Any identity attribute |
+| `$name` | Falls back to identity name when no mapped `name` exists (identity-origin rows) |
+
+#### `$accounts` — all linked managed accounts
+
+Each entry includes source attributes plus nested metadata:
+
+| Part | Key fields |
+| --- | --- |
+| Attributes | All fields from the managed account |
+| `source.id` / `source.name` | Source identifier (`id` absent for Identities rows) |
+| `schema.id` / `schema.name` | Native identity and display name |
+| `IIQDisabled` | Disabled flag when present |
+
+**Order:** configured sources → insertion order within each source → unknown sources last. When `mainAccount` is set, that account moves to index `0`.
+
+!!! tip "$accounts[0] is not always the origin"
+    `$accounts[0]` follows **source configuration order**. `$account` is always the **origin** row. When `mainAccount` differs from the origin, use `$account` for origin-specific logic.
+
+```velocity
+$accounts[0].source.name
+$accounts[0].schema.id
+```
+
+#### `$sources` — same data, grouped by source name
+
+```velocity
+$sources.Workday[0].jobTitle
+$sources.ActiveDirectory.size()
+```
+
+#### Origin fields
+
+| Variable | Description |
+| --- | --- |
+| `$originSource` | Source that created the Fusion account (`Identities`, `Workday`, …) |
+| `$originAccount` | Key string — managed: `sourceId::nativeIdentity`; identity: identity id |
+| `$account` | Full origin snapshot (same shape as `$accounts[]`); for Identities origin use `$account.name` and `source.name = Identities` |
+
+#### `$previous`
+
+Prior Fusion account values — useful for one-time assignments or change detection.
+
+#### Unique-only helpers
+
+| Variable | Behavior |
+| --- | --- |
+| `$counter` | Collision suffix for Unique definitions (auto-appended unless you use `#if` / `#set` directives) |
+| `$UUID` | Fresh v4 UUID per attempt |
+| `$isUnique(value)` | Test whether a candidate value is already taken |
+
+See [Unique type](#unique-type) above for collision and `$isUnique` examples.
 
 ### Available utilities
 
-#### $Math (JavaScript Math object)
+Helper objects are injected into every expression. Common patterns:
 
-Standard mathematical operations (`$Math.round(x)`, `$Math.floor(x)`, `$Math.ceil(x)`, `$Math.max(a, b)`, `$Math.min(a, b)`, `$Math.abs(x)`).
+| Helper | Typical use | Example |
+| --- | --- | --- |
+| `$Math` | Numeric operations | `$Math.floor(x)` |
+| `$Datefns` | Format and compare dates | `$Datefns.format($hireDate, 'yyyy-MM-dd')` |
+| `$Normalize` | Phone, date, name, address, ASCII | `$Normalize.phone($phone, "GB")` |
+| `$AddressParse` | State/region code lookup | `$AddressParse.getStateCode("California", "US")` |
+| `$JSON` | Parse or stringify JSON | `$JSON.parse($payload)` |
+| `$MD5` | Deterministic hash id | `$MD5($email)` |
 
-#### $Datefns (date-fns library)
-
-Advanced date formatting and manipulation (`$Datefns.format(date, format)`, `$Datefns.parse(date, format)`, `$Datefns.addDays(date, n)`, `$Datefns.differenceInDays(date1, date2)`, etc.).
-
-#### $AddressParse (address parsing)
-
-Parse and normalize US addresses (`$AddressParse.getCityState(city)`, `$AddressParse.parse(address)`).
-
-Additional geo lookup helpers:
-
-- `$AddressParse.getStateName(code, country)` — looks up the full state or region name for a code. Returns the empty string for unknown codes or unsupported countries. Supported country codes: `"US"`, `"GB"`, `"UK"` (alias for GB).
-- `$AddressParse.getStateCode(name, country)` — looks up the ISO code for a state or region name (case-insensitive). Returns the empty string for unknown names or unsupported countries. Supported country codes: `"US"`, `"GB"`, `"UK"`.
+#### Examples you will use often
 
 ```velocity
-## Code to full name
-$AddressParse.getStateName("NY", "US")        ## "New York"
-$AddressParse.getStateName("LND", "GB")       ## "Greater London"
-$AddressParse.getStateName("LND", "UK")       ## "Greater London" (UK alias)
+## Full name
+$firstname $lastname
 
-## Name to ISO code
-$AddressParse.getStateCode("New York", "US")          ## "NY"
-$AddressParse.getStateCode("new york", "US")          ## "NY" (case-insensitive)
-$AddressParse.getStateCode("Greater London", "GB")    ## "LND"
-$AddressParse.getStateCode("Atlantis", "US")          ## "" (unknown)
+## Formatted date
+$Datefns.format($hireDate, 'MMMM dd, yyyy')
+
+## Normalized username base
+$Normalize.ascii($firstname, "de")$Normalize.ascii($lastname, "de")
+
+## US address state code
+$Normalize.address("$city, $state $zip", "US")
 ```
 
-> **Note:** `$AddressParse.getCityState` and `$AddressParse.getCityStateCode` are deprecated because city names alone can collide across states (for example, there are Springfields in many US states). Prefer the explicit state/region lookups above for unambiguous results.
-
-#### $Normalize (data normalization)
-
-Standardize common data formats (`$Normalize.phone(number)`, `$Normalize.date(date)`, `$Normalize.name(name)`).
-`Normalize.phone` also accepts an optional default country code for local numbers, for example: `$Normalize.phone($phone, "GB")`. If the phone string already includes an international prefix (for example `+1`), that explicit prefix is used instead of the default.
-For ambiguous numeric dates, `Normalize.date` accepts an optional priority argument:
-`$Normalize.date($birthDate, "dd-MM-yyyy,MM-dd-yyyy")` (default) or
-`$Normalize.date($birthDate, "MM-dd-yyyy,dd-MM-yyyy")`.
-
-`Normalize.address(address, country?)` parses and reformats an address. The optional `country` parameter defaults to `"US"`. Supported country codes are `"US"`, `"GB"`, and `"UK"` (alias for GB). For US addresses, the fallback normalizes a full state name to its 2-letter code (for example `"California"` → `"CA"`). For UK addresses, the fallback normalizes a full region name or 3-letter region code (for example `"Greater London"` → `"LND"`). Unsupported country codes return the trimmed original address.
-
-```velocity
-## US: full state name is normalized to ISO code
-$Normalize.address("Los Angeles, California 90001", "US")
-## "Los Angeles, CA 90001"
-
-## US: 2-letter code is preserved
-$Normalize.address("Seattle, WA 98101", "US")
-## "Seattle, WA 98101"
-
-## UK: full region name is normalized to region code
-$Normalize.address("London, Greater London SW1A 2AA", "GB")
-## "London, LND SW1A 2AA"
-
-## UK alias works the same as GB
-$Normalize.address("London, Greater London SW1A 2AA", "UK")
-
-## Unsupported country: returns trimmed original
-$Normalize.address("Toronto, Ontario M5H 2N2", "CA")
-## "Toronto, Ontario M5H 2N2"
-```
-
-`Normalize.ascii(input, language?)` transliterates non-ASCII characters to their ASCII equivalents. The optional `language` parameter enables language-specific digraph rules. Supported languages: `"de"` (German: ä→ae, ö→oe, ü→ue, ß→ss), `"no"` (Norwegian), `"da"` (Danish), and `"sv"` (Swedish: ä→ae, ö→oe, å→aa, ø→oe). When no language is provided or the language is unrecognized, the helper falls back to generic transliteration (strips diacritics: ä→a, é→e, etc.). Output is always lowercase; chain with `$Normalize.name()` for proper-casing.
-
-```velocity
-## German (DACH) digraph rules
-$Normalize.ascii("Müller", "de")
-## "mueller"
-
-## Chain with Normalize.name for proper-casing
-$Normalize.name($Normalize.ascii("MÜLLER", "de"))
-## "Mueller"
-
-## Nordic digraph rules (Norwegian, Danish, Swedish)
-$Normalize.ascii("Søren Østergaard", "no")
-## "soeren oestergaard"
-
-## Generic transliteration fallback (no language)
-$Normalize.ascii("José García")
-## "jose garcia"
-```
-
-#### $MD5 (hashing)
-
-Compute a lowercase hex MD5 digest of a string: `$MD5($email)`.
-
-Returns an empty string for null, undefined, non-string, or whitespace-only input (the attribute value is not written).
-
-> **Note:** Use `$MD5` for deterministic identifiers compatible with downstream systems — not for password or secret hashing. MD5 is cryptographically weak and unsuitable for security-sensitive use.
-
-```velocity
-$MD5($email)
-## "b58996c504c5638798eb6b511e6f49af" when $email is "user@example.com"
-```
+!!! note "Full helper API"
+    Method signatures, optional parameters, and edge-case behavior for every helper are documented in [Velocity context reference](../../reference/velocity-context.md#available-utilities).
 
 ---
 
@@ -356,5 +363,6 @@ One can purposely generate an **empty** `nativeIdentity` in conjunction with the
   $email
 #end
 ```
+
 
 

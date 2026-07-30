@@ -34,16 +34,16 @@ Developer Settings provide tools for testing, troubleshooting, and monitoring.
 
 ### Configuration fields
 
-| Field                                            | Type     | Purpose                                                                                        | Default                                                | Risk level                                    |
-| ------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------- |
-| **Reset accounts?**                              | Boolean  | Clear Fusion account data and emit zero accounts on the next aggregation (rebuild on the following run) | No                                                     | ⚠️ **HIGH** — Deletes all Fusion account data |
-| **Reset forms?**                                 | Boolean  | Delete all Fusion review form definitions on the next aggregation                                       | No                                                     | Medium — removes pending and completed review forms |
-| **Managed accounts batch size**                  | Number   | Number of uncorrelated managed accounts per batch                                              | 100                                                    | Low                                           |
-| **Force attribute refresh on next aggregation?** | Boolean  | Recalculate Normal-type attributes on the next aggregation only (auto-disabled after that run) | No                                                     | Medium                                        |
-| **Enable concurrency check?**                    | Boolean  | Prevent concurrent aggregations                                                                | Yes                                                    | Low                                           |
-| **Enable external logging?**                     | Boolean  | Send connector logs to external endpoint                                                       | No                                                     | Low                                           |
-| **External logging URL**                         | URL      | Endpoint for external log aggregation                                                          | None                                                   | Low (if endpoint secured)                     |
-| **External logging level**                       | Dropdown | Minimum log level to send                                                                      | None                                                   | Low                                           |
+See [Advanced Settings — Developer Settings](../../configuration/advanced.md) for types, defaults, and conditionals. Fields covered in this guide:
+
+| Field | Reference | Risk |
+| --- | --- | --- |
+| Reset accounts? | [#resetaccounts](../../configuration/advanced.md#resetaccounts) | High — clears Fusion account data |
+| Reset forms? | [#resetforms](../../configuration/advanced.md#resetforms) | Medium — deletes review forms |
+| Force attribute refresh | [#forceattributerefresh](../../configuration/advanced.md#forceattributerefresh) | Medium — one-run Normal recalc |
+| Enable concurrency check? | [#concurrencycheckenabled](../../configuration/advanced.md#concurrencycheckenabled) | Low |
+| Managed accounts batch size | [#managedaccountsbatchsize](../../configuration/advanced.md#managedaccountsbatchsize) | Low |
+| External logging | [#externalloggingenabled](../../configuration/advanced.md#externalloggingenabled) | Low |
 
 **Screenshot placeholder:** Developer Settings interface.
 
@@ -606,6 +606,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](../../reference/proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md).
+
 
 
 

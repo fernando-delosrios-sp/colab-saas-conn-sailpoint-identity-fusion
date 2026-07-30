@@ -75,6 +75,8 @@ For authoritative, Records, and Orphan source-type details, see [Getting started
 | **Records (register-only)** | Generate and register unique attribute values (for example usernames or employee IDs) from a source without creating Fusion accounts or identities. |
 | **Orphan (match-only)** | Use supplemental directory data to improve Match scoring without ever creating identities from that source. |
 
+For full **Authoritative**, **Records**, and **Orphan** source-type behavior, see [Getting started — Operation modes](./getting-started/overview.md#operation-modes).
+
 ## Read next
 
 | Step | Resource |
@@ -107,3 +109,4 @@ For authoritative, Records, and Orphan source-type details, see [Getting started
 6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
 
 See [First aggregation](./getting-started/first-aggregation.md) for the full checklist.
+
