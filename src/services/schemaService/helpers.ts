@@ -26,6 +26,29 @@ export const attributeDefinitionToSchemaAttribute = (
     }
 }
 
+/** Minimal logger interface for optional dedupe diagnostics. */
+export type SchemaAttributeDedupeLog = { debug: (message: string) => void }
+
+/**
+ * Deduplicates schema attributes by case-insensitive name, keeping the first encountered variant.
+ */
+export const dedupeSchemaAttributesByName = (
+    attributes: SchemaAttribute[],
+    log?: SchemaAttributeDedupeLog
+): SchemaAttribute[] => {
+    const seen = new Map<string, SchemaAttribute>()
+    for (const attribute of attributes) {
+        if (!attribute.name || attribute.name.trim() === '') continue
+        const key = attribute.name.toLowerCase()
+        if (seen.has(key)) {
+            log?.debug(`Skipping duplicate schema attribute "${attribute.name}" (keeping "${seen.get(key)!.name}")`)
+            continue
+        }
+        seen.set(key, attribute)
+    }
+    return Array.from(seen.values())
+}
+
 export const apiSchemaToAccountSchema = (apiSchema: SchemaV2025): AccountSchema => {
     const attributes = (apiSchema.attributes ?? [])
         .map((x) => attributeDefinitionToSchemaAttribute(x))
@@ -39,3 +62,4 @@ export const apiSchemaToAccountSchema = (apiSchema: SchemaV2025): AccountSchema 
 
     return accountSchema
 }
+

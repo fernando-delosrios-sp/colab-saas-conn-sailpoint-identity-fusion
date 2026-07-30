@@ -3,11 +3,7 @@
 ## Purpose
 
 The schema service (`src/services/schemaService/`) defines the connector's account schemas. It owns the `AccountSchema` and `SchemaAttribute` types, the `fusionAccountSchemaAttributes` catalog in `src/data/schema.ts`, and the `FusionAttribute` TypeScript enum that mirrors it. The enum must be a string-valued mirror of the catalog (excluding `name` and `id`) so that code can refer to attributes by a stable, type-checked symbol. This spec defines the contract between the catalog data, the enum, and the schema descriptions the connector advertises to SailPoint.
-
 ## Requirements
-
-
-
 ### Requirement: FusionAttribute enum exists
 
 The connector MUST export a TypeScript `enum` named `FusionAttribute` from `src/data/schema.ts`. The enum MUST be string-valued, and the runtime value of each member MUST equal the `name` of a corresponding entry in `fusionAccountSchemaAttributes`. The enum MUST NOT include `name` or `id`.
@@ -101,4 +97,36 @@ When `SchemaService.getFusionAttributeSubset` builds the platform-facing attribu
 - **WHEN** `getFusionAttributeSubset` is called
 - **THEN** the input attribute bag MUST NOT be mutated
 - **AND** only the returned subset object reflects omitted keys
+
+### Requirement: Schema attributes deduplicated case-insensitively
+
+The schema service MUST deduplicate `SchemaAttribute` entries by case-insensitive name. When two or more attributes share the same lowercase name, the service MUST retain the first attribute encountered in processing order and MUST discard all subsequent variants without merging their metadata.
+
+#### Scenario: Managed source and identity attribute name collision
+
+- **GIVEN** a managed source account schema containing attribute `firstname`
+- **AND** identity schema attributes containing attribute `FirstName`
+- **WHEN** `SchemaService.buildDynamicSchema` constructs the dynamic `AccountSchema`
+- **THEN** the returned schema MUST contain exactly one attribute whose lowercase name is `firstname`
+- **AND** that attribute MUST be the first variant encountered in merge order
+
+#### Scenario: Multiple casing variants within one source
+
+- **GIVEN** a managed source account schema containing both `Username` and `username`
+- **WHEN** `SchemaService.buildDynamicSchema` constructs the dynamic `AccountSchema`
+- **THEN** the returned schema MUST contain exactly one attribute whose lowercase name is `username`
+- **AND** that attribute MUST be the first variant from the source attribute list
+
+#### Scenario: Schema ingestion deduplicates input attributes
+
+- **GIVEN** an input `AccountSchema` whose `attributes` array contains both `LastName` and `lastname`
+- **WHEN** `SchemaService.setFusionAccountSchema` is called with that schema
+- **THEN** internal schema attribute name lists MUST contain exactly one entry whose lowercase name is `lastname`
+- **AND** `getFusionAttributeSubset` MUST NOT emit both `LastName` and `lastname` keys for the same logical attribute
+
+#### Scenario: No duplicate lowercase names in output
+
+- **GIVEN** any combination of fusion, managed, identity, mapping, definition, and reverse-correlation attributes with case-insensitive overlaps
+- **WHEN** `SchemaService.buildDynamicSchema` returns
+- **THEN** no two entries in `attributes` MAY share the same lowercase `name`
 

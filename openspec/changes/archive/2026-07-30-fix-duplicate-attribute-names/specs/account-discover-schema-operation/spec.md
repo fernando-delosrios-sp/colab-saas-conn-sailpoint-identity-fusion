@@ -1,19 +1,4 @@
-# account-discover-schema Spec
-
-## Purpose
-
-The account-discover-schema operation returns the account schema used by ISC. This spec defines the contract for schema discovery behavior.
-## Requirements
-### Requirement: Schema discovery returns account schema
-The system SHALL return the account schema definition when the account-discover-schema operation is invoked.
-
-#### Scenario: Successful schema discovery
-- **WHEN** the account-discover-schema operation is invoked
-- **THEN** the system SHALL return the complete account schema with all attribute definitions
-
-#### Schema discovery with custom attributes
-- **WHEN** the account-discover-schema operation is invoked with custom attribute configurations
-- **THEN** the system SHALL return the schema including custom attribute definitions
+## ADDED Requirements
 
 ### Requirement: Discovered schema has no case-insensitive duplicate attribute names
 
@@ -31,4 +16,3 @@ The account-discover-schema operation MUST return a schema whose attribute list 
 - **GIVEN** a connector deployment where schema discovery previously failed due to case-insensitive duplicate attribute names
 - **WHEN** the account-discover-schema operation is invoked with the fixed connector
 - **THEN** the returned schema MUST be valid for ISC schema registration (no case-insensitive name collisions)
-
