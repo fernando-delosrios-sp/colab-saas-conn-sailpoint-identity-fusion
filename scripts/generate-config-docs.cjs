@@ -63,7 +63,7 @@ const USE_GUIDE_BY_SECTION = {
         path: '../use-guides/configuration/review-forms-and-reviewers.md',
         blurb: 'Manual review forms, reviewer assignment, and decision workflows.',
     },
-    'Proxy Settings': {
+    'External Settings': {
         title: 'Proxy deployment',
         path: '../reference/proxy-mode.md',
         blurb: 'Self-hosted proxy architecture and setup (technical reference).',
@@ -523,4 +523,5 @@ function main() {
 }
 
 main()
+
 

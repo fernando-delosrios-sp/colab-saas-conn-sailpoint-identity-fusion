@@ -196,7 +196,7 @@ const scope = loadInitialValues('scopeSettings.ts')
 const processing = loadInitialValues('processingControlSettings.ts')
 const attributeMapping = loadInitialValues('attributeMappingDefinitionsSettings.ts')
 const developer = loadInitialValues('developerSettings.ts')
-const proxy = loadInitialValues('proxySettings.ts')
+const external = loadInitialValues('externalSettings.ts')
 const uniqueDefs = loadInitialValues('uniqueAttributeDefinitionsSettings.ts')
 const normalDefs = loadInitialValues('normalAttributeDefinitionsSettings.ts')
 const sources = loadInitialValues('sourcesSettings.ts')
@@ -217,7 +217,7 @@ const merged = {
     processingWait: advancedConnection.processingWait,
     heartbeatInterval: advancedConnection.heartbeatInterval,
     ...developer,
-    ...proxy,
+    ...external,
     ...uniqueDefs,
     ...normalDefs,
     algorithm: matching.algorithm,
@@ -228,5 +228,6 @@ const merged = {
 const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'))
 spec.sourceConfigInitialValues = merged
 fs.writeFileSync(specPath, JSON.stringify(spec, null, 4) + '\n', 'utf8')
+
 
 
