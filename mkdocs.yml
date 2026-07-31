@@ -2,6 +2,7 @@ site_name: Identity Fusion NG Documentation
 site_description: Identity Fusion NG usage guides and operations reference
 site_url: https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/
 repo_url: https://github.com/fernando-delosrios-sp/colab-saas-conn-sailpoint-identity-fusion
+edit_uri: edit/2.2.0/preview/docs/
 site_dir: site
 docs_dir: docs
 exclude_docs: README.md
@@ -21,7 +22,6 @@ theme:
         - toc.follow
     icon:
         edit: material/pencil
-    edit_uri: edit/main/docs/
 
 nav:
     - Home: index.md
@@ -92,6 +92,7 @@ markdown_extensions:
               - name: mermaid
                 class: mermaid
                 format: !!python/name:pymdownx.superfences.fence_code_format
+
 
 
 

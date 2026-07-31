@@ -21,16 +21,17 @@ flowchart LR
     ID --> Map
     Map --> Define
     Define --> Match
-    Match --> OUT[Fusion accounts / identities]
-    Define --> REC[Record unique registration]
-    Match --> ORP[Orphan drop or disable]
+    Match --> FA[Fusion account]
+    Match --> FR[Fusion review]
+    Match --> AM[Fusion auto merge]
+    Match --> DROP[Orphan or record drop]
 ```
 
-| Step | Purpose | Records / Orphan behavior |
-| --- | --- | --- |
-| **Map** | Align managed account attributes with your Fusion account schema and merge values from multiple sources. | Runs for all source types, including **Records** and **Orphan** sources. |
-| **Define** | Create derived attributes, unique identifiers, UUIDs, and Velocity-based transformations. | **Records** sources register unique values without creating Fusion accounts. **Orphan** sources use Define output only when a match exists. |
-| **Match** | Compare Fusion accounts to identities in scope using similarity rules and optional manual review. | **Records** can optionally participate in Match scoring. **Orphan** sources never create identities for non-matched rows. |
+| Step | Purpose | Authoritative accounts | Orphan accounts | Records |
+| --- | --- | --- | --- | --- |
+| **Map** | Align managed account attributes with your Fusion account schema and merge values from multiple sources. | Full Map feeds Define and Match for identity lifecycle decisions. | Map prepares supplemental attributes used during Match. | Map runs; attributes feed Define and optional Match. |
+| **Define** | Create derived attributes, unique identifiers, UUIDs, and Velocity-based transformations. | Normal and Unique definitions evaluated before Match scoring. | Define output used only when a match exists. | Unique values registered; non-matched rows do not emit Fusion accounts. |
+| **Match** | Compare Fusion accounts to identities in scope using similarity rules and optional manual review. | Outcomes: Fusion account, Fusion review, Fusion auto merge, or new identity when Fusion is authoritative. | Non-matched rows dropped (optional disable on managed source); never create identities. | Optional Match participation; non-matched rows register unique values and drop. |
 
 ### Map (Consolidation)
 
@@ -114,6 +115,7 @@ For full **Authoritative**, **Records**, and **Orphan** source-type behavior, se
 6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
 
 See [Use guides — First aggregation checklist](./use-guides/index.md#first-aggregation-checklist) for the full checklist.
+
 
 
 
