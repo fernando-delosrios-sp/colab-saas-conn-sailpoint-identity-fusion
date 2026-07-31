@@ -213,6 +213,24 @@ The ubiquitous language spec MUST define **umbrella mode**, **side-car mode**, *
 - **THEN** both terms MUST have distinct definitions
 - **AND** definitions MUST clarify when identity scope is optional
 
+### Requirement: Correlated entitlement and correlate action are defined as a pair
+
+The ubiquitous language SHALL define **correlated entitlement** (outcome: all managed source accounts correlated with the Fusion identity) and **correlate action** (enforcement: direct PATCH of missing managed accounts when the platform assigns correlated entitlement to an account that lacks it) as linked terms. Documentation and specs SHALL use **correlated entitlement**, not informal synonyms such as "derived correlated".
+
+#### Scenario: Spec references correlated outcome
+
+- **GIVEN** a specification describes when the `correlated` action entitlement appears on a Fusion account
+- **WHEN** the spec is reviewed against this ubiquitous-language spec
+- **THEN** it SHALL use the term **correlated entitlement**
+- **AND** SHALL state that presence means all managed source accounts are correlated with the Fusion identity
+
+#### Scenario: Spec references correlate enforcement on assignment
+
+- **GIVEN** a specification describes platform assignment of the correlated entitlement on account create or update
+- **WHEN** the spec is reviewed against this ubiquitous-language spec
+- **THEN** it SHALL use the term **correlate action**
+- **AND** SHALL describe direct PATCH of missing managed source accounts as the enforcement mechanism
+
 ## Canonical Terms
 
 ### Account taxonomy
@@ -325,7 +343,8 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 |---|---|---|
 | **FusionReport** | `report` | Assign to trigger generation of a Fusion report for this account. |
 | **Fusion** | `fusion` | Assign to mark this as a Fusion account. |
-| **Correlated** | `correlated` | Set by the connector when all managed source accounts for this Fusion account have been correlated. Triggers correlation of missing source accounts when assigned externally. |
+| **Correlated entitlement** | `correlated` | The action entitlement present on a Fusion account when all managed source accounts for that Fusion identity are correlated with the Fusion identity. Evaluated on every Fusion account build; absent when any managed source account remains in `missing-accounts`. |
+| **Correlate action** | `correlate` / `correlated` (Add) | When the platform assigns the correlated entitlement to a Fusion account that lacks it, the connector runs the correlate action: direct identity correlation (ISC PATCH) for missing managed source accounts on provisioning paths until the correlated entitlement outcome is achieved or missing accounts remain. |
 | **Reviewer** | `reviewer:<sourceId>` | Assign to designate an identity as a reviewer for a specific managed source. The suffix identifies the source. The `reviewer` status entitlement is also set on the reviewer's Fusion account to mark their role. |
 
 #### Status entitlements
@@ -439,6 +458,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Correlate missing accounts on aggregation** | Correlation mode where the connector directly links uncorrelated managed source accounts to their Fusion identity via the ISC API during processing. |
 | **Reverse correlation** | Correlation mode where the connector creates a dedicated attribute on the managed source containing the Fusion identity ID, then ISC's correlation rule matches accounts to identities. Requires a correlation attribute name and display name. |
 | **Correlation attribute** | The attribute name used for reverse correlation on the managed source schema. Must be unique and not overlap with mapped or defined attributes. |
+| **Reverse-correlation attribute** | A Fusion account attribute value written for a reverse-correlation source, keyed by the source's `correlationAttribute`, linking the Fusion identity to managed source accounts. Managed on every Fusion account build so rebuild/remap steps do not permanently clobber established values. |
 | **Deferred candidate matching** | Per-source toggle that controls whether a managed source account is compared to other provisional Fusion accounts from the same source in the same run. When enabled, if the only strong match is a deferred candidate, identity creation is deferred. Disable when one person may appear as multiple accounts in a single aggregation. |
 | **Include record accounts in Match** | Per-source toggle for Record-type sources. When enabled, record accounts participate in Match scoring against identities and deferred candidates. When disabled, they only run Map and Define and register unique attributes. |
 | **Disable non-matching accounts** | Per-source toggle for Orphan-type sources. When enabled, orphan accounts that no longer match any identity are automatically disabled after aggregation. |
@@ -454,7 +474,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **External logging level** | The minimum severity for logs sent to the external endpoint. Options: Error, Warn, Info, Debug. |
 | **Concurrency check** | A safeguard that prevents overlapping connector aggregations from running simultaneously. Controlled by **Enable concurrency check?** in Developer Settings. |
 | **Priority processing** | When enabled, the connector expedites its processing queue. Controlled by **Enable priority processing?** in Developer Settings. |
-| **Cascade aggregation** | When enabled, single-account operations (e.g., accountRead) trigger aggregation of managed sources before fetching account data. Ensures up-to-date source data. |
+| **Cascade aggregation** | When `cascadeAggregationEnabled` is true, single-account operations (e.g., accountRead) trigger managed-source aggregation for sources referenced by the Fusion account before fetching managed account data. Per-source cascade failures are logged and the operation continues with available data. |
 | **Provisioning timeout** | The maximum time (in seconds) to wait for a provisioning operation (create, update, enable, disable) to complete. |
 | **Localized user communications** | When enabled, review forms and emails use the reviewer's preferred language. Requires an identity attribute specifying the language code. |
 | **Governance group** | An ISC group assigned to source governance. Members of this group are eligible as global reviewers when **Owners are global reviewers?** is enabled. |

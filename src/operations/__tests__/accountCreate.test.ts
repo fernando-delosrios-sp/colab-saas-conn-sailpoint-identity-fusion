@@ -1,6 +1,7 @@
 import { accountCreate } from '../accountCreate'
 import { executeActions } from '../actions'
 import { StatusEntitlement } from '../../model/statusEntitlement'
+import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 
 vi.mock('../actions', () => ({
     executeActions: vi.fn(),
@@ -42,6 +43,13 @@ function createRegistry() {
     log.metric = vi.fn()
 
     return registry
+}
+
+function mockCrashThrows(registry: ReturnType<typeof createRegistry>) {
+    const log = registry.log as any
+    log.crash = vi.fn((message: string) => {
+        throw new ConnectorError(message, ConnectorErrorType.Generic)
+    })
 }
 
 describe('accountCreate', () => {
@@ -114,4 +122,52 @@ describe('accountCreate', () => {
         expect(registry.identities.fetchIdentityByName).toHaveBeenCalledWith('Alice Doe')
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-created' })
     })
+
+    it('fails with observable message when identity is not found', async () => {
+        const registry = createRegistry()
+        mockCrashThrows(registry)
+        registry.identities.fetchIdentityByName = vi.fn().mockResolvedValue(undefined)
+
+        await expect(
+            accountCreate(registry, {
+                schema: { attributes: [] },
+                attributes: { name: 'Missing User' },
+            } as any)
+        ).rejects.toMatchObject({ message: 'Identity not found: Missing User' })
+
+        expect(registry.res.send).not.toHaveBeenCalled()
+    })
+
+    it('fails with observable message when schema is missing', async () => {
+        const registry = createRegistry()
+        mockCrashThrows(registry)
+
+        await expect(accountCreate(registry, { attributes: { name: 'Alice Doe' } } as any)).rejects.toMatchObject({
+            message: 'Account schema is required',
+        })
+
+        expect(registry.res.send).not.toHaveBeenCalled()
+    })
+
+    it('fails with observable message for unsupported action', async () => {
+        const registry = createRegistry()
+        mockCrashThrows(registry)
+        const { executeActions: realExecuteActions } = await vi.importActual<typeof import('../actions')>(
+            '../actions'
+        )
+        vi.mocked(executeActions).mockImplementation(realExecuteActions)
+
+        await expect(
+            accountCreate(registry, {
+                schema: { attributes: [] },
+                attributes: {
+                    name: 'Alice Doe',
+                    actions: ['unknown-action'],
+                },
+            } as any)
+        ).rejects.toMatchObject({ message: 'Unsupported action: unknown-action' })
+
+        expect(registry.res.send).not.toHaveBeenCalled()
+    })
 })
+

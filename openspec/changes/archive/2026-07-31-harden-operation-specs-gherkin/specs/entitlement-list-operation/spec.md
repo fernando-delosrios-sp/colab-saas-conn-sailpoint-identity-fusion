@@ -1,9 +1,13 @@
-# entitlement-list Spec
+## REMOVED Requirements
 
-## Purpose
+### Requirement: Entitlement list returns all entitlements
 
-The entitlement-list operation returns entitlement objects for aggregation. This spec defines the contract for entitlement listing behavior.
-## Requirements
+**Reason**: Replaced with type-split status vs action catalog contract.
+
+**Migration**: Use ADDED requirements in this change.
+
+## ADDED Requirements
+
 ### Requirement: Entitlement list returns static status entitlements without API calls
 
 When invoked with `type: status`, the entitlement-list operation SHALL stream static status entitlements from connector definitions without additional ISC API calls.
@@ -36,4 +40,3 @@ When invoked with an unsupported `type` value, the entitlement-list operation SH
 - **GIVEN** a valid connector configuration
 - **WHEN** the entitlement-list operation is invoked with an unsupported `type`
 - **THEN** the operation SHALL fail with a ConnectorError whose message matches `Invalid entitlement type <type>`
-

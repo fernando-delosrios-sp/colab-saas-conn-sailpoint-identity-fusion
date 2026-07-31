@@ -1,9 +1,13 @@
-# test-connection Spec
+## REMOVED Requirements
 
-## Purpose
+### Requirement: Test connection validates connector initialization
 
-The test-connection operation validates connector initialization and required service access. This spec defines the contract for connectivity validation behavior.
-## Requirements
+**Reason**: Replaced with conditional validation scenarios aligned to implementation.
+
+**Migration**: Use ADDED requirements in this change.
+
+## ADDED Requirements
+
 ### Requirement: Test connection validates sources and JMESPath filters
 
 The test-connection operation SHALL fetch all configured sources and validate account JMESPath filters before returning success.
@@ -78,4 +82,3 @@ When all applicable validations pass, the test-connection operation SHALL return
 - **GIVEN** all applicable validations pass
 - **WHEN** the test-connection operation completes
 - **THEN** the connector SHALL send `{}` as the operation result
-

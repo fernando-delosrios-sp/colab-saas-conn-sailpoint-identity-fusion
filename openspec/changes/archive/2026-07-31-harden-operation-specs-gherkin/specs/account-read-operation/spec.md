@@ -1,9 +1,13 @@
-# account-read Spec
+## REMOVED Requirements
 
-## Purpose
+### Requirement: Account read retrieves account by identity
 
-The account-read operation reads one account by native identity. This spec defines the contract for single account retrieval behavior.
-## Requirements
+**Reason**: Replaced with rebuild, attribute-operation, and cascade contract.
+
+**Migration**: Use ADDED requirements in this change.
+
+## ADDED Requirements
+
 ### Requirement: Account read rebuilds Fusion account with attribute operations REFRESH
 
 The account-read operation SHALL load sources and schema, rebuild the target Fusion account with attribute operations REFRESH (remap and redefine attributes without unique reset), and return the current ISC Fusion account representation.
@@ -51,4 +55,3 @@ When `cascadeAggregationEnabled` is true in processing control settings, the acc
 - **WHEN** the account-read operation rebuilds the Fusion account
 - **THEN** the connector SHALL log a warning for the legacy key
 - **AND** SHALL skip fetching that reference without failing the read
-

@@ -1,9 +1,13 @@
-# account-create Spec
+## REMOVED Requirements
 
-## Purpose
+### Requirement: Account create provisions new account
 
-The account-create operation creates a managed account when provisioning is enabled. This spec defines the contract for account creation behavior.
-## Requirements
+**Reason**: Replaced with precise provisioning contract aligned to implementation.
+
+**Migration**: Use ADDED requirements in this change for account-create behavior.
+
+## ADDED Requirements
+
 ### Requirement: Account create resolves identity and builds Fusion account
 
 The account-create operation SHALL resolve the target identity name from create input and the configured Fusion display attribute, fetch the identity, pre-process all Fusion accounts for unique-attribute collision detection, process the identity into a Fusion account, set `Requested` status, refresh unique attributes, execute assigned action entitlements sequentially, and return the ISC Fusion account representation.
@@ -101,4 +105,3 @@ When `input.attributes.actions` contains one or more action tokens, the account-
 - **GIVEN** a Fusion account being created
 - **WHEN** an unsupported action token is assigned during account create
 - **THEN** the operation SHALL fail with message matching `Unsupported action: <actionName>`
-

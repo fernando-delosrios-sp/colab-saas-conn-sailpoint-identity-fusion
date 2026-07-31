@@ -1,9 +1,13 @@
-# account-update Spec
+## REMOVED Requirements
 
-## Purpose
+### Requirement: Account update modifies existing account
 
-The account-update operation applies provisioning updates to an existing account. This spec defines the contract for account update behavior.
-## Requirements
+**Reason**: Replaced with precise update pipeline and action entitlement contract.
+
+**Migration**: Use ADDED requirements in this change.
+
+## ADDED Requirements
+
 ### Requirement: Account update rebuilds Fusion account with attribute operations NONE
 
 The account-update operation SHALL rebuild the target Fusion account using attribute operations `NONE` (no attribute refresh or unique reset) before applying entitlement changes, then return the updated ISC Fusion account.
@@ -102,4 +106,3 @@ When `input.changes` contains action entitlement Add or Remove operations, the a
 - **GIVEN** an existing Fusion account
 - **WHEN** an unsupported action token is assigned during account update
 - **THEN** the operation SHALL fail with message matching `Unsupported action: <actionName>`
-
