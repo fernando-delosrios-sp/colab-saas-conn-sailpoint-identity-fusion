@@ -12,11 +12,12 @@ flowchart TD
     Validate --> Setup[Load sources + schema]
     Setup --> Rebuild[Rebuild fusion account without refresh]
     Rebuild --> Changes[Process entitlement changes]
-    Changes --> Actions{actions attribute?}
-    Actions -- Yes --> Dispatch[Route to action handlers]
-    Actions -- No --> Crash[Unsupported change]
-    Dispatch --> Status[Recompute correlation status]
-    Status --> Out([Return updated ISC account])
+    Changes --> Restore[Restore reverse-correlation snapshot]
+    Restore --> Output{Remove correlate/correlated?}
+    Output -- Yes --> SkipRecompute[Generate ISC account without status recompute]
+    Output -- No --> Recompute[Generate ISC account with status recompute]
+    SkipRecompute --> Done([Return updated ISC account])
+    Recompute --> Done
 ```
 
 
@@ -43,12 +44,8 @@ flowchart TD
 4.  **Change Processing**:
     - Iterates through the list of requested changes.
     - For each change, asserts the `attribute` field is present.
-    - If the change targets the `actions` attribute, the change is dispatched to `executeActions()` in `operations/actions/index.ts`. Each action token (the substring before `:`) is routed to a handler:
-        - **Report** — Generates a fusion report.
-        - **Fusion** — Adds or removes the fusion tag.
-        - **Correlate / Correlated** — Manually triggers correlation logic. Both tokens map to the same handler.
-        - **Reviewer** — Assigns the source-specific reviewer entitlement.
-    - The dispatcher also detects `Remove` of `correlate`/`correlated` and skips the correlation-status recomputation in step 6.
+    - If the change targets the `actions` attribute, the change is dispatched to `executeActions()` in `operations/actions/index.ts`. Each action token (the substring before `:`) is routed to a handler. See [Action entitlements reference](#action-entitlements-reference).
+    - The dispatcher detects `Remove` of `correlate`/`correlated` and skips correlation-status recomputation in step 6. **Remove does not undo established correlation links** — it only affects output generation.
     - For any other `attribute`, the operation crashes the connector log (`log.crash("Unsupported entitlement change: …")`).
 
 5.  **Reverse-Correlation Snapshot Restore** (conditional):
@@ -57,6 +54,17 @@ flowchart TD
 6.  **Output Generation**:
     - Converts the rebuilt fusion account into an ISC account object via `fusion.getISCAccount(fusionAccount, includeUncorrelated=true, shouldRecomputeCorrelationStatus)`.
     - Returns the updated ISC account state.
+
+## Action entitlements reference
+
+| Action | Add (create or update) | Remove (create or update) |
+|--------|------------------------|---------------------------|
+| `report` | Runs the non-persistent report pipeline | No-op |
+| `fusion` | Adds the `fusion` action entitlement | Removes the `fusion` action entitlement |
+| `correlate` / `correlated` | Runs the **correlate action**: direct ISC PATCH for missing managed source accounts on provisioning paths. No reverse-correlation writes on this path. | On **update only**: skips correlation-status recompute on output. Does **not** undo established correlation links. |
+| `reviewer:<sourceId>` | Records the source as a reviewer scope on the Fusion account | Clears the reviewer scope for that source |
+
+The **`correlated` entitlement id** listed by entitlement-list is the catalog entry ISC can request. On output, the connector also evaluates **correlated entitlement** as a build outcome: it appears when `missing-accounts` is empty after build, and is absent when any managed source account remains missing.
 
 ## Behavior Notes
 

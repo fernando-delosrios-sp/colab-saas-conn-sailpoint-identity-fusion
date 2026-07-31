@@ -48,10 +48,10 @@ flowchart TD
 5.  **Action Execution**:
     - Checks for any actions specified in `input.attributes.actions` (normalized via `normalizeActionTokens`).
     - For each action token, the dispatcher in `operations/actions/index.ts` routes to the matching handler:
-        - **Report** — Generates a fusion report (if configured).
-        - **Fusion** — Marks the account as a fusion account (adds the 'fusion' tag/attribute).
-        - **Correlate / Correlated** — Triggers correlation logic to link missing source accounts to this identity. Both tokens map to the same handler.
-        - **Reviewer** — Assigns the source-specific reviewer entitlement. (See `account-update.md` for the full action handler table.)
+        - **Report** — Generates a fusion report (if configured). Remove is a no-op on create.
+        - **Fusion** — Adds the `fusion` action entitlement on the Fusion account.
+        - **Correlate / Correlated** — Runs the **correlate action** on this provisioning path: direct identity correlation (ISC PATCH) for missing managed source accounts. Both wire tokens map to the same handler. Reverse-correlation attribute writes are not applied on this path.
+        - **Reviewer** — Assigns the source-specific reviewer entitlement. See [Action entitlements reference](account-update.md#action-entitlements-reference).
 
 6.  **Response Generation**:
     - Converts the internal fusion identity into an ISC account object.
@@ -62,4 +62,5 @@ flowchart TD
 - **nativeIdentity immutability**: The `nativeIdentity` (account identifier) is determined at creation time and is never changed afterwards. This prevents disconnection between the existing Fusion account and the platform during subsequent updates, reads, or enable/disable cycles.
 - **Account name immutability**: The account `name` (display attribute) is also locked at creation. It always reflects the hosting identity's name. This prevents destruction of the identity linkage if an attribute definition would otherwise overwrite it.
 - **Unique attributes**: Unique attribute values (e.g. generated usernames) are freshly calculated during creation with collision detection against all existing Fusion accounts. These values remain stable unless the account is disabled and re-enabled (which triggers a unique attribute reset).
+
 
