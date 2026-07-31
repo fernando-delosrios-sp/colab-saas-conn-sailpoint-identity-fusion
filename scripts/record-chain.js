@@ -139,7 +139,7 @@ rl.question('Enter chain name: ', (chainName) => {
         // Brief pause so async api-log writes can flush before reading artifacts from disk
         setTimeout(() => {
             ensureFinalized(logDir, safeName)
-            console.log(`Recording artifacts under recordings/${safeName}/`)
+            console.log(`Recording artifacts under ${path.relative(process.cwd(), logDir)}/`)
             console.log(`Connector logs saved to: ${logFile}`)
             process.exit(code ?? 0)
         }, 300)
@@ -150,3 +150,4 @@ rl.question('Enter chain name: ', (chainName) => {
         process.exit(1)
     })
 })
+

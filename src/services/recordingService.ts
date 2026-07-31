@@ -6,6 +6,7 @@ import { FusionConfig, RecordingConfig } from '../model/config'
 import { ApiLogEntry } from './clientService/recordingApiAdapter'
 import { sanitizeForJson } from '../utils/sanitizeForJson'
 import type { MatchingResultsSnapshot } from './recordingService/matchingResultsSnapshot'
+import { recordingCacheKey } from '../data/recordingPaths'
 import {
     getOrCreateRecordingStore,
     RecordingManifest,
@@ -47,10 +48,11 @@ function shouldRegisterExitHandlers(): boolean {
 }
 
 async function finalizeAllRecordingChains(): Promise<void> {
-    for (const chainName of chainsToFinalize) {
-        const config = chainConfigs.get(chainName)
-        const log = chainLogs.get(chainName)
+    for (const cacheKey of chainsToFinalize) {
+        const config = chainConfigs.get(cacheKey)
+        const log = chainLogs.get(cacheKey)
         if (config && log) {
+            const chainName = config.recording?.chainName ?? cacheKey.split('/').pop()!
             await finalizeRecordingChain(chainName, config, log)
         }
     }
@@ -157,11 +159,12 @@ export async function finalizeRecordingChain(
     log: LogService,
     reportsPath?: string
 ): Promise<string> {
-    if (finalizedChains.has(chainName)) return ''
-    finalizedChains.add(chainName)
+    const cacheKey = recordingCacheKey(chainName, config.baseurl)
+    if (finalizedChains.has(cacheKey)) return ''
+    finalizedChains.add(cacheKey)
 
     const recConfig: RecordingConfig = config.recording ?? { mode: 'off', store: 'ndjson' }
-    const store = getOrCreateRecordingStore(recConfig, chainName)
+    const store = getOrCreateRecordingStore(recConfig, chainName, config.baseurl)
     await store.flush()
 
     const dir = store.getRecordingDir()
@@ -230,15 +233,16 @@ export class RecordingService {
     ) {
         const recConfig: RecordingConfig = config.recording ?? { mode: 'off', store: 'ndjson' }
         this.chainName = recConfig.chainName ?? `recording-${Date.now()}`
-        this.store = getOrCreateRecordingStore(recConfig, this.chainName)
+        this.store = getOrCreateRecordingStore(recConfig, this.chainName, config.baseurl)
         this.log.info(`RecordingService initialized — chain "${this.chainName}"`)
 
         const stepsFile = path.join(this.store.getRecordingDir(), 'steps.ndjson')
         bootstrapStepCounter(this.store.getRecordingDir(), stepsFile)
 
-        chainsToFinalize.add(this.chainName)
-        chainConfigs.set(this.chainName, config)
-        chainLogs.set(this.chainName, log)
+        const cacheKey = recordingCacheKey(this.chainName, config.baseurl)
+        chainsToFinalize.add(cacheKey)
+        chainConfigs.set(cacheKey, config)
+        chainLogs.set(cacheKey, log)
         registerExitHandlersOnce()
     }
 

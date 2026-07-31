@@ -1,6 +1,7 @@
 CHANGELOG.md [167L]
 # Changelog
 ## 2.2.0
+- (2026-07-31) **Enhancement:** External log and recording artifact paths are now tenant-scoped on shared proxy hosts. Default disk log path is `logs/<tenant>/fusion-{YYYYMMDD}.log` and chain recordings write to `recordings/<tenant>/{chainName}/`, where `<tenant>` is derived from connection Base URL (fallback `unknown-tenant`). Explicit `LOG_FILE` override is unchanged. Local recording scripts honor `BASEURL` for tenant folder selection.
 - (2026-07-30) **Breaking:** Unified **External Settings** under Advanced Settings — replaces separate Proxy Settings and Developer Settings external logging. Removed config keys `proxyEnabled`, `proxyUrl`, `proxyPassword`, and `externalLoggingUrl`. New keys: `externalProcessingEnabled`, `externalTargetUrl`, `externalTargetPassword`, `externalProxyEnabled`, `externalRecordingEnabled`, `recordingName`, `externalLoggingEnabled`, `externalLoggingLevel`. Operators must re-save sources with External Settings. External logging routes by role: HTTP POST from ISC (direct), disk append on proxy server (`LOG_FILE` or `logs/fusion-{YYYYMMDD}.log`), noop on proxy client. ISC **Recording chain name** activates record mode when gateway + proxy + recording are enabled. `proxy-service`, `log-service`, and `recording-service` specs updated.
 - (2026-07-30) **Enhancement:** Fusion review forms localize via **Default Language** when **Enable localized user communications?** is on (not per-reviewer identity language). Form strings use `form_*` keys in `locales.ts`.
 - (2026-07-30) **Fix:** Account schema discovery deduplicates attribute names case-insensitively — when managed-source and identity attributes share a logical name with different casing (e.g. `FirstName` + `firstname`), the connector keeps the first variant and drops later duplicates. Prevents ISC API rejection of discover payloads with case-insensitive name collisions. Schema ingestion (`setFusionAccountSchema`) applies the same dedup so runtime attribute output cannot emit both casings.
@@ -68,4 +69,5 @@ CHANGELOG.md [167L]
 - Improved performance by caching listSourceSchemas API results.
 - Added PR CI review orchestration with refactor, documentation, and README changelog gates.
 - Added deterministic PR quality checks for refactor review, code documentation review, and docs/changelog review.
+
 

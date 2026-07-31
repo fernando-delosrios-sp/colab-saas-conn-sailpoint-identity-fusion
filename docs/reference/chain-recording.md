@@ -7,7 +7,7 @@ npm run build
 npm run record
 ```
 
-Enter a chain name when prompted. The connector runs in record mode and writes artifacts under `recordings/{chainName}/`:
+Enter a chain name when prompted. The connector runs in record mode and writes artifacts under `recordings/<tenant>/{chainName}/`, where `<tenant>` is derived from connection **Base URL** (first hostname label; fallback `unknown-tenant`). For local `npm run record`, set `BASEURL` in the environment if you need a specific tenant folder (defaults to `unknown-tenant` when unset):
 
 | File | Purpose |
 | --- | --- |
@@ -54,4 +54,5 @@ Harness unit tests (no local recordings required):
 ```bash
 npm test -- src/operations/__tests__/chain/chain.replay.test.ts
 ```
+
 

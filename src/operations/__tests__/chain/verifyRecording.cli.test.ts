@@ -3,12 +3,14 @@ import { recordingChainDir } from '../../../data/recordingPaths'
 import { verifyChainRecording, printChainVerifyReport } from './harness/chainRecordingVerify'
 
 const chainName = process.env.VERIFY_RECORDING_CHAIN?.trim()
+const baseurl = process.env.BASEURL
 
 describe.skipIf(!chainName)('verifyRecording CLI', () => {
     it(`verifies recording: ${chainName}`, async () => {
-        const scenarioPath = path.join(recordingChainDir(chainName!), 'scenario.json')
+        const scenarioPath = path.join(recordingChainDir(chainName!, baseurl), 'scenario.json')
         const result = await verifyChainRecording(scenarioPath)
         printChainVerifyReport(result, chainName!)
         expect(result.success).toBe(true)
     })
 })
+

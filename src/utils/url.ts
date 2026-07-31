@@ -3,6 +3,38 @@
  * Centralizes URL construction logic used across the codebase.
  */
 
+/** Fallback tenant segment when baseurl is missing or unparseable. */
+export const UNKNOWN_TENANT_SLUG = 'unknown-tenant'
+
+/**
+ * Derives a filesystem-safe tenant slug from an ISC API base URL.
+ * Uses the first hostname label (e.g. `acme` from `acme.api.identitynow.com`).
+ */
+export function tenantSlugFromBaseurl(baseurl: string | undefined): string {
+    if (!baseurl || typeof baseurl !== 'string' || !baseurl.trim()) {
+        return UNKNOWN_TENANT_SLUG
+    }
+    try {
+        let host = new URL(baseurl.trim()).hostname
+        if (host.startsWith('[') && host.endsWith(']')) {
+            host = host.slice(1, -1)
+        }
+        let segment: string
+        if (host.includes(':')) {
+            segment = host.replace(/[^a-fA-F0-9:._-]+/g, '_').replace(/:/g, '_')
+        } else if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+            segment = host.replace(/\./g, '_')
+        } else {
+            const dot = host.indexOf('.')
+            segment = dot === -1 ? host : host.slice(0, dot)
+        }
+        const safe = segment.replace(/[^a-zA-Z0-9._-]+/g, '_')
+        return safe.length > 0 ? safe : UNKNOWN_TENANT_SLUG
+    } catch {
+        return UNKNOWN_TENANT_SLUG
+    }
+}
+
 // ============================================================================
 // UI Origin Helpers
 // ============================================================================
@@ -202,3 +234,4 @@ export function createUrlContext(baseUrl: string | undefined): UrlContext {
         form: (id) => buildFormDefinitionUrl(uiOrigin, id),
     }
 }
+

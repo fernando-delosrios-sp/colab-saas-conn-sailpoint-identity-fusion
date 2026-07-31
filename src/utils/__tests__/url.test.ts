@@ -1,4 +1,6 @@
 import {
+    tenantSlugFromBaseurl,
+    UNKNOWN_TENANT_SLUG,
     getUIOriginFromBaseUrl,
     buildIdentityUrl,
     buildIdentityAccountsUrl,
@@ -16,6 +18,22 @@ import {
 describe('url', () => {
     const apiBase = 'https://acme.api.identitynow.com'
     const uiOrigin = 'https://acme.identitynow.com'
+
+    describe('tenantSlugFromBaseurl', () => {
+        it('returns first hostname label for standard ISC API URL', () => {
+            expect(tenantSlugFromBaseurl('https://acme.api.identitynow.com')).toBe('acme')
+        })
+
+        it('sanitizes IPv4 hostnames', () => {
+            expect(tenantSlugFromBaseurl('https://10.0.0.1/v3')).toBe('10_0_0_1')
+        })
+
+        it('returns unknown-tenant for empty or invalid baseurl', () => {
+            expect(tenantSlugFromBaseurl(undefined)).toBe(UNKNOWN_TENANT_SLUG)
+            expect(tenantSlugFromBaseurl('')).toBe(UNKNOWN_TENANT_SLUG)
+            expect(tenantSlugFromBaseurl('not-a-url')).toBe(UNKNOWN_TENANT_SLUG)
+        })
+    })
 
     describe('getUIOriginFromBaseUrl', () => {
         it('should convert api. subdomain to UI origin', () => {
@@ -163,3 +181,4 @@ describe('url', () => {
         })
     })
 })
+

@@ -3,6 +3,7 @@ import * as path from 'path'
 import type { RecordingConfig } from '../../model/config'
 import type { ApiLogEntry } from '../clientService/recordingApiAdapter'
 import { NdjsonRecordingStore } from './ndjsonRecordingStore'
+import { recordingCacheKey } from '../../data/recordingPaths'
 
 /** Metadata written to manifest.json on finalize. */
 export interface RecordingManifest {
@@ -43,22 +44,23 @@ export interface RecordingStore extends ApiLogReader {
 const storeCache = new Map<string, RecordingStore>()
 
 /** Creates the configured store implementation (default NDJSON). */
-export function createRecordingStore(config: RecordingConfig, chainName: string): RecordingStore {
+export function createRecordingStore(config: RecordingConfig, chainName: string, baseurl?: string): RecordingStore {
     const storeType = config.store ?? 'ndjson'
     switch (storeType) {
         case 'ndjson':
-            return new NdjsonRecordingStore(chainName)
+            return new NdjsonRecordingStore(chainName, baseurl)
         default:
             throw new Error(`Unsupported recording store: ${storeType}`)
     }
 }
 
-/** Returns one store instance per chain so api-log and counters stay consistent across operations. */
-export function getOrCreateRecordingStore(config: RecordingConfig, chainName: string): RecordingStore {
-    const cached = storeCache.get(chainName)
+/** Returns one store instance per tenant+chain so api-log and counters stay consistent across operations. */
+export function getOrCreateRecordingStore(config: RecordingConfig, chainName: string, baseurl?: string): RecordingStore {
+    const cacheKey = recordingCacheKey(chainName, baseurl)
+    const cached = storeCache.get(cacheKey)
     if (cached) return cached
-    const store = createRecordingStore(config, chainName)
-    storeCache.set(chainName, store)
+    const store = createRecordingStore(config, chainName, baseurl)
+    storeCache.set(cacheKey, store)
     return store
 }
 
@@ -95,7 +97,7 @@ function readApiLogFromManifest(
 }
 
 /** Loads api-log entries from a chain directory using manifest store type when present. */
-export function loadRecordingApiLog(chainDir: string): ApiLogEntry[] {
+export function loadRecordingApiLog(chainDir: string, baseurl?: string): ApiLogEntry[] {
     const manifestPath = path.join(chainDir, 'manifest.json')
     const fromManifest = readApiLogFromManifest(manifestPath)
 
@@ -105,9 +107,10 @@ export function loadRecordingApiLog(chainDir: string): ApiLogEntry[] {
 
     const storeType = fromManifest?.storeType ?? 'ndjson'
     const chainName = path.basename(chainDir)
-    const store = createRecordingStore({ mode: 'replay', store: storeType, chainName }, chainName)
+    const store = createRecordingStore({ mode: 'replay', store: storeType, chainName }, chainName, baseurl)
     return store.loadApiLog()
 }
+
 
 
 
