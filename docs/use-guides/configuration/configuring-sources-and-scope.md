@@ -16,7 +16,7 @@ Identity Fusion NG can run in two common patterns. The Fusion source **Authorita
 | Pattern | Fusion source authoritative? | Typical use | Match? | Map / Define? |
 | --- | --- | --- | --- | --- |
 | **[Umbrella mode](../../glossary.md#deployment-and-integration)** | **Yes** | Fusion owns correlation and identity-creation decisions for configured managed sources | Required for similarity-based deduplication | Yes |
-| **[Side-car mode](../../glossary.md#deployment-and-integration)** | **No** | Enrich identities with computed attributes, register unique values, or process orphan supplemental data alongside existing authoritative sources | Optional (Fusion does not create identities authoritatively) | Yes |
+| **[Side-car mode](../../glossary.md#deployment-and-integration)** | **No** | Managed sources contribute to identities the same as in umbrella mode; authoritative managed sources can still create identities themselves | Optional (Fusion source does not authoritatively create identities) | Yes |
 
 ```mermaid
 flowchart LR
@@ -25,16 +25,16 @@ flowchart LR
         FU --> ID1[Create or correlate identities]
     end
     subgraph sidecar [Side-car mode — non-authoritative Fusion]
-        AUTH[Other authoritative source] --> ID2[Identities]
         MS2[Managed sources] --> FUS[Fusion non-authoritative]
-        FUS --> ENR[Map / Define / orphan Match only]
-        ENR -.-> ID2
+        FUS --> ENR[Map / Define / Match]
+        ENR --> ID2[Identities]
+        MS2 -.->|authoritative managed source| ID2
     end
 ```
 
 **Umbrella mode** is what most **Match** deployments need. Fusion decides whether an incoming managed account creates a new identity, correlates to an existing one, or enters manual review.
 
-**Side-car mode** is sufficient when you only need **Map and Define** (unique IDs, normalized attributes, consolidated multi-source values) or **Orphan** supplemental matching. Other ISC sources remain authoritative for identity lifecycle; Fusion enriches or assists without owning creation decisions.
+**Side-car mode** — the Fusion source is usually **non-authoritative**. Managed sources still contribute to identities the same way they would in umbrella mode, including Map, Define, and Match. An **authoritative** managed source can create identities itself even when the Fusion source is not authoritative.
 
 !!! tip "Choosing a mode"
     - Need similarity Match with review forms and authoritative correlation → **umbrella** (Fusion authoritative).
@@ -223,4 +223,5 @@ See [Managing reviewers](managing-reviewers.md) and [Review forms and reviewers]
 | Match baseline and thresholds | [Matching identities](matching-identities.md) |
 | Reviewer entitlements and access profiles | [Managing reviewers](managing-reviewers.md) |
 | Field keys and defaults | [Source Settings](../../configuration/source.md) |
+
 
