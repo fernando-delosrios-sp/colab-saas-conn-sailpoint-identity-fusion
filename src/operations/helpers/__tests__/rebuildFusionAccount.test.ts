@@ -212,4 +212,59 @@ describe('rebuildFusionAccount', () => {
         )
         expect(fetchManagedAccount).not.toHaveBeenCalled()
     })
+
+    it('triggers cascade aggregation for managed sources when enabled', async () => {
+        const aggregateManagedSource = vi.fn().mockResolvedValue(undefined)
+        const fetchManagedAccount = vi.fn().mockResolvedValue(undefined)
+
+        const registry = {
+            sources: {
+                fetchFusionAccount: vi.fn().mockResolvedValue(undefined),
+                fusionAccountsByNativeIdentity: new Map([
+                    [
+                        'fusion-cascade',
+                        {
+                            nativeIdentity: 'fusion-cascade',
+                            identityId: 'identity-cascade',
+                            attributes: {
+                                accounts: ['source-a::user-1'],
+                            },
+                        },
+                    ],
+                ]),
+                fetchManagedAccount,
+                getSourceByName: vi.fn().mockReturnValue(undefined),
+                getSourceById: vi.fn().mockReturnValue({ isManaged: true, name: 'Source A' }),
+                aggregateManagedSource,
+                config: { cascadeAggregationEnabled: true },
+                get isCascadeAggregationEnabled() {
+                    return this.config.cascadeAggregationEnabled ?? false
+                },
+            },
+            identities: {
+                fetchIdentityById: vi.fn().mockResolvedValue(undefined),
+                getIdentityById: vi.fn().mockReturnValue({ id: 'identity-cascade', accounts: [] }),
+            },
+            fusion: {
+                processFusionAccount: vi.fn().mockResolvedValue({ nativeIdentity: 'fusion-cascade' }),
+            },
+            log: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+        } as any
+
+        await rebuildFusionAccount(
+            'fusion-cascade',
+            {} as any,
+            {
+                fusion: registry.fusion,
+                identities: registry.identities,
+                sources: registry.sources,
+                log: registry.log,
+            },
+            true
+        )
+
+        expect(aggregateManagedSource).toHaveBeenCalledWith('source-a', false)
+        expect(fetchManagedAccount).toHaveBeenCalledWith('source-a', 'user-1')
+    })
 })
+

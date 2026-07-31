@@ -5,15 +5,22 @@
 The account-discover-schema operation returns the account schema used by ISC. This spec defines the contract for schema discovery behavior.
 ## Requirements
 ### Requirement: Schema discovery returns account schema
-The system SHALL return the account schema definition when the account-discover-schema operation is invoked.
+
+The account-discover-schema operation SHALL fetch all configured sources and build a dynamic Fusion account schema from managed source schemas plus connector attribute mapping and definition configuration, then return that schema via `res.send`.
 
 #### Scenario: Successful schema discovery
-- **WHEN** the account-discover-schema operation is invoked
-- **THEN** the system SHALL return the complete account schema with all attribute definitions
 
-#### Schema discovery with custom attributes
-- **WHEN** the account-discover-schema operation is invoked with custom attribute configurations
-- **THEN** the system SHALL return the schema including custom attribute definitions
+- **GIVEN** a valid connector configuration with managed sources and attribute definitions
+- **WHEN** the account-discover-schema operation is invoked
+- **THEN** the connector SHALL fetch all sources
+- **AND** SHALL build the dynamic account schema via `buildDynamicSchema()`
+- **AND** SHALL return the complete account schema with all attribute definitions
+
+#### Scenario: Schema discovery with custom attributes
+
+- **GIVEN** normal and unique attribute definitions configured in connector settings
+- **WHEN** the account-discover-schema operation is invoked
+- **THEN** the returned schema SHALL include attributes derived from those definitions
 
 ### Requirement: Discovered schema has no case-insensitive duplicate attribute names
 

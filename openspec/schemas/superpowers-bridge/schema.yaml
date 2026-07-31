@@ -447,7 +447,8 @@ apply:
     | MED | design.md | Implementation guidance |
     | MED | verify artifact instruction | Verify-fix loop checks |
     | MED | retrospective artifact instruction | Post-verify analysis |
-    | LOW | git-commit, changelog-generator skills | Optional commit/changelog |
+    | MED | git-commit skill | Archive step 4d (manual fallback if missing) |
+    | LOW | changelog-generator skill | Changelog task in step 1b |
 
     ## STEPS
     0. **Pre-flight — skills and tooling**
@@ -455,8 +456,9 @@ apply:
        - subagent-driven-development (transitive: test-driven-development,
          requesting-code-review)
        - finishing-a-development-branch
-       Optional: git-commit, changelog-generator, openspec-verify-change
+       Optional: changelog-generator, openspec-verify-change
        Confirm project CLI tools from plan.md on PATH. If missing, STOP.
+       (`git-commit` is invoked in archive step 4d — manual fallback if absent.)
 
     1. **Executor — subagent-driven-development**
        Invoke via Skill tool. Tell executor:
@@ -476,7 +478,8 @@ apply:
        - `openspec validate --all --json` — all `"valid": true`
        - Documentation tasks reflect actual behavior
        - Changelog: changelog-generator if available, else manual
-       - Commits: prefer git-commit; working tree clean (`git status --porcelain` empty)
+       - Commits: stage and commit all implementation work; working tree clean
+         (`git status --porcelain` empty) before step 2
 
     2. **Verify-fix loop** (BLOCKING — apply NOT complete until ✅ PASS):
        Repeat: (a) invoke openspec-verify-change or manual verify checks →
@@ -486,14 +489,37 @@ apply:
     3. **Retrospective** (while context is hot, BEFORE PR):
        Produce retrospective artifact (own PRECHECK). Part of same PR deliverables.
 
-    4. **Archive** (complete artifacts → sync specs → commit):
+    4. **Archive** (backfill → sync → **commit** → gate):
+       Archive is NOT complete until step (e) passes — including when
+       re-running on a change archived in a prior session with uncommitted
+       openspec files still on disk.
+
        a. Backfill missing artifacts via `openspec status --change <name> --json`
        b. Move stray `docs/superpowers/specs/` into change artifacts; delete strays
-       c. Run `openspec archive -y` if still under `openspec/changes/<name>/`
-       d. **Commit** (REQUIRED — archive -y does NOT commit):
-          stage `openspec/specs/` + `openspec/changes/`; prefer git-commit
-       e. **Post-commit gate**: `git status --porcelain` empty; latest commit
-          includes synced specs + archive folder if (c) ran
+       c. **Sync and move**: if still under `openspec/changes/<name>/`, run
+          `openspec archive -y`. If already under
+          `openspec/changes/archive/YYYY-MM-DD-<name>/`, skip (c) — proceed to (d).
+       d. **Commit archive output** (REQUIRED sub-step — `openspec archive -y`
+          does NOT commit; do NOT report archive complete without this):
+          1. Run `git status --porcelain`.
+          2. If output is empty, proceed to (e).
+          3. If non-empty, stage all openspec-related paths:
+             `git add openspec/specs/ openspec/changes/` plus any paths
+             touched in (a) or (b).
+          4. Create the commit (default — do not skip when porcelain is non-empty):
+             - **Preferred**: invoke **git-commit** via Skill tool (change name,
+               spec sync, archive path in message context).
+             - **Fallback** if git-commit unavailable: conventional commit
+               manually, e.g. `docs(openspec): archive <change-name> and sync specs`
+          5. Do NOT open a PR or call step 5 until (e) passes.
+       e. **Post-commit gate** (BLOCKING — archive incomplete until pass):
+          - `test -z "$(git status --porcelain)"`
+          - If (c) ran OR change is under `openspec/changes/archive/`: confirm
+            latest commit includes synced specs and archived change folder:
+            `git log -1 --name-only -- openspec/specs/ openspec/changes/archive/`
+          - If (c) was skipped but porcelain was non-empty before (d), the
+            commit from (d) must have cleared porcelain — re-run (d) if not.
+          Do NOT proceed to step 5 until this gate passes.
 
     5. **Completion — PR LAST**
        PRECHECK: step 4e passed. Invoke **finishing-a-development-branch**.
@@ -503,7 +529,8 @@ apply:
     - Deliverable: branch PR with all artifacts, synced specs, archived change,
       retrospective, verify PASS, changelog, updated docs.
     - Apply owns verify end-to-end in one session.
-    - Archive incomplete until post-commit gate passes.
+    - Archive incomplete until post-commit gate (4e) passes — including 4d commit.
+    - No skipping archive commit because git-commit skill is missing — use manual fallback.
 
     ## NARROWING
     - No silent fallback for missing required skills.

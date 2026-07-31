@@ -82,4 +82,14 @@ describe('testConnection', () => {
 
         expect(registry.workflows.fetchSender).toHaveBeenCalledTimes(1)
     })
+
+    it('skips email sender workflow validation when email workflow is not configured', async () => {
+        const { registry, sources } = createMockRegistry([{ name: 'AD', correlationMode: 'none' }])
+        sources.isEmailWorkflowConfigured.mockReturnValue(false)
+
+        await testConnection(registry, {})
+
+        expect(registry.workflows.fetchSender).not.toHaveBeenCalled()
+    })
 })
+

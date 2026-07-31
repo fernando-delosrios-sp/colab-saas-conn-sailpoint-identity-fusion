@@ -2,6 +2,7 @@ import { accountUpdate } from '../accountUpdate'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
 import { executeActions } from '../actions'
 import { FusionAction } from '../../model/fusionAction'
+import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import type { Mock } from 'vitest'
 
 vi.mock('../helpers/rebuildFusionAccount', () => ({
@@ -38,6 +39,13 @@ function createRegistry() {
     log.crash = vi.fn()
 
     return registry
+}
+
+function mockCrashThrows(registry: ReturnType<typeof createRegistry>) {
+    const log = registry.log as any
+    log.crash = vi.fn((message: string) => {
+        throw new ConnectorError(message, ConnectorErrorType.Generic)
+    })
 }
 
 describe('accountUpdate', () => {
@@ -139,5 +147,26 @@ describe('accountUpdate', () => {
         expect(registry.sources.fetchFusionAccount).toHaveBeenCalledWith('fusion-1')
         expect(fusionAccount.attributes.reverseNativeIdentity).toBe('native-before-update')
     })
+
+    it('fails with observable message for unsupported action', async () => {
+        const registry = createRegistry()
+        mockCrashThrows(registry)
+        const { executeActions: realExecuteActions } = await vi.importActual<typeof import('../actions')>(
+            '../actions'
+        )
+        vi.mocked(executeActions).mockImplementation(realExecuteActions)
+        ;(rebuildFusionAccount as Mock).mockResolvedValue({ managedKey: 'fusion-1', name: 'Fusion User' })
+
+        await expect(
+            accountUpdate(registry, {
+                identity: 'fusion-1',
+                schema: { attributes: [] },
+                changes: [{ attribute: 'actions', op: 'Add', value: 'unknown-action' }],
+            } as any)
+        ).rejects.toMatchObject({ message: 'Unsupported action: unknown-action' })
+
+        expect(registry.res.send).not.toHaveBeenCalled()
+    })
 })
+
 

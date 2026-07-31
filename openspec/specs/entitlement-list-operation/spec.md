@@ -3,16 +3,37 @@
 ## Purpose
 
 The entitlement-list operation returns entitlement objects for aggregation. This spec defines the contract for entitlement listing behavior.
-
 ## Requirements
+### Requirement: Entitlement list returns static status entitlements without API calls
 
-### Requirement: Entitlement list returns all entitlements
-The system SHALL return all available entitlement objects when the entitlement-list operation is invoked.
+When invoked with `type: status`, the entitlement-list operation SHALL stream static status entitlements from connector definitions without additional ISC API calls.
 
-#### Scenario: Successful entitlement listing
-- **WHEN** the entitlement-list operation is invoked
-- **THEN** the system SHALL return all entitlements in the configured sources
+#### Scenario: Status entitlements listed from static catalog
 
-#### Scenario: Entitlement listing with filters
-- **WHEN** the entitlement-list operation is invoked with filter criteria
-- **THEN** the system SHALL return only entitlements matching the filter criteria
+- **GIVEN** a valid connector configuration
+- **WHEN** the entitlement-list operation is invoked with `type: status`
+- **THEN** the connector SHALL stream each static status entitlement via `res.send`
+- **AND** SHALL NOT fetch managed sources for status listing
+
+### Requirement: Entitlement list returns dynamic action entitlements including reviewer scopes
+
+When invoked with `type: action`, the entitlement-list operation SHALL fetch all sources and stream static action entitlements (`report`, `fusion`, `correlated`) plus one `reviewer:<sourceId>` action entitlement per configured managed source.
+
+#### Scenario: Action entitlements include static and reviewer entries
+
+- **GIVEN** managed sources `Source A` (id `src-a`) and `Source B` (id `src-b`) are configured
+- **WHEN** the entitlement-list operation is invoked with `type: action`
+- **THEN** the connector SHALL fetch all sources
+- **AND** SHALL stream static action entitlements for `report`, `fusion`, and `correlated`
+- **AND** SHALL stream `reviewer:src-a` and `reviewer:src-b` action entitlements
+
+### Requirement: Entitlement list rejects invalid entitlement types
+
+When invoked with an unsupported `type` value, the entitlement-list operation SHALL fail with a ConnectorError.
+
+#### Scenario: Invalid entitlement type fails with observable message
+
+- **GIVEN** a valid connector configuration
+- **WHEN** the entitlement-list operation is invoked with an unsupported `type`
+- **THEN** the operation SHALL fail with a ConnectorError whose message matches `Invalid entitlement type <type>`
+

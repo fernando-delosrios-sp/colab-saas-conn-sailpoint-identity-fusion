@@ -3,16 +3,52 @@
 ## Purpose
 
 The account-read operation reads one account by native identity. This spec defines the contract for single account retrieval behavior.
-
 ## Requirements
+### Requirement: Account read rebuilds Fusion account with attribute operations REFRESH
 
-### Requirement: Account read retrieves account by identity
-The system SHALL retrieve a single account by its native identity when the account-read operation is invoked.
+The account-read operation SHALL load sources and schema, rebuild the target Fusion account with attribute operations REFRESH (remap and redefine attributes without unique reset), and return the current ISC Fusion account representation.
 
-#### Scenario: Successful account read
-- **WHEN** the account-read operation is invoked with a valid native identity
-- **THEN** the system SHALL return the account data for the specified identity
+#### Scenario: Successful account read returns refreshed ISC account
 
-#### Scenario: Account not found
-- **WHEN** the account-read operation is invoked with an invalid native identity
-- **THEN** the system SHALL return an appropriate not-found response
+- **GIVEN** an existing Fusion account for the requested identity
+- **WHEN** the account-read operation is invoked with valid read input
+- **THEN** the connector SHALL rebuild the Fusion account with attribute operations REFRESH
+- **AND** SHALL return the ISC account via `res.send`
+
+#### Scenario: Missing identity fails with observable message
+
+- **GIVEN** account-read input without an identity value
+- **WHEN** the account-read operation is invoked
+- **THEN** the operation SHALL fail with message `Account identity is required`
+
+#### Scenario: Fusion account not found fails with observable message
+
+- **GIVEN** read input referencing an identity with no Fusion account
+- **WHEN** the account-read operation is invoked
+- **THEN** the operation SHALL fail with a message matching `Fusion account not found for identity: <identity>`
+
+### Requirement: Account read optionally triggers cascade aggregation before managed account fetch
+
+When `cascadeAggregationEnabled` is true in processing control settings, the account-read operation SHALL trigger managed-source aggregation for each source referenced by the Fusion account's managed account keys before fetching managed accounts. Per-source cascade failures SHALL be logged and SHALL NOT fail the overall read operation.
+
+#### Scenario: Cascade aggregation runs when enabled
+
+- **GIVEN** `cascadeAggregationEnabled` is true
+- **AND** an existing Fusion account linked to managed accounts on source `src-a`
+- **WHEN** the account-read operation is invoked
+- **THEN** the connector SHALL attempt aggregation for `src-a` before fetching managed accounts
+- **AND** SHALL continue the rebuild even if cascade aggregation for a source fails
+
+#### Scenario: Cascade skipped when disabled
+
+- **GIVEN** `cascadeAggregationEnabled` is false or unset
+- **WHEN** the account-read operation is invoked
+- **THEN** the connector SHALL NOT trigger cascade aggregation before managed account fetch
+
+#### Scenario: Legacy non-composite managed account keys are skipped with warning
+
+- **GIVEN** a Fusion account referencing a legacy non-composite managed account key
+- **WHEN** the account-read operation rebuilds the Fusion account
+- **THEN** the connector SHALL log a warning for the legacy key
+- **AND** SHALL skip fetching that reference without failing the read
+
