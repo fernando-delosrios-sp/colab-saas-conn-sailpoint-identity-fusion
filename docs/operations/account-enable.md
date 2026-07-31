@@ -16,6 +16,11 @@ flowchart TD
     Enable --> Out([Return enabled ISC account])
 ```
 
+
+## Architecture diagram
+
+![Account Enable architecture diagram](../assets/images/operations/accountEnable.png)
+
 1.  **Setup**:
     - Loads sources and schema.
     - Initializes attribute counters.

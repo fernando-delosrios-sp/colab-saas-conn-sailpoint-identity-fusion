@@ -17,6 +17,11 @@ flowchart TD
     Static --> Out
 ```
 
+
+## Architecture diagram
+
+![Entitlement List architecture diagram](../assets/images/operations/entitlementList.png)
+
 1.  **Input Analysis**:
     - Checks the requested `type` of entitlement.
 

@@ -77,13 +77,9 @@ Configure **Source Settings → Scope** to define the baseline of identities to 
 | **Identity Scope Query**             | `attributes.cloudLifecycleState:active`      | Only active identities                   | Exclude terminated employees from comparisons        |
 | **Identity Scope Query**             | `source.name:"Workday" OR source.name:"ADP"` | Identities from specific sources         | Only HR-sourced identities                           |
 
-**Without a baseline:** If **Include identities in the scope?** is No or Identity Scope Query returns zero identities, there is **no baseline** to compare accounts against. Match cannot detect existing identities—only merge new accounts from configured sources.
-
-**Screenshot placeholder:** Source Settings showing identity scope for baseline.
+**Without a [baseline](../../glossary.md#processing-states-and-outcomes):** If **Include identities in the scope?** is No or Identity Scope Query returns zero identities, there is **no baseline** to compare accounts against. Match cannot detect existing identities—only merge new accounts from configured sources.
 
 ![Match source settings - Baseline](../../assets/images/match-source-settings.png)
-
-<!-- PLACEHOLDER: Screenshot of Source Settings with sources and identity scope for Match. Save as docs/assets/images/match-source-settings.png -->
 
 ### Sources configuration
 
@@ -140,11 +136,7 @@ Configure **Attribute Matching Settings → Matching Settings** to define match 
 | **Enable automatic merge**       | Skip review when the combined score meets the automatic merge match score | No initially; enable after tuning                  |
 | **Fusion attribute matches**          | List of identity attributes to compare                                         | At least 2 attributes (e.g. name + email)          |
 
-**Screenshot placeholder:** Attribute Matching Settings - Matching section.
-
 ![Fusion matching settings - Configuration](../../assets/images/match-fusion-matching.png)
-
-<!-- PLACEHOLDER: Screenshot of Attribute Matching Settings > Matching. Save as docs/assets/images/match-fusion-matching.png -->
 
 ### Per-attribute match configuration
 
@@ -245,6 +237,7 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 - You want human approval for all merges
 
 ---
+
 
 
 

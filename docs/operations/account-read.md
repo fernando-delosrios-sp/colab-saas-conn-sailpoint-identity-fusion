@@ -18,6 +18,11 @@ flowchart TD
     Map --> Out([Return fresh ISC account])
 ```
 
+
+## Architecture diagram
+
+![Account Read architecture diagram](../assets/images/operations/accountRead.png)
+
 1.  **Setup**:
     - Verifies that the `identity` (ID) is provided.
     - Loads all managed sources (`sources.fetchAllSources()`).

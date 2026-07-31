@@ -25,6 +25,11 @@ flowchart TD
     Schema -- Missing attribute --> Err
 ```
 
+
+## Architecture diagram
+
+![Test Connection architecture diagram](../assets/images/operations/testConnection.png)
+
 1.  **Execution**:
     - The operation is invoked by ISC.
     - It verifies access to the Fusion source and ensures that all configured managed sources exist.

@@ -14,6 +14,11 @@ flowchart TD
     Disable --> Out([Return disabled ISC account])
 ```
 
+
+## Architecture diagram
+
+![Account Disable architecture diagram](../assets/images/operations/accountDisable.png)
+
 1.  **Setup**:
     - Loads sources and schema.
 

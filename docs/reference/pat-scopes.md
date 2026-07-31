@@ -78,6 +78,21 @@ flowchart TD
     BASE --> WG[+ workgroup:read]
 ```
 
+## PAT scope recommender
+
+Derive minimal and conditional scopes from an exported Fusion source configuration JSON:
+
+```bash
+npm run pat-scopes:recommend -- path/to/source-config.json
+```
+
+The script inspects managed sources (`aggregationMode`, `correlationMode`, `disableNonMatchingAccounts`), Match rules, review/report settings, and global reviewer flags. It prints:
+
+- **Core minimum** — Map/Define side-car deployments (`idn:accounts:manage`, `sp:search:read`, `idn:sources:manage`, `idn:source-schema:manage`)
+- **Full minimal + conditional** — Match, delayed aggregation, reverse correlation, orphan disable, and workflow features as applicable
+
+Export the source config from ISC (Admin → Connections → Sources → your Fusion source → Export) or use a sanitized copy from scenario recordings.
+
 ## Caveats
 
 1. **`GET /v2025/form-definitions`** — No explicit scope in the OpenAPI spec; `sp:forms:manage` is included conservatively because other form operations require it.
@@ -92,3 +107,4 @@ flowchart TD
 - [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) — aggregation mode and correlation mode
 - [Entitlement list](../operations/entitlement-list.md) — status and action entitlements the connector exposes
 - [Connection and observability tuning](../use-guides/operation/connection-and-observability-tuning.md) — resilience settings
+

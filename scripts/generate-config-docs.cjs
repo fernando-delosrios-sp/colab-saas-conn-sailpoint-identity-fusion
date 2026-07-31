@@ -81,6 +81,10 @@ const ADDITIONAL_GUIDES_BY_MENU = {
             title: 'Review forms and reviewers',
             path: '../use-guides/configuration/review-forms-and-reviewers.md',
         },
+        {
+            title: 'Match tuning cookbooks',
+            path: '../use-guides/configuration/match-tuning-cookbooks.md',
+        },
     ],
     'Advanced Settings': [
         {
@@ -499,6 +503,7 @@ function renderIndex(menus) {
     lines.push('## Related references')
     lines.push('')
     lines.push('- [ISC PAT scopes](../reference/pat-scopes.md) — required API permissions for the connector PAT')
+    lines.push('- [Config to account-list phases](../reference/config-to-phases.md) — map settings to aggregation log phases')
     lines.push('- [Velocity context](../reference/velocity-context.md) — helpers available in Define expressions')
     lines.push('- [Standard account schema](../reference/standard-account-schema.md) — Fusion account attribute schema')
     lines.push('- [Entitlement list](../operations/entitlement-list.md) — status and action entitlements exposed by the connector')
@@ -524,6 +529,7 @@ function main() {
 }
 
 main()
+
 
 
 

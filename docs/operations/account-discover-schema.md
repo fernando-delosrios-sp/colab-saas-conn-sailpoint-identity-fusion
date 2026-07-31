@@ -16,6 +16,11 @@ flowchart TD
     Dedup --> Out([Return schema to ISC])
 ```
 
+
+## Architecture diagram
+
+![Account Discover Schema architecture diagram](../assets/images/operations/accountDiscoverSchema.png)
+
 1.  **Setup**:
     - Loads all managed sources to access their schemas.
 

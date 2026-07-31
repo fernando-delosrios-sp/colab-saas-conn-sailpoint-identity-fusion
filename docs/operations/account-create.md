@@ -19,6 +19,11 @@ flowchart TD
     Dispatch --> Out([Return ISC account])
 ```
 
+
+## Architecture diagram
+
+![Account Create architecture diagram](../assets/images/operations/accountCreate.png)
+
 1.  **Input Validation**:
     - Verifies that the `identity` (ID) and `schema` are provided in the input.
     - Loads the fusion account schema.
