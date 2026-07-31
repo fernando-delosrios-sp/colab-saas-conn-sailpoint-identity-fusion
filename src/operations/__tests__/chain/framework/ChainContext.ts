@@ -34,9 +34,11 @@ export interface ChainContext {
     options: {
         sweep: number
         stepId: string
+        stepTimestamp?: string
     }
     scenario?: any
     /** Shared api-log replay adapter for the chain (one instance, sequential consumption). */
     replayAdapter?: ReplayApiAdapter
 }
+
 

@@ -6,6 +6,7 @@ on:
         paths:
             - '.github/workflows/**.yml'
     pull_request:
+        branches-ignore: ['2.2.0/preview', '2.1/fixes']
         paths:
             - '.github/workflows/**.yml'
         types: [opened, synchronize, reopened]
@@ -32,3 +33,4 @@ jobs:
                     echo "Linting $f"
                     yamllint -d "{extends: relaxed, rules: {new-line-at-end-of-file: disable}}" "$f" 2>&1 || { echo "FAILED: $f"; exit 1; }
                   done
+

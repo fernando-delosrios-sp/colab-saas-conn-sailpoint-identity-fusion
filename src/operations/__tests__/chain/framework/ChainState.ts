@@ -61,6 +61,8 @@ export class ChainState {
     private state: ChainStateSnapshot
     private stepResults: StepResult[] = []
     private sweepIndex = 0
+    /** Live ServiceRegistry reused across chain replay steps (not part of snapshots). */
+    private serviceRegistry: unknown
 
     constructor(initialState?: ChainStateSnapshot) {
         this.state = initialState ?? {
@@ -121,6 +123,14 @@ export class ChainState {
 
     getSweepIndex(): number {
         return this.sweepIndex
+    }
+
+    getServiceRegistry<T = unknown>(): T | undefined {
+        return this.serviceRegistry as T | undefined
+    }
+
+    setServiceRegistry(registry: unknown): void {
+        this.serviceRegistry = registry
     }
 
     getFusionAccounts(): ChainFusionAccount[] {
@@ -278,3 +288,4 @@ export class ChainState {
         fs.writeFileSync(filePath, JSON.stringify(this.state, null, 2) + '\n')
     }
 }
+

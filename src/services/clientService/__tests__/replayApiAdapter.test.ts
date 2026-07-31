@@ -79,6 +79,61 @@ describe('ReplayApiAdapter', () => {
         }).toThrow(ConnectorError)
     })
 
+    it('serves repeated read calls in FIFO order', async () => {
+        const entries: ApiLogEntry[] = [
+            {
+                api: 'search',
+                method: 'searchPost',
+                args: [{ search: { query: { query: 'status:active' } } }],
+                response: { data: [{ id: 'first' }] },
+                timestamp: '2026-01-01T00:00:00.000Z',
+            },
+            {
+                api: 'search',
+                method: 'searchPost',
+                args: [{ search: { query: { query: 'status:active' } } }],
+                response: { data: [{ id: 'second' }] },
+                timestamp: '2026-01-01T00:00:01.000Z',
+            },
+        ]
+        const adapter = new ReplayApiAdapter(entries)
+        const searchApi = adapter.searchApi as any
+
+        await expect(searchApi.searchPost({ search: { query: { query: 'status:active' } } })).resolves.toEqual({
+            data: [{ id: 'first' }],
+        })
+        await expect(searchApi.searchPost({ search: { query: { query: 'status:active' } } })).resolves.toEqual({
+            data: [{ id: 'second' }],
+        })
+        expect(() => {
+            searchApi.searchPost({ search: { query: { query: 'status:active' } } })
+        }).toThrow(ConnectorError)
+    })
+
+    it('seeks cursors before a step timestamp', async () => {
+        const entries: ApiLogEntry[] = [
+            {
+                api: 'accounts',
+                method: 'listAccounts',
+                args: [{ limit: 10 }],
+                response: { data: [{ id: 'first' }] },
+                timestamp: '2026-01-01T00:00:00.000Z',
+            },
+            {
+                api: 'accounts',
+                method: 'listAccounts',
+                args: [{ limit: 10 }],
+                response: { data: [{ id: 'second' }] },
+                timestamp: '2026-01-01T00:00:02.000Z',
+            },
+        ]
+        const adapter = new ReplayApiAdapter(entries)
+        const accountsApi = adapter.accountsApi as any
+
+        adapter.seekBefore('2026-01-01T00:00:02.000Z')
+        await expect(accountsApi.listAccounts({ limit: 10 })).resolves.toEqual({ data: [{ id: 'second' }] })
+    })
+
     it('exposes all 12 IscApiAdapter getters', () => {
         const adapter = new ReplayApiAdapter([])
 
@@ -171,5 +226,6 @@ describe('loadApiLog', () => {
         }
     })
 })
+
 
 

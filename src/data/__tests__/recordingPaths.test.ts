@@ -1,4 +1,4 @@
-import { recordingCacheKey, recordingChainDir, recordingChainDirRelative } from '../recordingPaths'
+import { parseRecordingChainRef, recordingCacheKey, recordingChainDir, recordingChainDirRelative } from '../recordingPaths'
 
 describe('recordingPaths', () => {
     const baseurl = 'https://acme.api.identitynow.com'
@@ -23,5 +23,21 @@ describe('recordingPaths', () => {
 
     it('builds cache keys scoped by tenant and chain name', () => {
         expect(recordingCacheKey('prod-baseline', baseurl)).toBe('acme/prod-baseline')
+    })
+
+    it('parses qualified tenant/chain references without baseurl', () => {
+        expect(parseRecordingChainRef('company12926-poc/fernando')).toEqual({
+            tenant: 'company12926-poc',
+            chainName: 'fernando',
+            chainRef: 'company12926-poc/fernando',
+        })
+        expect(recordingChainDir('company12926-poc/fernando')).toMatch(
+            /recordings[/\\]company12926-poc[/\\]fernando$/
+        )
+        expect(recordingCacheKey('company12926-poc/fernando')).toBe('company12926-poc/fernando')
+    })
+
+    it('rejects trailing slash without chain name', () => {
+        expect(() => parseRecordingChainRef('company12926-poc/')).toThrow(/chain name is missing/)
     })
 })

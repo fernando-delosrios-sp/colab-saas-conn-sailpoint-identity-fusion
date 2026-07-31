@@ -3,10 +3,10 @@ const readline = require('readline')
 const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
-const { chainDir } = require('./recording-paths.cjs')
+const { chainDir, parseRecordingChainRef } = require('./recording-paths.cjs')
 const { finalizeChainArtifacts, countNdjsonLines } = require('./finalize-chain-artifacts.cjs')
 
-function ensureFinalized(logDir, safeName) {
+function ensureFinalized(logDir, chainRef) {
     const manifestPath = path.join(logDir, 'manifest.json')
     const scenarioPath = path.join(logDir, 'scenario.json')
     const apiLogPath = path.join(logDir, 'api-log.ndjson')
@@ -15,7 +15,7 @@ function ensureFinalized(logDir, safeName) {
     if (!fs.existsSync(scenarioPath) && fs.existsSync(stepsPath)) {
         console.log('Writing scenario.json and manifest.json from recorded steps...')
         try {
-            const result = finalizeChainArtifacts(safeName)
+            const result = finalizeChainArtifacts(chainRef)
             console.log(`Finalized: ${result.stepCount} steps, ${result.apiLogEntryCount} api-log entries`)
         } catch (err) {
             console.warn(`WARNING: could not finalize artifacts: ${err.message}`)
@@ -59,15 +59,22 @@ const rl = readline.createInterface({
     output: process.stdout,
 })
 
-rl.question('Enter chain name: ', (chainName) => {
-    const trimmed = (chainName || '').trim()
+rl.question('Enter chain reference (tenant/chain, e.g. company12926-poc/fernando): ', (chainInput) => {
+    const trimmed = (chainInput || '').trim()
     if (!trimmed) {
-        console.error('Chain name is required')
+        console.error('Chain reference is required (tenant/chain)')
         process.exit(1)
     }
 
-    const safeName = trimmed.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()
-    const logDir = chainDir(safeName)
+    let chainRef
+    try {
+        chainRef = parseRecordingChainRef(trimmed).chainRef
+    } catch (err) {
+        console.error(err.message)
+        process.exit(1)
+    }
+
+    const logDir = chainDir(chainRef)
     const logFile = path.join(logDir, 'connector.log')
     const expectedArtifacts = [
         path.join(logDir, 'manifest.json'),
@@ -82,7 +89,7 @@ rl.question('Enter chain name: ', (chainName) => {
 
     const logStream = fs.createWriteStream(logFile, { flags: 'w' })
 
-    console.log(`Recording to chain: ${safeName}`)
+    console.log(`Recording to chain: ${chainRef}`)
     console.log(`Artifact directory: ${logDir}`)
     console.log('Expected artifacts on exit:')
     for (const artifact of expectedArtifacts) {
@@ -98,7 +105,7 @@ rl.question('Enter chain name: ', (chainName) => {
         env: {
             ...process.env,
             RECORD_MODE: 'true',
-            RECORD_CHAIN_NAME: safeName,
+            RECORD_CHAIN_NAME: chainRef,
             VERBOSE_RECORDING: 'true',
         },
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -122,7 +129,6 @@ rl.question('Enter chain name: ', (chainName) => {
         if (!child.killed) {
             child.kill('SIGINT')
         }
-        // spcx often exits before the connector async SIGINT handler completes
         setTimeout(() => {
             if (!child.killed) {
                 child.kill('SIGTERM')
@@ -136,9 +142,8 @@ rl.question('Enter chain name: ', (chainName) => {
     child.on('exit', (code) => {
         logStream.end()
         console.log('')
-        // Brief pause so async api-log writes can flush before reading artifacts from disk
         setTimeout(() => {
-            ensureFinalized(logDir, safeName)
+            ensureFinalized(logDir, chainRef)
             console.log(`Recording artifacts under ${path.relative(process.cwd(), logDir)}/`)
             console.log(`Connector logs saved to: ${logFile}`)
             process.exit(code ?? 0)
@@ -150,4 +155,3 @@ rl.question('Enter chain name: ', (chainName) => {
         process.exit(1)
     })
 })
-

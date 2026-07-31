@@ -19,7 +19,10 @@ import { readSettings as readNormalAttributeSettings } from '../../../data/confi
 import { getInternalConfigFlat } from '../../../data/config/internal'
 import type { MatchingResultsSnapshot } from '../../recordingService/matchingResultsSnapshot'
 
-const RECORDING_DIR = path.join(process.cwd(), 'recordings', 'fernando')
+import { recordingChainDir } from '../../../data/recordingPaths'
+
+const CHAIN_REF = 'company12926-poc/fernando'
+const RECORDING_DIR = recordingChainDir(CHAIN_REF)
 const SCENARIO_PATH = path.join(RECORDING_DIR, 'scenario.json')
 const MATCHING_RESULTS_PATH = path.join(RECORDING_DIR, 'reports', 'matching-results.json')
 const FERNANDO_RECORDING_AVAILABLE =
@@ -216,4 +219,5 @@ describe('fernando recording match replay', () => {
         }
     )
 })
+
 

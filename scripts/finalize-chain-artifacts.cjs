@@ -1,6 +1,6 @@
 const fs = require('fs')
 const path = require('path')
-const { chainDir } = require('./recording-paths.cjs')
+const { chainDir, parseRecordingChainRef } = require('./recording-paths.cjs')
 
 function countNdjsonLines(filePath) {
     if (!fs.existsSync(filePath)) return 0
@@ -100,9 +100,9 @@ function buildScenario(chainName, steps, dir) {
 }
 
 /** Writes scenario.json and manifest.json from on-disk steps/api-log. */
-function finalizeChainArtifacts(chainName) {
-    const safeName = chainName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()
-    const dir = chainDir(safeName)
+function finalizeChainArtifacts(chainRef) {
+    const { chainRef: normalized } = parseRecordingChainRef(chainRef)
+    const dir = chainDir(normalized)
     const steps = loadStepsFromDisk(dir)
     const apiLogPath = path.join(dir, 'api-log.ndjson')
     const apiLogEntryCount = countNdjsonLines(apiLogPath)
@@ -112,7 +112,7 @@ function finalizeChainArtifacts(chainName) {
     const stepsPath = path.join(dir, 'steps.ndjson')
     const reportsPath = path.join(dir, 'reports', 'aggregation.json')
 
-    const scenario = buildScenario(safeName, steps, dir)
+    const scenario = buildScenario(normalized, steps, dir)
     fs.writeFileSync(scenarioPath, JSON.stringify(scenario, null, 2) + '\n')
 
     const artifactPaths = [
@@ -130,7 +130,7 @@ function finalizeChainArtifacts(chainName) {
     const manifest = {
         version: '1.0.0',
         store: 'ndjson',
-        chainName: safeName,
+        chainName: normalized,
         recordedAt: new Date().toISOString(),
         apiLogPath: path.relative(process.cwd(), apiLogPath),
         apiLogEntryCount,
@@ -148,3 +148,4 @@ function finalizeChainArtifacts(chainName) {
 }
 
 module.exports = { finalizeChainArtifacts, countNdjsonLines, loadStepsFromDisk, buildScenario, loadExistingConfig }
+
