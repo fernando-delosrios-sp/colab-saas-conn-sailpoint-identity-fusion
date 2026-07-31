@@ -88,6 +88,8 @@ Include attributes that help reviewers decide if identities are matches:
 
 ## Step 4: Set up access profiles for reviewers
 
+See [Managing reviewers](managing-reviewers.md) for the recommended access-profile model, global vs per-source assignment, and workload tuning. The steps below summarize the same workflow in the Match setup context.
+
 ### Create reviewer access profiles
 
 For each source, create an access profile that grants reviewer permissions. The connector automatically creates a dedicated reviewer entitlement for each managed source that can be assigned to your users.
@@ -124,19 +126,7 @@ Create an access profile for viewing match reports:
 
 ## Enforced correlation role
 
-An **enforced correlation role** is an automatically mergeed ISC role that operates on Fusion identities to ensure that managed accounts are correlated to their corresponding Fusion identities.
-
-- **What it does**
-    - Assigns a **correlated action entitlement** to those Fusion identities that currently have either:
-        - the **action correlated entitlement**, **or**
-        - the **status uncorrelated entitlement**.
-    - This means the **assignment criteria intentionally include the same entitlement the role assigns**, and the two conditions (already correlated vs. still uncorrelated) are mutually exclusive.
-- **Why the criteria look “always true”**
-    - Because the role targets Fusion identities that are either correlated or uncorrelated, its criteria are effectively always true for any Fusion identity in scope. This is **by design**:
-        - Uncorrelated accounts get the correlated action entitlement so that they are brought into correlation.
-        - Already correlated accounts keep the correlated action entitlement so their state remains consistent.
-- **How this relates to aggregation correlation**
-    - If **Correlation mode** is set to **Do not correlate**, configuring an enforced correlation role is the supported way to still ensure that new managed accounts are correlated to their Fusion identities during or after aggregation.
+See [Managing correlation](managing-correlation.md#enforced-correlation-role) for enforced correlation role behavior and when to use it with **Do not correlate**.
 
 ---
 
@@ -295,7 +285,9 @@ Track these metrics to assess Match effectiveness:
 
 - For algorithm selection and tuning, see [Effective use of matching algorithms](tuning-matching-algorithms.md).
 - For attribute merging strategies, see [Effective use of Map](mapping-attributes.md).
-- For ISC setup (connection, schema, identity profile), see [First aggregation](../../getting-started/first-aggregation.md).
+- For ISC setup (connection, schema, identity profile), see [Use guides overview](../index.md#first-aggregation-checklist).
+- For reviewer access profiles and assignment, see [Managing reviewers](managing-reviewers.md).
+
 
 
 

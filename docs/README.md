@@ -1,19 +1,20 @@
 # Identity Fusion NG — Documentation
 
-Identity Fusion NG documentation is published as an MkDocs site with six top-level sections.
+Identity Fusion NG documentation is published as an MkDocs site with five top-level sections.
 
 ## Site sections
 
 | Section | Start here | Description |
 | --- | --- | --- |
 | **Home** | [Home](index.md) | Product framing and inline Map-Define-Match framework |
-| **Getting started** | [Overview](getting-started/overview.md) | Prerequisites, operation modes, first aggregation checklist |
 | **Configuration reference** | [Configuration reference](configuration/index.md) | Generated field reference from `connector-spec.json` |
-| **Use guides** | [Use guides overview](use-guides/index.md) | Scenario-driven how-tos (configuration, operation, validation, deployment) |
+| **Use guides** | [Use guides overview](use-guides/index.md) | Prerequisites, first aggregation, and scenario-driven how-tos |
 | **Glossary** | [Glossary](glossary.md) | Canonical domain terms |
 | **Technical reference** | [Standard account schema](reference/standard-account-schema.md) | Schema, Velocity context, observability, operations, proxy, chain recording |
 
 ## Use guides index
+
+The [Use guides overview](use-guides/index.md) includes prerequisites, the first-aggregation checklist, operation modes, and links to every guide below.
 
 ### Configuration guides
 
@@ -22,9 +23,11 @@ Identity Fusion NG documentation is published as an MkDocs site with six top-lev
 | [Mapping attributes](use-guides/configuration/mapping-attributes.md) | Attribute mapping and merge strategies |
 | [Defining attributes](use-guides/configuration/defining-attributes.md) | Velocity, unique IDs, UUIDs, counters |
 | [Matching identities](use-guides/configuration/matching-identities.md) | Match detection and baseline configuration |
-| [Review forms and reviewers](use-guides/configuration/review-forms-and-reviewers.md) | Manual review workflow and access profiles |
+| [Managing correlation](use-guides/configuration/managing-correlation.md) | Correlation modes, reverse correlation, enforced roles |
+| [Managing reviewers](use-guides/configuration/managing-reviewers.md) | Reviewer access profiles and assignment |
+| [Review forms and reviewers](use-guides/configuration/review-forms-and-reviewers.md) | Manual review workflow and Match flow |
 | [Tuning matching algorithms](use-guides/configuration/tuning-matching-algorithms.md) | Algorithms, thresholds, and score blending |
-| [Configuring sources](use-guides/configuration/configuring-sources.md) | Source scope, aggregation, and correlation modes |
+| [Configuring sources](use-guides/configuration/configuring-sources.md) | Source scope, aggregation, and source types |
 
 ### Operation guides
 
@@ -54,4 +57,3 @@ npm run docs:serve
 ```
 
 Generated Configuration reference pages live under `docs/configuration/` and are recreated on each `docs:prepare` run. The Home page is authored in `docs/index.md`.
-

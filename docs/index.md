@@ -62,7 +62,7 @@ Compare Fusion accounts to identities in scope using similarity rules and option
 
 See [Matching identities](./use-guides/configuration/matching-identities.md) and [Attribute Matching Settings](./configuration/matching.md).
 
-For authoritative, Records, and Orphan source-type details, see [Getting started — Operation modes](./getting-started/overview.md#operation-modes).
+For authoritative, Records, and Orphan source-type details, see [Use guides — Operation modes](./use-guides/index.md#operation-modes).
 
 ## When to use it
 
@@ -75,14 +75,16 @@ For authoritative, Records, and Orphan source-type details, see [Getting started
 | **Records (register-only)** | Generate and register unique attribute values (for example usernames or employee IDs) from a source without creating Fusion accounts or identities. |
 | **Orphan (match-only)** | Use supplemental directory data to improve Match scoring without ever creating identities from that source. |
 
-For full **Authoritative**, **Records**, and **Orphan** source-type behavior, see [Getting started — Operation modes](./getting-started/overview.md#operation-modes).
+For full **Authoritative**, **Records**, and **Orphan** source-type behavior, see [Use guides — Operation modes](./use-guides/index.md#operation-modes).
 
 ## Read next
 
 | Step | Resource |
 | --- | --- |
-| Shortest path to a first aggregation | [Getting started — First aggregation](./getting-started/first-aggregation.md) |
-| Prerequisites and operation modes | [Getting started — Overview](./getting-started/overview.md) |
+| Shortest path to a first aggregation | [Use guides — First aggregation checklist](./use-guides/index.md#first-aggregation-checklist) |
+| Prerequisites and operation modes | [Use guides overview](./use-guides/index.md) |
+| Correlation modes and planning | [Managing correlation](./use-guides/configuration/managing-correlation.md) |
+| Reviewer assignment | [Managing reviewers](./use-guides/configuration/managing-reviewers.md) |
 | Field-level configuration reference | [Configuration reference](./configuration/index.md) |
 | Scenario-driven setup guides | [Use guides overview](./use-guides/index.md) |
 | Connector operations (APIs ISC calls) | [Connector operations reference](./operations/index.md) |
@@ -108,5 +110,6 @@ For full **Authoritative**, **Records**, and **Orphan** source-type behavior, se
 5. **Discover schema** — Run **Discover Schema** so ISC has the combined account schema.
 6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
 
-See [First aggregation](./getting-started/first-aggregation.md) for the full checklist.
+See [Use guides — First aggregation checklist](./use-guides/index.md#first-aggregation-checklist) for the full checklist.
+
 
