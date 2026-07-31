@@ -1063,7 +1063,7 @@
                         },
                         {
                             "key": "externalTargetUrl",
-                            "label": "External target URL",
+                            "label": "Server",
                             "type": "url",
                             "required": false,
                             "parentKey": "externalProcessingEnabled",
@@ -1072,10 +1072,10 @@
                         },
                         {
                             "key": "externalTargetPassword",
-                            "label": "External target password",
+                            "label": "Password",
                             "type": "secret",
-                            "required": true,
-                            "parentKey": "externalProxyEnabled",
+                            "required": false,
+                            "parentKey": "externalProcessingEnabled",
                             "parentValue": "true",
                             "helpKey": "Shared secret for proxy authentication. Required when proxy mode is enabled. See [External target password](configuration/advanced.md#externaltargetpassword)."
                         },
