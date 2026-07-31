@@ -19,6 +19,11 @@ flowchart TD
     Status --> Out([Return updated ISC account])
 ```
 
+
+## Architecture diagram
+
+![Account Update architecture diagram](../assets/images/operations/accountUpdate.png)
+
 1.  **Input Validation**:
     - Verifies that the `identity` (ID) and `changes` list are provided and that `changes` is non-empty.
     - Computes the list of reverse-correlation attributes from sources configured with `correlationMode: 'reverse'` and a `correlationAttribute`. An empty reverse-correlation snapshot is created.

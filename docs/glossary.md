@@ -229,6 +229,10 @@ Configuration is organized into menus and sections in the connector source in IS
 
 | Term | Definition |
 |------|------------|
+| **Umbrella mode** | Deployment pattern where the Fusion source is **authoritative** in ISC. Fusion owns correlation and identity-creation decisions for configured managed sources. Match is typically required. See [Configuring sources and scope](use-guides/configuration/configuring-sources-and-scope.md#deployment-modes-umbrella-vs-side-car). |
+| **Side-car mode** | Deployment pattern where the Fusion source is usually **non-authoritative**. Fusion runs Map and Define (and optional Orphan Match) alongside other authoritative sources without owning identity lifecycle. See [Configuring sources and scope](use-guides/configuration/configuring-sources-and-scope.md#deployment-modes-umbrella-vs-side-car). |
+| **Sources scope** | The set of managed accounts fetched from sources listed under **Authoritative account sources**, after per-source filters. Defines which account rows enter Map, Define, and Match. Distinct from identity scope. |
+| **Identity scope** | The set of ISC identities included when **Include identities in the scope?** is enabled, filtered by **Identity Scope Query**. Optional; provides a Match baseline from identity profiles before managed accounts exist. When disabled, baseline comes from managed and Fusion accounts only. |
 | **Proxy mode** | A deployment option where connector logic runs on an external server and communicates with ISC via a lightweight proxy connector. Offloads processing from ISC infrastructure. |
 | **External logging** | Sending connector log output to an external endpoint (e.g., Splunk, Datadog) for centralized monitoring. Controlled by the external logging URL and level settings. |
 | **External logging level** | The minimum severity for logs sent to the external endpoint. Options: Error, Warn, Info, Debug. |
@@ -248,6 +252,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Golden artifact** | A pre-validated expected output file (e.g., `output.sweep1.expected.json`) used as the reference for automated test comparison. Generated artifacts are compared against golden artifacts to detect regressions. |
 | **Sweep** (testing) | A single aggregation run within a test scenario. Multi-sweep scenarios (sweep 1, sweep 2) validate stateful behavior across sequential aggregations. |
 | **Side effects** | Non-account changes produced during an aggregation run (e.g., form creation, correlation API calls). Captured in side-effect files for test validation. |
+
 
 
 

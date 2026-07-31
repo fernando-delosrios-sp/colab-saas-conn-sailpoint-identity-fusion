@@ -19,6 +19,11 @@ flowchart TD
     Epilogue --> End([End])
 ```
 
+
+## Architecture diagram
+
+![Account List architecture diagram](../assets/images/operations/accountList.png)
+
 | Phase | Log prefix | Code | Summary |
 | ----- | ---------- | ---- | ------- |
 | 1 | `PHASE 1 Setup` | `setupPhase` | Sources, lock, reset flags, schema, reverse correlation |

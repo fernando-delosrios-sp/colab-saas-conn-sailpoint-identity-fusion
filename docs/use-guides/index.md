@@ -1,8 +1,16 @@
 # Use guides
 
-Scenario-based guides for configuring, operating, validating, and deploying Identity Fusion NG. Start here for prerequisites, your first aggregation, and an index of every guide.
+Scenario-based guides for configuring, operating, validating, and deploying Identity Fusion NG. Start with [Getting started](../getting-started/overview.md) for a Day 1–7 checklist, or use [Which guide do I need?](../getting-started/which-guide.md) to pick a configuration path.
 
 Each guide walks through real setup patterns and tuning recipes. For exact field keys, types, defaults, and allowed values, use the linked [Configuration reference](../configuration/index.md) page.
+
+## Getting started
+
+| Guide | Description |
+| ----- | ----------- |
+| [Overview](../getting-started/overview.md) | Day 1–7 checklist, operation modes, umbrella vs side-car |
+| [First aggregation](../getting-started/first-aggregation.md) | Run and verify your first aggregation |
+| [Which guide do I need?](../getting-started/which-guide.md) | Decision tree to configuration guides |
 
 ## Prerequisites
 
@@ -60,6 +68,7 @@ The connector can run side by side with other ISC sources. In **umbrella mode**,
 | [Managing reviewers](configuration/managing-reviewers.md) | Reviewer access profiles, global vs per-source assignment, and review workload. |
 | [Review forms and reviewers](configuration/review-forms-and-reviewers.md) | Review form fields, expiration, automatic merge, and end-to-end Match flow. |
 | [Tuning matching algorithms](configuration/tuning-matching-algorithms.md) | Algorithms, thresholds, and how scores combine. |
+| [Match tuning cookbooks](configuration/match-tuning-cookbooks.md) | HR+AD, Records pool, and Orphan cleanup worked examples. |
 
 ## Operation guides
 
@@ -85,8 +94,10 @@ The connector can run side by side with other ISC sources. In **umbrella mode**,
 
 | Goal | Resource |
 | --- | --- |
+| Getting started checklist | [Getting started — Overview](../getting-started/overview.md) |
 | Field-level configuration reference | [Configuration reference](../configuration/index.md) |
 | Map, Define, Match framework overview | [Home](../index.md) |
 | Domain terms | [Glossary](../glossary.md) |
 | Connector operations (APIs ISC calls) | [Connector operations reference](../operations/index.md) |
 | Status and reviewer entitlements | [Entitlement list](../operations/entitlement-list.md) |
+

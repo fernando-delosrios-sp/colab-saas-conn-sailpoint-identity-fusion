@@ -20,11 +20,7 @@ Advanced Settings are organized into four sections:
 | **External Settings**            | Shared external target, proxy mode, logging, recording        | Proxy deployments, centralized logging, scenario recording on server  |
 | **Advanced Connection Settings** | API behavior: queue, retry, timeouts, concurrency             | Production tuning, rate limit management, performance optimization |
 
-**Screenshot placeholder:** Advanced Settings menu interface.
-
 ![Advanced Settings menu - Overview](../../assets/images/advanced-settings-menu.png)
-
-<!-- PLACEHOLDER: Screenshot of Advanced Settings with Developer and Advanced Connection sections. Save as docs/assets/images/advanced-settings-menu.png -->
 
 ---
 
@@ -48,8 +44,6 @@ See [Advanced Settings — Developer Settings](../../configuration/advanced.md) 
 | Scoring concurrency limit | [#scoringmaxconcurrency](../../configuration/advanced.md#scoringmaxconcurrency) | Low |
 
 External logging moved to [External Settings](../../configuration/advanced.md#external-settings) — see below.
-
-**Screenshot placeholder:** Developer Settings interface.
 
 ![Developer Settings - Configuration](../../assets/images/advanced-settings-developer.png)
 
@@ -270,11 +264,7 @@ Advanced Connection Settings control API behavior, resilience, and performance.
 | **Queue**                 | Max concurrent requests, Parallel batch size, Requests per second | Rate limiting and concurrency control |
 | **Retry**                 | API request retries                            | Automatic retry for failed requests   |
 
-**Screenshot placeholder:** Advanced Connection Settings interface.
-
 ![Advanced Connection Settings - Configuration](../../assets/images/advanced-settings-connection.png)
-
-<!-- PLACEHOLDER: Screenshot of Advanced Connection Settings. Save as docs/assets/images/advanced-settings-connection.png -->
 
 ### Provisioning and timing
 
@@ -579,6 +569,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](../../reference/proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md).
+
 
 
 

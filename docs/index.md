@@ -81,7 +81,9 @@ For full **Authoritative**, **Records**, and **Orphan** source-type behavior, se
 
 | Step | Resource |
 | --- | --- |
-| Shortest path to a first aggregation | [Use guides — First aggregation checklist](./use-guides/index.md#first-aggregation-checklist) |
+| Day 1–7 onboarding checklist | [Getting started — Overview](./getting-started/overview.md) |
+| Shortest path to a first aggregation | [Getting started — First aggregation](./getting-started/first-aggregation.md) |
+| Choose the right guide | [Which guide do I need?](./getting-started/which-guide.md) |
 | Prerequisites and operation modes | [Use guides overview](./use-guides/index.md) |
 | Correlation modes and planning | [Managing correlation](./use-guides/configuration/managing-correlation.md) |
 | Reviewer assignment | [Managing reviewers](./use-guides/configuration/managing-reviewers.md) |
@@ -112,6 +114,7 @@ For full **Authoritative**, **Records**, and **Orphan** source-type behavior, se
 6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
 
 See [Use guides — First aggregation checklist](./use-guides/index.md#first-aggregation-checklist) for the full checklist.
+
 
 
 

@@ -17,12 +17,20 @@ theme:
         - search.suggest
         - search.highlight
         - content.code.copy
+        - content.action.edit
         - toc.follow
+    icon:
+        edit: material/pencil
+    edit_uri: edit/main/docs/
 
 nav:
     - Home: index.md
     - Use guides:
           - Use guides overview: use-guides/index.md
+          - Getting started:
+                - Overview: getting-started/overview.md
+                - First aggregation: getting-started/first-aggregation.md
+                - Which guide do I need?: getting-started/which-guide.md
           - Configuration guides:
                 - Configuring sources and scope: use-guides/configuration/configuring-sources-and-scope.md
                 - Source types: use-guides/configuration/source-types.md
@@ -33,6 +41,7 @@ nav:
                 - Managing reviewers: use-guides/configuration/managing-reviewers.md
                 - Review forms and reviewers: use-guides/configuration/review-forms-and-reviewers.md
                 - Tuning matching algorithms: use-guides/configuration/tuning-matching-algorithms.md
+                - Match tuning cookbooks: use-guides/configuration/match-tuning-cookbooks.md
     - Configuration:
           - Configuration reference: configuration/index.md
           - Connection Settings: configuration/connection.md
@@ -57,6 +66,7 @@ nav:
           - Observability: reference/observability.md
           - Proxy deployment: reference/proxy-mode.md
           - Scenario recording: reference/scenario-recording.md
+          - Configuration to account-list phases: reference/config-to-phases.md
           - Connector operations:
                 - Connector operations (APIs ISC calls): operations/index.md
                 - Connectivity:
@@ -82,6 +92,7 @@ markdown_extensions:
               - name: mermaid
                 class: mermaid
                 format: !!python/name:pymdownx.superfences.fence_code_format
+
 
 
 

@@ -22,11 +22,7 @@ Matching algorithms calculate **similarity scores** (0–100) between attribute 
 | **Minimum combined match score**  | Global floor for the weighted combined score                   | Matching Settings (0–100)                                                           |
 | **Mandatory match**               | Rule must pass its minimum for a potential match               | Per attribute (Yes/No)                                                              |
 
-**Screenshot placeholder:** Fusion attribute matches configuration.
-
 ![Fusion attribute matches - Configuration interface](../../assets/images/matching-algorithms-config.png)
-
-<!-- PLACEHOLDER: Screenshot of Attribute Matching Settings > Fusion attribute matches. Save as docs/assets/images/matching-algorithms-config.png -->
 
 ---
 
@@ -456,11 +452,7 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 | **High false negatives** | Missing obvious matches               | Lower thresholds; add more attributes; try different algorithms                                |
 | **Borderline cases**     | Many ambiguous matches                | Toggle **Enable automatic assignment** for obvious ones; manual review for borderline |
 
-**Screenshot placeholder:** Review form showing per-attribute similarity scores.
-
 ![Similarity scores on review form - Detail view](../../assets/images/matching-algorithms-scores-form.png)
-
-<!-- PLACEHOLDER: Screenshot of review form showing per-attribute similarity scores. Save as docs/assets/images/matching-algorithms-scores-form.png -->
 
 ---
 

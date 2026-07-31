@@ -59,6 +59,11 @@ flowchart TD
     Epilogue --> End([End])
 ```
 
+
+## Architecture diagram
+
+![Dry Run architecture diagram](../assets/images/operations/custom-dryrun.png)
+
 ### What runs (same as aggregation)
 
 - Managed source and identity fetch

@@ -7,10 +7,18 @@ Identity Fusion NG documentation is published as an MkDocs site with five top-le
 | Section | Start here | Description |
 | --- | --- | --- |
 | **Home** | [Home](index.md) | Product framing and inline Map-Define-Match framework |
-| **Use guides** | [Use guides overview](use-guides/index.md) | Prerequisites, first aggregation, and scenario-driven how-tos |
+| **Use guides** | [Use guides overview](use-guides/index.md) | Prerequisites, Getting started, and scenario-driven how-tos |
 | **Configuration reference** | [Configuration reference](configuration/index.md) | Generated field reference from `connector-spec.json` |
 | **Glossary** | [Glossary](glossary.md) | Canonical domain terms |
-| **Technical reference** | [Standard account schema](reference/standard-account-schema.md) | Schema, Velocity context, observability, operations, proxy, scenario recording |
+| **Technical reference** | [Standard account schema](reference/standard-account-schema.md) | Schema, Velocity context, observability, operations, config-to-phases, PAT scopes |
+
+## Getting started
+
+| Page | Description |
+| --- | --- |
+| [Overview](getting-started/overview.md) | Day 1–7 checklist and deployment mode summary |
+| [First aggregation](getting-started/first-aggregation.md) | Run and verify your first aggregation |
+| [Which guide do I need?](getting-started/which-guide.md) | Decision tree to the right configuration guide |
 
 ## Use guides index
 
@@ -29,6 +37,7 @@ The [Use guides overview](use-guides/index.md) includes prerequisites, the first
 | [Managing reviewers](use-guides/configuration/managing-reviewers.md) | Reviewer access profiles and assignment |
 | [Review forms and reviewers](use-guides/configuration/review-forms-and-reviewers.md) | Manual review workflow and Match flow |
 | [Tuning matching algorithms](use-guides/configuration/tuning-matching-algorithms.md) | Algorithms, thresholds, and score blending |
+| [Match tuning cookbooks](use-guides/configuration/match-tuning-cookbooks.md) | HR+AD, Records pool, and Orphan cleanup patterns |
 
 ### Operation guides
 
@@ -50,6 +59,18 @@ The [Use guides overview](use-guides/index.md) includes prerequisites, the first
 | --- | --- |
 | [Migrating from Identity Fusion v1](use-guides/deployment/migrating-from-identity-fusion-v1.md) | Upgrade from Identity Fusion 1.x |
 
+## Operation diagram PNGs
+
+C4 container diagrams are authored as editable `.drawio` files under `docs/operations/diagrams/`. Published pages embed PNG exports from `docs/assets/images/operations/`.
+
+**Re-export after editing a diagram:**
+
+```bash
+node scripts/export-drawio-pngs.cjs
+```
+
+Requires network access (uses the diagrams.net convert service). Alternatively, open the `.drawio` file in [draw.io](https://app.diagrams.net/) and export PNG to `docs/assets/images/operations/<operation-slug>.png`.
+
 ## Build locally
 
 ```bash
@@ -58,4 +79,3 @@ npm run docs:serve
 ```
 
 Generated Configuration reference pages live under `docs/configuration/` and are recreated on each `docs:prepare` run. The Home page is authored in `docs/index.md`.
-

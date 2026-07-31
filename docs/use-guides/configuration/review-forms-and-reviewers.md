@@ -68,17 +68,7 @@ Include attributes that help reviewers decide if identities are matches:
 | **phone**      | Contact verification     | Same phone → likely match                                 |
 | **employeeId** | Business key             | Same ID → definitely match; different → investigate       |
 
-**Screenshot placeholder:** Manual review form example.
-
 ![Match review form - Example](../../assets/images/match-review-form.png)
-
-<!-- PLACEHOLDER: Screenshot of manual review form for potential matches. Save as docs/assets/images/match-review-form.png -->
-
-**Screenshot placeholder:** Email notification to reviewer.
-
-![Email to reviewer - Notification](../../assets/images/match-email-reviewer.png)
-
-<!-- PLACEHOLDER: Screenshot of email sent to reviewer. Save as docs/assets/images/match-email-reviewer.png -->
 
 !!! note "Didactic guide"
     This page explains **how and when** to configure settings with examples. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
@@ -145,9 +135,11 @@ See [Managing correlation](managing-correlation.md#enforced-correlation-role) fo
 | 7    | **Connector** | On next aggregation, applies reviewer decision                      | Account correlated or new identity created |
 | 8    | **Connector** | Updates account history                                             | Audit trail maintained                     |
 
-**Video placeholder:** End-to-end matching walkthrough.
+### End-to-end walkthrough
 
-<!-- PLACEHOLDER: Video walking through matching: aggregation, match, form, resolution. Save as docs/assets/videos/match-flow.mp4 -->
+![Match flow — aggregation through reviewer decision](../../assets/images/match-flow.png)
+
+The table above is the static walkthrough for the manual review path. For log phase mapping, see [Config to account-list phases](../../reference/config-to-phases.md). For Match tuning patterns, see [Match tuning cookbooks](match-tuning-cookbooks.md).
 
 ### Detailed step-by-step
 
@@ -287,6 +279,7 @@ Track these metrics to assess Match effectiveness:
 - For attribute merging strategies, see [Effective use of Map](mapping-attributes.md).
 - For ISC setup (connection, schema, identity profile), see [Use guides overview](../index.md#first-aggregation-checklist).
 - For reviewer access profiles and assignment, see [Managing reviewers](managing-reviewers.md).
+
 
 
 

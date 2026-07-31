@@ -15,8 +15,8 @@ Identity Fusion NG can run in two common patterns. The Fusion source **Authorita
 
 | Pattern | Fusion source authoritative? | Typical use | Match? | Map / Define? |
 | --- | --- | --- | --- | --- |
-| **Umbrella mode** | **Yes** | Fusion owns correlation and identity-creation decisions for configured managed sources | Required for similarity-based deduplication | Yes |
-| **Side-car mode** | **No** | Enrich identities with computed attributes, register unique values, or process orphan supplemental data alongside existing authoritative sources | Optional (Fusion does not create identities authoritatively) | Yes |
+| **[Umbrella mode](../../glossary.md#deployment-and-integration)** | **Yes** | Fusion owns correlation and identity-creation decisions for configured managed sources | Required for similarity-based deduplication | Yes |
+| **[Side-car mode](../../glossary.md#deployment-and-integration)** | **No** | Enrich identities with computed attributes, register unique values, or process orphan supplemental data alongside existing authoritative sources | Optional (Fusion does not create identities authoritatively) | Yes |
 
 ```mermaid
 flowchart LR
@@ -47,8 +47,8 @@ Two scope concepts work together but answer different questions:
 
 | Concept | Configuration | What it includes |
 | --- | --- | --- |
-| **Sources scope** | **Authoritative account sources** list | Managed accounts fetched from each configured source (after filters) |
-| **Identity scope** | **Include identities in the scope?** + **Identity Scope Query** | ISC identities matching the search query |
+| **[Sources scope](../../glossary.md#deployment-and-integration)** | **Authoritative account sources** list | Managed accounts fetched from each configured source (after filters) |
+| **[Identity scope](../../glossary.md#deployment-and-integration)** | **Include identities in the scope?** + **Identity Scope Query** | ISC identities matching the search query |
 
 ```mermaid
 flowchart TD
@@ -123,7 +123,7 @@ When disabled:
 | **Source type** | Authoritative accounts, Records, or Orphan accounts | Yes | See [Source types](source-types.md) |
 | **Include record accounts in Match** | Match scoring for Records sources | No (Records only) | Default on |
 | **Disable non-matching accounts** | Disable orphan non-matches | No (Orphan only) | Background disable on managed source |
-| **Deferred candidate matching** | Same-run deferred-candidate comparison | No (Authoritative only) | Same source only; never cross-source |
+| **[Deferred candidate matching](../../glossary.md#candidates)** | Same-run deferred-candidate comparison | No (Authoritative only) | Same source only; never cross-source |
 | **Accounts API filter** | Server-side account list filter | No | ISC `filters` parameter |
 | **Accounts JMESPath filter** | Client-side page filter | No | Applied to `{ "accounts": [...] }` |
 | **Aggregation batch size** | Cap accounts per aggregation | No | Empty = all accounts |
@@ -223,3 +223,4 @@ See [Managing reviewers](managing-reviewers.md) and [Review forms and reviewers]
 | Match baseline and thresholds | [Matching identities](matching-identities.md) |
 | Reviewer entitlements and access profiles | [Managing reviewers](managing-reviewers.md) |
 | Field keys and defaults | [Source Settings](../../configuration/source.md) |
+

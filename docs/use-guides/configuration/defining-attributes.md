@@ -52,8 +52,8 @@ Add each attribute under **Normal Attribute Definitions** or **Unique Attribute 
 | Immutable UUID | Unique | `$UUID` |
 | Sequential employee number | Unique | `EMP-$counter` with **Use incremental counter?** = Yes |
 
-**Screenshot placeholder:** Attribute Definition with examples.
-Attribute definition example
+![Attribute definition example](../../assets/images/attribute-management-mapping-merge.png)
+
 
 ---
 
