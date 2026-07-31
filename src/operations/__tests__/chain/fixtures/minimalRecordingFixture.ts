@@ -2,6 +2,9 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { recordingChainDir } from '../../../../data/recordingPaths'
 
+/** Default baseurl for harness fixtures — yields tenant slug `example`. */
+export const FIXTURE_BASEURL = 'https://example.identitynow.com'
+
 export interface MinimalScenarioOptions {
     chainName?: string
     includeDriftGolden?: boolean
@@ -46,17 +49,18 @@ export function writePassingScenario(dir: string, options: MinimalScenarioOption
     return scenarioPath
 }
 
-/** Creates a chain under recordings/{chainName}/ with a passing scenario. */
-export function installPassingRecordingChain(chainName: string): string {
-    const dir = recordingChainDir(chainName)
+/** Creates a chain under recordings/<tenant>/{chainName}/ with a passing scenario. */
+export function installPassingRecordingChain(chainName: string, baseurl = FIXTURE_BASEURL): string {
+    const dir = recordingChainDir(chainName, baseurl)
     writePassingScenario(dir, { chainName })
     return dir
 }
 
-/** Removes a chain directory under recordings/ if present. */
-export function removeRecordingChain(chainName: string): void {
-    const dir = recordingChainDir(chainName)
+/** Removes a chain directory under recordings/<tenant>/ if present. */
+export function removeRecordingChain(chainName: string, baseurl = FIXTURE_BASEURL): void {
+    const dir = recordingChainDir(chainName, baseurl)
     if (fs.existsSync(dir)) {
         fs.rmSync(dir, { recursive: true, force: true })
     }
 }
+

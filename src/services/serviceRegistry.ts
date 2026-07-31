@@ -113,8 +113,8 @@ export class ServiceRegistry {
                 this.bindRecordingHooks()
             } else if (recMode === 'replay') {
                 const chainName = this.config.recording?.chainName
-                const chainDir = chainName ? recordingChainDirRelative(chainName) : undefined
-                const entries = chainDir ? loadRecordingApiLog(chainDir) : []
+                const chainDir = chainName ? recordingChainDirRelative(chainName, this.config.baseurl) : undefined
+                const entries = chainDir ? loadRecordingApiLog(chainDir, this.config.baseurl) : []
                 adapter = new ReplayApiAdapter(entries, adapter.config)
             }
 
@@ -306,6 +306,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 

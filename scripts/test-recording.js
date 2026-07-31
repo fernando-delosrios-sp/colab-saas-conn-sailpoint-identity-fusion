@@ -3,20 +3,12 @@ const readline = require('readline')
 const { spawnSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
-const { RECORDINGS_ROOT, chainDir } = require('./recording-paths.cjs')
+const { chainDir, listTenantChainDirs } = require('./recording-paths.cjs')
 const { finalizeChainArtifacts } = require('./finalize-chain-artifacts.cjs')
 
 function listAvailableChains() {
-    if (!fs.existsSync(RECORDINGS_ROOT)) return []
-    return fs
-        .readdirSync(RECORDINGS_ROOT, { withFileTypes: true })
-        .filter((d) => {
-            if (!d.isDirectory()) return false
-            const scenario = path.join(RECORDINGS_ROOT, d.name, 'scenario.json')
-            const steps = path.join(RECORDINGS_ROOT, d.name, 'steps.ndjson')
-            return fs.existsSync(scenario) || fs.existsSync(steps)
-        })
-        .map((d) => d.name)
+    return listTenantChainDirs()
+        .map((entry) => entry.chainName)
         .sort()
 }
 
@@ -104,3 +96,4 @@ if (argChain) {
 } else {
     promptChainName(listAvailableChains())
 }
+

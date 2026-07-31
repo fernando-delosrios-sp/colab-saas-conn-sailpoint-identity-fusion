@@ -4,6 +4,7 @@ import {
     installPassingRecordingChain,
     removeRecordingChain,
     writePassingScenario,
+    FIXTURE_BASEURL,
 } from './fixtures/minimalRecordingFixture'
 import { recordingChainDir } from '../../../data/recordingPaths'
 
@@ -12,7 +13,7 @@ const REPO_ROOT = path.resolve(__dirname, '../../../..')
 function runTestRecordingScript(chainName: string): ReturnType<typeof spawnSync> {
     return spawnSync('node', ['scripts/test-recording.js', chainName], {
         cwd: REPO_ROOT,
-        env: { ...process.env },
+        env: { ...process.env, BASEURL: FIXTURE_BASEURL },
         encoding: 'utf-8',
     })
 }
@@ -23,7 +24,7 @@ describe('test-recording CLI script', () => {
 
     beforeAll(() => {
         installPassingRecordingChain(passingChain)
-        const driftDir = recordingChainDir(driftChain)
+        const driftDir = recordingChainDir(driftChain, FIXTURE_BASEURL)
         writePassingScenario(driftDir, { chainName: driftChain, includeDriftGolden: true })
     })
 
@@ -49,3 +50,4 @@ describe('test-recording CLI script', () => {
         expect(result.stderr ?? '').toContain('Record this chain first')
     })
 })
+

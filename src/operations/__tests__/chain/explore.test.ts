@@ -6,6 +6,7 @@ import { MockRegistry } from './framework/ChainContext'
 import { recordingChainDir } from '../../../data/recordingPaths'
 
 const exploreChain = process.env.EXPLORE_RECORDING_CHAIN?.trim()
+const baseurl = process.env.BASEURL
 
 describe.skipIf(!exploreChain)('Run and Inspect Step-1 Output', () => {
     beforeAll(() => {
@@ -23,7 +24,7 @@ describe.skipIf(!exploreChain)('Run and Inspect Step-1 Output', () => {
     })
 
     it(`runs step-1 and prints output for chain: ${exploreChain}`, async () => {
-        const scenarioPath = path.join(recordingChainDir(exploreChain!), 'scenario.json')
+        const scenarioPath = path.join(recordingChainDir(exploreChain!, baseurl), 'scenario.json')
         const runner = new ChainRunner(scenarioPath)
         const result = await runner.executeStep('step-1')
 
@@ -45,3 +46,4 @@ describe.skipIf(!exploreChain)('Run and Inspect Step-1 Output', () => {
         }
     })
 })
+

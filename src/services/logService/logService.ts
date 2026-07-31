@@ -49,6 +49,8 @@ type LogConfig = {
     isProxy?: boolean
     /** Optional operation name for log attribution, e.g. "accountList" */
     operationContext?: string
+    /** ISC connection base URL — used for tenant-scoped external log paths */
+    baseurl?: string
 }
 
 function resolveExternalLogRoute(config: LogConfig): ExternalLogRoute {
@@ -213,6 +215,7 @@ export class LogService {
     private externalLogRoute: ExternalLogRoute
     private externalTargetUrl?: string
     private externalLoggingLevel: LogLevel
+    private baseurl?: string
     // Track pending external log promises so they can be flushed before process exit.
     // Uses a Set for O(1) add/delete instead of array indexOf which is O(n).
     private pendingExternalLogs: Set<Promise<void>> = new Set()
@@ -256,6 +259,7 @@ export class LogService {
         this.externalTargetUrl = config.externalTargetUrl
         this.externalLogRoute = resolveExternalLogRoute(config)
         this.operationContext = config.operationContext
+        this.baseurl = config.baseurl
 
         // Also set the underlying logger level
         logger.level = this.configuredLevel
@@ -510,7 +514,7 @@ export class LogService {
         }
 
         if (this.externalLogRoute === 'disk') {
-            const pending: Promise<void> = appendLogLine(logMessage)
+            const pending: Promise<void> = appendLogLine(logMessage, this.baseurl)
                 .catch(() => {})
                 .finally(() => {
                     this.pendingExternalLogs.delete(pending)

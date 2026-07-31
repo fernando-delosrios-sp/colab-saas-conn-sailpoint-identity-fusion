@@ -69,7 +69,32 @@ describe('LogService external logging routing', () => {
         expect(appendSpy).not.toHaveBeenCalled()
     })
 
-    it('appends to default disk path on proxy server', async () => {
+    it('appends to tenant-scoped disk path on proxy server', async () => {
+        process.env.PROXY_PASSWORD = 'secret'
+        delete process.env.LOG_FILE
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+        global.fetch = fetchMock
+
+        const log = new LogService({
+            spConnDebugLoggingEnabled: false,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalLoggingEnabled: true,
+            externalTargetUrl: 'https://proxy.example.com',
+            externalLoggingLevel: 'info',
+            baseurl: 'https://acme.api.identitynow.com',
+        })
+
+        log.info('proxy server log')
+        await log.flush()
+
+        expect(fetchMock).not.toHaveBeenCalled()
+        const tenantLogDir = 'logs/acme'
+        const files = await fs.readdir(tenantLogDir)
+        expect(files.some((f) => f.startsWith('fusion-') && f.endsWith('.log'))).toBe(true)
+    })
+
+    it('uses unknown-tenant when baseurl is missing on proxy server', async () => {
         process.env.PROXY_PASSWORD = 'secret'
         delete process.env.LOG_FILE
         const fetchMock = vi.fn().mockResolvedValue({ ok: true })
@@ -84,11 +109,11 @@ describe('LogService external logging routing', () => {
             externalLoggingLevel: 'info',
         })
 
-        log.info('proxy server log')
+        log.info('fallback tenant log')
         await log.flush()
 
-        expect(fetchMock).not.toHaveBeenCalled()
-        const files = await fs.readdir('logs')
+        const tenantLogDir = 'logs/unknown-tenant'
+        const files = await fs.readdir(tenantLogDir)
         expect(files.some((f) => f.startsWith('fusion-') && f.endsWith('.log'))).toBe(true)
     })
 
@@ -133,3 +158,4 @@ describe('LogService external logging routing', () => {
         expect(fetchMock).not.toHaveBeenCalled()
     })
 })
+

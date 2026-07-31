@@ -6,10 +6,15 @@ import { readConfig } from '@sailpoint/connector-sdk'
 import { safeReadConfig } from '../../data/config/readConfig'
 import { ServiceRegistry } from '../serviceRegistry'
 import { RecordingApiAdapter } from '../clientService/recordingApiAdapter'
+import { ReplayApiAdapter } from '../clientService/replayApiAdapter'
 import { SdkApiAdapter } from '../clientService'
+import { ApiLogEntry } from '../clientService/recordingApiAdapter'
 import { loadRecordingApiLog } from '../recordingService/recordingStore'
 import { resetRecordingLifecycleForTests } from '../recordingService'
 import { OperationRunContext } from '../logService/operationRunContext'
+import { recordingChainDir } from '../../data/recordingPaths'
+import { FIXTURE_BASEURL } from '../../operations/__tests__/chain/fixtures/minimalRecordingFixture'
+import { FusionConfig } from '../../model/config'
 
 vi.mock('@sailpoint/connector-sdk', async () => {
     const actual = await vi.importActual<typeof import('@sailpoint/connector-sdk')>('@sailpoint/connector-sdk')
@@ -20,11 +25,35 @@ vi.mock('@sailpoint/connector-sdk', async () => {
 })
 
 const minimalPlatformConfig = {
-    baseurl: 'https://example.com',
+    baseurl: FIXTURE_BASEURL,
     clientId: 'id',
     clientSecret: 'secret',
     spConnectorInstanceId: 'instance-id',
     sources: [],
+}
+
+function installTenantScopedReplayChain(chainName: string, baseurl: string, entry: ApiLogEntry): string {
+    const dir = recordingChainDir(chainName, baseurl)
+    fs.mkdirSync(dir, { recursive: true })
+    const apiLogPath = path.join(dir, 'api-log.ndjson')
+    fs.writeFileSync(apiLogPath, JSON.stringify(entry) + '\n')
+    fs.writeFileSync(
+        path.join(dir, 'manifest.json'),
+        JSON.stringify({
+            version: '1.0.0',
+            store: 'ndjson',
+            chainName,
+            recordedAt: new Date().toISOString(),
+            apiLogPath: path.relative(process.cwd(), apiLogPath),
+            apiLogEntryCount: 1,
+            stepsPath: 'steps.ndjson',
+            stepCount: 0,
+            phaseCount: 0,
+            scenarioPath: 'scenario.json',
+            artifactPaths: [],
+        })
+    )
+    return dir
 }
 
 describe('ServiceRegistry recording wiring', () => {
@@ -79,6 +108,34 @@ describe('ServiceRegistry recording wiring', () => {
 
         fs.rmSync(registry.recording!.getRecordingDir(), { recursive: true, force: true })
     })
+
+    it('wires ReplayApiAdapter from tenant-scoped chain directory', async () => {
+        const chainName = `replay-registry-${Date.now()}`
+        const apiEntry: ApiLogEntry = {
+            api: 'sources',
+            method: 'listSources',
+            args: [{}],
+            response: [{ id: 'tenant-scoped-src' }],
+            timestamp: '2026-01-01T00:00:00.000Z',
+        }
+        const chainDir = installTenantScopedReplayChain(chainName, FIXTURE_BASEURL, apiEntry)
+
+        const config = {
+            ...minimalPlatformConfig,
+            recording: { mode: 'replay' as const, chainName, store: 'ndjson' as const },
+        } as FusionConfig
+
+        const registry = new ServiceRegistry(config, {}, { send: vi.fn() }, 'testConnection')
+
+        expect(registry.recording).toBeUndefined()
+        const adapter = (registry.client as any).adapter
+        expect(adapter).toBeInstanceOf(ReplayApiAdapter)
+
+        const result = await registry.client.sourcesApi.listSources({})
+        expect(result).toEqual([{ id: 'tenant-scoped-src' }])
+
+        fs.rmSync(chainDir, { recursive: true, force: true })
+    })
 })
 
 describe('loadRecordingApiLog', () => {
@@ -117,4 +174,5 @@ describe('loadRecordingApiLog', () => {
         fs.rmSync(tmpDir, { recursive: true, force: true })
     })
 })
+
 

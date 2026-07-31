@@ -18,8 +18,11 @@ export class NdjsonRecordingStore implements RecordingStore {
     private writeChain: Promise<void> = Promise.resolve()
     private dirReady = false
 
-    constructor(private readonly chainName: string) {
-        this.recordingDir = recordingChainDir(chainName)
+    constructor(
+        private readonly chainName: string,
+        baseurl?: string
+    ) {
+        this.recordingDir = recordingChainDir(chainName, baseurl)
         this.apiLogPath = path.join(this.recordingDir, 'api-log.ndjson')
         this.apiLogEntryCount = this.countLines(this.apiLogPath)
         this.phaseCount = this.countLines(path.join(this.recordingDir, COLLECTION_FILES.phases))
@@ -105,3 +108,4 @@ export class NdjsonRecordingStore implements RecordingStore {
         return content.split('\n').filter(Boolean).length
     }
 }
+

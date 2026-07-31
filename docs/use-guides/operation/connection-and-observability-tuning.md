@@ -118,7 +118,7 @@ External logging moved to [External Settings](../../configuration/advanced.md#ex
 | --- | --- |
 | **Direct ISC processing** | HTTP POST plain-text lines to **External target URL** |
 | **Proxy client (ISC)** | No external logging (proxy server owns logs) |
-| **Proxy server** | Append sanitized lines to `LOG_FILE` or `logs/fusion-{YYYYMMDD}.log` |
+| **Proxy server** | Append sanitized lines to `LOG_FILE` or `logs/<tenant>/fusion-{YYYYMMDD}.log` (`<tenant>` from Base URL; fallback `unknown-tenant`) |
 
 **Configuration** (Advanced Settings → External Settings):
 
@@ -579,6 +579,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](../../reference/proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md).
+
 
 
 

@@ -223,8 +223,8 @@ if (isProxyServer) {
 
 When **Enable external logging?** is on under External Settings, the proxy **client** (ISC) does not ship logs externally. The proxy **server** appends sanitized plain-text lines to:
 
-- `process.env.LOG_FILE` when set, otherwise
-- `logs/fusion-{YYYYMMDD}.log` under the server working directory
+- `process.env.LOG_FILE` when set (exact path — no tenant subdirectory injected), otherwise
+- `logs/<tenant>/fusion-{YYYYMMDD}.log` under the server working directory, where `<tenant>` is derived from connection **Base URL** (first hostname label; fallback `unknown-tenant`)
 
 No HTTP log receiver runs on the server — disk append only. See [connection and observability tuning](../use-guides/operation/connection-and-observability-tuning.md).
 
@@ -594,4 +594,5 @@ spec:
 
 - For general troubleshooting, see [Troubleshooting](../use-guides/validation-and-troubleshooting/troubleshooting.md).
 - For connection settings and resilience, see [Connection and observability tuning](../use-guides/operation/connection-and-observability-tuning.md).
+
 

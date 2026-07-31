@@ -76,7 +76,8 @@ export class ChainRunner {
         this.scenario = raw as ChainScenario
 
         const chainDir = path.dirname(resolved)
-        const apiLogEntries = loadRecordingApiLog(chainDir)
+        const baseurl = typeof this.scenario.config.baseurl === 'string' ? this.scenario.config.baseurl : undefined
+        const apiLogEntries = loadRecordingApiLog(chainDir, baseurl)
         if (apiLogEntries.length > 0) {
             this.replayAdapter = new ReplayApiAdapter(apiLogEntries, this.scenario.config as any)
         }
@@ -250,5 +251,6 @@ export function registerStepFn(
 function getStepFn(operation: string): ((step: StepDefinition, context: ChainContext) => Promise<unknown>) | undefined {
     return stepFns.get(operation)
 }
+
 
 
