@@ -2,7 +2,8 @@ name: Deploy docs to GitHub Pages
 
 on:
     push:
-        branches: ['main', '2.2.0/preview']
+        # main still uses the pre-restructure MkDocs IA; deploying it overwrites preview docs.
+        branches: ['2.2.0/preview']
     workflow_dispatch:
 
 permissions:
@@ -55,5 +56,6 @@ jobs:
             - name: Deploy to GitHub Pages
               id: deployment
               uses: actions/deploy-pages@v4
+
 
 
