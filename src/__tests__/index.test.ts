@@ -1,6 +1,5 @@
 import { connector } from '../index'
 import { createConnector } from '@sailpoint/connector-sdk'
-import { safeReadConfig } from '../data/config'
 import { createOperationHandler } from '../utils/operationHandler'
 import { testConnection } from '../operations/testConnection'
 import { accountList } from '../operations/accountList'
@@ -14,7 +13,6 @@ import { accountDiscoverSchema } from '../operations/accountDiscoverSchema'
 import type { Mock } from 'vitest'
 
 vi.mock('@sailpoint/connector-sdk', () => ({ createConnector: vi.fn() }))
-vi.mock('../data/config', () => ({ safeReadConfig: vi.fn() }))
 vi.mock('../utils/operationHandler', () => ({ createOperationHandler: vi.fn() }))
 vi.mock('../operations/testConnection', () => ({ testConnection: vi.fn() }))
 vi.mock('../operations/accountList', () => ({ accountList: vi.fn() }))
@@ -45,25 +43,20 @@ describe('connector factory', () => {
             command: vi.fn().mockReturnThis(),
         }
         ;(createConnector as Mock).mockReturnValue(mockConnector)
-        ;(safeReadConfig as Mock).mockResolvedValue({ some: 'config' })
         ;(createOperationHandler as Mock).mockImplementation((name) => `handler_${name}`)
     })
 
     it('should configure and return a connector with all standard operations', async () => {
         const result = await connector()
 
-        expect(safeReadConfig).toHaveBeenCalledTimes(1)
         expect(createConnector).toHaveBeenCalledTimes(1)
 
         expect(result).toBe(mockConnector)
-
-        const config = { some: 'config' }
 
         // Verify handlers were created
         expect(createOperationHandler).toHaveBeenCalledWith(
             'testConnection',
             testConnection,
-            config,
             expect.objectContaining({
                 errorMessage: 'Failed to test connection',
             })
@@ -71,39 +64,26 @@ describe('connector factory', () => {
         expect(createOperationHandler).toHaveBeenCalledWith(
             'accountList',
             accountList,
-            config,
             expect.objectContaining({
                 errorMessage: 'Failed to aggregate accounts',
                 keepAlive: 'memory',
             })
         )
-        expect(createOperationHandler).toHaveBeenCalledWith('accountRead', accountRead, config, expect.any(Object))
-        expect(createOperationHandler).toHaveBeenCalledWith('accountCreate', accountCreate, config, expect.any(Object))
+        expect(createOperationHandler).toHaveBeenCalledWith('accountRead', accountRead, expect.any(Object))
+        expect(createOperationHandler).toHaveBeenCalledWith('accountCreate', accountCreate, expect.any(Object))
         expect(createOperationHandler).toHaveBeenCalledWith(
             'accountUpdate',
             accountUpdate,
-            config,
             expect.objectContaining({
                 keepAlive: 'simple',
             })
         )
-        expect(createOperationHandler).toHaveBeenCalledWith('accountEnable', accountEnable, config, expect.any(Object))
-        expect(createOperationHandler).toHaveBeenCalledWith(
-            'accountDisable',
-            accountDisable,
-            config,
-            expect.any(Object)
-        )
-        expect(createOperationHandler).toHaveBeenCalledWith(
-            'entitlementList',
-            entitlementList,
-            config,
-            expect.any(Object)
-        )
+        expect(createOperationHandler).toHaveBeenCalledWith('accountEnable', accountEnable, expect.any(Object))
+        expect(createOperationHandler).toHaveBeenCalledWith('accountDisable', accountDisable, expect.any(Object))
+        expect(createOperationHandler).toHaveBeenCalledWith('entitlementList', entitlementList, expect.any(Object))
         expect(createOperationHandler).toHaveBeenCalledWith(
             'accountDiscoverSchema',
             accountDiscoverSchema,
-            config,
             expect.objectContaining({
                 errorMessage: 'Failed to discover schema',
             })
@@ -138,19 +118,19 @@ describe('connector factory', () => {
 
         const entitlementListCall = calls.find((c: any) => c[0] === 'entitlementList')
 
-        expect(accountReadCall[3].errorMessage({ identity: 'test-user' })).toBe('Failed to read account test-user')
-        expect(accountCreateCall[3].errorMessage({ identity: 'test-user', attributes: { name: 'Test User' } })).toBe(
+        expect(accountReadCall[2].errorMessage({ identity: 'test-user' })).toBe('Failed to read account test-user')
+        expect(accountCreateCall[2].errorMessage({ identity: 'test-user', attributes: { name: 'Test User' } })).toBe(
             'Failed to create account Test User'
         )
-        expect(accountCreateCall[3].errorMessage({ identity: 'test-user', attributes: {} })).toBe(
+        expect(accountCreateCall[2].errorMessage({ identity: 'test-user', attributes: {} })).toBe(
             'Failed to create account test-user'
         )
-        expect(accountUpdateCall[3].errorMessage({ identity: 'test-user' })).toBe('Failed to update account test-user')
-        expect(accountEnableCall[3].errorMessage({ identity: 'test-user' })).toBe('Failed to enable account test-user')
-        expect(accountDisableCall[3].errorMessage({ identity: 'test-user' })).toBe(
+        expect(accountUpdateCall[2].errorMessage({ identity: 'test-user' })).toBe('Failed to update account test-user')
+        expect(accountEnableCall[2].errorMessage({ identity: 'test-user' })).toBe('Failed to enable account test-user')
+        expect(accountDisableCall[2].errorMessage({ identity: 'test-user' })).toBe(
             'Failed to disable account test-user'
         )
-        expect(entitlementListCall[3].errorMessage({ type: 'group' })).toBe(
+        expect(entitlementListCall[2].errorMessage({ type: 'group' })).toBe(
             'Failed to list entitlements for type group'
         )
     })

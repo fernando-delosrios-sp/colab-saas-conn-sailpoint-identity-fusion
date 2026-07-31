@@ -1,7 +1,10 @@
 import { createOperationHandler, OperationHandlerOptions } from '../operationHandler'
 import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
+import { safeReadConfig } from '../../data/config'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import type { Mock } from 'vitest'
+
+vi.mock('../../data/config', () => ({ safeReadConfig: vi.fn() }))
 
 // Mock the ServiceRegistry class
 vi.mock('../../services/serviceRegistry', () => {
@@ -59,6 +62,7 @@ describe('createOperationHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks()
         vi.useFakeTimers()
+        vi.mocked(safeReadConfig).mockResolvedValue(mockConfig)
 
         defaultFn = vi.fn().mockImplementation((serviceRegistry: any) => {
             serviceRegistry.res.send()
@@ -75,7 +79,7 @@ describe('createOperationHandler', () => {
 
     describe('Execution Modes (RunMode)', () => {
         it('should run in Default mode when not custom or proxy', async () => {
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+            const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
             await handler(context, input, res)
 
             expect(defaultFn).toHaveBeenCalledTimes(1)
@@ -89,12 +93,19 @@ describe('createOperationHandler', () => {
                 serviceRegistry.res.send()
                 return Promise.resolve(undefined)
             })
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+            const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
             await handler(context, input, res)
 
             expect(context[operationName]).toHaveBeenCalledTimes(1)
             expect(context[operationName]).toHaveBeenCalledWith(expect.any(Object), input)
             expect(defaultFn).not.toHaveBeenCalled()
+        })
+
+        it('loads config on each operation invocation', async () => {
+            const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
+            await handler(context, input, res)
+
+            expect(safeReadConfig).toHaveBeenCalledTimes(1)
         })
 
         it('should run in Proxy mode when proxy client', async () => {
@@ -111,7 +122,7 @@ describe('createOperationHandler', () => {
                 },
             }))
 
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+            const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
             await handler(context, input, res)
 
             // To verify proxy.execute was called, we need to inspect the mocked registry instance
@@ -123,7 +134,7 @@ describe('createOperationHandler', () => {
 
     describe('Keep-Alive Functionality', () => {
         it('should not start keepAlive by default', async () => {
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+            const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
             await handler(context, input, res)
 
             vi.advanceTimersByTime(2000)
@@ -143,9 +154,10 @@ describe('createOperationHandler', () => {
             defaultFn.mockReturnValue(longPromise)
 
             const options: OperationHandlerOptions = { ...defaultOptions, keepAlive: 'simple' }
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, options)
+            const handler = createOperationHandler(operationName, defaultFn, options)
 
             const promise = handler(context, input, res)
+            await Promise.resolve()
             resolveRegistry = (ServiceRegistry as any).mock.results[(ServiceRegistry as any).mock.results.length - 1].value
 
             // Wait for interval to be set up
@@ -179,9 +191,10 @@ describe('createOperationHandler', () => {
             defaultFn.mockReturnValue(longPromise)
 
             const options: OperationHandlerOptions = { ...defaultOptions, keepAlive: 'memory' }
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, options)
+            const handler = createOperationHandler(operationName, defaultFn, options)
 
             const promise = handler(context, input, res)
+            await Promise.resolve()
             resolveRegistry = (ServiceRegistry as any).mock.results[(ServiceRegistry as any).mock.results.length - 1].value
 
             await Promise.resolve()
@@ -209,7 +222,7 @@ describe('createOperationHandler', () => {
             }))
 
             const options: OperationHandlerOptions = { ...defaultOptions, keepAlive: 'simple' }
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, options)
+            const handler = createOperationHandler(operationName, defaultFn, options)
 
             const promise = handler(context, input, res)
             await Promise.resolve()
@@ -239,7 +252,7 @@ describe('createOperationHandler', () => {
             })
 
             const options: OperationHandlerOptions = { ...defaultOptions, keepAlive: 'memory' }
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, options)
+            const handler = createOperationHandler(operationName, defaultFn, options)
 
             const promise = handler(context, input, res)
             await Promise.resolve()
@@ -255,7 +268,7 @@ describe('createOperationHandler', () => {
             const connectorError = new ConnectorError('Original error', ConnectorErrorType.NotFound)
             defaultFn.mockRejectedValue(connectorError)
 
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+            const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
 
             await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
             await expect(handler(context, input, res)).rejects.toHaveProperty('message', 'Original error')
@@ -264,7 +277,7 @@ describe('createOperationHandler', () => {
         it('should wrap string errors in ConnectorError', async () => {
             defaultFn.mockRejectedValue('String error')
 
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+            const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
 
             await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
             await expect(handler(context, input, res)).rejects.toHaveProperty(
@@ -276,7 +289,7 @@ describe('createOperationHandler', () => {
         it('should wrap Error objects in ConnectorError', async () => {
             defaultFn.mockRejectedValue(new Error('Standard error'))
 
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+            const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
 
             await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
             await expect(handler(context, input, res)).rejects.toHaveProperty(
@@ -292,7 +305,7 @@ describe('createOperationHandler', () => {
                 errorMessage: (input: any) => `Dynamic error for ${input.data}`,
             }
 
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, options)
+            const handler = createOperationHandler(operationName, defaultFn, options)
 
             await expect(handler(context, input, res)).rejects.toThrow(ConnectorError)
             await expect(handler(context, input, res)).rejects.toHaveProperty(
@@ -304,14 +317,14 @@ describe('createOperationHandler', () => {
 
     describe('Cleanup', () => {
         it('should clear interval on success', async () => {
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+            const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
             await handler(context, input, res)
         })
 
         it('should clear interval on error', async () => {
             defaultFn.mockRejectedValue(new Error('Test error'))
 
-            const handler = createOperationHandler(operationName, defaultFn, mockConfig, defaultOptions)
+            const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
 
             await expect(handler(context, input, res)).rejects.toThrow()
         })
@@ -319,5 +332,6 @@ describe('createOperationHandler', () => {
 
 
 })
+
 
 

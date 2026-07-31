@@ -1,5 +1,6 @@
 import { readConfig } from '@sailpoint/connector-sdk'
 import { safeReadConfig } from '../readConfig'
+import { ProxyService } from '../../../services/proxyService'
 
 vi.mock('@sailpoint/connector-sdk', async () => {
     const actual = await vi.importActual<typeof import('@sailpoint/connector-sdk')>('@sailpoint/connector-sdk')
@@ -53,9 +54,10 @@ describe('safeReadConfig recording env bridge', () => {
         expect(config.recording?.mode).toBe('off')
     })
 
-    it('bridges External Settings recording name into config.recording', async () => {
+    it('bridges External Settings recording name into config.recording on proxy server host', async () => {
         delete process.env.RECORD_MODE
         delete process.env.RECORD_CHAIN_NAME
+        process.env.PROXY_PASSWORD = 'secret'
         vi.mocked(readConfig).mockResolvedValue({
             ...minimalPlatformConfig,
             externalProcessingEnabled: true,
@@ -70,6 +72,68 @@ describe('safeReadConfig recording env bridge', () => {
 
         expect(config.recording?.mode).toBe('record')
         expect(config.recording?.chainName).toBe('prod-baseline')
+    })
+
+    it('bridges external recording on proxy server when forwarded config has client-resolved recording.mode off', async () => {
+        delete process.env.RECORD_MODE
+        delete process.env.RECORD_CHAIN_NAME
+        process.env.PROXY_PASSWORD = 'secret'
+        vi.mocked(readConfig).mockResolvedValue({
+            ...minimalPlatformConfig,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalRecordingEnabled: true,
+            recordingName: 'prod-baseline',
+            externalTargetUrl: 'https://proxy.example.com',
+            externalTargetPassword: 'secret',
+            isProxy: true,
+            recording: { mode: 'off', store: 'ndjson' },
+        } as never)
+
+        const config = await safeReadConfig()
+
+        expect(config.recording?.mode).toBe('record')
+        expect(config.recording?.chainName).toBe('prod-baseline')
+    })
+
+    it('does not bridge External Settings recording on ISC proxy client', async () => {
+        delete process.env.RECORD_MODE
+        delete process.env.RECORD_CHAIN_NAME
+        delete process.env.PROXY_PASSWORD
+        vi.mocked(readConfig).mockResolvedValue({
+            ...minimalPlatformConfig,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalRecordingEnabled: true,
+            recordingName: 'prod-baseline',
+            externalTargetUrl: 'https://proxy.example.com',
+            externalTargetPassword: 'secret',
+        } as never)
+
+        const config = await safeReadConfig()
+
+        expect(config.recording?.mode).toBe('off')
+        expect(config.recording?.chainName).toBeUndefined()
+    })
+
+    it('resolves proxy client mode from External Settings via safeReadConfig', async () => {
+        vi.mocked(readConfig).mockResolvedValue({
+            ...minimalPlatformConfig,
+            externalProcessingEnabled: 1,
+            externalProxyEnabled: 1,
+            externalTargetUrl: 'https://proxy.example.com',
+            externalTargetPassword: 'secret',
+        } as never)
+
+        const config = await safeReadConfig()
+        delete process.env.PROXY_PASSWORD
+
+        const proxy = new ProxyService(config, { info: vi.fn() } as any, {} as any, 'std:account:list')
+
+        expect(config.externalProcessingEnabled).toBe(true)
+        expect(config.externalProxyEnabled).toBe(true)
+        expect(config.externalTargetUrl).toBe('https://proxy.example.com')
+        expect(proxy.isProxyMode()).toBe(true)
     })
 
     it('fails validation when recording enabled without proxy', async () => {
@@ -106,5 +170,6 @@ describe('safeReadConfig heartbeat interval', () => {
         expect(config.statsLoggingIntervalMs).toBe(30_000)
     })
 })
+
 
 

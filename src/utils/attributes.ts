@@ -185,8 +185,10 @@ export function extractStringOrDefault(attributes: Record<string, any>, key: str
 export function extractBoolean(attributes: Record<string, any>, key: string): boolean | undefined {
     const value = getAttributeValue(attributes, key)
     if (typeof value === 'boolean') return value
-    if (value === 'true') return true
-    if (value === 'false') return false
+    if (value === 'true' || value === 'True') return true
+    if (value === 'false' || value === 'False') return false
+    if (value === 1 || value === '1') return true
+    if (value === 0 || value === '0') return false
     return undefined
 }
 
@@ -364,3 +366,4 @@ export function getAccountStringAttribute(account: Account, name: string): strin
     const value = getAccountAttribute(account, name)
     return typeof value === 'string' ? value : undefined
 }
+
