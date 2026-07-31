@@ -21,9 +21,6 @@ theme:
 
 nav:
     - Home: index.md
-    - Getting started:
-          - Overview: getting-started/overview.md
-          - First aggregation: getting-started/first-aggregation.md
     - Configuration:
           - Configuration reference: configuration/index.md
           - Connection Settings: configuration/connection.md
@@ -38,6 +35,8 @@ nav:
                 - Mapping attributes: use-guides/configuration/mapping-attributes.md
                 - Defining attributes: use-guides/configuration/defining-attributes.md
                 - Matching identities: use-guides/configuration/matching-identities.md
+                - Managing correlation: use-guides/configuration/managing-correlation.md
+                - Managing reviewers: use-guides/configuration/managing-reviewers.md
                 - Review forms and reviewers: use-guides/configuration/review-forms-and-reviewers.md
                 - Tuning matching algorithms: use-guides/configuration/tuning-matching-algorithms.md
                 - Configuring sources: use-guides/configuration/configuring-sources.md
@@ -77,6 +76,11 @@ nav:
 markdown_extensions:
     - admonition
     - pymdownx.details
-    - pymdownx.superfences
+    - pymdownx.superfences:
+          custom_fences:
+              - name: mermaid
+                class: mermaid
+                format: !!python/name:pymdownx.superfences.fence_code_format
+
 
 

@@ -124,7 +124,7 @@ Configure **Source Settings → Processing Control** for account lifecycle:
 
 !!! warning "Important"
 
-    When merging a new managed account with an existing identity, managed account correlation will only occur if **Correlation mode** is set to **Correlate missing accounts on aggregation** **or** you have configured an **enforced correlation role** that drives that correlation. Otherwise, the connector will not correlate the new managed account automatically.
+    When merging a new managed account with an existing identity, managed account correlation will only occur if **Correlation mode** is set to **Correlate missing accounts on aggregation** **or** you have configured an **enforced correlation role** that drives that correlation. Otherwise, the connector will not correlate the new managed account automatically. See [Managing correlation](managing-correlation.md).
 
 ---
 
@@ -247,5 +247,6 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 - You want human approval for all merges
 
 ---
+
 
 

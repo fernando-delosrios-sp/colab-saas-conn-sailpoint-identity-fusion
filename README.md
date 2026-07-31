@@ -20,7 +20,7 @@ Identity Fusion NG is an **Identity Security Cloud (ISC) connector** that consol
 4. Configure Map, Define, and Match — [Configuration reference](docs/configuration/index.md) and [Use guides](docs/use-guides/index.md).
 5. Run **Discover Schema**, then create an identity profile and aggregate.
 
-See [First aggregation](docs/getting-started/first-aggregation.md) for the full checklist.
+See [Use guides overview](docs/use-guides/index.md) for prerequisites, the first-aggregation checklist, and all setup guides.
 
 ## Build docs locally
 
