@@ -191,6 +191,31 @@ describe('ProxyService.performFetch', () => {
         expect(global.fetch).toHaveBeenCalledTimes(1)
     })
 
+    it('uses config.commandType when context commandType is missing', async () => {
+        const config = {
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetUrl: 'https://proxy.example.com',
+            commandType: 'std:account:list',
+        }
+        const mockLog = { error: vi.fn() }
+        const service = new ProxyService(config as any, mockLog as any, {} as any)
+
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            text: async () => '',
+        })
+
+        await (service as any).performFetch({})
+
+        expect(global.fetch).toHaveBeenCalledWith(
+            'https://proxy.example.com',
+            expect.objectContaining({
+                body: expect.stringContaining('"type":"std:account:list"'),
+            })
+        )
+    })
+
     it('throws ConnectorError when fetch throws unknown error', async () => {
         const config = {
             externalProcessingEnabled: true,
@@ -223,3 +248,4 @@ describe('ProxyService.processProxyResponse', () => {
         expect(sent).toEqual([{ id: 'acct-1', name: 'X' }])
     })
 })
+

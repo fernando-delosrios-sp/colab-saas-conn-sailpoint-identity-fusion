@@ -5,9 +5,6 @@ import { EventEmitter } from 'events'
 EventEmitter.defaultMaxListeners = Math.max(EventEmitter.defaultMaxListeners || 0, 20)
 
 import { createConnector } from '@sailpoint/connector-sdk'
-import { safeReadConfig } from './data/config'
-
-import { FusionConfig } from './model/config'
 import { createOperationHandler } from './utils/operationHandler'
 import { testConnection } from './operations/testConnection'
 import { accountList } from './operations/accountList'
@@ -28,55 +25,54 @@ import { resolveIdentityNameFromCreateInput } from './utils/identityName'
  * @returns A promise that resolves to the configured connector
  */
 export const connector = async () => {
-    const config: FusionConfig = await safeReadConfig()
-
     return createConnector()
         .stdTestConnection(
-            createOperationHandler('testConnection', testConnection, config, {
+            createOperationHandler('testConnection', testConnection, {
                 errorMessage: 'Failed to test connection',
             })
         )
         .stdAccountList(
-            createOperationHandler('accountList', accountList, config, {
+            createOperationHandler('accountList', accountList, {
                 errorMessage: 'Failed to aggregate accounts',
                 keepAlive: 'memory',
             })
         )
         .stdAccountRead(
-            createOperationHandler('accountRead', accountRead, config, {
+            createOperationHandler('accountRead', accountRead, {
                 errorMessage: (input) => `Failed to read account ${input.identity}`,
             })
         )
         .stdAccountCreate(
-            createOperationHandler('accountCreate', accountCreate, config, {
+            createOperationHandler('accountCreate', accountCreate, {
                 errorMessage: (input) => `Failed to create account ${resolveIdentityNameFromCreateInput(input) ?? input.identity}`,
             })
         )
         .stdAccountUpdate(
-            createOperationHandler('accountUpdate', accountUpdate, config, {
+            createOperationHandler('accountUpdate', accountUpdate, {
                 errorMessage: (input) => `Failed to update account ${input.identity}`,
                 keepAlive: 'simple',
             })
         )
         .stdAccountEnable(
-            createOperationHandler('accountEnable', accountEnable, config, {
+            createOperationHandler('accountEnable', accountEnable, {
                 errorMessage: (input) => `Failed to enable account ${input.identity}`,
             })
         )
         .stdAccountDisable(
-            createOperationHandler('accountDisable', accountDisable, config, {
+            createOperationHandler('accountDisable', accountDisable, {
                 errorMessage: (input) => `Failed to disable account ${input.identity}`,
             })
         )
         .stdEntitlementList(
-            createOperationHandler('entitlementList', entitlementList, config, {
+            createOperationHandler('entitlementList', entitlementList, {
                 errorMessage: (input) => `Failed to list entitlements for type ${input.type}`,
             })
         )
         .stdAccountDiscoverSchema(
-            createOperationHandler('accountDiscoverSchema', accountDiscoverSchema, config, {
+            createOperationHandler('accountDiscoverSchema', accountDiscoverSchema, {
                 errorMessage: 'Failed to discover schema',
             })
         )
 
 }
+

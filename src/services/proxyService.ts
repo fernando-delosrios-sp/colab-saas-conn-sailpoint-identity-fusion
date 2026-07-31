@@ -2,6 +2,7 @@ import { ConnectorError, Response } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
 import { LogService } from './logService'
 import { assert } from '../utils/assert'
+import { isProxyClientConfig, isProxyServerHost } from '../utils/proxyRole'
 import crypto from 'crypto'
 
 const KEEPALIVE = 2.5 * 60 * 1000
@@ -45,14 +46,7 @@ export class ProxyService {
      * to an external proxy server.
      */
     isProxyMode(): boolean {
-        const gatewayEnabled = this.config.externalProcessingEnabled ?? false
-        const proxyEnabled = this.config.externalProxyEnabled ?? false
-        const hasTargetUrl =
-            this.config.externalTargetUrl !== undefined && this.config.externalTargetUrl !== ''
-        const isServer = process.env.PROXY_PASSWORD !== undefined
-        const isAlreadyProxyRequest = this.config.isProxy === true
-
-        return gatewayEnabled && proxyEnabled && hasTargetUrl && !isServer && !isAlreadyProxyRequest
+        return isProxyClientConfig(this.config)
     }
 
     /**
@@ -60,11 +54,10 @@ export class ProxyService {
      * server that receives and processes forwarded requests.
      */
     isProxyService(): boolean {
-        const gatewayEnabled = this.config.externalProcessingEnabled ?? false
-        const proxyEnabled = this.config.externalProxyEnabled ?? false
-        const hasProxyPassword = process.env.PROXY_PASSWORD !== undefined
+        const gatewayEnabled = this.config.externalProcessingEnabled === true
+        const proxyEnabled = this.config.externalProxyEnabled === true
 
-        if (gatewayEnabled && proxyEnabled && hasProxyPassword) {
+        if (gatewayEnabled && proxyEnabled && isProxyServerHost()) {
             this.log.info('Running as proxy server')
 
             // 🛡️ Sentinel: Enforce strict proxy password validation. If the server requires
@@ -130,7 +123,7 @@ export class ProxyService {
         }
         const externalConfig = { ...this.config, isProxy: true }
         const body = {
-            type: this.commandType,
+            type: this.commandType ?? this.config.commandType,
             input,
             config: externalConfig,
         }
@@ -273,4 +266,5 @@ export class ProxyService {
         this.log.info(`Proxy sent ${validObjectCount} valid objects to ISC`)
     }
 }
+
 

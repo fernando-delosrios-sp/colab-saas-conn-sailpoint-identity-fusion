@@ -15,6 +15,7 @@ import * as scopeSettings from './settings/scopeSettings'
 import * as sourcesSettings from './settings/sourcesSettings'
 import * as uniqueAttributeDefinitionsSettings from './settings/uniqueAttributeDefinitionsSettings'
 import { resolveRecordingConfig } from './resolveRecordingConfig'
+import { isProxyServerHost } from '../../utils/proxyRole'
 
 const settingsPipeline = [
     sourcesSettings.readSettings,
@@ -44,9 +45,16 @@ function bridgeExternalRecording(config: FusionConfig, rawRecording?: Partial<Re
         return rawRecording
     }
 
+    // Chain artifacts are written on the proxy server only — not on the ISC forwarding client.
+    if (!isProxyServerHost()) {
+        return rawRecording
+    }
+
     const bridged: Partial<RecordingConfig> = { ...rawRecording }
 
-    if (bridged.mode === undefined) {
+    // ISC proxy clients resolve recording.mode to 'off' before forwarding; the server must still record.
+    const clientResolvedOff = config.isProxy === true && bridged.mode === 'off'
+    if (bridged.mode === undefined || clientResolvedOff) {
         bridged.mode = 'record'
     }
     if (bridged.chainName === undefined) {
@@ -85,3 +93,4 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
 
     return config
 }
+

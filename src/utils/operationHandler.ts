@@ -1,4 +1,5 @@
 import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
+import { safeReadConfig } from '../data/config'
 import { FusionConfig } from '../model/config'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { ProxyService } from '../services/proxyService'
@@ -25,9 +26,9 @@ function resolveRunMode(
     proxy: ProxyService,
     operationName: string
 ): { runMode: RunMode; isProxyServer: boolean } {
-    const isProxyServer = proxy.isProxyService()
+    const isProxyClient = proxy.isProxyMode()
+    const isProxyServer = !isProxyClient && proxy.isProxyService()
     const isCustom = context[operationName] !== undefined
-    const isProxyClient = !isProxyServer && proxy.isProxyMode()
     const runMode: RunMode = isCustom ? RunMode.Custom : isProxyClient ? RunMode.Proxy : RunMode.Default
     return { runMode, isProxyServer }
 }
@@ -86,10 +87,10 @@ async function runOperation(
 export function createOperationHandler(
     operationName: string,
     defaultFn: (...args: any[]) => Promise<void>,
-    config: FusionConfig,
     options: OperationHandlerOptions
 ): any {
     return async (context: any, input: any, res: any) => {
+        const config: FusionConfig = await safeReadConfig()
         let interval: ReturnType<typeof setInterval> | undefined
         const serviceRegistry = new ServiceRegistry(config, context, res, operationName)
         try {
@@ -120,6 +121,7 @@ export function createOperationHandler(
         }
     }
 }
+
 
 
 

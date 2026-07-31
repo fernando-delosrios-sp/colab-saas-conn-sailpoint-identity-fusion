@@ -99,4 +99,17 @@ describe('externalSettings.readSettings', () => {
         expect(result.externalRecordingEnabled).toBe(true)
         expect(result.recordingName).toBe('prod-baseline')
     })
+
+    it('normalizes numeric ISC toggle values for external settings', () => {
+        const result = readSettings({
+            externalProcessingEnabled: 1 as unknown as boolean,
+            externalProxyEnabled: 1 as unknown as boolean,
+            externalTargetUrl: 'https://proxy.example.com',
+            externalTargetPassword: 'secret',
+        })
+
+        expect(result.externalProcessingEnabled).toBe(true)
+        expect(result.externalProxyEnabled).toBe(true)
+    })
 })
+

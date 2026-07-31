@@ -44,6 +44,7 @@ describe('LogService external logging routing', () => {
         expect(fetchMock).toHaveBeenCalledTimes(1)
         expect(fetchMock.mock.calls[0][0]).toBe('https://logs.example.com/ingest')
         expect(fetchMock.mock.calls[0][1]?.method).toBe('POST')
+        expect(fetchMock.mock.calls[0][1]?.headers?.['x-fusion-baseurl']).toBeUndefined()
     })
 
     it('noop on proxy client — no HTTP POST and no disk write', async () => {
@@ -139,6 +140,51 @@ describe('LogService external logging routing', () => {
         expect(content).toContain('custom path log')
     })
 
+    it('ignores deprecated LOG_FILE=logs/proxy-ingest.log on proxy server', async () => {
+        process.env.PROXY_PASSWORD = 'secret'
+        process.env.LOG_FILE = 'logs/proxy-ingest.log'
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+        global.fetch = fetchMock
+
+        const log = new LogService({
+            spConnDebugLoggingEnabled: false,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalLoggingEnabled: true,
+            externalTargetUrl: 'https://proxy.example.com',
+            externalLoggingLevel: 'info',
+            baseurl: 'https://acme.api.identitynow.com',
+        })
+
+        log.info('tenant disk log')
+        await log.flush()
+
+        expect(fetchMock).not.toHaveBeenCalled()
+        const tenantLogDir = 'logs/acme'
+        const files = await fs.readdir(tenantLogDir)
+        expect(files.some((f) => f.startsWith('fusion-') && f.endsWith('.log'))).toBe(true)
+    })
+
+    it('noop on proxy server host when proxy sub-option is off (never HTTP POST to self)', async () => {
+        process.env.PROXY_PASSWORD = 'secret'
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+        global.fetch = fetchMock
+
+        const log = new LogService({
+            spConnDebugLoggingEnabled: false,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: false,
+            externalLoggingEnabled: true,
+            externalTargetUrl: 'http://localhost:3000',
+            externalLoggingLevel: 'info',
+        })
+
+        log.info('proxy server without proxy flag')
+        await log.flush()
+
+        expect(fetchMock).not.toHaveBeenCalled()
+    })
+
     it('gateway off disables external logging even when sub-toggle is stored true', async () => {
         delete process.env.PROXY_PASSWORD
         const fetchMock = vi.fn().mockResolvedValue({ ok: true })
@@ -158,4 +204,5 @@ describe('LogService external logging routing', () => {
         expect(fetchMock).not.toHaveBeenCalled()
     })
 })
+
 

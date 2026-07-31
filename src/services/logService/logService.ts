@@ -10,7 +10,8 @@ import {
     createEmptyCumulativeOutcomes,
 } from './operationRunContext'
 import { formatPhaseEndDetailSuffix } from './operationHeartbeat'
-import { appendLogLine } from './fileLogSink'
+import { appendLogLine, FUSION_BASEURL_HEADER } from './fileLogSink'
+import { isProxyClientConfig, isProxyServerHost } from '../../utils/proxyRole'
 
 type Logger = typeof logger
 
@@ -60,19 +61,14 @@ function resolveExternalLogRoute(config: LogConfig): ExternalLogRoute {
         return 'off'
     }
 
-    const isProxyServer = process.env.PROXY_PASSWORD !== undefined
-    const isProxyClient =
-        gatewayActive &&
-        config.externalProxyEnabled === true &&
-        !!config.externalTargetUrl &&
-        !isProxyServer &&
-        config.isProxy !== true
+    const isProxyServer = isProxyServerHost()
+    const isProxyClient = isProxyClientConfig(config)
 
     if (isProxyClient) {
         return 'noop'
     }
-    if (isProxyServer && config.externalProxyEnabled === true) {
-        return 'disk'
+    if (isProxyServer) {
+        return config.externalProxyEnabled === true ? 'disk' : 'noop'
     }
     return 'http'
 }
@@ -528,10 +524,14 @@ export class LogService {
         if (!url.toLowerCase().startsWith('http://') && !url.toLowerCase().startsWith('https://')) {
             return
         }
+        const headers: Record<string, string> = { 'Content-Type': 'text/plain' }
+        if (this.baseurl) {
+            headers[FUSION_BASEURL_HEADER] = this.baseurl
+        }
         const doFetch = () =>
             fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
+                headers,
                 body: logMessage,
                 signal: AbortSignal.timeout(LogService.EXTERNAL_LOG_TIMEOUT_MS),
             }).then(() => {})

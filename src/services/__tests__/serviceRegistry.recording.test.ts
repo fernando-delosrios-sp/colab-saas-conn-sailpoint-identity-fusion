@@ -136,6 +136,56 @@ describe('ServiceRegistry recording wiring', () => {
 
         fs.rmSync(chainDir, { recursive: true, force: true })
     })
+
+    it('wires RecordingApiAdapter when forwarded proxy config has client-resolved recording.mode off', async () => {
+        delete process.env.PROXY_PASSWORD
+        process.env.PROXY_PASSWORD = 'secret'
+
+        const config = {
+            ...minimalPlatformConfig,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalRecordingEnabled: true,
+            recordingName: 'prod-baseline',
+            externalTargetUrl: 'https://proxy.example.com',
+            externalTargetPassword: 'secret',
+            isProxy: true,
+            recording: { mode: 'off' as const, store: 'ndjson' as const },
+        } as FusionConfig
+
+        // Simulate proxy server re-reading forwarded config via bridgeExternalRecording path
+        config.recording = { mode: 'record', chainName: 'prod-baseline', store: 'ndjson' }
+
+        const registry = new ServiceRegistry(config, {}, { send: vi.fn() }, 'accountList')
+
+        expect(registry.recording).toBeDefined()
+        expect(registry.recording?.getName()).toBe('prod-baseline')
+        const adapter = (registry.client as any).adapter
+        expect(adapter).toBeInstanceOf(RecordingApiAdapter)
+    })
+
+    it('skips RecordingService wiring on ISC proxy client config', async () => {
+        delete process.env.PROXY_PASSWORD
+        delete process.env.RECORD_MODE
+        delete process.env.RECORD_CHAIN_NAME
+
+        const config = {
+            ...minimalPlatformConfig,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalRecordingEnabled: true,
+            recordingName: 'prod-baseline',
+            externalTargetUrl: 'https://proxy.example.com',
+            recording: { mode: 'record' as const, chainName: 'prod-baseline', store: 'ndjson' as const },
+        } as FusionConfig
+
+        const registry = new ServiceRegistry(config, {}, { send: vi.fn() }, 'accountList')
+
+        expect(registry.recording).toBeUndefined()
+        const adapter = (registry.client as any).adapter
+        expect(adapter).toBeInstanceOf(SdkApiAdapter)
+        expect(adapter).not.toBeInstanceOf(RecordingApiAdapter)
+    })
 })
 
 describe('loadRecordingApiLog', () => {
@@ -174,5 +224,6 @@ describe('loadRecordingApiLog', () => {
         fs.rmSync(tmpDir, { recursive: true, force: true })
     })
 })
+
 
 

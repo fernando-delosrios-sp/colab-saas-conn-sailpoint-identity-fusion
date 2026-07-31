@@ -1063,7 +1063,7 @@
                         },
                         {
                             "key": "externalTargetUrl",
-                            "label": "Server",
+                            "label": "Server URL",
                             "type": "url",
                             "required": false,
                             "parentKey": "externalProcessingEnabled",

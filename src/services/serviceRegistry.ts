@@ -25,6 +25,7 @@ import { EntitlementService } from './entitlementService'
 import { EmailService } from './emailService'
 import { WorkflowService } from './workflowService'
 import { ProxyService } from './proxyService'
+import { isProxyClientConfig } from '../utils/proxyRole'
 import { ReportService } from './reportService'
 import { RecordingService } from './recordingService'
 import { FusionRun } from '../model/fusionRun'
@@ -92,9 +93,10 @@ export class ServiceRegistry {
             this.log.setQueue(this.client.getQueue())
         } else {
             const recMode = this.config.recording?.mode ?? 'off'
+            const skipLocalRecording = isProxyClientConfig(this.config)
             let adapter: IscApiAdapter = new SdkApiAdapter(this.config, this.log)
 
-            if (recMode === 'record') {
+            if (recMode === 'record' && !skipLocalRecording) {
                 const recording = (context as any).recordingService ?? new RecordingService(this.log, this.config)
                 this.recording = recording
                 adapter = new RecordingApiAdapter(
@@ -111,7 +113,7 @@ export class ServiceRegistry {
                     `Recording enabled — chain: ${recording.getName()}, dir: ${recording.getRecordingDir()}, store: ${rec?.store ?? 'ndjson'}`
                 )
                 this.bindRecordingHooks()
-            } else if (recMode === 'replay') {
+            } else if (recMode === 'replay' && !skipLocalRecording) {
                 const chainName = this.config.recording?.chainName
                 const chainDir = chainName ? recordingChainDirRelative(chainName, this.config.baseurl) : undefined
                 const entries = chainDir ? loadRecordingApiLog(chainDir, this.config.baseurl) : []
@@ -306,6 +308,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 
