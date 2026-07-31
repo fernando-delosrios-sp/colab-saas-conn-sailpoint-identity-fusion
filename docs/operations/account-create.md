@@ -6,6 +6,19 @@ The Account Create operation creates a new fusion account for a specific identit
 
 ## Process Flow
 
+```mermaid
+flowchart TD
+    Start([Account create invoked]) --> Validate[Validate identity and schema]
+    Validate --> Fetch[Fetch authoritative identity]
+    Fetch --> Pre[Pre-process: register unique values + fusion map]
+    Pre --> Process[Process identity → Fusion account]
+    Process --> Unique[Refresh unique attributes]
+    Unique --> Actions{Actions requested?}
+    Actions -- Yes --> Dispatch[Run action handlers]
+    Actions -- No --> Out
+    Dispatch --> Out([Return ISC account])
+```
+
 1.  **Input Validation**:
     - Verifies that the `identity` (ID) and `schema` are provided in the input.
     - Loads the fusion account schema.
@@ -44,3 +57,4 @@ The Account Create operation creates a new fusion account for a specific identit
 - **nativeIdentity immutability**: The `nativeIdentity` (account identifier) is determined at creation time and is never changed afterwards. This prevents disconnection between the existing Fusion account and the platform during subsequent updates, reads, or enable/disable cycles.
 - **Account name immutability**: The account `name` (display attribute) is also locked at creation. It always reflects the hosting identity's name. This prevents destruction of the identity linkage if an attribute definition would otherwise overwrite it.
 - **Unique attributes**: Unique attribute values (e.g. generated usernames) are freshly calculated during creation with collision detection against all existing Fusion accounts. These values remain stable unless the account is disabled and re-enabled (which triggers a unique attribute reset).
+

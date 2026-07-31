@@ -17,9 +17,9 @@ Before you configure Identity Fusion NG in ISC:
 
 The shortest path from a new Fusion source to a working aggregation:
 
-1. **Create the source** — In Admin → Connections → Sources, create a source with the Identity Fusion NG connector. Set **Authoritative** when you rely on Match for correlation decisions.
+1. **Create the source** — In Admin → Connections → Sources, create a source with the Identity Fusion NG connector. Set **Authoritative** when you rely on Match for correlation decisions (umbrella mode).
 2. **Configure connection** — Set the Identity Security Cloud API URL and Personal Access Token (ID and secret). Use **Review and Test** to verify connectivity.
-3. **Configure processing** — Set [Configuring sources](configuration/configuring-sources.md) (identity scope, managed sources, aggregation behavior), then:
+3. **Configure processing** — Start with [Configuring sources and scope](configuration/configuring-sources-and-scope.md) (scope, managed sources, umbrella vs side-car), then [Source types](configuration/source-types.md) per managed source:
     - **Map:** [Mapping attributes](configuration/mapping-attributes.md) (merge strategy and per-attribute mappings).
     - **Define:** [Defining attributes](configuration/defining-attributes.md) (Velocity, unique IDs, UUIDs, counters).
     - **Match (if used):** [Matching identities](configuration/matching-identities.md), [Managing correlation](configuration/managing-correlation.md), and [Managing reviewers](configuration/managing-reviewers.md) after sources and baseline are correct.
@@ -28,7 +28,7 @@ The shortest path from a new Fusion source to a working aggregation:
 
 ## Operation modes
 
-Each managed source in **Source Settings** has a **Source type** that controls how its accounts are processed:
+Each managed source has a **Source type** that controls processing. See [Source types](configuration/source-types.md) for full behavior.
 
 | Mode | Behavior | Typical use |
 | --- | --- | --- |
@@ -36,27 +36,23 @@ Each managed source in **Source Settings** has a **Source type** that controls h
 | **Records** | Map and Define run; unique values register without emitting Fusion accounts for non-matched rows | Identifier generation without new identities |
 | **Orphan accounts** | Non-matched rows are dropped (optional disable on managed source) | Supplemental data for Match only |
 
-**Records sources:** **Include record accounts in Match** (default on) controls whether record accounts participate in Match scoring. When off, a bulk **record unique registration** step runs instead of full Match processing.
-
-**Orphan sources:** **Disable non-matching accounts** optionally triggers a background disable for stale orphans lacking a match.
-
-See [Configuring sources](configuration/configuring-sources.md) for filters, aggregation timing, and per-source options.
-
 ## Deployment patterns
 
-| Goal | Typical authority | Managed sources |
+| Goal | Fusion authoritative? | Managed sources |
 | --- | --- | --- |
-| **Match** (correlation and deduplication) | Fusion source is **authoritative** | One or more authoritative account sources |
-| **Map and Define only** (unique IDs, consolidated attributes) | Fusion is often **not** authoritative | Optional; depends on your Map requirements |
+| **Match** (correlation and deduplication) | **Yes** (umbrella mode) | One or more Authoritative account sources |
+| **Map and Define only** (unique IDs, consolidated attributes) | Usually **no** (side-car mode) | Optional; depends on Map requirements |
 | **Records** (register unique values without new identities) | Usually non-authoritative | Records-type sources |
-| **Orphan** (match-only supplemental data) | Usually non-authoritative | Orphan-type sources |
+| **Orphan** (match-only supplemental data) | Non-authoritative | Orphan-type sources |
 
-The connector can run side by side with other ISC sources. When Fusion is authoritative for Match, it determines which incoming managed accounts create a new identity and which correlate to an existing one.
+The connector can run side by side with other ISC sources. In **umbrella mode**, Fusion determines which incoming managed accounts create a new identity and which correlate to an existing one. In **side-car mode**, Fusion enriches or assists without owning identity creation.
 
 ## Configuration guides
 
 | Guide | Description |
 | ----- | ----------- |
+| [Configuring sources and scope](configuration/configuring-sources-and-scope.md) | Scope, umbrella vs side-car, aggregation, owners as reviewers. **Start here.** |
+| [Source types](configuration/source-types.md) | Authoritative, Records, and Orphan processing modes. |
 | [Mapping attributes](configuration/mapping-attributes.md) | Attribute mapping, merging, and consolidation from multiple sources. |
 | [Defining attributes](configuration/defining-attributes.md) | Attribute definitions (Velocity computed attributes, unique identifiers, UUIDs, counters). |
 | [Matching identities](configuration/matching-identities.md) | Detect and resolve potential matching identities using one or more sources. |
@@ -64,7 +60,6 @@ The connector can run side by side with other ISC sources. When Fusion is author
 | [Managing reviewers](configuration/managing-reviewers.md) | Reviewer access profiles, global vs per-source assignment, and review workload. |
 | [Review forms and reviewers](configuration/review-forms-and-reviewers.md) | Review form fields, expiration, automatic merge, and end-to-end Match flow. |
 | [Tuning matching algorithms](configuration/tuning-matching-algorithms.md) | Algorithms, thresholds, and how scores combine. |
-| [Configuring sources](configuration/configuring-sources.md) | Source settings, scope, aggregation timing, and source types. |
 
 ## Operation guides
 
@@ -77,7 +72,7 @@ The connector can run side by side with other ISC sources. When Fusion is author
 
 | Guide | Description |
 | ----- | ----------- |
-| [Testing and validation](validation-and-troubleshooting/testing-and-validation.md) | Structured validation before production. |
+| [Data-driven testing process](validation-and-troubleshooting/testing-and-validation.md) | Scenario recording, replay, and regression verification. |
 | [Troubleshooting](validation-and-troubleshooting/troubleshooting.md) | Common issues, checks, and recovery steps. |
 
 ## Deployment guides
@@ -94,3 +89,4 @@ The connector can run side by side with other ISC sources. When Fusion is author
 | Map, Define, Match framework overview | [Home](../index.md) |
 | Domain terms | [Glossary](../glossary.md) |
 | Connector operations (APIs ISC calls) | [Connector operations reference](../operations/index.md) |
+| Status and reviewer entitlements | [Entitlement list](../operations/entitlement-list.md) |

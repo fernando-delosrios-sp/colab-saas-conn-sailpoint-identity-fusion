@@ -1003,7 +1003,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation) and manage memory consumption during match detection by adjusting batch sizes.<br><br><strong>v2.2.0</strong>",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation) and manage memory consumption during match detection by adjusting batch sizes.<br><br>The section header in ISC shows the <strong>installed connector version</strong> for reference — it updates automatically when you upgrade the connector package.",
                     "items": [
                         {
                             "key": "resetAccounts",

@@ -17,7 +17,7 @@ Advanced Settings are organized into four sections:
 | Section                          | Purpose                                                         | When to configure                                                  |
 | -------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------ |
 | **Developer Settings**           | Reset accounts, batch/concurrency tuning                        | Testing, troubleshooting, performance tuning                       |
-| **External Settings**            | Shared external target, proxy mode, logging, recording        | Proxy deployments, centralized logging, chain recording on server  |
+| **External Settings**            | Shared external target, proxy mode, logging, recording        | Proxy deployments, centralized logging, scenario recording on server  |
 | **Advanced Connection Settings** | API behavior: queue, retry, timeouts, concurrency             | Production tuning, rate limit management, performance optimization |
 
 **Screenshot placeholder:** Advanced Settings menu interface.
@@ -31,6 +31,8 @@ Advanced Settings are organized into four sections:
 ## Part 1: Developer Settings
 
 Developer Settings provide tools for testing, troubleshooting, and monitoring.
+
+The **Developer Settings** section header in the ISC source configuration UI displays the **installed connector version** (from the connector package metadata). Use it to confirm which build is deployed — it updates automatically when you upgrade the connector; you do not configure this value manually.
 
 ### Configuration fields
 
@@ -50,8 +52,6 @@ External logging moved to [External Settings](../../configuration/advanced.md#ex
 **Screenshot placeholder:** Developer Settings interface.
 
 ![Developer Settings - Configuration](../../assets/images/advanced-settings-developer.png)
-
-<!-- PLACEHOLDER: Screenshot of Developer Settings. Save as docs/assets/images/advanced-settings-developer.png -->
 
 ### Reset accounts
 
@@ -579,6 +579,7 @@ Some settings appear in both **Connection Settings** and **Advanced Settings**:
 
 - For proxy mode (delegating to external server), see [Configuring proxy mode](../../reference/proxy-mode.md).
 - For connection and configuration issues, see [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md).
+
 
 
 

@@ -1,7 +1,8 @@
-import { ChainRunner, registerStepFn, StepDefinition } from '../framework/ChainRunner'
+import { ScenarioRunner, registerStepFn, StepDefinition } from '../framework/ScenarioRunner'
 import { ChainContext } from '../framework/ChainContext'
 import { MockRegistry } from '../framework/ChainContext'
-import { buildReplayContext, collectOutputs, compareOutputs } from './ReplayAdapter'
+import { buildReplayContext, collectOutputs } from './ReplayAdapter'
+import { compareOutputs } from '../../../scenarioReplay'
 import { accountDiscoverSchema } from '../../../../operations/accountDiscoverSchema'
 import { entitlementList } from '../../../../operations/entitlementList'
 import { accountList } from '../../../../operations/accountList'
@@ -20,7 +21,7 @@ export interface StepVerifyResult {
     error?: string
 }
 
-export interface ChainVerifyResult {
+export interface ScenarioVerifyResult {
     success: boolean
     stepsExecuted: number
     stepsFailed: number
@@ -28,10 +29,13 @@ export interface ChainVerifyResult {
     stepResults: StepVerifyResult[]
 }
 
+/** @deprecated Use ScenarioVerifyResult */
+export type ChainVerifyResult = ScenarioVerifyResult
+
 let stepFnsRegistered = false
 
-/** Registers all connector operation handlers used during chain replay verification. */
-export function registerChainStepFns(): void {
+/** Registers all connector operation handlers used during scenario replay verification. */
+export function registerScenarioStepFns(): void {
     if (stepFnsRegistered) return
     stepFnsRegistered = true
 
@@ -175,19 +179,25 @@ export function registerChainStepFns(): void {
     })
 }
 
+/** @deprecated Use registerScenarioStepFns */
+export const registerChainStepFns = registerScenarioStepFns
+
 /** Resets step registration (for tests that need a clean registry). */
-export function resetChainStepFnsForTests(): void {
+export function resetScenarioStepFnsForTests(): void {
     stepFnsRegistered = false
 }
+
+/** @deprecated Use resetScenarioStepFnsForTests */
+export const resetChainStepFnsForTests = resetScenarioStepFnsForTests
 
 /**
  * Executes all steps in a recorded scenario and compares outputs against goldens.
  * Returns structured pass/fail/drift results suitable for CLI or unit test assertions.
  */
-export async function verifyChainRecording(scenarioPath: string): Promise<ChainVerifyResult> {
-    registerChainStepFns()
+export async function verifyScenarioRecording(scenarioPath: string): Promise<ScenarioVerifyResult> {
+    registerScenarioStepFns()
 
-    const runner = new ChainRunner(scenarioPath)
+    const runner = new ScenarioRunner(scenarioPath)
     const results = await runner.executeAll()
     const steps = runner.getSteps()
     const stepResults: StepVerifyResult[] = []
@@ -245,12 +255,15 @@ export async function verifyChainRecording(scenarioPath: string): Promise<ChainV
     }
 }
 
+/** @deprecated Use verifyScenarioRecording */
+export const verifyChainRecording = verifyScenarioRecording
+
 /** Prints a human-readable verification report to stdout. */
-export function printChainVerifyReport(result: ChainVerifyResult, chainLabel: string): void {
+export function printScenarioVerifyReport(result: ScenarioVerifyResult, scenarioLabel: string): void {
     console.log('')
-    console.log('Identity Fusion NG — Chain Recording Verification')
-    console.log('=================================================')
-    console.log(`Chain: ${chainLabel}`)
+    console.log('Identity Fusion NG — Scenario Recording Verification')
+    console.log('====================================================')
+    console.log(`Scenario: ${scenarioLabel}`)
     console.log(`Steps executed: ${result.stepsExecuted}`)
     console.log('')
 
@@ -281,3 +294,6 @@ export function printChainVerifyReport(result: ChainVerifyResult, chainLabel: st
     }
     console.log('')
 }
+
+/** @deprecated Use printScenarioVerifyReport */
+export const printChainVerifyReport = printScenarioVerifyReport

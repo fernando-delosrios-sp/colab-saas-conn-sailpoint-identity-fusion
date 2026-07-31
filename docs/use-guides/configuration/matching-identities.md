@@ -50,15 +50,13 @@ Use Identity Fusion for Match when you face these challenges:
 | **Fusion report access profile**  | Access profile with "Fusion report" entitlement               | Allow specific users to view potential match reports                                            |
 | **Automatic merge**          | **Attribute Matching Settings → Enable automatic merge** | Assign without manual review when the combined score meets the automatic merge match score |
 
-**Screenshot placeholder:** High-level Match flow diagram.
-
 ![Match flow - Overview](../../assets/images/match-flow.png)
-
-<!-- PLACEHOLDER: Diagram or screenshot of Match flow. Save as docs/assets/images/match-flow.png -->
 
 ---
 
 ## Scope and baseline
+
+For a full explanation of when to enable identity scope (and when managed sources alone define your scope), see [Configuring sources and scope — Do you need identities in scope?](configuring-sources-and-scope.md#do-you-need-identities-in-scope).
 
 - **Sources scope** — Managed accounts coming from the **Authoritative account sources** you configure. Each managed account is processed and either becomes a Fusion account or triggers a Fusion review form; the form can result in creating a new Fusion account or linking the managed account to an existing Fusion account as part of an identity.
 - **Identity scope** — Identities selected by **Include identities in the scope?** and **Identity Scope Query**. Identity scope and sources scope are complementary and can overlap.
@@ -247,6 +245,7 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 - You want human approval for all merges
 
 ---
+
 
 
 

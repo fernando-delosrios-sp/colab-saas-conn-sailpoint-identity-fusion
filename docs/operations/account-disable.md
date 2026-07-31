@@ -6,6 +6,14 @@ The Account Disable operation disables a fusion account. This typically prevents
 
 ## Process Flow
 
+```mermaid
+flowchart TD
+    Start([Account disable invoked]) --> Setup[Load sources + schema]
+    Setup --> Rebuild[Rebuild fusion account]
+    Rebuild --> Disable[Set disabled status]
+    Disable --> Out([Return disabled ISC account])
+```
+
 1.  **Setup**:
     - Loads sources and schema.
 
@@ -26,3 +34,4 @@ The Account Disable operation disables a fusion account. This typically prevents
 
 - **Unique attributes are NOT reset on disable**: The disable operation uses `resetDefinition: false`, so existing unique attribute values (e.g. usernames) are preserved. The actual unique attribute reset happens on the subsequent **enable** operation, which sets `resetDefinition: true` to regenerate collision-free values.
 - **nativeIdentity and name are preserved**: The `nativeIdentity` and account `name` are never changed by any operation after creation.
+

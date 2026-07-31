@@ -6,6 +6,19 @@ The Account Update operation applies changes to a fusion account. Currently, it 
 
 ## Process Flow
 
+```mermaid
+flowchart TD
+    Start([Account update invoked]) --> Validate[Validate identity + changes]
+    Validate --> Setup[Load sources + schema]
+    Setup --> Rebuild[Rebuild fusion account without refresh]
+    Rebuild --> Changes[Process entitlement changes]
+    Changes --> Actions{actions attribute?}
+    Actions -- Yes --> Dispatch[Route to action handlers]
+    Actions -- No --> Crash[Unsupported change]
+    Dispatch --> Status[Recompute correlation status]
+    Status --> Out([Return updated ISC account])
+```
+
 1.  **Input Validation**:
     - Verifies that the `identity` (ID) and `changes` list are provided and that `changes` is non-empty.
     - Computes the list of reverse-correlation attributes from sources configured with `correlationMode: 'reverse'` and a `correlationAttribute`. An empty reverse-correlation snapshot is created.
@@ -43,3 +56,4 @@ The Account Update operation applies changes to a fusion account. Currently, it 
 ## Behavior Notes
 
 - **No attribute refresh on update**: The account is rebuilt with `ATTR_OPS_NONE` (`refreshMapping: false`, `refreshDefinition: false`), preserving all existing attribute values including `nativeIdentity` and account `name`. The update operation only processes entitlement changes (actions) and does not regenerate attributes.
+

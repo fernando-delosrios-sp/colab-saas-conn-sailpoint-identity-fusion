@@ -43,11 +43,31 @@ describe('test-recording CLI script', () => {
         expect(result.status).not.toBe(0)
     })
 
-    it('exits non-zero with clear error when chain directory is missing', () => {
-        const result = runTestRecordingScript('unknown-chain-does-not-exist-xyz')
+    it('exits non-zero with clear error when scenario directory is missing', () => {
+        const result = runTestRecordingScript('unknown-scenario-does-not-exist-xyz')
         expect(result.status).toBe(1)
-        expect(result.stderr ?? '').toContain('ERROR: chain directory not found')
-        expect(result.stderr ?? '').toContain('Record this chain first')
+        expect(result.stderr ?? '').toContain('ERROR: scenario directory not found')
+        expect(result.stderr ?? '').toContain('Capture this scenario first')
     })
 })
+
+describe('record-scenario CLI script', () => {
+    it('prints deprecation warning referencing External Settings before starting', () => {
+        const result = spawnSync('node', ['scripts/record-scenario.js'], {
+            cwd: REPO_ROOT,
+            env: {
+                ...process.env,
+                RECORD_SCENARIO_NAME: 'deprecation-test/fixture',
+            },
+            encoding: 'utf-8',
+            timeout: 500,
+            killSignal: 'SIGKILL',
+        })
+
+        const output = `${result.stderr ?? ''}${result.stdout ?? ''}`
+        expect(output).toContain('DEPRECATED')
+        expect(output).toContain('externalRecordingEnabled')
+    })
+})
+
 

@@ -170,7 +170,7 @@ describe('fernando recording match replay', () => {
         async () => {
         const artifact = loadMatchingResults()
 
-        if (artifact) {
+        if (artifact && (artifact.deferredMatches?.length ?? 0) > 0) {
             console.log('\n=== MATCH SWEEP RESULT (from matching-results.json) ===')
             console.log(JSON.stringify(artifact.sweepSummary, null, 2))
             logDeferredMatches(artifact.deferredMatches)
@@ -219,5 +219,6 @@ describe('fernando recording match replay', () => {
         }
     )
 })
+
 
 

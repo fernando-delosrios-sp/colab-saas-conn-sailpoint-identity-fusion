@@ -1,5 +1,5 @@
 import * as path from 'path'
-import { ChainRunner, registerStepFn } from './framework/ChainRunner'
+import { ScenarioRunner, registerStepFn } from './framework/ScenarioRunner'
 import { buildReplayContext, collectOutputs } from './harness/ReplayAdapter'
 import { accountList } from '../../../operations/accountList'
 import { MockRegistry } from './framework/ChainContext'
@@ -25,7 +25,7 @@ describe.skipIf(!exploreChain)('Run and Inspect Step-1 Output', () => {
 
     it(`runs step-1 and prints output for chain: ${exploreChain}`, async () => {
         const scenarioPath = path.join(recordingChainDir(exploreChain!, baseurl), 'scenario.json')
-        const runner = new ChainRunner(scenarioPath)
+        const runner = new ScenarioRunner(scenarioPath)
         const result = await runner.executeStep('step-1')
 
         expect(result.success).toBe(true)
@@ -46,4 +46,3 @@ describe.skipIf(!exploreChain)('Run and Inspect Step-1 Output', () => {
         }
     })
 })
-

@@ -1,18 +1,18 @@
 import * as path from 'path'
 import * as fs from 'os'
 import * as fsSync from 'fs'
-import { ChainRunner } from './framework/ChainRunner'
-import { compareOutputs } from './harness/ReplayAdapter'
-import { verifyChainRecording, registerChainStepFns } from './harness/chainRecordingVerify'
+import { ScenarioRunner } from './framework/ScenarioRunner'
+import { compareOutputs } from '../../scenarioReplay'
+import { verifyScenarioRecording, registerScenarioStepFns } from './harness/scenarioRecordingVerify'
 import { writePassingScenario } from './fixtures/minimalRecordingFixture'
 
-describe('Identity Fusion NG - Chain Replay Harness', () => {
+describe('Identity Fusion NG - Scenario Replay Harness', () => {
     let tempDir: string
     let scenarioPath: string
 
     beforeAll(() => {
-        registerChainStepFns()
-        tempDir = fsSync.mkdtempSync(path.join(fs.tmpdir(), 'chain-replay-fixture-'))
+        registerScenarioStepFns()
+        tempDir = fsSync.mkdtempSync(path.join(fs.tmpdir(), 'scenario-replay-fixture-'))
         scenarioPath = writePassingScenario(tempDir)
     })
 
@@ -22,8 +22,8 @@ describe('Identity Fusion NG - Chain Replay Harness', () => {
         }
     })
 
-    it('verifyChainRecording succeeds on minimal fixture', async () => {
-        const result = await verifyChainRecording(scenarioPath)
+    it('verifyScenarioRecording succeeds on minimal fixture', async () => {
+        const result = await verifyScenarioRecording(scenarioPath)
         expect(result.stepResults[0]?.error).toBeUndefined()
         expect(result.stepsFailed).toBe(0)
         expect(result.drifts).toEqual([])
@@ -40,7 +40,7 @@ describe('Identity Fusion NG - Chain Replay Harness', () => {
 
     describe('Scenario structure validation', () => {
         it('validates scenario JSON structure from fixture', () => {
-            const runner = new ChainRunner(scenarioPath)
+            const runner = new ScenarioRunner(scenarioPath)
 
             const config = runner.getConfig()
             expect(config).toBeDefined()
@@ -59,7 +59,7 @@ describe('Identity Fusion NG - Chain Replay Harness', () => {
         })
 
         it('reference values have expected keys', () => {
-            const runner = new ChainRunner(scenarioPath)
+            const runner = new ScenarioRunner(scenarioPath)
             const refValues = runner.getReferenceValues()
 
             for (const [_stepId, refs] of Object.entries(refValues)) {

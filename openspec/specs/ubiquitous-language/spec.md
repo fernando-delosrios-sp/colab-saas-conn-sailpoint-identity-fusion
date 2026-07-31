@@ -5,9 +5,7 @@
 This spec defines the canonical domain terms and their usage requirements across the connector, its configuration, and its documentation. The ubiquitous language ensures consistent terminology between developers, domain experts, and AI agents.
 
 This spec is the master reference for the project's domain vocabulary. `docs/concepts/glossary.md` is a user-friendly mirror and MUST be kept aligned with this spec.
-
 ## Requirements
-
 ### Requirement: This spec is the source of truth for domain vocabulary
 
 `openspec/specs/ubiquitous-language/spec.md` SHALL be the authoritative source for canonical domain terms, definitions, and usage rules. `docs/concepts/glossary.md` and all other artifacts SHALL reflect the definitions in this spec.
@@ -181,6 +179,21 @@ The ubiquitous-language glossary SHALL define **Operation heartbeat**, **STATUS 
 
 - **WHEN** a reader consults the ubiquitous-language spec glossary
 - **THEN** it SHALL contain an **EVENT_SUMMARY line** entry describing aggregated account-level activity between heartbeat ticks
+
+### Requirement: Recording scenario terminology SHALL be canonical
+
+The term **scenario** (recording) SHALL refer to a named, tenant-scoped recording directory under `recordings/<tenant>/{scenarioName}/` containing captured operation steps (`steps.ndjson`), ISC API log (`api-log.ndjson`), compiled replay definition (`scenario.json`), and supporting artifacts. The terms **chain**, **chain reference**, and **chain name** SHALL NOT be used in new code, configuration help text, or documentation when referring to recording or replay artifacts.
+
+#### Scenario: Documentation uses scenario for recording artifacts
+
+- **WHEN** documentation describes capturing or replaying recorded operation sequences
+- **THEN** the term "scenario" or "scenario reference" (`tenant/scenarioName`) MUST be used
+- **AND** the term "chain" MUST NOT be used in the recording/replay domain
+
+#### Scenario: Code review discovers chain terminology in recording domain
+
+- **WHEN** a code review finds `chainName`, `chainRef`, or user-facing "chain" strings in recording/replay modules
+- **THEN** the contributor MUST rename to `scenarioName`, `scenarioRef`, or "scenario" unless the identifier is a deprecated compatibility alias
 
 ## Canonical Terms
 

@@ -19,9 +19,9 @@
         "remote-log-server": "mkdir -p logs && LOG_FILE=logs/remote-logs-$(date +%Y%m%d).log concurrently --raw \"node log-server.js\" \"wait-on tcp:2389 && npx tmole 2389 2>&1 | grep -v '\\[200 OK\\]\\|\\[201\\|\\[204\\|\\[404\\|\\[500'\"",
         "tmole": "npx tmole 3000",
         "dev": "cross-env NODE_OPTIONS=--enable-source-maps spcx run dist/index.js",
-        "record": "node scripts/record-chain.js",
+        "record": "node scripts/record-scenario.js",
         "finalize": "node scripts/finalize-chain.js",
-        "replay": "node scripts/replay-chain.js",
+        "replay": "node scripts/replay-scenario.js",
         "test-recording": "node scripts/test-recording.js",
         "lint": "npx eslint . && npx knip",
         "lint:docs-code": "npx eslint \"src/**/*.{ts,js,mjs,cjs}\"",
@@ -103,6 +103,7 @@
         "readdir-glob": "^3.0.0"
     }
 }
+
 
 
 

@@ -37,6 +37,7 @@ describe('safeReadConfig recording env bridge', () => {
         const config = await safeReadConfig()
 
         expect(config.recording?.mode).toBe('record')
+        expect(config.recording?.scenarioName).toBe('env-chain')
         expect(config.recording?.chainName).toBe('env-chain')
         expect(config.recording?.verbose).toBe(true)
         expect(config.recording?.store).toBe('ndjson')
@@ -71,6 +72,7 @@ describe('safeReadConfig recording env bridge', () => {
         const config = await safeReadConfig()
 
         expect(config.recording?.mode).toBe('record')
+        expect(config.recording?.scenarioName).toBe('prod-baseline')
         expect(config.recording?.chainName).toBe('prod-baseline')
     })
 
@@ -93,6 +95,7 @@ describe('safeReadConfig recording env bridge', () => {
         const config = await safeReadConfig()
 
         expect(config.recording?.mode).toBe('record')
+        expect(config.recording?.scenarioName).toBe('prod-baseline')
         expect(config.recording?.chainName).toBe('prod-baseline')
     })
 
@@ -113,6 +116,7 @@ describe('safeReadConfig recording env bridge', () => {
         const config = await safeReadConfig()
 
         expect(config.recording?.mode).toBe('off')
+        expect(config.recording?.scenarioName).toBeUndefined()
         expect(config.recording?.chainName).toBeUndefined()
     })
 
@@ -170,6 +174,7 @@ describe('safeReadConfig heartbeat interval', () => {
         expect(config.statsLoggingIntervalMs).toBe(30_000)
     })
 })
+
 
 
 

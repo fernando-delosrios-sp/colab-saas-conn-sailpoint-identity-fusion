@@ -6,6 +6,16 @@ The Account Discover Schema operation generates the schema definition for fusion
 
 ## Process Flow
 
+```mermaid
+flowchart TD
+    Start([Discover schema invoked]) --> Load[Load managed sources]
+    Load --> Build[Build dynamic schema]
+    Build --> Base[Merge base Fusion attributes]
+    Base --> Managed[Add managed source schema attributes]
+    Managed --> Dedup[Deduplicate case-insensitively]
+    Dedup --> Out([Return schema to ISC])
+```
+
 1.  **Setup**:
     - Loads all managed sources to access their schemas.
 
@@ -16,4 +26,5 @@ The Account Discover Schema operation generates the schema definition for fusion
 
 3.  **Output**:
     - Returns the generated schema object to ISC.
+
 
