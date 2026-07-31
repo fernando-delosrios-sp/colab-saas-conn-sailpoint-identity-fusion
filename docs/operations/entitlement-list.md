@@ -50,7 +50,7 @@ flowchart TD
     - Returns the static action entitlements (defined in `src/data/action.ts`):
         - `report` — "Fusion report": generate a fusion report on demand.
         - `fusion` — "Fusion account": mark an account as a fusion account.
-        - `correlated` — "Correlated": trigger correlation logic for missing source accounts.
+        - `correlated` — "Correlated": the **correlated entitlement** catalog entry. On Fusion account output, this entitlement appears when all managed source accounts are correlated (`missing-accounts` empty). Assigning it on create/update runs the **correlate action** (direct PATCH for missing accounts).
     - Also returns one **per-source reviewer entitlement** for each managed source (sourced dynamically from the loaded managed sources): id `reviewer:<sourceId>`, name `<sourceName> reviewer`, description `Reviewer for potentially duplicated identities from <sourceName> source`. These drive the per-source reviewer role.
     - **Report Entitlement**:
         - Can be requested to generate a report of the potential aggregated results without actually aggregating the source.
@@ -58,8 +58,9 @@ flowchart TD
 
     !!! note
 
-        Actions are modeled as entitlements so they can be requested via access requests in ISC. All Action entitlements are requestable. The `correlate` and `correlated` tokens are both accepted by the action dispatcher and map to the same handler, but the entitlement id exposed here is `correlated`.
+        Actions are modeled as entitlements so they can be requested via access requests in ISC. All Action entitlements are requestable. The `correlate` and `correlated` wire tokens are both accepted by the action dispatcher on create/update and map to the same handler; the entitlement id exposed here is `correlated`.
 
 4.  **Output**:
     - Returns the list of entitlements.
+
 

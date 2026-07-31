@@ -11,18 +11,22 @@ flowchart TD
     Start([Test connection invoked]) --> Init[Initialize connector services]
     Init --> Sources[Verify managed sources exist]
     Sources --> JMES[Validate JMESPath filters]
-    JMES --> Delay{Delayed aggregation configured?}
+    JMES --> Email{Email workflow configured?}
+    Email -- Yes --> EmailWF[Validate email workflow sender]
+    Email -- No --> Delay{Delayed aggregation configured?}
+    EmailWF --> Delay
     Delay -- Yes --> WF[Validate delayed-aggregation workflow]
     Delay -- No --> Rev{Reverse correlation configured?}
     WF --> Rev
-    Rev -- Yes --> Schema[Validate reverse-correlation schema attributes]
+    Rev -- Yes --> Schema[Validate reverse-correlation setup per source]
     Rev -- No --> OK[Return success]
     Schema --> OK
     Init -- Failure --> Err([Throw error])
     Sources -- Missing source --> Err
     JMES -- Invalid expression --> Err
+    EmailWF -- Missing sender --> Err
     WF -- Missing workflow --> Err
-    Schema -- Missing attribute --> Err
+    Schema -- Setup validation failed --> Err
 ```
 
 
@@ -34,8 +38,9 @@ flowchart TD
     - The operation is invoked by ISC.
     - It verifies access to the Fusion source and ensures that all configured managed sources exist.
     - It validates configured `Accounts JMESPath filter` expressions.
+    - When email workflow delivery is configured, it validates that the email workflow sender is reachable.
     - If any source is configured for delayed aggregation, it validates delayed-aggregation workflow/sender availability.
-    - If any sources are configured for reverse correlation, it validates that the specified reverse correlation attributes exist in those managed sources' schemas.
+    - If any sources are configured for reverse correlation, it validates reverse-correlation setup for each such source. Failures name the source and correlation attribute.
     - If the service registry, basic initialization, and these connectivity checks succeed, the connection is considered healthy.
 
 2.  **Output**:

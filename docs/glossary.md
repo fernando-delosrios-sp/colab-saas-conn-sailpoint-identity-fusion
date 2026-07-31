@@ -66,7 +66,8 @@ Fusion accounts carry two kinds of entitlements, distinguished by how they are a
 |------|-----------|------------|
 | **FusionReport** | `report` | Assign to trigger generation of a Fusion report for this account. |
 | **Fusion** | `fusion` | Assign to mark this as a Fusion account. |
-| **Correlated** | `correlated` | Set by the connector when all managed source accounts for this Fusion account have been correlated. Triggers correlation of missing source accounts when assigned externally. |
+| **Correlated entitlement** | `correlated` | The action entitlement present on a Fusion account when all managed source accounts for that Fusion identity are correlated with the Fusion identity. Evaluated on every Fusion account build; absent when any managed source account remains in `missing-accounts`. |
+| **Correlate action** | `correlate` / `correlated` (Add) | When the platform assigns the correlated entitlement to a Fusion account that lacks it, the connector runs the correlate action: direct identity correlation (ISC PATCH) for missing managed source accounts on provisioning paths. Remove on account update skips status recompute and does not undo established correlation links. |
 | **Reviewer** | `reviewer:<sourceId>` | Assign to designate an identity as a reviewer for a specific managed source. The suffix identifies the source. The `reviewer` status entitlement is also set on the reviewer's Fusion account to mark their role. |
 
 ### Status entitlements
@@ -217,8 +218,9 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Aggregation delay** | The number of minutes to wait after processing before triggering a delayed aggregation. |
 | **Correlation mode** | Per-source setting controlling how uncorrelated managed source accounts are linked to identities. Options: **Do not correlate** (leave unlinked), **Correlate missing accounts on aggregation** (link via API during processing), or **Reverse correlation from managed source** (push Fusion identity data back to the source for ISC correlation). |
 | **Correlate missing accounts on aggregation** | Correlation mode where the connector directly links uncorrelated managed source accounts to their Fusion identity via the ISC API during processing. |
-| **Reverse correlation** | Correlation mode where the connector creates a dedicated attribute on the managed source containing the Fusion identity ID, then ISC's correlation rule matches accounts to identities. Requires a correlation attribute name and display name. |
+| **Reverse correlation** | Correlation mode where the connector manages a **reverse-correlation attribute** on the Fusion account (keyed by the source's `correlationAttribute`) so ISC can match managed source accounts to identities. Requires a correlation attribute name and display name on the managed source schema. |
 | **Correlation attribute** | The attribute name used for reverse correlation on the managed source schema. Must be unique and not overlap with mapped or defined attributes. |
+| **Reverse-correlation attribute** | A Fusion account attribute value written for a reverse-correlation source, keyed by the source's `correlationAttribute`, linking the Fusion identity to managed source accounts. Managed on every Fusion account build so rebuild/remap steps do not permanently clobber established values. |
 | **Deferred candidate matching** | Per-source toggle that controls whether a managed source account is compared to other provisional Fusion accounts from the same source in the same run. When enabled, if the only strong match is a deferred candidate, identity creation is deferred. Disable when one person may appear as multiple accounts in a single aggregation. |
 | **Include record accounts in Match** | Per-source toggle for Record-type sources. When enabled, record accounts participate in Match scoring against identities and deferred candidates. When disabled, they only run Map and Define and register unique attributes. |
 | **Disable non-matching accounts** | Per-source toggle for Orphan-type sources. When enabled, orphan accounts that no longer match any identity are automatically disabled after aggregation. |
@@ -252,6 +254,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Golden artifact** | A pre-validated expected output file (e.g., `output.sweep1.expected.json`) used as the reference for automated test comparison. Generated artifacts are compared against golden artifacts to detect regressions. |
 | **Sweep** (testing) | A single aggregation run within a test scenario. Multi-sweep scenarios (sweep 1, sweep 2) validate stateful behavior across sequential aggregations. |
 | **Side effects** | Non-account changes produced during an aggregation run (e.g., form creation, correlation API calls). Captured in side-effect files for test validation. |
+
 
 
 
