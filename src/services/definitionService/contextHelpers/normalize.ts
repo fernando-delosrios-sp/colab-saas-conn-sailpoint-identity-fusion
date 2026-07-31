@@ -375,11 +375,8 @@ function normalizeUsAddress(address: string): string | undefined {
 
     const [, city, stateInput, zip] = cityStateMatch
     const stateInputTrimmed = stateInput.trim()
-    const byCode = State.getStateByCodeAndCountry(stateInputTrimmed.toUpperCase(), 'US')
-    let state = byCode
-    if (!state) {
-        state = State.getStateByNameAndCountry(stateInputTrimmed, 'US')
-    }
+    const state = State.getStateByCodeAndCountry(stateInputTrimmed.toUpperCase(), 'US') ??
+        State.getStateByNameAndCountry(stateInputTrimmed, 'US')
     const stateCode = state?.isoCode
     if (!stateCode) return undefined
 
@@ -392,10 +389,8 @@ function normalizeUkAddress(address: string): string | undefined {
 
     const [, city, regionInput, postcode] = ukMatch
     const regionInputTrimmed = regionInput.trim()
-    let region = State.getStateByCodeAndCountry(regionInputTrimmed.toUpperCase(), 'GB')
-    if (!region) {
-        region = State.getStateByNameAndCountry(regionInputTrimmed, 'GB')
-    }
+    const region = State.getStateByCodeAndCountry(regionInputTrimmed.toUpperCase(), 'GB') ??
+        State.getStateByNameAndCountry(regionInputTrimmed, 'GB')
     const regionCode = region?.isoCode
     if (!regionCode) return undefined
 
