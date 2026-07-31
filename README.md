@@ -22,6 +22,19 @@ Identity Fusion NG is an **Identity Security Cloud (ISC) connector** that consol
 
 See [Use guides overview](docs/use-guides/index.md) for prerequisites, the first-aggregation checklist, and all setup guides.
 
+## Scenario recording and replay
+
+Capture scenarios via ISC **External Settings** on proxy deployments (`externalRecordingEnabled` + `recordingName`). For local workflows:
+
+| Command | Purpose |
+| --- | --- |
+| `npm run replay -- tenant/scenario` | Interactive replay — spawns connector, auto-feeds steps, live output |
+| `npm run test-recording -- tenant/scenario` | Headless golden verification (CI / regression) |
+| `npm run record` | Deprecated local capture escape hatch |
+| `npm run finalize -- tenant/scenario` | Recover `scenario.json` after crash |
+
+Full reference: [Scenario recording](docs/reference/scenario-recording.md).
+
 ## Build docs locally
 
 ```bash

@@ -25,9 +25,9 @@ const USE_GUIDE_BY_MENU = {
         blurb: 'PAT setup, queue sizing, retries, timeouts, and log interpretation.',
     },
     'Source Settings': {
-        title: 'Configuring sources',
-        path: '../use-guides/configuration/configuring-sources.md',
-        blurb: 'Identity scope, Authoritative/Records/Orphan patterns, aggregation, and correlation.',
+        title: 'Configuring sources and scope',
+        path: '../use-guides/configuration/configuring-sources-and-scope.md',
+        blurb: 'Identity scope, umbrella vs side-car deployment, aggregation, and correlation.',
     },
     'Attribute Mapping Settings': {
         title: 'Mapping attributes',
@@ -477,7 +477,7 @@ function renderIndex(menus) {
     /** @type {Record<string, string>} */
     const menuGuideTitles = {
         connection: 'Connection and observability tuning',
-        source: 'Configuring sources',
+        source: 'Configuring sources and scope',
         mapping: 'Mapping attributes',
         definition: 'Defining attributes',
         matching: 'Matching identities',
@@ -501,6 +501,7 @@ function renderIndex(menus) {
     lines.push('- [ISC PAT scopes](../reference/pat-scopes.md) — required API permissions for the connector PAT')
     lines.push('- [Velocity context](../reference/velocity-context.md) — helpers available in Define expressions')
     lines.push('- [Standard account schema](../reference/standard-account-schema.md) — Fusion account attribute schema')
+    lines.push('- [Entitlement list](../operations/entitlement-list.md) — status and action entitlements exposed by the connector')
     lines.push('')
     return `${lines.join('\n')}\n`
 }
@@ -523,5 +524,6 @@ function main() {
 }
 
 main()
+
 
 

@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { ReplayApiAdapter } from '../../../../services/clientService/replayApiAdapter'
 import { loadRecordingApiLog } from '../../../../services/recordingService/recordingStore'
+import { sanitizeScenarioConfigForReplay, type ScenarioConfig, type ScenararioConfig } from '../../../scenarioReplay'
 import { ChainState } from './ChainState'
 import { ChainContext } from './ChainContext'
 
@@ -15,36 +16,22 @@ export interface StepDefinition {
     expectedStateDelta?: Record<string, unknown>
 }
 
-export interface ScenararioConfig {
-    sources?: Array<Record<string, unknown>>
-    uniqueAttributeDefinitions?: Array<Record<string, unknown>>
-    normalAttributeDefinitions?: Array<Record<string, unknown>>
-    attributeMaps?: Array<Record<string, unknown>>
-    matchingConfigs?: Array<Record<string, unknown>>
-    fusionManualReviewScore?: number
-    fusionEnableAutoMerge?: boolean
-    fusionOwnerIsGlobalReviewer?: boolean
-    fusionFormExpirationDays?: number
-    includeIdentities?: boolean
-    deleteEmpty?: boolean
-    skipAccountsWithMissingId?: boolean
-    maxHistoryMessages?: number
-    reset?: boolean
-    resetAccounts?: boolean
-    resetForms?: boolean
-    forceAttributeRefresh?: boolean
-    [key: string]: unknown
-}
+export type { ScenarioConfig, ScenararioConfig }
 
-export interface ChainScenario {
+export interface ScenarioDefinition {
     version: string
+    scenarioName?: string
+    /** @deprecated Use scenarioName */
     chainName?: string
     recordedAt?: string
-    config: ScenararioConfig
+    config: ScenarioConfig
     initialState: Record<string, unknown>
     steps: StepDefinition[]
     referenceValues?: Record<string, Record<string, unknown>>
 }
+
+/** @deprecated Use ScenarioDefinition */
+export type ChainScenario = ScenarioDefinition
 
 export interface StepResult {
     stepId: string
@@ -56,7 +43,7 @@ export interface StepResult {
     error?: string
 }
 
-export interface ChainResult {
+export interface ScenarioResult {
     success: boolean
     stepsExecuted: number
     stepsFailed: number
@@ -64,15 +51,8 @@ export interface ChainResult {
     finalState: Record<string, unknown>
 }
 
-/** Removes end-of-session runtime fields persisted into recorded scenario config. */
-export function sanitizeScenarioConfigForReplay(config: ScenararioConfig): ScenararioConfig {
-    const clean = { ...config }
-    delete clean.batchCumulativeCount
-    delete clean.acctAggregationStart
-    delete clean.acctAggregationEnd
-    delete clean.cloudCacheUpdate
-    return clean
-}
+/** @deprecated Use ScenarioResult */
+export type ChainResult = ScenarioResult
 
 function loadStepTimestamps(stepsPath: string): Record<string, string> {
     if (!fs.existsSync(stepsPath)) return {}
@@ -92,8 +72,8 @@ function loadStepTimestamps(stepsPath: string): Record<string, string> {
     return timestamps
 }
 
-export class ChainRunner {
-    private scenario: ChainScenario
+export class ScenarioRunner {
+    private scenario: ScenarioDefinition
     private state: ChainState
     private replayAdapter?: ReplayApiAdapter
     private stepTimestamps: Record<string, string>
@@ -102,7 +82,7 @@ export class ChainRunner {
         const resolved = path.isAbsolute(scenarioPath) ? scenarioPath : path.resolve(scenarioPath)
         const raw = JSON.parse(fs.readFileSync(resolved, 'utf8'))
 
-        this.scenario = raw as ChainScenario
+        this.scenario = raw as ScenarioDefinition
         this.scenario.config = sanitizeScenarioConfigForReplay(this.scenario.config)
 
         const chainDir = path.dirname(resolved)
@@ -129,7 +109,7 @@ export class ChainRunner {
         return this.state
     }
 
-    getConfig(): ScenararioConfig {
+    getConfig(): ScenarioConfig {
         return this.scenario.config
     }
 
@@ -200,7 +180,7 @@ export class ChainRunner {
         }
     }
 
-    async executeAll(): Promise<ChainResult> {
+    async executeAll(): Promise<ScenarioResult> {
         const results: StepResult[] = []
         let failed = 0
 
@@ -221,7 +201,7 @@ export class ChainRunner {
         }
     }
 
-    async executeUpTo(stepId: string): Promise<ChainResult> {
+    async executeUpTo(stepId: string): Promise<ScenarioResult> {
         const results: StepResult[] = []
         let failed = 0
 
@@ -271,6 +251,11 @@ export class ChainRunner {
     }
 }
 
+/** @deprecated Use ScenarioRunner */
+export const ChainRunner = ScenarioRunner
+
+export { sanitizeScenarioConfigForReplay }
+
 const stepFns = new Map<string, (step: StepDefinition, context: ChainContext) => Promise<unknown>>()
 
 export function registerStepFn(
@@ -283,7 +268,3 @@ export function registerStepFn(
 function getStepFn(operation: string): ((step: StepDefinition, context: ChainContext) => Promise<unknown>) | undefined {
     return stepFns.get(operation)
 }
-
-
-
-

@@ -96,7 +96,8 @@ For full **Authoritative**, **Records**, and **Orphan** source-type behavior, se
 | [Mapping attributes](./use-guides/configuration/mapping-attributes.md) | Attribute mapping, merging, and consolidation from multiple sources. |
 | [Defining attributes](./use-guides/configuration/defining-attributes.md) | Velocity computed attributes, unique identifiers, UUIDs, counters. |
 | [Matching identities](./use-guides/configuration/matching-identities.md) | Detect and resolve potential matching identities. |
-| [Configuring sources](./use-guides/configuration/configuring-sources.md) | Source settings, scope, aggregation timing, and correlation modes. |
+| [Configuring sources and scope](./use-guides/configuration/configuring-sources-and-scope.md) | Source settings, scope, umbrella vs side-car, aggregation timing. |
+| [Source types](./use-guides/configuration/source-types.md) | Authoritative, Records, and Orphan processing modes. |
 | [Connection and observability tuning](./use-guides/operation/connection-and-observability-tuning.md) | Queue, retry, timeouts, rate limiting, and logging. |
 | [Proxy deployment](./reference/proxy-mode.md) | Run connector logic on an external server and connect ISC via proxy. |
 | [Troubleshooting](./use-guides/validation-and-troubleshooting/troubleshooting.md) | Common issues, logs, and recovery steps. |
@@ -111,5 +112,6 @@ For full **Authoritative**, **Records**, and **Orphan** source-type behavior, se
 6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
 
 See [Use guides — First aggregation checklist](./use-guides/index.md#first-aggregation-checklist) for the full checklist.
+
 
 

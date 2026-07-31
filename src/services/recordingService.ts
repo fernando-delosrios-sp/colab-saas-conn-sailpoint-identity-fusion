@@ -96,7 +96,8 @@ function loadStepsFromDisk(store: RecordingStore): RecordedStep[] {
     })
 }
 
-function buildScenario(chainName: string, config: FusionConfig, store: RecordingStore, steps: RecordedStep[]): Record<string, unknown> {
+function buildScenario(scenarioRef: string, config: FusionConfig, store: RecordingStore, steps: RecordedStep[]): Record<string, unknown> {
+    const { scenarioName } = parseRecordingChainRef(scenarioRef, config.baseurl)
     const firstStep = steps[0]
     const firstState = firstStep?.stateAfter
     const initialState = firstState
@@ -140,7 +141,8 @@ function buildScenario(chainName: string, config: FusionConfig, store: Recording
     return {
         version: '1.0.0',
         recordedAt: new Date().toISOString(),
-        chainName,
+        scenarioName,
+        chainName: scenarioName,
         config: sanitizeForJson(config),
         initialState,
         steps: scenarioSteps,
@@ -233,9 +235,9 @@ export class RecordingService {
         private readonly config: FusionConfig
     ) {
         const recConfig: RecordingConfig = config.recording ?? { mode: 'off', store: 'ndjson' }
-        this.chainName = recConfig.chainName ?? `recording-${Date.now()}`
+        this.chainName = recConfig.scenarioName ?? recConfig.chainName ?? `recording-${Date.now()}`
         this.store = getOrCreateRecordingStore(recConfig, this.chainName, config.baseurl)
-        this.log.info(`RecordingService initialized — chain "${this.chainName}"`)
+        this.log.info(`RecordingService initialized — scenario "${this.chainName}"`)
 
         const stepsFile = path.join(this.store.getRecordingDir(), 'steps.ndjson')
         bootstrapStepCounter(this.store.getRecordingDir(), stepsFile)
@@ -359,6 +361,7 @@ export function resetRecordingLifecycleForTests(): void {
     exitHandlersRegistered = false
     clearRecordingStoreCache()
 }
+
 
 
 

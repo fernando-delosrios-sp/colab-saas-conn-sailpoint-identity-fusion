@@ -6,6 +6,16 @@ The Account Enable operation re-enables a previously disabled fusion account. Th
 
 ## Process Flow
 
+```mermaid
+flowchart TD
+    Start([Account enable invoked]) --> Setup[Load sources + schema + counters]
+    Setup --> Global[Fetch ALL fusion accounts + register unique pool]
+    Global --> Rebuild[Rebuild target account with resetDefinition]
+    Rebuild --> Unique[Refresh unique attributes]
+    Unique --> Enable[Set enabled status]
+    Enable --> Out([Return enabled ISC account])
+```
+
 1.  **Setup**:
     - Loads sources and schema.
     - Initializes attribute counters.
@@ -35,3 +45,4 @@ The Account Enable operation re-enables a previously disabled fusion account. Th
 - **Unique attribute reset**: Enabling a Fusion account uses `ATTR_OPS_RESET` (`resetDefinition: true`), which unregisters the account's existing unique attribute values and recalculates them. An explicit `refreshUniqueAttributes` pass follows the rebuild to resolve any collisions against the global registry collected in the pre-processing step. This guarantees the re-enabled account receives collision-free values even if its previous values were reassigned while it was disabled.
 - **Changeable unique attributes**: Use regular unique attribute schemas (e.g. usernames, email aliases) to define attributes you want refreshed on enable/disable cycles. Disabling and then re-enabling a Fusion account is the mechanism that triggers this regeneration.
 - **nativeIdentity and name are preserved**: Even though unique attributes are reset, the `nativeIdentity` and account `name` are never changed. The attribute definition engine skips them for identity-linked accounts to prevent disconnection and identity destruction.
+

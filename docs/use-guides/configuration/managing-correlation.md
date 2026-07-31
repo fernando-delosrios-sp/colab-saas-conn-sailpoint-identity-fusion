@@ -5,7 +5,7 @@ This guide explains how Identity Fusion NG correlates managed source accounts to
 **Configuration reference:** [Source Settings — Processing Control](../../configuration/source.md)
 
 !!! note "Didactic guide"
-    This page explains **how and when** to choose correlation strategies. For field keys, types, defaults, and constraints, see the linked **Configuration reference** and [Configuring sources](configuring-sources.md).
+    This page explains **how and when** to choose correlation strategies. For field keys, types, defaults, and constraints, see the linked **Configuration reference** and [Configuring sources and scope](configuring-sources-and-scope.md).
 
 ## Correlation in the Map → Define → Match pipeline
 
@@ -105,13 +105,14 @@ See [Managing reviewers](managing-reviewers.md) for entitlement and access-profi
 
 !!! tip
 
-    Managed accounts must be **uncorrelated** to enter Match scoring. Correlated managed accounts are treated as part of the baseline. See [Configuring sources](configuring-sources.md).
+    Managed accounts must be **uncorrelated** to enter Match scoring. Correlated managed accounts are treated as part of the baseline. See [Configuring sources and scope](configuring-sources-and-scope.md).
 
 ## Related guides
 
 | Topic | Guide |
 | --- | --- |
-| Source types, filters, aggregation timing | [Configuring sources](configuring-sources.md) |
+| Source types, filters, aggregation timing | [Configuring sources and scope](configuring-sources-and-scope.md) · [Source types](source-types.md) |
 | Match rules and thresholds | [Matching identities](matching-identities.md) |
 | Review decisions that drive merge correlation | [Review forms and reviewers](review-forms-and-reviewers.md) |
 | First aggregation setup | [Use guides overview](../index.md#first-aggregation-checklist) |
+

@@ -9,7 +9,7 @@ import { ClientService, SdkApiAdapter, ApiQueue } from './clientService'
 import { IscApiAdapter } from './clientService/iscApiAdapter'
 import { RecordingApiAdapter, ApiLogEntry } from './clientService/recordingApiAdapter'
 import { ReplayApiAdapter } from './clientService/replayApiAdapter'
-import { recordingChainDirRelative } from '../data/recordingPaths'
+import { recordingScenarioDirRelative } from '../data/recordingPaths'
 import { loadRecordingApiLog } from './recordingService/recordingStore'
 import { DryRunApiAdapter } from './clientService/dryRunApiAdapter'
 import { SourceService } from './sourceService'
@@ -114,9 +114,12 @@ export class ServiceRegistry {
                 )
                 this.bindRecordingHooks()
             } else if (recMode === 'replay' && !skipLocalRecording) {
-                const chainName = this.config.recording?.chainName
-                const chainDir = chainName ? recordingChainDirRelative(chainName, this.config.baseurl) : undefined
-                const entries = chainDir ? loadRecordingApiLog(chainDir, this.config.baseurl) : []
+                this.log.info('Replay mode active — no live ISC API calls permitted')
+                const scenarioName = this.config.recording?.scenarioName ?? this.config.recording?.chainName
+                const scenarioDir = scenarioName
+                    ? recordingScenarioDirRelative(scenarioName, this.config.baseurl)
+                    : undefined
+                const entries = scenarioDir ? loadRecordingApiLog(scenarioDir, this.config.baseurl) : []
                 adapter = new ReplayApiAdapter(entries, adapter.config)
             }
 
@@ -131,6 +134,16 @@ export class ServiceRegistry {
             const queue = new ApiQueue(queueConfig)
             this.client = new ClientService(adapter, queue, this.config, this.log)
             this.log.setQueue(queue)
+
+            if (recMode === 'replay' && !skipLocalRecording) {
+                const wiredAdapter = (this.client as { adapter?: IscApiAdapter }).adapter
+                if (!(wiredAdapter instanceof ReplayApiAdapter)) {
+                    throw new ConnectorError(
+                        'Replay mode requires ReplayApiAdapter — live SdkApiAdapter wiring is not permitted',
+                        ConnectorErrorType.Generic
+                    )
+                }
+            }
         }
 
         // Initialize services that don't depend on others
@@ -308,6 +321,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 

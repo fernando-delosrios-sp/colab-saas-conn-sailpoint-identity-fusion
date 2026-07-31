@@ -25,8 +25,8 @@ idn:identity-profile-attribute:manage
 
 | Scope | API calls covered |
 | --- | --- |
-| `idn:accounts:manage` | List fusion and managed accounts; correlate managed accounts to identities |
-| `idn:accounts-state:manage` | Disable managed accounts in the delayed-aggregation path |
+| `idn:accounts:manage` | List fusion and managed accounts; correlate managed accounts to identities; account create/update provisioning |
+| `idn:accounts-state:manage` | Disable managed accounts (orphan non-match path and delayed-aggregation side effects) via `POST /accounts/{id}/disable` |
 | `sp:search:read` | Identity lookups: scope query, fetch by ID/name, aggregation event search |
 | `idn:sources:manage` | List/get/update sources; correlation config; load-accounts aggregation |
 | `idn:source-schema:manage` | Read Fusion and managed source schemas; add reverse-correlation schema attributes |
@@ -40,20 +40,22 @@ idn:identity-profile-attribute:manage
 
 ## Conditional scopes
 
+These scopes appear in both the minimal set and the conditional table because they are required only when specific features are enabled. Omit them for deployments that do not use those features.
+
 | Scope | Required when… |
 | --- | --- |
-| `idn:accounts-state:manage` | `aggregationMode: delayed` is set on any managed source |
+| `idn:accounts-state:manage` | **Disable non-matching accounts** on an Orphan source, or `aggregationMode: delayed` side effects |
 | `idn:task-management:read` | `aggregationMode: before` is set on any managed source |
 | `sp:forms:manage` | Match step is enabled (manual review workflow) |
 | `sp:workflow:manage` | Match email notifications or delayed aggregation are enabled |
 | `sp:workflow-execute:external` | Match email notifications or delayed aggregation are enabled |
-| `idn:workgroup:read` | Fusion source has a management workgroup assigned |
+| `idn:workgroup:read` | Fusion source has a management workgroup assigned, or **Owners are global reviewers?** resolves workgroup members |
 | `idn:identity-profile:manage` | `correlationMode: reverse` is set on any managed source |
 | `idn:identity-profile-attribute:manage` | `correlationMode: reverse` is set on any managed source |
 
 ## Core minimum (Map and Define only)
 
-For a minimal Map/Define deployment with no Match, no email, no reverse correlation, and no aggregation control:
+For a minimal Map/Define side-car deployment with no Match, no email, no reverse correlation, no aggregation control, and no orphan disable:
 
 ```
 idn:accounts:manage
@@ -82,9 +84,11 @@ flowchart TD
 2. **`PATCH /v2025/form-instances/{id}`** — Any authenticated token can call this endpoint; no additional scope beyond a valid PAT.
 3. **`sp:workflow-execute:external`** — Exact scope string for `POST /v2025/workflows/{id}/test`. Do not substitute `sp:workflow:manage`.
 4. **Reverse correlation scopes** — Only exercised when `correlationMode: reverse` is configured on at least one managed source.
+5. **Entitlement list operation** — Does not call ISC APIs; no additional PAT scope beyond source/account reads already listed above.
 
 ## Related configuration
 
 - [Connection Settings](../configuration/connection.md) — PAT ID and secret fields
-- [Configuring sources](../use-guides/configuration/configuring-sources.md) — aggregation mode and correlation mode
+- [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) — aggregation mode and correlation mode
+- [Entitlement list](../operations/entitlement-list.md) — status and action entitlements the connector exposes
 - [Connection and observability tuning](../use-guides/operation/connection-and-observability-tuning.md) — resilience settings

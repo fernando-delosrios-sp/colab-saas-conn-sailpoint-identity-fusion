@@ -6,6 +6,17 @@ The Entitlement List operation returns available entitlements for the fusion con
 
 ## Process Flow
 
+```mermaid
+flowchart TD
+    Start([Entitlement list invoked]) --> Type{Requested type?}
+    Type -- status --> Static[Return static status entitlements]
+    Type -- action --> Fetch[Fetch managed sources]
+    Fetch --> Actions[Return static action entitlements]
+    Actions --> Reviewers[Add per-source reviewer entitlements]
+    Reviewers --> Out([Return entitlement list])
+    Static --> Out
+```
+
 1.  **Input Analysis**:
     - Checks the requested `type` of entitlement.
 
@@ -46,3 +57,4 @@ The Entitlement List operation returns available entitlements for the fusion con
 
 4.  **Output**:
     - Returns the list of entitlements.
+

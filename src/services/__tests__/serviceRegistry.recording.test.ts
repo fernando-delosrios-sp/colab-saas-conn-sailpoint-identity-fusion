@@ -13,7 +13,7 @@ import { loadRecordingApiLog } from '../recordingService/recordingStore'
 import { resetRecordingLifecycleForTests } from '../recordingService'
 import { OperationRunContext } from '../logService/operationRunContext'
 import { recordingChainDir } from '../../data/recordingPaths'
-import { FIXTURE_BASEURL } from '../../operations/__tests__/chain/fixtures/minimalRecordingFixture'
+import { FIXTURE_BASEURL } from '../../operations/__tests__/scenario/fixtures/minimalRecordingFixture'
 import { FusionConfig } from '../../model/config'
 
 vi.mock('@sailpoint/connector-sdk', async () => {
@@ -137,6 +137,31 @@ describe('ServiceRegistry recording wiring', () => {
         fs.rmSync(chainDir, { recursive: true, force: true })
     })
 
+    it('replay mode never wires live SdkApiAdapter as the active adapter', async () => {
+        const scenarioName = `replay-guard-${Date.now()}`
+        const apiEntry: ApiLogEntry = {
+            api: 'sources',
+            method: 'listSources',
+            args: [{}],
+            response: [{ id: 'guard-src' }],
+            timestamp: '2026-01-01T00:00:00.000Z',
+        }
+        const scenarioDir = installTenantScopedReplayChain(scenarioName, FIXTURE_BASEURL, apiEntry)
+
+        const config = {
+            ...minimalPlatformConfig,
+            recording: { mode: 'replay' as const, scenarioName, store: 'ndjson' as const },
+        } as FusionConfig
+
+        const registry = new ServiceRegistry(config, {}, { send: vi.fn() }, 'testConnection')
+
+        const adapter = (registry.client as any).adapter
+        expect(adapter).toBeInstanceOf(ReplayApiAdapter)
+        expect(adapter).not.toBeInstanceOf(SdkApiAdapter)
+
+        fs.rmSync(scenarioDir, { recursive: true, force: true })
+    })
+
     it('wires RecordingApiAdapter when forwarded proxy config has client-resolved recording.mode off', async () => {
         delete process.env.PROXY_PASSWORD
         process.env.PROXY_PASSWORD = 'secret'
@@ -224,6 +249,7 @@ describe('loadRecordingApiLog', () => {
         fs.rmSync(tmpDir, { recursive: true, force: true })
     })
 })
+
 
 
 

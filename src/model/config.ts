@@ -488,9 +488,14 @@ interface InternalConfig {
 // Recording Configuration
 // ============================================================================
 
-/** Centralized recording flags, replacing scattered env vars (RECORD_MODE, RECORD_CHAIN_NAME, VERBOSE_RECORDING). */
+/** Centralized recording flags, replacing scattered env vars (RECORD_MODE, RECORD_SCENARIO_NAME, VERBOSE_RECORDING). */
 export interface RecordingConfig {
     mode: 'off' | 'record' | 'replay'
+    /** Named recording scenario for record/replay artifact paths. */
+    scenarioName?: string
+    /**
+     * @deprecated Use `scenarioName`. Kept for backward compatibility with legacy configs and env vars.
+     */
     chainName?: string
     verbose?: boolean
     /** Persistence backend for record-mode artifacts. Default `'ndjson'`. */
@@ -518,6 +523,7 @@ export interface FusionConfig
         InternalConfig {
     recording?: RecordingConfig
 }
+
 
 
 

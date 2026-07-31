@@ -57,7 +57,8 @@ function bridgeExternalRecording(config: FusionConfig, rawRecording?: Partial<Re
     if (bridged.mode === undefined || clientResolvedOff) {
         bridged.mode = 'record'
     }
-    if (bridged.chainName === undefined) {
+    if (bridged.scenarioName === undefined && bridged.chainName === undefined) {
+        bridged.scenarioName = chainName
         bridged.chainName = chainName
     }
 
@@ -93,4 +94,5 @@ export const safeReadConfig = async (): Promise<FusionConfig> => {
 
     return config
 }
+
 

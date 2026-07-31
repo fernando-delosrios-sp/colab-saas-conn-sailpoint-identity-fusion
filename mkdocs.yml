@@ -21,6 +21,18 @@ theme:
 
 nav:
     - Home: index.md
+    - Use guides:
+          - Use guides overview: use-guides/index.md
+          - Configuration guides:
+                - Configuring sources and scope: use-guides/configuration/configuring-sources-and-scope.md
+                - Source types: use-guides/configuration/source-types.md
+                - Mapping attributes: use-guides/configuration/mapping-attributes.md
+                - Defining attributes: use-guides/configuration/defining-attributes.md
+                - Matching identities: use-guides/configuration/matching-identities.md
+                - Managing correlation: use-guides/configuration/managing-correlation.md
+                - Managing reviewers: use-guides/configuration/managing-reviewers.md
+                - Review forms and reviewers: use-guides/configuration/review-forms-and-reviewers.md
+                - Tuning matching algorithms: use-guides/configuration/tuning-matching-algorithms.md
     - Configuration:
           - Configuration reference: configuration/index.md
           - Connection Settings: configuration/connection.md
@@ -29,17 +41,6 @@ nav:
           - Attribute Definition Settings: configuration/definition.md
           - Attribute Matching Settings: configuration/matching.md
           - Advanced Settings: configuration/advanced.md
-    - Use guides:
-          - Use guides overview: use-guides/index.md
-          - Configuration guides:
-                - Mapping attributes: use-guides/configuration/mapping-attributes.md
-                - Defining attributes: use-guides/configuration/defining-attributes.md
-                - Matching identities: use-guides/configuration/matching-identities.md
-                - Managing correlation: use-guides/configuration/managing-correlation.md
-                - Managing reviewers: use-guides/configuration/managing-reviewers.md
-                - Review forms and reviewers: use-guides/configuration/review-forms-and-reviewers.md
-                - Tuning matching algorithms: use-guides/configuration/tuning-matching-algorithms.md
-                - Configuring sources: use-guides/configuration/configuring-sources.md
           - Operation guides:
                 - Dry-run analysis: use-guides/operation/dry-run-analysis.md
                 - Connection and observability tuning: use-guides/operation/connection-and-observability-tuning.md
@@ -55,7 +56,7 @@ nav:
           - ISC PAT scopes: reference/pat-scopes.md
           - Observability: reference/observability.md
           - Proxy deployment: reference/proxy-mode.md
-          - Chain recording: reference/chain-recording.md
+          - Scenario recording: reference/scenario-recording.md
           - Connector operations:
                 - Connector operations (APIs ISC calls): operations/index.md
                 - Connectivity:
@@ -81,6 +82,7 @@ markdown_extensions:
               - name: mermaid
                 class: mermaid
                 format: !!python/name:pymdownx.superfences.fence_code_format
+
 
 
 

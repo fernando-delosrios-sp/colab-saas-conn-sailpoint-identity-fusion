@@ -6,6 +6,18 @@ The Account Read operation retrieves the current state of a specific fusion acco
 
 ## Process Flow
 
+```mermaid
+flowchart TD
+    Start([Account read invoked]) --> Setup[Load sources + schema]
+    Setup --> Rebuild[Rebuild fusion account]
+    Rebuild --> Cascade{cascadeAggregationEnabled?}
+    Cascade -- Yes --> Agg[Aggregate referenced managed sources]
+    Cascade -- No --> Fetch
+    Agg --> Fetch[Fetch identity + managed accounts]
+    Fetch --> Map[Re-run Map + Define]
+    Map --> Out([Return fresh ISC account])
+```
+
 1.  **Setup**:
     - Verifies that the `identity` (ID) is provided.
     - Loads all managed sources (`sources.fetchAllSources()`).
@@ -26,3 +38,4 @@ The Account Read operation retrieves the current state of a specific fusion acco
     - Normalizes any pending form state for output (`fusion.normalizePendingFormStateForOutput()`).
     - Converts the rebuilt fusion account into an ISC account object via `fusion.getISCAccount(fusionAccount)`.
     - Sends the result back to ISC and emits a `log.timer().end(...)` line on success.
+
