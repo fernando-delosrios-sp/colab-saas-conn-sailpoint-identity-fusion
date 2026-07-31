@@ -135,14 +135,11 @@ export class ServiceRegistry {
             this.client = new ClientService(adapter, queue, this.config, this.log)
             this.log.setQueue(queue)
 
-            if (recMode === 'replay' && !skipLocalRecording) {
-                const wiredAdapter = (this.client as { adapter?: IscApiAdapter }).adapter
-                if (!(wiredAdapter instanceof ReplayApiAdapter)) {
-                    throw new ConnectorError(
-                        'Replay mode requires ReplayApiAdapter — live SdkApiAdapter wiring is not permitted',
-                        ConnectorErrorType.Generic
-                    )
-                }
+            if (recMode === 'replay' && !skipLocalRecording && !(adapter instanceof ReplayApiAdapter)) {
+                throw new ConnectorError(
+                    'Replay mode requires ReplayApiAdapter — live SdkApiAdapter wiring is not permitted',
+                    ConnectorErrorType.Generic
+                )
             }
         }
 
@@ -321,6 +318,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 
