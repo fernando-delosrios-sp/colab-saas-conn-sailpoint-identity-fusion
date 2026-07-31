@@ -401,11 +401,13 @@ export class DefinitionService {
         if (counterDefinitions.length === 0) return
 
         this.log.debug(`Initializing ${counterDefinitions.length} incremental counter attributes`)
-        const existingCounters = Object.fromEntries(
-            Array.from(stateWrapper.entries()).filter(([key]) =>
-                counterDefinitions.some((definition) => definition.name === key)
-            )
-        )
+        // Performance optimization: Using for...of instead of Array.from().filter() avoids intermediate array allocations
+        const existingCounters: Record<string, any> = {}
+        for (const [key, value] of stateWrapper.entries()) {
+            if (counterDefinitions.some((definition) => definition.name === key)) {
+                existingCounters[key] = value
+            }
+        }
         if (Object.keys(existingCounters).length > 0) {
             this.log.debug(`Preserving existing counter values: ${JSON.stringify(existingCounters)}`)
         }
