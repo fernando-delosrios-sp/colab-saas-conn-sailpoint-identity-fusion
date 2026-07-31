@@ -12,19 +12,52 @@ function stableKey(apiName: string, method: string, args: unknown[]): string {
 
 export class ReplayApiAdapter implements IscApiAdapter {
     public readonly config: Configuration
-    private readonly responseMap = new Map<string, unknown>()
+    /** FIFO queues for repeated read calls that share the same stable key. */
+    private readonly readQueues = new Map<string, unknown[]>()
+    private readonly readCursors = new Map<string, number>()
     private readonly writeLog: ApiLogEntry[] = []
     private readonly consumedWrites = new Set<number>()
+    private readonly orderedEntries: ApiLogEntry[]
 
     constructor(entries: ApiLogEntry[], config?: Configuration) {
         this.config = config ?? ({} as Configuration)
+        this.orderedEntries = [...entries]
 
         for (const entry of entries) {
             const key = stableKey(entry.api, entry.method, entry.args)
             if (isWriteMethod(entry.method)) {
                 this.writeLog.push(entry)
             } else {
-                this.responseMap.set(key, entry.response)
+                const queue = this.readQueues.get(key) ?? []
+                queue.push(entry.response)
+                this.readQueues.set(key, queue)
+            }
+        }
+    }
+
+    /**
+     * Positions read/write cursors as if all api-log entries before `timestamp` were already consumed.
+     * Aligns replay with the ISC state at the start of a recorded step.
+     */
+    seekBefore(timestamp: string): void {
+        this.readCursors.clear()
+        this.consumedWrites.clear()
+
+        for (let i = 0; i < this.orderedEntries.length; i++) {
+            const entry = this.orderedEntries[i]
+            if (!entry.timestamp || entry.timestamp >= timestamp) {
+                break
+            }
+
+            const key = stableKey(entry.api, entry.method, entry.args)
+            if (isWriteMethod(entry.method)) {
+                const writeIndex = this.writeLog.indexOf(entry)
+                if (writeIndex >= 0) {
+                    this.consumedWrites.add(writeIndex)
+                }
+            } else {
+                const cursor = this.readCursors.get(key) ?? 0
+                this.readCursors.set(key, cursor + 1)
             }
         }
     }
@@ -40,13 +73,15 @@ export class ReplayApiAdapter implements IscApiAdapter {
     }
 
     private assertRecordedResponse(apiName: string, method: string, args: unknown[], key: string): unknown {
-        const response = this.responseMap.get(key)
-        if (response === undefined) {
+        const queue = this.readQueues.get(key)
+        const cursor = this.readCursors.get(key) ?? 0
+        if (!queue || cursor >= queue.length) {
             throw new ConnectorError(
                 `Replay: unrecorded API call: ${apiName}.${method}(${JSON.stringify(args)})`
             )
         }
-        return response
+        this.readCursors.set(key, cursor + 1)
+        return queue[cursor]
     }
 
     private resolveReplayCall(apiName: string, method: string, args: unknown[]): Promise<unknown> {
@@ -104,6 +139,7 @@ export function loadApiLog(fileOrDirPath: string): ApiLogEntry[] {
     if (!content) return []
     return content.split('\n').map((line) => JSON.parse(line))
 }
+
 
 
 

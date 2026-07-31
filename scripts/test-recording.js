@@ -3,18 +3,18 @@ const readline = require('readline')
 const { spawnSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
-const { chainDir, listTenantChainDirs } = require('./recording-paths.cjs')
+const { chainDir, parseRecordingChainRef, listTenantChainDirs, resolveChainRefFromArgv } = require('./recording-paths.cjs')
 const { finalizeChainArtifacts } = require('./finalize-chain-artifacts.cjs')
 
 function listAvailableChains() {
     return listTenantChainDirs()
-        .map((entry) => entry.chainName)
+        .map((entry) => entry.chainRef)
         .sort()
 }
 
-function validateChain(chainName) {
-    const safeName = chainName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()
-    const dir = chainDir(safeName)
+function validateChain(chainRefInput) {
+    const { chainRef } = parseRecordingChainRef(chainRefInput)
+    const dir = chainDir(chainRef)
     const scenarioPath = path.join(dir, 'scenario.json')
     const stepsPath = path.join(dir, 'steps.ndjson')
 
@@ -26,7 +26,7 @@ function validateChain(chainName) {
 
     if (!fs.existsSync(scenarioPath) && fs.existsSync(stepsPath)) {
         console.log('scenario.json missing — finalizing from steps.ndjson...')
-        const result = finalizeChainArtifacts(safeName)
+        const result = finalizeChainArtifacts(chainRef)
         console.log(`  wrote scenario.json (${result.stepCount} steps) and manifest.json`)
     } else if (!fs.existsSync(scenarioPath)) {
         console.error(`ERROR: scenario.json not found at ${scenarioPath}`)
@@ -34,19 +34,19 @@ function validateChain(chainName) {
         process.exit(1)
     }
 
-    return safeName
+    return chainRef
 }
 
-function runVerification(chainName) {
-    const safeName = validateChain(chainName)
+function runVerification(chainRefInput) {
+    const chainRef = validateChain(chainRefInput)
 
     console.log('')
     console.log('Identity Fusion NG — Test Recording')
     console.log('===================================')
-    console.log(`Verifying chain: ${safeName}`)
-    console.log(`Artifact directory: ${chainDir(safeName)}`)
+    console.log(`Verifying chain: ${chainRef}`)
+    console.log(`Artifact directory: ${chainDir(chainRef)}`)
     console.log('')
-    console.log('Usage: npm run test-recording -- <chainName>')
+    console.log('Usage: npm run test-recording -- <tenant/chain>')
     console.log('')
 
     const result = spawnSync(
@@ -55,7 +55,7 @@ function runVerification(chainName) {
         {
             env: {
                 ...process.env,
-                VERIFY_RECORDING_CHAIN: safeName,
+                VERIFY_RECORDING_CHAIN: chainRef,
             },
             stdio: 'inherit',
         }
@@ -64,7 +64,7 @@ function runVerification(chainName) {
     process.exit(result.status ?? 1)
 }
 
-function promptChainName(available) {
+function promptChainRef(available) {
     const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -78,22 +78,21 @@ function promptChainName(available) {
         console.log('')
     }
 
-    rl.question('Enter chain name to verify: ', (chainName) => {
+    rl.question('Enter chain reference to verify (tenant/chain): ', (chainInput) => {
         rl.close()
-        const trimmed = (chainName || '').trim()
+        const trimmed = (chainInput || '').trim()
         if (!trimmed) {
-            console.error('Chain name is required')
-            console.error('Usage: npm run test-recording -- <chainName>')
+            console.error('Chain reference is required (tenant/chain)')
+            console.error('Usage: npm run test-recording -- <tenant/chain>')
             process.exit(1)
         }
         runVerification(trimmed)
     })
 }
 
-const argChain = process.argv[2]?.trim()
+const argChain = resolveChainRefFromArgv(process.argv)
 if (argChain) {
     runVerification(argChain)
 } else {
-    promptChainName(listAvailableChains())
+    promptChainRef(listAvailableChains())
 }
-

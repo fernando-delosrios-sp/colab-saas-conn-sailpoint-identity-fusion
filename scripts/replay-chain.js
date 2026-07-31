@@ -3,25 +3,12 @@ const readline = require('readline')
 const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
-const { RECORDINGS_ROOT, chainDir } = require('./recording-paths.cjs')
+const { chainDir, parseRecordingChainRef, listChainsWithApiLog, resolveChainRefFromArgv } = require('./recording-paths.cjs')
 const { finalizeChainArtifacts, countNdjsonLines } = require('./finalize-chain-artifacts.cjs')
 
-function listAvailableChains() {
-    if (!fs.existsSync(RECORDINGS_ROOT)) return []
-    return fs
-        .readdirSync(RECORDINGS_ROOT, { withFileTypes: true })
-        .filter((d) => {
-            if (!d.isDirectory()) return false
-            const apiLog = path.join(RECORDINGS_ROOT, d.name, 'api-log.ndjson')
-            return fs.existsSync(apiLog) && countNdjsonLines(apiLog) > 0
-        })
-        .map((d) => d.name)
-        .sort()
-}
-
-function validateChain(chainName) {
-    const safeName = chainName.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()
-    const dir = chainDir(safeName)
+function validateChain(chainRefInput) {
+    const { chainRef } = parseRecordingChainRef(chainRefInput)
+    const dir = chainDir(chainRef)
     const scenarioPath = path.join(dir, 'scenario.json')
     const apiLogPath = path.join(dir, 'api-log.ndjson')
     const manifestPath = path.join(dir, 'manifest.json')
@@ -47,7 +34,7 @@ function validateChain(chainName) {
 
     if (!fs.existsSync(scenarioPath) && fs.existsSync(path.join(dir, 'steps.ndjson'))) {
         console.log('scenario.json missing — finalizing from steps.ndjson...')
-        const result = finalizeChainArtifacts(safeName)
+        const result = finalizeChainArtifacts(chainRef)
         console.log(`  wrote scenario.json (${result.stepCount} steps) and manifest.json`)
     } else if (!fs.existsSync(scenarioPath)) {
         console.warn('WARNING: scenario.json missing and no steps.ndjson to build from')
@@ -65,18 +52,18 @@ function validateChain(chainName) {
         }
     }
 
-    return { dir, scenarioPath, safeName }
+    return { dir, chainRef }
 }
 
-function startReplay(chainName) {
-    const { dir, safeName } = validateChain(chainName)
+function startReplay(chainRefInput) {
+    const { dir, chainRef } = validateChain(chainRefInput)
     const logFile = path.join(dir, 'connector-replay.log')
     const logStream = fs.createWriteStream(logFile, { flags: 'w' })
 
     console.log('')
     console.log('Identity Fusion NG — Chain Replay')
     console.log('=================================')
-    console.log(`Replaying chain: ${safeName}`)
+    console.log(`Replaying chain: ${chainRef}`)
     console.log(`Artifact directory: ${dir}`)
     console.log(`Connector log: ${logFile}`)
     console.log('Connector starting in replay mode. Press Ctrl+C to stop.')
@@ -86,7 +73,7 @@ function startReplay(chainName) {
         env: {
             ...process.env,
             REPLAY_MODE: 'true',
-            RECORD_CHAIN_NAME: safeName,
+            RECORD_CHAIN_NAME: chainRef,
             VERBOSE_RECORDING: process.env.VERBOSE_RECORDING ?? 'true',
         },
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -123,7 +110,7 @@ function startReplay(chainName) {
     })
 }
 
-function promptChainName(available) {
+function promptChainRef(available) {
     const rl = readline.createInterface({
         input: process.stdin,
         output: process.stdout,
@@ -137,20 +124,20 @@ function promptChainName(available) {
         console.log('')
     }
 
-    rl.question('Enter chain name to replay: ', (chainName) => {
+    rl.question('Enter chain reference to replay (tenant/chain): ', (chainInput) => {
         rl.close()
-        const trimmed = (chainName || '').trim()
+        const trimmed = (chainInput || '').trim()
         if (!trimmed) {
-            console.error('Chain name is required')
+            console.error('Chain reference is required (tenant/chain)')
             process.exit(1)
         }
         startReplay(trimmed)
     })
 }
 
-const argChain = process.argv[2]?.trim()
+const argChain = resolveChainRefFromArgv(process.argv)
 if (argChain) {
     startReplay(argChain)
 } else {
-    promptChainName(listAvailableChains())
+    promptChainRef(listChainsWithApiLog())
 }

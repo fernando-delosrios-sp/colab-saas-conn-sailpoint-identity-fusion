@@ -64,18 +64,49 @@ export interface ChainResult {
     finalState: Record<string, unknown>
 }
 
+/** Removes end-of-session runtime fields persisted into recorded scenario config. */
+export function sanitizeScenarioConfigForReplay(config: ScenararioConfig): ScenararioConfig {
+    const clean = { ...config }
+    delete clean.batchCumulativeCount
+    delete clean.acctAggregationStart
+    delete clean.acctAggregationEnd
+    delete clean.cloudCacheUpdate
+    return clean
+}
+
+function loadStepTimestamps(stepsPath: string): Record<string, string> {
+    if (!fs.existsSync(stepsPath)) return {}
+
+    const timestamps: Record<string, string> = {}
+    for (const line of fs.readFileSync(stepsPath, 'utf-8').trim().split('\n')) {
+        if (!line) continue
+        try {
+            const step = JSON.parse(line) as { stepId?: string; timestamp?: string }
+            if (step.stepId && step.timestamp) {
+                timestamps[step.stepId] = step.timestamp
+            }
+        } catch {
+            /* skip malformed lines */
+        }
+    }
+    return timestamps
+}
+
 export class ChainRunner {
     private scenario: ChainScenario
     private state: ChainState
     private replayAdapter?: ReplayApiAdapter
+    private stepTimestamps: Record<string, string>
 
     constructor(scenarioPath: string) {
         const resolved = path.isAbsolute(scenarioPath) ? scenarioPath : path.resolve(scenarioPath)
         const raw = JSON.parse(fs.readFileSync(resolved, 'utf8'))
 
         this.scenario = raw as ChainScenario
+        this.scenario.config = sanitizeScenarioConfigForReplay(this.scenario.config)
 
         const chainDir = path.dirname(resolved)
+        this.stepTimestamps = loadStepTimestamps(path.join(chainDir, 'steps.ndjson'))
         const baseurl = typeof this.scenario.config.baseurl === 'string' ? this.scenario.config.baseurl : undefined
         const apiLogEntries = loadRecordingApiLog(chainDir, baseurl)
         if (apiLogEntries.length > 0) {
@@ -222,6 +253,7 @@ export class ChainRunner {
             options: {
                 sweep: step.sweep ?? 1,
                 stepId: step.id,
+                stepTimestamp: this.stepTimestamps[step.id],
             },
             scenario: this.scenario,
             replayAdapter: this.replayAdapter,
@@ -251,6 +283,7 @@ export function registerStepFn(
 function getStepFn(operation: string): ((step: StepDefinition, context: ChainContext) => Promise<unknown>) | undefined {
     return stepFns.get(operation)
 }
+
 
 
 

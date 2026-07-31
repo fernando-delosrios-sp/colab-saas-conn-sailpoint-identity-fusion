@@ -2,7 +2,7 @@ name: Build and release connector
 
 on:
     push:
-        branches: [main]
+        branches: [main, '2.2.0/preview', '2.1/fixes']
     workflow_dispatch:
 
 permissions:
@@ -51,4 +51,5 @@ jobs:
                   name: ${{ steps.pkg.outputs.name }} v${{ steps.pkg.outputs.version }}
                   generate_release_notes: true
                   files: dist/*.zip
+
 

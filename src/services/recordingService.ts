@@ -6,7 +6,7 @@ import { FusionConfig, RecordingConfig } from '../model/config'
 import { ApiLogEntry } from './clientService/recordingApiAdapter'
 import { sanitizeForJson } from '../utils/sanitizeForJson'
 import type { MatchingResultsSnapshot } from './recordingService/matchingResultsSnapshot'
-import { recordingCacheKey } from '../data/recordingPaths'
+import { parseRecordingChainRef, recordingCacheKey } from '../data/recordingPaths'
 import {
     getOrCreateRecordingStore,
     RecordingManifest,
@@ -52,7 +52,7 @@ async function finalizeAllRecordingChains(): Promise<void> {
         const config = chainConfigs.get(cacheKey)
         const log = chainLogs.get(cacheKey)
         if (config && log) {
-            const chainName = config.recording?.chainName ?? cacheKey.split('/').pop()!
+            const chainName = config.recording?.chainName ?? cacheKey
             await finalizeRecordingChain(chainName, config, log)
         }
     }
@@ -159,6 +159,7 @@ export async function finalizeRecordingChain(
     log: LogService,
     reportsPath?: string
 ): Promise<string> {
+    const chainRef = parseRecordingChainRef(chainName, config.baseurl).chainRef
     const cacheKey = recordingCacheKey(chainName, config.baseurl)
     if (finalizedChains.has(cacheKey)) return ''
     finalizedChains.add(cacheKey)
@@ -175,7 +176,7 @@ export async function finalizeRecordingChain(
     const matchingResultsPath = fs.existsSync(matchingResultsFile)
         ? path.relative(process.cwd(), matchingResultsFile)
         : undefined
-    const scenario = buildScenario(chainName, config, store, steps)
+    const scenario = buildScenario(chainRef, config, store, steps)
     const scenarioPath = path.join(dir, 'scenario.json')
     fs.writeFileSync(scenarioPath, JSON.stringify(scenario, null, 2) + '\n')
 
@@ -200,7 +201,7 @@ export async function finalizeRecordingChain(
     const manifest: RecordingManifest = {
         version: '1.0.0',
         store: recConfig.store ?? 'ndjson',
-        chainName,
+        chainName: chainRef,
         recordedAt: new Date().toISOString(),
         apiLogPath: path.relative(process.cwd(), apiLogPath),
         apiLogEntryCount: store.getApiLogEntryCount(),
@@ -216,7 +217,7 @@ export async function finalizeRecordingChain(
     fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
     store.close()
 
-    log.info(`Recording "${chainName}" finalized — ${steps.length} steps, ${manifest.apiLogEntryCount} api-log entries → ${scenarioPath}`)
+    log.info(`Recording "${chainRef}" finalized — ${steps.length} steps, ${manifest.apiLogEntryCount} api-log entries → ${scenarioPath}`)
     return scenarioPath
 }
 
@@ -358,5 +359,6 @@ export function resetRecordingLifecycleForTests(): void {
     exitHandlersRegistered = false
     clearRecordingStoreCache()
 }
+
 
 
