@@ -12,6 +12,7 @@ nav:
     - Get started: get-started.md
     - Concepts:
           - Map, define, and match: concepts/map-define-match.md
+          - Glossary: concepts/glossary.md
     - Configuration guides:
           - Guides overview: guides/index.md
           - Core pipeline:
