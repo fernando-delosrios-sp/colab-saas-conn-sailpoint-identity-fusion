@@ -268,7 +268,7 @@ export class FusionCollections {
             const fromIdentity = originSource === IDENTITIES_SOURCE_NAME
 
             if (this._accountIds.size === 0) {
-                if (!fromIdentity || (fromIdentity && !originIdentityInScope)) {
+                if (!fromIdentity || !originIdentityInScope) {
                     this._statuses.add(StatusEntitlement.Orphan)
                     this._addHistory(`Account became orphan after removing source account: ${id}`)
                 }
