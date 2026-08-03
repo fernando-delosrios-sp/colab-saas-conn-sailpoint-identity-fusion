@@ -11,6 +11,7 @@ import { accountDisable } from '../../../../operations/accountDisable'
 import { accountEnable } from '../../../../operations/accountEnable'
 import { accountRead } from '../../../../operations/accountRead'
 import { accountUpdate } from '../../../../operations/accountUpdate'
+import { testConnection } from '../../../../operations/testConnection'
 
 export interface StepVerifyResult {
     stepId: string
@@ -158,6 +159,22 @@ export function registerScenarioStepFns(): void {
         }
     })
 
+    registerStepFn('testConnection', async (step: StepDefinition, context: ChainContext) => {
+        const replayCtx = buildReplayContext(step, context)
+        const registry = replayCtx.registry as unknown as MockRegistry
+
+        try {
+            await testConnection(registry as any, (step.input ?? {}) as any)
+        } catch (err) {
+            console.error(`Error in testConnection for ${step.id}:`, err)
+        }
+
+        return {
+            operation: step.operation,
+            outputs: collectOutputs(replayCtx),
+        }
+    })
+
     registerStepFn('accountUpdate', async (step: StepDefinition, context: ChainContext) => {
         const replayCtx = buildReplayContext(step, context)
         const registry = replayCtx.registry as unknown as MockRegistry
@@ -297,3 +314,4 @@ export function printScenarioVerifyReport(result: ScenarioVerifyResult, scenario
 
 /** @deprecated Use printScenarioVerifyReport */
 export const printChainVerifyReport = printScenarioVerifyReport
+

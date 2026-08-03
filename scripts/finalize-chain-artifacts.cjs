@@ -90,7 +90,8 @@ function buildScenario(chainName, steps, dir) {
     return {
         version: '1.0.0',
         recordedAt: new Date().toISOString(),
-        chainName,
+        scenarioName: normalized,
+        chainName: normalized,
         config,
         initialState,
         steps: scenarioSteps,
@@ -115,6 +116,7 @@ function finalizeChainArtifacts(chainRef) {
     const scenario = buildScenario(normalized, steps, dir)
     fs.writeFileSync(scenarioPath, JSON.stringify(scenario, null, 2) + '\n')
 
+    const matchingResultsPath = path.join(dir, 'reports', 'matching-results.json')
     const artifactPaths = [
         path.relative(process.cwd(), scenarioPath),
         path.relative(process.cwd(), apiLogPath),
@@ -126,10 +128,14 @@ function finalizeChainArtifacts(chainRef) {
     if (fs.existsSync(reportsPath)) {
         artifactPaths.push(path.relative(process.cwd(), reportsPath))
     }
+    if (fs.existsSync(matchingResultsPath)) {
+        artifactPaths.push(path.relative(process.cwd(), matchingResultsPath))
+    }
 
     const manifest = {
         version: '1.0.0',
         store: 'ndjson',
+        scenarioName: normalized,
         chainName: normalized,
         recordedAt: new Date().toISOString(),
         apiLogPath: path.relative(process.cwd(), apiLogPath),
@@ -140,6 +146,9 @@ function finalizeChainArtifacts(chainRef) {
         phaseCount: countNdjsonLines(phasesPath),
         scenarioPath: path.relative(process.cwd(), scenarioPath),
         reportsPath: fs.existsSync(reportsPath) ? path.relative(process.cwd(), reportsPath) : undefined,
+        matchingResultsPath: fs.existsSync(matchingResultsPath)
+            ? path.relative(process.cwd(), matchingResultsPath)
+            : undefined,
         artifactPaths,
     }
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
@@ -148,4 +157,5 @@ function finalizeChainArtifacts(chainRef) {
 }
 
 module.exports = { finalizeChainArtifacts, countNdjsonLines, loadStepsFromDisk, buildScenario, loadExistingConfig }
+
 

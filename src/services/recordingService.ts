@@ -6,6 +6,12 @@ import { FusionConfig, RecordingConfig } from '../model/config'
 import { ApiLogEntry } from './clientService/recordingApiAdapter'
 import { sanitizeForJson } from '../utils/sanitizeForJson'
 import type { MatchingResultsSnapshot } from './recordingService/matchingResultsSnapshot'
+import {
+    loadAggregationReportRecording,
+    loadMatchingResultsRecording,
+    type AggregationReportRecording,
+    type MatchingResultsRecording,
+} from './recordingService/reportArtifacts'
 import { parseRecordingChainRef, recordingCacheKey } from '../data/recordingPaths'
 import {
     getOrCreateRecordingStore,
@@ -105,13 +111,17 @@ function buildScenario(scenarioRef: string, config: FusionConfig, store: Recordi
               identities: firstState.identities,
               managedAccounts: firstState.managedAccounts,
               fusionAccounts: firstState.fusionAccounts,
+              fusionIdentityAccounts: firstState.fusionIdentityAccounts ?? [],
               fusionIdentityDecisions: firstState.fusionIdentityDecisions,
+              finishedFusionDecisions: firstState.finishedFusionDecisions ?? [],
           }
         : {
               identities: [],
               managedAccounts: [],
               fusionAccounts: [],
+              fusionIdentityAccounts: [],
               fusionIdentityDecisions: [],
+              finishedFusionDecisions: [],
           }
 
     const scenarioSteps = steps.map((step) => ({
@@ -130,9 +140,11 @@ function buildScenario(scenarioRef: string, config: FusionConfig, store: Recordi
             outputCount: step.output.length,
             durationMs: step.duration,
             managedAccountsCount: step.stateAfter.managedAccounts.length,
-            fusionAccountsCount: step.stateAfter.fusionAccounts.length,
+            fusionAccountsCount:
+                step.stateAfter.fusionAccounts.length + (step.stateAfter.fusionIdentityAccounts?.length ?? 0),
             identitiesCount: step.stateAfter.identities.length,
             fusionIdentityDecisionsCount: step.stateAfter.fusionIdentityDecisions.length,
+            finishedFusionDecisionsCount: step.stateAfter.finishedFusionDecisions?.length ?? 0,
         }
     }
 
@@ -204,6 +216,7 @@ export async function finalizeRecordingChain(
         version: '1.0.0',
         store: recConfig.store ?? 'ndjson',
         chainName: chainRef,
+        scenarioName: chainRef,
         recordedAt: new Date().toISOString(),
         apiLogPath: path.relative(process.cwd(), apiLogPath),
         apiLogEntryCount: store.getApiLogEntryCount(),
@@ -269,19 +282,47 @@ export class RecordingService {
         this.store.append('phases', record)
     }
 
-    writeAggregationReport(report: unknown): void {
+    writeAggregationReport(report: unknown, stepId?: string): void {
         const reportsDir = path.join(this.store.getRecordingDir(), 'reports')
         fs.mkdirSync(reportsDir, { recursive: true })
         const reportPath = path.join(reportsDir, 'aggregation.json')
-        fs.writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n')
+        const existing = fs.existsSync(reportPath)
+            ? loadAggregationReportRecording(JSON.parse(fs.readFileSync(reportPath, 'utf-8')))
+            : { version: '1.1.0' as const, runs: [] }
+        const recording: AggregationReportRecording = {
+            version: '1.1.0',
+            runs: [
+                ...existing.runs.filter((run) => run.stepId !== stepId),
+                {
+                    stepId,
+                    recordedAt: new Date().toISOString(),
+                    report: report as Record<string, unknown>,
+                },
+            ],
+        }
+        fs.writeFileSync(reportPath, JSON.stringify(sanitizeForJson(recording), null, 2) + '\n')
     }
 
     writeMatchingResults(snapshot: MatchingResultsSnapshot): string {
         const reportsDir = path.join(this.store.getRecordingDir(), 'reports')
         fs.mkdirSync(reportsDir, { recursive: true })
         const reportPath = path.join(reportsDir, 'matching-results.json')
-        fs.writeFileSync(reportPath, JSON.stringify(sanitizeForJson(snapshot), null, 2) + '\n')
+        const existing = fs.existsSync(reportPath)
+            ? loadMatchingResultsRecording(JSON.parse(fs.readFileSync(reportPath, 'utf-8')))
+            : { version: '1.1.0' as const, runs: [] }
+        const recording: MatchingResultsRecording = {
+            version: '1.1.0',
+            runs: [
+                ...existing.runs.filter((run) => run.stepId !== snapshot.stepId),
+                snapshot,
+            ],
+        }
+        fs.writeFileSync(reportPath, JSON.stringify(sanitizeForJson(recording), null, 2) + '\n')
         return reportPath
+    }
+
+    getCurrentStepId(): string | undefined {
+        return this.currentStep?.stepId
     }
 
     getStepCount(): number {
@@ -361,6 +402,7 @@ export function resetRecordingLifecycleForTests(): void {
     exitHandlersRegistered = false
     clearRecordingStoreCache()
 }
+
 
 
 

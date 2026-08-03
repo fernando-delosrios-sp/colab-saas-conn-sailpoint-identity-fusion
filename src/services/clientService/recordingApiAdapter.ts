@@ -3,7 +3,10 @@ import { IscApiAdapter } from './iscApiAdapter'
 import { sanitizeApiPayload } from '../../utils/sanitizeForJson'
 
 export interface ApiLogEntry {
+    /** ISC SDK getter name (e.g. `accounts`, `search`). Alias: `getter`. */
     api: string
+    /** Spec alias for {@link api}; persisted alongside `api` for tooling compatibility. */
+    getter?: string
     method: string
     args: unknown[]
     response: unknown
@@ -34,6 +37,7 @@ export class RecordingApiAdapter implements IscApiAdapter {
                             try {
                                 this.onApiCall({
                                     api: apiName,
+                                    getter: apiName,
                                     method,
                                     args: args.map(sanitizeApiPayload),
                                     response: sanitizeApiPayload(response),
@@ -65,3 +69,4 @@ export class RecordingApiAdapter implements IscApiAdapter {
     get identityProfilesApi() { return this.createApiProxy('identityProfiles', this.inner.identityProfilesApi) }
     get identityAttributesApi() { return this.createApiProxy('identityAttributes', this.inner.identityAttributesApi) }
 }
+

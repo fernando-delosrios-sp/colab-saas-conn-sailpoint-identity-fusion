@@ -242,6 +242,7 @@ export class FormService {
 
     private resetFormDataState(): void {
         this.run.clearDecisions()
+        this.run.clearFinishedFusionDecisions()
         this.fusionMergeDecisionMap = new Map()
         this.run.clearReviewUrls()
         this._pendingReviewContextByAccountId = new Map()
@@ -811,6 +812,7 @@ export class FormService {
      */
     public registerFinishedDecision(decision: FusionDecision, includeInProcessingQueue: boolean = false): void {
         this._finishedFusionDecisions.push(decision)
+        this.run.addFinishedFusionDecision(decision)
         if (!includeInProcessingQueue) return
         assert(this.run.fusionIdentityDecisions, 'Fusion identity decisions not fetched')
         this.run.addDecision(decision)
@@ -843,6 +845,21 @@ export class FormService {
     /**
      * Get merge fusion decision for an identity ID
      */
+    /** Restores merge decisions from a recorded run snapshot for replay. */
+    public seedFinishedFusionDecisions(decisions: FusionDecision[]): void {
+        for (const decision of decisions) {
+            if (!decision.finished) continue
+            this._finishedFusionDecisions.push(decision)
+            this.run.addFinishedFusionDecision(decision)
+            if (!decision.newIdentity && decision.identityId) {
+                this.fusionMergeDecisionMap.set(decision.identityId, decision)
+            }
+            if (decision.newIdentity) {
+                this.run.addDecision(decision)
+            }
+        }
+    }
+
     public getFusionMergeDecision(identityId: string): FusionDecision | undefined {
         return this.fusionMergeDecisionMap.get(identityId)
     }

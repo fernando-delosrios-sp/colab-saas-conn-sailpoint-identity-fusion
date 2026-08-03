@@ -44,6 +44,7 @@ export interface ChainStateSnapshot {
     managedAccounts: Record<string, ChainManagedAccount[]>
     fusionAccounts: ChainFusionAccount[]
     forms: Array<Record<string, unknown>>
+    finishedFusionDecisions?: Array<Record<string, unknown>>
     [key: string]: unknown
 }
 
@@ -70,6 +71,7 @@ export class ChainState {
             managedAccounts: {},
             fusionAccounts: [],
             forms: [],
+            finishedFusionDecisions: [],
         }
     }
 
@@ -240,6 +242,28 @@ export class ChainState {
                         this.state.forms[existingIndex] = { ...this.state.forms[existingIndex], ...form }
                     } else {
                         this.state.forms.push(form)
+                    }
+                }
+            }
+        }
+        if ('finishedFusionDecisions' in delta) {
+            const decisions = delta.finishedFusionDecisions as Array<Record<string, unknown>>
+            if (Array.isArray(decisions)) {
+                if (!this.state.finishedFusionDecisions) {
+                    this.state.finishedFusionDecisions = []
+                }
+                for (const decision of decisions) {
+                    const accountId = (decision.account as { id?: string } | undefined)?.id
+                    const existingIndex = this.state.finishedFusionDecisions.findIndex(
+                        (d) => (d.account as { id?: string } | undefined)?.id === accountId
+                    )
+                    if (existingIndex >= 0) {
+                        this.state.finishedFusionDecisions[existingIndex] = {
+                            ...this.state.finishedFusionDecisions[existingIndex],
+                            ...decision,
+                        }
+                    } else {
+                        this.state.finishedFusionDecisions.push(decision)
                     }
                 }
             }

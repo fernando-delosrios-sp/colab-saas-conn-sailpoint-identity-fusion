@@ -238,6 +238,54 @@ describe('FusionRun', () => {
         expect(run.getManagedAccountInfo('src-a::native-1')?.identityId).toBe('identity-1')
     })
 
+    it('snapshot includes identity-linked fusion accounts separately from managed-key map', () => {
+        const run = new FusionRun()
+        ;(run as any)._fusionAccountMap.set('managed-key', { name: 'managed-fa', managedKey: 'managed-key' } as any)
+        ;(run as any)._fusionIdentityMap.set('identity-1', {
+            name: 'identity-fa',
+            identityId: 'identity-1',
+        } as any)
+
+        const snap = run.snapshot()
+        expect(snap.fusionAccounts).toHaveLength(1)
+        expect(snap.fusionIdentityAccounts).toHaveLength(1)
+        expect(snap.fusionIdentityAccounts[0].identityId).toBe('identity-1')
+    })
+
+    it('restore repopulates fusion identity map from snapshot', () => {
+        const run = new FusionRun()
+        run.restore({
+            managedAccounts: [],
+            fusionAccounts: [],
+            fusionIdentityAccounts: [{ identityId: 'identity-1', name: 'target' } as any],
+            identities: [],
+            fusionIdentityDecisions: [],
+            finishedFusionDecisions: [],
+            pendingCandidateIdentityIds: [],
+            pendingReviewUrlsByReviewerId: {},
+            pendingReviewUrlsByCandidateId: {},
+            sourcesByName: {},
+            currentRunNonMatchedKeysBySource: {},
+            fusionBlends: [],
+            autoMergedIds: [],
+            matchScoringMs: 0,
+            phaseTimings: [],
+            managedAccountInventory: {},
+            formCounters: {
+                formsCreated: 0,
+                formInstancesCreated: 0,
+                formsFound: 0,
+                formInstancesFound: 0,
+                answeredFormInstancesProcessed: 0,
+            },
+            formDeleteQueue: { formsToDelete: [], queuedFormDeleteIds: [] },
+            managedAccountProcessing: { state: 'idle', startedAt: 0, batchSize: 0 },
+            trigramIndexBuilt: false,
+        })
+
+        expect((run as any)._fusionIdentityMap.get('identity-1')?.name).toBe('target')
+    })
+
     it('snapshot returns serializable state', () => {
         const run = new FusionRun()
         run.managedAccountsById.set('k1', { name: 'a1' } as any)
@@ -356,6 +404,7 @@ function makeMockRecorder(options: { tracker: AggregationTracker; run?: FusionRu
     }
     return recorder
 }
+
 
 
 

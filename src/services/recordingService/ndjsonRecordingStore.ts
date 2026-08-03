@@ -2,6 +2,13 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { recordingChainDir } from '../../data/recordingPaths'
 import type { ApiLogEntry } from '../clientService/recordingApiAdapter'
+
+function normalizeApiLogEntry(raw: ApiLogEntry): ApiLogEntry {
+    const api = raw.api ?? raw.getter ?? ''
+    const getter = raw.getter ?? raw.api ?? api
+    return { ...raw, api, getter }
+}
+
 import type { RecordingManifest, RecordingStore } from './recordingStore'
 
 const COLLECTION_FILES = {
@@ -29,9 +36,11 @@ export class NdjsonRecordingStore implements RecordingStore {
     }
 
     appendApiCall(entry: ApiLogEntry): void {
+        const getter = entry.getter ?? entry.api
         const line =
             JSON.stringify({
                 api: entry.api,
+                getter,
                 method: entry.method,
                 args: entry.args,
                 response: entry.response,
@@ -53,7 +62,7 @@ export class NdjsonRecordingStore implements RecordingStore {
         if (!fs.existsSync(this.apiLogPath)) return []
         const content = fs.readFileSync(this.apiLogPath, 'utf-8').trim()
         if (!content) return []
-        return content.split('\n').map((line) => JSON.parse(line) as ApiLogEntry)
+        return content.split('\n').map((line) => normalizeApiLogEntry(JSON.parse(line) as ApiLogEntry))
     }
 
     writeManifest(manifest: RecordingManifest): void {
@@ -108,4 +117,5 @@ export class NdjsonRecordingStore implements RecordingStore {
         return content.split('\n').filter(Boolean).length
     }
 }
+
 

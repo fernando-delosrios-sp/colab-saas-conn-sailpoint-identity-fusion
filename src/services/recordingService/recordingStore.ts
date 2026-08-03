@@ -9,7 +9,9 @@ import { recordingCacheKey } from '../../data/recordingPaths'
 export interface RecordingManifest {
     version: string
     store: RecordingConfig['store']
+    /** @deprecated Use scenarioName */
     chainName: string
+    scenarioName?: string
     recordedAt: string
     apiLogPath: string
     apiLogEntryCount: number
@@ -110,6 +112,7 @@ export function loadRecordingApiLog(chainDir: string, baseurl?: string): ApiLogE
     const store = createRecordingStore({ mode: 'replay', store: storeType, chainName }, chainName, baseurl)
     return store.loadApiLog()
 }
+
 
 
 

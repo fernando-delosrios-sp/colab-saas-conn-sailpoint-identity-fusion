@@ -10,6 +10,12 @@ function stableKey(apiName: string, method: string, args: unknown[]): string {
     return stableApiCallKey(apiName, method, args)
 }
 
+function normalizeApiLogEntry(raw: ApiLogEntry): ApiLogEntry {
+    const api = raw.api ?? raw.getter ?? ''
+    const getter = raw.getter ?? raw.api ?? api
+    return { ...raw, api, getter }
+}
+
 export class ReplayApiAdapter implements IscApiAdapter {
     public readonly config: Configuration
     /** FIFO queues for repeated read calls that share the same stable key. */
@@ -21,9 +27,9 @@ export class ReplayApiAdapter implements IscApiAdapter {
 
     constructor(entries: ApiLogEntry[], config?: Configuration) {
         this.config = config ?? ({} as Configuration)
-        this.orderedEntries = [...entries]
+        this.orderedEntries = entries.map(normalizeApiLogEntry)
 
-        for (const entry of entries) {
+        for (const entry of this.orderedEntries) {
             const key = stableKey(entry.api, entry.method, entry.args)
             if (isWriteMethod(entry.method)) {
                 this.writeLog.push(entry)
@@ -139,6 +145,7 @@ export function loadApiLog(fileOrDirPath: string): ApiLogEntry[] {
     if (!content) return []
     return content.split('\n').map((line) => JSON.parse(line))
 }
+
 
 
 
