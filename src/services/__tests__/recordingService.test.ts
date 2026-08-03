@@ -204,9 +204,52 @@ describe('allocateStepIndex', () => {
         expect(scenario.matchingResultsPath).toContain('matching-results.json')
 
         const saved = JSON.parse(fs.readFileSync(matchingResultsPath, 'utf-8'))
-        expect(saved.sweepSummary.deferred).toBe(12)
+        expect(saved.version).toBe('1.1.0')
+        expect(saved.runs[0].sweepSummary.deferred).toBe(12)
 
         fs.rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('accumulates matching-results runs without overwriting prior accountList captures', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const chainName = `matching-accum-${Date.now()}`
+        const config = {
+            recording: { mode: 'record' as const, chainName, store: 'ndjson' as const },
+        } as FusionConfig
+        const service = new RecordingService(log, config)
+
+        service.writeMatchingResults({
+            version: '1.0.0',
+            recordedAt: new Date().toISOString(),
+            operation: 'accountList',
+            stepId: 'step-1',
+            sweepSummary: { processed: 24, nonMatch: 24 },
+            identityMatches: [],
+            deferredMatches: [],
+            nonMatches: [{ accountName: 'A', accountSource: 'HR', matches: [] }],
+            failedMatches: [],
+        })
+        service.writeMatchingResults({
+            version: '1.0.0',
+            recordedAt: new Date().toISOString(),
+            operation: 'accountList',
+            stepId: 'step-10',
+            sweepSummary: { processed: 36, partial: 11, exact: 1 },
+            identityMatches: [{ accountName: 'Auto', accountSource: 'HR', matches: [] }],
+            deferredMatches: [],
+            nonMatches: [],
+            failedMatches: [],
+        })
+
+        const saved = JSON.parse(
+            fs.readFileSync(path.join(service.getRecordingDir(), 'reports', 'matching-results.json'), 'utf-8')
+        )
+        expect(saved.runs).toHaveLength(2)
+        expect(saved.runs[0].stepId).toBe('step-1')
+        expect(saved.runs[1].stepId).toBe('step-10')
+        expect(saved.runs[1].sweepSummary?.partial).toBe(11)
+
+        fs.rmSync(service.getRecordingDir(), { recursive: true, force: true })
     })
 })
 
@@ -227,6 +270,7 @@ describe('NdjsonRecordingStore', () => {
             const loaded = store.loadApiLog()
             expect(loaded).toHaveLength(1)
             expect(loaded[0].api).toBe('search')
+            expect(loaded[0].getter).toBe('search')
             expect(store.getApiLogEntryCount()).toBe(1)
 
             store.writeManifest({
@@ -250,4 +294,5 @@ describe('NdjsonRecordingStore', () => {
         })
     })
 })
+
 

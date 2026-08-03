@@ -296,6 +296,7 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             registry.log.warn = vi.fn().mockImplementation((...args) => {
                 console.warn('LOG.WARN:', ...args)
             })
+            registry.workflows.testWorkflow = vi.fn().mockResolvedValue({ status: 200 })
             state.setServiceRegistry(registry)
         }
 
@@ -453,10 +454,12 @@ function configureNonReplayMocks(
 
     // Mock form fetch methods to populate from recorded state
     const forms = state.getForms()
-    if (forms.length > 0) {
+    const finishedDecisions = (state.toJSON().finishedFusionDecisions as Array<Record<string, unknown>> | undefined) ?? []
+    const seedDecisions = finishedDecisions.length > 0 ? finishedDecisions : forms
+    if (seedDecisions.length > 0) {
         registry.forms.fetchFormInstances = vi.fn().mockResolvedValue(undefined)
         registry.forms.processFetchedFormData = vi.fn().mockImplementation(async () => {
-            registry.forms.fusionIdentityDecisions = forms
+            registry.forms.seedFinishedFusionDecisions(seedDecisions as any)
         })
     }
 
@@ -720,3 +723,4 @@ export function collectOutputs(context: ChainContext): unknown[] {
 }
 
 export { compareOutputs }
+

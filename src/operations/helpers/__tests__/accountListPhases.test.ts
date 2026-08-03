@@ -148,7 +148,10 @@ describe('reportEpilogue recording artifacts', () => {
 
         const reportPath = path.join(recording.getRecordingDir(), 'reports', 'aggregation.json')
         expect(fs.existsSync(reportPath)).toBe(true)
-        expect(JSON.parse(fs.readFileSync(reportPath, 'utf-8'))).toEqual(snapshot)
+        const saved = JSON.parse(fs.readFileSync(reportPath, 'utf-8'))
+        expect(saved.version).toBe('1.1.0')
+        expect(saved.runs).toHaveLength(1)
+        expect(saved.runs[0].report).toEqual(snapshot)
 
         fs.rmSync(recording.getRecordingDir(), { recursive: true, force: true })
     })
@@ -173,9 +176,11 @@ describe('reportEpilogue recording artifacts', () => {
         const matchingPath = path.join(recording.getRecordingDir(), 'reports', 'matching-results.json')
         expect(fs.existsSync(matchingPath)).toBe(true)
         const saved = JSON.parse(fs.readFileSync(matchingPath, 'utf-8'))
-        expect(saved.deferredMatches).toHaveLength(1)
-        expect(saved.nonMatches).toHaveLength(1)
-        expect(saved.sweepSummary.processed).toBe(2)
+        expect(saved.version).toBe('1.1.0')
+        expect(saved.runs).toHaveLength(1)
+        expect(saved.runs[0].deferredMatches).toHaveLength(1)
+        expect(saved.runs[0].nonMatches).toHaveLength(1)
+        expect(saved.runs[0].sweepSummary.processed).toBe(2)
         expect(buildMatchingResultsSnapshot).toHaveBeenCalledOnce()
 
         fs.rmSync(recording.getRecordingDir(), { recursive: true, force: true })
@@ -214,6 +219,8 @@ describe('reportEpilogue recording artifacts', () => {
             timer,
         })
 
+        expect(registry.reports.buildAggregationReportSnapshot).toHaveBeenCalledWith(true, expect.any(Object))
+
         const dir = recording.getRecordingDir()
         expect(fs.existsSync(path.join(dir, 'reports', 'aggregation.json'))).toBe(true)
         expect(fs.existsSync(path.join(dir, 'reports', 'matching-results.json'))).toBe(true)
@@ -237,3 +244,4 @@ describe('reportEpilogue recording artifacts', () => {
         fs.rmSync(dir, { recursive: true, force: true })
     })
 })
+

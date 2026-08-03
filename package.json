@@ -24,6 +24,7 @@
         "finalize": "node scripts/finalize-chain.js",
         "replay": "node scripts/replay-scenario.js",
         "test-recording": "node scripts/test-recording.js",
+        "refresh-recording-reports": "node scripts/refresh-scenario-reports.js",
         "lint": "npx eslint . && npx knip",
         "lint:docs-code": "npx eslint \"src/**/*.{ts,js,mjs,cjs}\"",
         "lint:markdown": "npx markdownlint \"README.md\" \"docs/**/*.md\"",

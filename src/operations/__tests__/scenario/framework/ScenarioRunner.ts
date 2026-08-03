@@ -98,6 +98,7 @@ export class ScenarioRunner {
             managedAccounts: (this.scenario.initialState.managedAccounts as Record<string, any[]>) ?? {},
             fusionAccounts: (this.scenario.initialState.fusionAccounts as any[]) ?? [],
             forms: (this.scenario.initialState.fusionIdentityDecisions as any[]) ?? [],
+            finishedFusionDecisions: (this.scenario.initialState.finishedFusionDecisions as any[]) ?? [],
         })
     }
 
@@ -268,3 +269,4 @@ export function registerStepFn(
 function getStepFn(operation: string): ((step: StepDefinition, context: ChainContext) => Promise<unknown>) | undefined {
     return stepFns.get(operation)
 }
+

@@ -36,8 +36,10 @@ export function toManagedAccountInfo(account: Account): ManagedAccountInfo {
 export interface RunStateSnapshot {
     managedAccounts: Record<string, any>[]
     fusionAccounts: Record<string, any>[]
+    fusionIdentityAccounts: Record<string, any>[]
     identities: Record<string, any>[]
     fusionIdentityDecisions: Record<string, any>[]
+    finishedFusionDecisions: Record<string, any>[]
     pendingCandidateIdentityIds: string[]
     pendingReviewUrlsByReviewerId: Record<string, string[]>
     pendingReviewUrlsByCandidateId: Record<string, string[]>
@@ -93,6 +95,7 @@ export class FusionRun {
     readonly sourcesWithoutReviewers = new Set<string>()
     private _linkedAccountKeyIndex: Set<string> | undefined
     private _fusionIdentityDecisions: FusionDecision[] = []
+    private _finishedFusionDecisions: FusionDecision[] = []
     private _pendingCandidateIdentityIds: Set<string> = new Set()
     private _pendingReviewUrlsByReviewerId: Map<string, string[]> = new Map()
     private _pendingReviewUrlsByCandidateId: Map<string, string[]> = new Map()
@@ -171,6 +174,10 @@ export class FusionRun {
 
     get fusionIdentityDecisions(): readonly FusionDecision[] {
         return this._fusionIdentityDecisions
+    }
+
+    get finishedFusionDecisions(): readonly FusionDecision[] {
+        return this._finishedFusionDecisions
     }
 
     get pendingCandidateIdentityIds(): ReadonlySet<string> {
@@ -545,8 +552,16 @@ export class FusionRun {
         this._fusionIdentityDecisions.push(decision)
     }
 
+    addFinishedFusionDecision(decision: FusionDecision): void {
+        this._finishedFusionDecisions.push(decision)
+    }
+
     clearDecisions(): void {
         this._fusionIdentityDecisions = []
+    }
+
+    clearFinishedFusionDecisions(): void {
+        this._finishedFusionDecisions = []
     }
 
     addReviewUrlForReviewer(reviewerId: string, url: string): void {
@@ -733,8 +748,10 @@ export class FusionRun {
         return {
             managedAccounts: Array.from(this.managedAccountsById.values()),
             fusionAccounts: Array.from(this._fusionAccountMap.values()),
+            fusionIdentityAccounts: Array.from(this._fusionIdentityMap.values()),
             identities: Array.from(this._identityMap.values()),
             fusionIdentityDecisions: this._fusionIdentityDecisions.map((d) => ({ ...d })),
+            finishedFusionDecisions: this._finishedFusionDecisions.map((d) => ({ ...d })),
             pendingCandidateIdentityIds: Array.from(this._pendingCandidateIdentityIds),
             pendingReviewUrlsByReviewerId: Object.fromEntries(this._pendingReviewUrlsByReviewerId),
             pendingReviewUrlsByCandidateId: Object.fromEntries(this._pendingReviewUrlsByCandidateId),
@@ -776,11 +793,19 @@ export class FusionRun {
         for (const account of snapshot.fusionAccounts) {
             this._fusionAccountMap.set((account as any).managedKey ?? (account as any).name, account as FusionAccount)
         }
+        this._fusionIdentityMap.clear()
+        for (const account of snapshot.fusionIdentityAccounts ?? []) {
+            const identityId = (account as FusionAccount).identityId
+            if (identityId) {
+                this._fusionIdentityMap.set(identityId, account as FusionAccount)
+            }
+        }
         this._identityMap.clear()
         for (const identity of snapshot.identities) {
             this._identityMap.set((identity as any).id, identity as IdentityDocument)
         }
         this._fusionIdentityDecisions = snapshot.fusionIdentityDecisions as FusionDecision[]
+        this._finishedFusionDecisions = (snapshot.finishedFusionDecisions ?? []) as FusionDecision[]
         this._pendingCandidateIdentityIds = new Set(snapshot.pendingCandidateIdentityIds)
         this._pendingReviewUrlsByReviewerId = new Map(Object.entries(snapshot.pendingReviewUrlsByReviewerId))
         this._pendingReviewUrlsByCandidateId = new Map(Object.entries(snapshot.pendingReviewUrlsByCandidateId))

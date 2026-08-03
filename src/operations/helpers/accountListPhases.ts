@@ -401,7 +401,12 @@ async function recordMatchingResultsSnapshot(
             deferred: outcomes.deferred,
             nonMatch: outcomes.nonMatch,
         }
-        const snapshot = fusion.buildMatchingResultsSnapshot(tracker, { sweepSummary })
+        const stepId = recording.getCurrentStepId()
+        const snapshot = fusion.buildMatchingResultsSnapshot(tracker, {
+            sweepSummary,
+            stepId,
+            operation: 'accountList',
+        })
         recording.writeMatchingResults(snapshot)
     } catch (error) {
         log.warn(`Report epilogue: matching results recording failed: ${(error as Error).message}`)
@@ -427,11 +432,12 @@ async function generateAggregationReportEpilogue(
             serviceRegistry.identities,
             outputCount
         )
-        await generateReport(false, serviceRegistry, aggregationStats)
         if (recording) {
-            const snapshot = await reports.buildAggregationReportSnapshot(false, aggregationStats)
-            recording.writeAggregationReport(snapshot)
+            const stepId = recording.getCurrentStepId()
+            const snapshot = await reports.buildAggregationReportSnapshot(true, aggregationStats)
+            recording.writeAggregationReport(snapshot, stepId)
         }
+        await generateReport(false, serviceRegistry, aggregationStats)
         reportOp.done()
     } catch (error) {
         log.warn(`Report epilogue: aggregation report failed: ${(error as Error).message}`)
