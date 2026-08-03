@@ -26,10 +26,16 @@ function resolveRunMode(
     operationName: string
 ): { runMode: RunMode; isProxyServer: boolean } {
     const isProxyServer = proxy.isProxyService()
-    const isCustom = context[operationName] !== undefined
-    const isProxyClient = !isProxyServer && proxy.isProxyMode()
-    const runMode: RunMode = isCustom ? RunMode.Custom : isProxyClient ? RunMode.Proxy : RunMode.Default
-    return { runMode, isProxyServer }
+
+    if (context[operationName] !== undefined) {
+        return { runMode: RunMode.Custom, isProxyServer }
+    }
+
+    if (!isProxyServer && proxy.isProxyMode()) {
+        return { runMode: RunMode.Proxy, isProxyServer }
+    }
+
+    return { runMode: RunMode.Default, isProxyServer }
 }
 
 function scheduleKeepAlive(
