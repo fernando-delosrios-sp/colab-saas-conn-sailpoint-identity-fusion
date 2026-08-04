@@ -48,9 +48,15 @@ export class MappingService {
         }
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
-            const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some(
-                (accounts) => accounts.length > 0,
-            )
+            // Performance optimization: Using a for...of loop directly on the iterable avoids intermediate heap allocations
+            // that Array.from().some() would create, reducing garbage collection overhead in this hot path.
+            let hasManagedAccountContext = false
+            for (const accounts of sourceAttributeMap.values()) {
+                if (accounts.length > 0) {
+                    hasManagedAccountContext = true
+                    break
+                }
+            }
             const shouldPreserveCurrentWithoutContext =
                 !hasManagedAccountContext && !fusionAccount.isIdentity
             const sourceOrder = this.sourceConfigs.map((sc) => sc.name)

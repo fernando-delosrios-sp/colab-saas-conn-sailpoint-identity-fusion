@@ -61,3 +61,6 @@
 ## 2026-05-24 - Avoid Array.from(set) chaining for iteration
 **Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
 **Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.
+## 2026-08-04 - Direct collection iteration outperforms spreading to Array
+**Learning:** When iterating over Map iterables using properties like `.values()`, utilizing `Array.from()` to chain array methods like `.some()` or `.find()` forces the entire iterable to be copied into a temporary array on the heap. This causes unnecessary memory allocations and garbage collection pressure, particularly in hot paths like attribute mapping.
+**Action:** Iterated over map values directly using `for...of` loops and manual evaluation (with early exits like `break` or `return`) to bypass Array allocations completely and streamline traversal execution speed.
