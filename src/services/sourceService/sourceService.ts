@@ -198,7 +198,13 @@ export class SourceService {
     // ------------------------------------------------------------------------
 
     public getFusionSource(): SourceInfo | undefined {
-        return Array.from(this.sourcesById.values()).find((s) => !s.isManaged)
+        // Performance optimization: Avoid Array.from().find() intermediate allocations on Map/Set values
+        for (const s of this.sourcesById.values()) {
+            if (!s.isManaged) {
+                return s
+            }
+        }
+        return undefined
     }
 
     public get fusionSourceOwner(): OwnerDto {
