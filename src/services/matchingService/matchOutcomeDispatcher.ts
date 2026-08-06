@@ -139,10 +139,11 @@ function resolveDeferredDrainResolution(
     run: FusionRun,
     mode?: MatchSweepMode
 ): 'deferred-match' | 'non-match' {
-    if (isAnalysisOnlyMode(mode)) {
-        return hasActionableDeferredAnchorMatch(analysis.fusionAccount, run) ? 'deferred-match' : 'non-match'
-    }
-    return hasDeferredCandidateMatches(analysis.fusionAccount) ? 'deferred-match' : 'non-match'
+    const hasMatch = isAnalysisOnlyMode(mode)
+        ? hasActionableDeferredAnchorMatch(analysis.fusionAccount, run)
+        : hasDeferredCandidateMatches(analysis.fusionAccount)
+
+    return hasMatch ? 'deferred-match' : 'non-match'
 }
 
 /**
