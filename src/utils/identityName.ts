@@ -18,3 +18,18 @@ export function resolveIdentityNameFromCreateInput(
     const displayValue = displayAttribute ? input.attributes?.[displayAttribute] : undefined
     return trimStr(displayValue) ?? trimStr(input.attributes?.name) ?? trimStr(input.identity) ?? undefined
 }
+
+/**
+ * Resolves the display name for an identity document from the ISC API.
+ *
+ * Priority:
+ * 1. `displayName` field
+ * 2. `attributes.displayName` field
+ * 3. `name` field
+ *
+ * Uses `any` cast internally because `attributes` is not typed on `IdentityDocument` but is often present in responses.
+ */
+export function resolveIdentityDisplayName(identity: any): string | undefined {
+    if (!identity) return undefined
+    return identity.displayName || identity.attributes?.displayName || identity.name || undefined
+}
