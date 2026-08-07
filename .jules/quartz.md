@@ -12,3 +12,6 @@
 
 **Learning:** When multiple functions iterate over mixed-type arrays (e.g., parsing varying SDK shapes like strings or objects) to extract normalized string values, the loop and type-checking logic is often duplicated (e.g. in `toSetFromAttribute` and `normalizeActionTokens`).
 **Action:** Encapsulate the loop and type-checking logic into a shared helper function (like `normalizeArrayItems`) to eliminate duplicate code blocks, clarify intent, and ensure consistency when handling these mixed-type arrays.
+## 2026-08-07 - Consolidating Repeated Property Lookup Fallbacks
+**Learning:** Chained nullish coalescing operations (`??`) for reading object properties (e.g., `readUnknown(attrs, 'email') ?? readUnknown(attrs, 'mail')`) create unnecessary noise and duplicate fallback logic across modules.
+**Action:** Replaced repetitive fallback chains with a new variadic `extractObjectValue` helper to encapsulate the fallback logic, improving DRYness and making property extraction intent clearer.
