@@ -61,3 +61,7 @@
 ## 2026-05-24 - Avoid Array.from(set) chaining for iteration
 **Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
 **Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.
+## 2026-08-08 - Prevent Array Allocations in Linked Account Lookup
+
+**Learning:** Iterating over `allFusionAccounts` and `allFusionIdentities` using the array spread syntax `[...run.allFusionAccounts, ...run.allFusionIdentities].some(...)` in a hot path like `isManagedAccountLinkedInFusion` forces the creation of large intermediate arrays before iteration even begins. This results in significant heap allocations, memory pressure, and performance degradation during extensive matching cycles. Furthermore, using `run.allFusionAccounts` triggers the `Array.from()` map conversion in the `FusionRun` getter.
+**Action:** Replaced the array spread and `.some(...)` pattern with a direct sequential `for...of` iteration over the respective sources. For fusion accounts, used `run.fusionAccountsIterable()` to stream the internal map values without copying them to an array first, preventing all unnecessary intermediate allocations and enabling true O(1) short-circuiting.
