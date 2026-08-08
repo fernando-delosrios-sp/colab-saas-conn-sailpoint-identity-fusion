@@ -373,7 +373,7 @@ $firstname$lastname      ## Throws error if null
 | **Access profile not assigned**  | Check reviewer's access profiles        | Assign `<Source> reviewer` access profile  |
 | **Email notifications disabled** | Check ISC notification settings         | Enable form notifications in ISC           |
 | **Forms expired**                | Check **Manual review expiration days** | Increase expiration; create new forms      |
-| **No reviewers configured**      | Check **Owner is global reviewer?**     | Enable; or assign reviewer access profiles |
+| **No reviewers configured**      | Check **Owners are global reviewers?** and Fusion source owner / governance group | Enable global reviewers with owner and governance group; or assign `<Source> reviewer` access profiles |
 
 **Diagnostic steps:**
 
@@ -552,7 +552,7 @@ curl -X POST https://your-proxy.com/fusion \
 | **ISC aggregation history** | Source → Aggregation History                                             | Aggregation status, timing, counts    |
 | **External logs**           | Your log aggregator (if configured)                                      | Detailed connector logs (Debug level) |
 
-For `accountList` log line kinds (`STATUS`, `EVENT_SUMMARY`, `DETAIL`, match/decision segments, grep patterns), see [Advanced connection settings — Operation log line kinds](../operation/connection-and-observability-tuning.md#operation-log-line-kinds-accountlist).
+For `accountList` log line kinds (`STATUS`, `EVENT_SUMMARY`, `DETAIL`, match/decision segments, grep patterns), see [Observability and log format](../../reference/observability.md) and [Monitor aggregation progress](../operation/monitor-aggregation-progress.md).
 
 ### Enabling external logging
 
@@ -561,11 +561,15 @@ For `accountList` log line kinds (`STATUS`, `EVENT_SUMMARY`, `DETAIL`, match/dec
 **Configuration:**
 
 ```
-Advanced Settings → Developer Settings:
+Advanced Settings → External Settings:
+- Enable external processing?: Yes
+- Enable proxy mode?: No (for direct ISC logging)
+- External target URL: https://logs.example.com/fusion
 - Enable external logging?: Yes
-- External logging URL: https://logs.example.com/fusion
 - External logging level: Debug (for troubleshooting; Info for production)
 ```
+
+See [Monitor aggregation progress](../operation/monitor-aggregation-progress.md) for full setup steps.
 
 ![External logging - Configuration](../../assets/images/troubleshooting-external-logging.png)
 
@@ -727,6 +731,7 @@ If the problem persists after retrying, temporarily disable the **Enable concurr
 
 - For specific feature guidance, see the other usage guides (Map & Define, Match, matching algorithms, advanced settings, proxy mode).
 - For ISC general troubleshooting, see [SailPoint documentation](https://documentation.sailpoint.com/saas/).
+
 
 
 

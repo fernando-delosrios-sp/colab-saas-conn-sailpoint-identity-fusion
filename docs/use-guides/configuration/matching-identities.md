@@ -46,7 +46,8 @@ Use Identity Fusion for Match when you face these challenges:
 
 | Option                            | Configuration                                                 | Use case                                                                                        |
 | --------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| **Access profiles for reviewers** | Create access profile per source with reviewer entitlement    | Assign reviewers per source for targeted notifications                                          |
+| **Global reviewers**              | **Owners are global reviewers?** = Yes; Fusion source owner and/or governance group in ISC | Simple setup — all forms go to owner and governance group; no entitlement access profiles needed |
+| **Access profiles for reviewers** | Create access profile per source with reviewer entitlement    | Fine-grained control — assign reviewers per managed source                                      |
 | **Fusion report access profile**  | Access profile with "Fusion report" entitlement               | Allow specific users to view potential match reports                                            |
 | **Automatic merge**          | **Attribute Matching Settings → Enable automatic merge** | Assign without manual review when the combined score meets the automatic merge match score |
 
@@ -237,6 +238,7 @@ Matching always uses one **combined match score**: a weighted mean of per-rule s
 - You want human approval for all merges
 
 ---
+
 
 
 

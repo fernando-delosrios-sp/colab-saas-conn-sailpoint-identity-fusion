@@ -8,8 +8,6 @@ Dry-run mode is activated by passing a `dryRun` object on the account-list input
 
 Write side effects are inhibited at the API adapter boundary (`DryRunApiAdapter`). Business logic (Match, Correlation, Output) runs identically to a persistent aggregation; only ISC write API calls are suppressed with synthetic responses.
 
-The former `custom:dryrun` command has been removed. Use dry-run mode on `std:account:list` instead.
-
 Dry-run mode cannot be combined with recording mode (`recording.mode: record` or `replay`).
 
 ## When to use it
@@ -150,21 +148,12 @@ When the proxy server receives `std:account:list`, include the `dryRun` object i
 
 See [Proxy mode](../reference/proxy-mode.md) for architecture and setup.
 
-## Migration from `custom:dryrun`
-
-| Before (`custom:dryrun`) | After (`std:account:list`) |
-| ------------------------ | -------------------------- |
-| Separate command | `{ dryRun: { enabled: true } }` on account-list input |
-| `writeToDisk` | `saveFile: true` |
-| `sendReportTo` | `sendEmail: ["address@example.com"]` |
-| `includeExisting`, `includeMatched` | Removed — full pipeline always runs; detail is in the HTML report |
-| Enriched output rows (`matchingStatus`, `reportCategories`, `review`) | Removed — use the HTML report, account stream, and terminal summary |
-
 ## Related documentation
 
 - [Account list operation](account-list.md) — full persistent aggregation flow
 - [Matching identities](../use-guides/configuration/matching-identities.md) — tuning thresholds; includes a dry-run workflow note
 - [Tuning matching algorithms](../use-guides/configuration/tuning-matching-algorithms.md) — recommended testing approach
 - [Glossary: dry-run mode](../concepts/glossary.md) — canonical term definition
+
 
 

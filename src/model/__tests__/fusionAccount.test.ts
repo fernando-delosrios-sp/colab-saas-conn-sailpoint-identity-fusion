@@ -415,6 +415,7 @@ describe('FusionAccount', () => {
             expect(acc.fromIdentity).toBe(false)
             expect(acc.statuses).not.toContain('baseline')
             expect(acc.sources).not.toContain(IDENTITIES_SOURCE_NAME)
+            expect(acc.originAccountId).toBe('src-a::native-1')
         })
     })
 
@@ -681,6 +682,64 @@ describe('FusionAccount', () => {
             acc.setCorrelatedAccount('src-a::native-1')
             expect(acc.collections.accountIds.has('src-a::native-1')).toBe(true)
             expect(acc.collections.missingAccountIds.has('src-a::native-1')).toBe(false)
+        })
+    })
+
+    describe('17. Composite-only account reference loading', () => {
+        it('drops non-composite accounts values during fromFusionAccount', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Account',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    accounts: ['legacy-uuid-only', 'src-a::user-1'],
+                },
+            } as unknown as Account)
+            expect(acc.previousAccountIdsSet.has('src-a::user-1')).toBe(true)
+            expect(acc.previousAccountIdsSet.has('legacy-uuid-only')).toBe(false)
+        })
+
+        it('drops non-composite missing-accounts values during fromFusionAccount', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Account',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    'missing-accounts': ['legacy-uuid-only', 'src-a::missing-1'],
+                },
+            } as unknown as Account)
+            expect(acc.missingAccountIds).toContain('src-a::missing-1')
+            expect(acc.missingAccountIds).not.toContain('legacy-uuid-only')
+        })
+
+        it('retains identity ID originAccount for Identities origin', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Identity',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    originSource: IDENTITIES_SOURCE_NAME,
+                    originAccount: 'identity-uuid-123',
+                },
+            } as unknown as Account)
+            expect(acc.originAccountId).toBe('identity-uuid-123')
+        })
+
+        it('rejects raw originAccount for managed-source origin', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-2',
+                id: 'isc-2',
+                name: 'Persisted Managed',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    originSource: 'Workday',
+                    originAccount: 'legacy-uuid-only',
+                },
+            } as unknown as Account)
+            expect(acc.originAccountId).toBeUndefined()
         })
     })
 

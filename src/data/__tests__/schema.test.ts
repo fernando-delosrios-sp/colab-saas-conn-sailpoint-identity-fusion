@@ -23,3 +23,28 @@ describe('FusionAttribute', () => {
         }
     })
 })
+
+describe('fusionAccountSchemaAttributes descriptions', () => {
+    const descriptionFor = (name: string) =>
+        fusionAccountSchemaAttributes.find((a) => a.name === name)?.description ?? ''
+
+    it('accounts description requires composite managed account keys only', () => {
+        const description = descriptionFor('accounts')
+        expect(description).toMatch(/sourceId::nativeIdentity/i)
+        expect(description).not.toMatch(/legacy|backwards compat/i)
+    })
+
+    it('missing-accounts description requires composite managed account keys only', () => {
+        const description = descriptionFor('missing-accounts')
+        expect(description).toMatch(/sourceId::nativeIdentity/i)
+        expect(description).not.toMatch(/legacy|backwards compat/i)
+    })
+
+    it('originAccount description distinguishes identity ID from composite managed account key', () => {
+        const description = descriptionFor('originAccount')
+        expect(description).toMatch(/identity ID/i)
+        expect(description).toMatch(/sourceId::nativeIdentity/i)
+        expect(description).not.toMatch(/legacy|backwards compat/i)
+    })
+})
+

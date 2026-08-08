@@ -2,7 +2,7 @@
 
 Proxy mode allows the Identity Fusion NG connector to **delegate all processing** to an external endpoint. The connector running in ISC (client) forwards commands and configuration to your external service (proxy server), which executes the real logic and returns results. This guide covers setup, security, troubleshooting, and best practices for proxy mode.
 
-For ISC field definitions (External Settings gateway, proxy sub-option, target URL/password), see [Advanced configuration](../configuration/advanced.md).
+**Quick start:** [Run the connector via proxy](../use-guides/operation/run-via-proxy.md) · **Field reference:** [Advanced configuration](../configuration/advanced.md)
 
 ---
 
@@ -226,7 +226,7 @@ When **Enable external logging?** is on under External Settings, the proxy **cli
 - `process.env.LOG_FILE` when set (exact path — no tenant subdirectory injected), otherwise
 - `logs/<tenant>/fusion-{YYYYMMDD}.log` under the server working directory, where `<tenant>` is derived from connection **Base URL** (first hostname label; fallback `unknown-tenant`)
 
-No HTTP log receiver runs on the server — disk append only. See [connection and observability tuning](../use-guides/operation/connection-and-observability-tuning.md).
+No HTTP log receiver runs on the server — disk append only. See [Monitor aggregation progress](../use-guides/operation/monitor-aggregation-progress.md).
 
 ### Implementing the proxy server
 
@@ -593,6 +593,7 @@ spec:
 **Next steps:**
 
 - For general troubleshooting, see [Troubleshooting](../use-guides/validation-and-troubleshooting/troubleshooting.md).
-- For connection settings and resilience, see [Connection and observability tuning](../use-guides/operation/connection-and-observability-tuning.md).
+- For connection settings and resilience, see [Tune API performance](../use-guides/operation/tune-api-performance.md).
+
 
 

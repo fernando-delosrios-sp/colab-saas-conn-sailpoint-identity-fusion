@@ -1,4 +1,10 @@
-## ADDED Requirements
+# match-outcome-dispatch Spec
+
+## Purpose
+
+The match outcome dispatch module (`MatchOutcomeDispatcher` in `src/services/matchingService/`) owns managed-account Match step routing: scoring candidates, resolving outcomes (exact, partial, deferred, non-match), and applying the associated domain actions. This spec defines its public interface, dependency boundaries, concurrency limits, and work-queue side effects.
+
+## Requirements
 
 ### Requirement: MatchOutcomeDispatcher is the single module for Match step outcome dispatch
 
@@ -157,6 +163,7 @@ When `MatchOutcomeDispatcher.handlePartialMatch` successfully creates or reuses 
 - **GIVEN** `createFusionForm` returns `formDefinitionReady: false` or throws
 - **WHEN** partial match handling completes
 - **THEN** `run.claimAccount` SHALL NOT be invoked for that account solely due to partial-match dispatch
+
 
 
 

@@ -6,6 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-08-08
+### ⚠️ Breaking Changes
+- **Legacy raw managed account IDs removed from schema attributes** — The `accounts`, `missing-accounts`, and `originAccount` attributes no longer accept plain ISC account UUIDs without the composite `sourceId::nativeIdentity` form (except `originAccount` when `originSource` is `Identities`, which continues to store an identity ID). Non-composite values are dropped during load with a diagnostic warning. **Migration:** Before upgrading, patch persisted Fusion account attributes to composite managed account keys or re-aggregate sources so references are rewritten.
+
+---
 ## 2026-08-03
 
 ### 🐛 Fixes

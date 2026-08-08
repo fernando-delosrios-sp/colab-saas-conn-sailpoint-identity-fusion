@@ -49,15 +49,17 @@ function collectManagedAccountKeys(
 }
 
 /**
- * Parses a collection of managed account keys, warning and skipping any legacy
- * non-composite references.
+ * Parses a collection of managed account keys, warning and skipping any value
+ * that is not a valid composite key (`sourceId::nativeIdentity`).
  */
 function parseManagedAccountKeys(accountIds: Iterable<string>, log: LogService): ParsedAccountKey[] {
     const parsedKeys: ParsedAccountKey[] = []
     for (const id of accountIds) {
         const parsed = parseManagedAccountKey(id)
         if (!parsed) {
-            log.warn(`Skipping legacy non-composite managed account reference during fusion account rebuild: ${id}`)
+            log.warn(
+                `Skipping invalid managed account key during fusion account rebuild (expected sourceId::nativeIdentity): ${id}`
+            )
             continue
         }
         parsedKeys.push(parsed)
@@ -144,3 +146,4 @@ export const rebuildFusionAccount = async (
     })
     return await fusion.processFusionAccount(account, attributeOperations)
 }
+

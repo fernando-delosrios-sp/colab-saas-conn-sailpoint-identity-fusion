@@ -63,7 +63,7 @@ Compare Fusion accounts to identities in scope using similarity rules and option
 
 See [Matching identities](./use-guides/configuration/matching-identities.md) and [Attribute Matching Settings](./configuration/matching.md).
 
-For authoritative, Records, and Orphan source-type details, see [Use guides — Operation modes](./use-guides/index.md#operation-modes).
+For authoritative, Records, and Orphan source-type details, see [Getting started — Operation modes](./getting-started/index.md#operation-modes).
 
 ## When to use it
 
@@ -76,20 +76,16 @@ For authoritative, Records, and Orphan source-type details, see [Use guides — 
 | **Records (register-only)** | Generate and register unique attribute values (for example usernames or employee IDs) from a source without creating Fusion accounts or identities. |
 | **Orphan (match-only)** | Use supplemental directory data to improve Match scoring without ever creating identities from that source. |
 
-For full **Authoritative**, **Records**, and **Orphan** source-type behavior, see [Use guides — Operation modes](./use-guides/index.md#operation-modes).
+For full **Authoritative**, **Records**, and **Orphan** source-type behavior, see [Getting started — Operation modes](./getting-started/index.md#operation-modes).
 
 ## Read next
 
 | Step | Resource |
 | --- | --- |
-| Day 1–7 onboarding checklist | [Getting started — Overview](./getting-started/overview.md) |
-| Shortest path to a first aggregation | [Getting started — First aggregation](./getting-started/first-aggregation.md) |
-| Choose the right guide | [Which guide do I need?](./getting-started/which-guide.md) |
-| Prerequisites and operation modes | [Use guides overview](./use-guides/index.md) |
+| Install, configure, and run your first aggregation | [Getting started](./getting-started/index.md) |
 | Correlation modes and planning | [Managing correlation](./use-guides/configuration/managing-correlation.md) |
 | Reviewer assignment | [Managing reviewers](./use-guides/configuration/managing-reviewers.md) |
 | Field-level configuration reference | [Configuration reference](./configuration/index.md) |
-| Scenario-driven setup guides | [Use guides overview](./use-guides/index.md) |
 | Connector operations (APIs ISC calls) | [Connector operations reference](./operations/index.md) |
 
 ## Documentation map
@@ -101,20 +97,18 @@ For full **Authoritative**, **Records**, and **Orphan** source-type behavior, se
 | [Matching identities](./use-guides/configuration/matching-identities.md) | Detect and resolve potential matching identities. |
 | [Configuring sources and scope](./use-guides/configuration/configuring-sources-and-scope.md) | Source settings, scope, umbrella vs side-car, aggregation timing. |
 | [Source types](./use-guides/configuration/source-types.md) | Authoritative, Records, and Orphan processing modes. |
-| [Connection and observability tuning](./use-guides/operation/connection-and-observability-tuning.md) | Queue, retry, timeouts, rate limiting, and logging. |
+| [Operation guides](./use-guides/operation/index.md) | Monitor, tune, dry-run, proxy, recording, and reset workflows. |
 | [Proxy deployment](./reference/proxy-mode.md) | Run connector logic on an external server and connect ISC via proxy. |
 | [Troubleshooting](./use-guides/validation-and-troubleshooting/troubleshooting.md) | Common issues, logs, and recovery steps. |
 
 ## Quick start
 
-1. **Add the connector to ISC** — Upload the Identity Fusion NG connector (for example via SailPoint CLI or your organization's process).
-2. **Create a source** — In Admin → Connections → Sources, create a new source using the Identity Fusion NG connector. Mark it **Authoritative** when you need Match.
-3. **Configure connection** — Set Identity Security Cloud API URL and Personal Access Token (ID and secret). Use **Review and Test** to verify connectivity. See [PAT scopes](./reference/pat-scopes.md) for required API permissions.
-4. **Configure the connector** — Use the [Configuration reference](./configuration/index.md) and [Use guides](./use-guides/index.md) for Map, Define, and Match settings.
-5. **Discover schema** — Run **Discover Schema** so ISC has the combined account schema.
-6. **Identity profile and aggregation** — Create an identity profile and provisioning plan as required by ISC, then run entitlement and account aggregation.
+1. **Add the connector to ISC** and create a Fusion source — mark it **Authoritative** when you need Match.
+2. **Configure connection** — set the ISC API URL and Personal Access Token; use **Review and Test**. See [PAT scopes](./reference/pat-scopes.md).
+3. **Configure Map, Define, and Match**, then run Discover Schema, entitlement aggregation, and account aggregation.
 
-See [Use guides — First aggregation checklist](./use-guides/index.md#first-aggregation-checklist) for the full checklist.
+See [Getting started](./getting-started/index.md) for the full setup checklist, first-aggregation verification, and guide index.
+
 
 
 

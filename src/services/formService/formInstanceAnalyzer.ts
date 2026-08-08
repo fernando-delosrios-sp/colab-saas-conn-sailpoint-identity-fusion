@@ -45,7 +45,7 @@ export type FormInstanceAnalyzerDeps = {
 export const extractAccountIdFromInstance = (instance: FormInstanceResponseV2025): string | undefined => {
     const accountInfo = extractAccountInfoFromFormInput(instance.formInput)
     const accountId = accountInfo?.id
-    return accountId ? normalizeCompositeManagedAccountKey(accountId) ?? accountId : undefined
+    return accountId ? normalizeCompositeManagedAccountKey(accountId) : undefined
 }
 
 /**
@@ -145,3 +145,4 @@ export const analyzeFormInstances = (
         shouldRemoveAccountFromMap,
     }
 }
+

@@ -307,7 +307,7 @@ export class FusionLayers {
                 ConnectorErrorType.Generic
             )
         }
-        const normalizedKey = normalizeCompositeManagedAccountKey(accountId) ?? accountId
+        const normalizedKey = accountId
         const skipBlendReplay =
             Boolean(skipBlendHistoryForManagedKeys?.has(normalizedKey)) ||
             Boolean(skipBlendHistoryForManagedKeys?.has(accountId))
@@ -508,3 +508,4 @@ export class FusionLayers {
         }
     }
 }
+

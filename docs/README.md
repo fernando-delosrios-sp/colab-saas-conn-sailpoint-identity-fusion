@@ -7,57 +7,16 @@ Identity Fusion NG documentation is published as an MkDocs site with five top-le
 | Section | Start here | Description |
 | --- | --- | --- |
 | **Home** | [Home](index.md) | Product framing and inline Map-Define-Match framework |
-| **Use guides** | [Use guides overview](use-guides/index.md) | Prerequisites, Getting started, and scenario-driven how-tos |
+| **Use guides** | [Getting started](getting-started/index.md) | Setup checklist, deployment patterns, goal-based paths, and scenario guides |
 | **Configuration reference** | [Configuration reference](configuration/index.md) | Generated field reference from `connector-spec.json` |
 | **Glossary** | [Glossary](glossary.md) | Canonical domain terms |
 | **Technical reference** | [Standard account schema](reference/standard-account-schema.md) | Schema, Velocity context, observability, operations, config-to-phases, PAT scopes |
 
 ## Getting started
 
-| Page | Description |
-| --- | --- |
-| [Overview](getting-started/overview.md) | Day 1–7 checklist and deployment mode summary |
-| [First aggregation](getting-started/first-aggregation.md) | Run and verify your first aggregation |
-| [Which guide do I need?](getting-started/which-guide.md) | Decision tree to the right configuration guide |
+[Getting started](getting-started/index.md) is a single page covering prerequisites, the setup checklist, first-aggregation verification, operation modes, deployment patterns, goal-based guide selection, and a shallow-to-deep reading order for all scenario guides.
 
-## Use guides index
-
-The [Use guides overview](use-guides/index.md) includes prerequisites, the first-aggregation checklist, operation modes, and links to every guide below.
-
-### Configuration guides
-
-| Guide | Description |
-| --- | --- |
-| [Configuring sources and scope](use-guides/configuration/configuring-sources-and-scope.md) | Scope, umbrella vs side-car, aggregation, and reviewers |
-| [Source types](use-guides/configuration/source-types.md) | Authoritative, Records, and Orphan processing modes |
-| [Mapping attributes](use-guides/configuration/mapping-attributes.md) | Attribute mapping and merge strategies |
-| [Defining attributes](use-guides/configuration/defining-attributes.md) | Velocity, unique IDs, UUIDs, counters |
-| [Matching identities](use-guides/configuration/matching-identities.md) | Match detection and baseline configuration |
-| [Managing correlation](use-guides/configuration/managing-correlation.md) | Correlation modes, reverse correlation, enforced roles |
-| [Managing reviewers](use-guides/configuration/managing-reviewers.md) | Reviewer access profiles and assignment |
-| [Review forms and reviewers](use-guides/configuration/review-forms-and-reviewers.md) | Manual review workflow and Match flow |
-| [Tuning matching algorithms](use-guides/configuration/tuning-matching-algorithms.md) | Algorithms, thresholds, and score blending |
-| [Match tuning cookbooks](use-guides/configuration/match-tuning-cookbooks.md) | HR+AD, Records pool, and Orphan cleanup patterns |
-
-### Operation guides
-
-| Guide | Description |
-| --- | --- |
-| [Dry-run analysis](use-guides/operation/dry-run-analysis.md) | Non-persistent account-list analysis |
-| [Connection and observability tuning](use-guides/operation/connection-and-observability-tuning.md) | Queue, retry, timeouts, logging |
-
-### Validation and troubleshooting guides
-
-| Guide | Description |
-| --- | --- |
-| [Testing and validation](use-guides/validation-and-troubleshooting/testing-and-validation.md) | Structured validation before production |
-| [Troubleshooting](use-guides/validation-and-troubleshooting/troubleshooting.md) | Common issues and recovery |
-
-### Deployment guides
-
-| Guide | Description |
-| --- | --- |
-| [Migrating from Identity Fusion v1](use-guides/deployment/migrating-from-identity-fusion-v1.md) | Upgrade from Identity Fusion 1.x |
+Individual guides live under `use-guides/` (configuration, operation, validation, deployment) and are linked from Getting started and from the MkDocs nav.
 
 ## Operation diagram PNGs
 

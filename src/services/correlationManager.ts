@@ -90,7 +90,7 @@ export class CorrelationManager {
         // managed account even when assembleAccount already blended it off missing-accounts.
         if (mergeDecision && !mergeDecision.newIdentity && canDirectCorrelate) {
             const rawKey = trimStr(mergeDecision.account.id) ?? ''
-            const assignedKey = normalizeCompositeManagedAccountKey(rawKey) ?? rawKey
+            const assignedKey = normalizeCompositeManagedAccountKey(rawKey)
             const assignedSource = mergeDecision.account.sourceName
             if (
                 assignedKey &&
@@ -145,6 +145,7 @@ export class CorrelationManager {
         fusionAccount.updateCorrelationStatus()
     }
 }
+
 
 
 

@@ -13,7 +13,7 @@ Configure **Attribute Matching Settings → Review Settings** for the manual rev
 | **List of Fusion account attributes to include in form** | Attributes shown to reviewer                | `name`, `email`, `department`, `manager`, `hireDate`, `phone` |
 | **Manual review expiration days**                        | Form expiration                             | 7 (default); adjust based on SLA                              |
 | **Maximum candidates per review form**                   | Limit of potential matches shown on form    | 3 (default); valid range 1–15                                 |
-| **Owners are global reviewers?**                         | Add Fusion source owner to all review forms | Yes (ensures at least one reviewer)                           |
+| **Owners are global reviewers?**                         | Add Fusion source owner and governance group to all review forms | Yes for pilots; use source owner + governance group for simple global coverage |
 | **Send report to owner on aggregation?**                 | Email report after each aggregation         | Yes (useful for monitoring)                                   |
 
 !!! note
@@ -78,13 +78,13 @@ Include attributes that help reviewers decide if identities are matches:
 
 ## Step 4: Set up access profiles for reviewers
 
-See [Managing reviewers](managing-reviewers.md) for the recommended access-profile model, global vs per-source assignment, and workload tuning. The steps below summarize the same workflow in the Match setup context.
+See [Managing reviewers](managing-reviewers.md) for the full reviewer model — global reviewers via source owner and governance group, or fine-grained control via entitlement assignments. The steps below summarize the per-source entitlement workflow in the Match setup context.
 
 ### Create reviewer access profiles
 
-For each source, create an access profile that grants reviewer permissions. The connector automatically creates a dedicated reviewer entitlement for each managed source that can be assigned to your users.
+For fine-grained control, create an access profile per managed source. The connector creates a dedicated `<Source Name> reviewer` entitlement for each managed source during **Entitlement Aggregation**.
 
-While the connector supports establishing the current source owner as a **global reviewer** for all managed sources (via "Owners are global reviewers?"), it is recommended to use the dedicated per-source reviewer entitlements for granular control.
+For a simpler setup without access profiles, enable **Owners are global reviewers?** and assign the Fusion **source owner** and/or **governance group** in ISC — see [Managing reviewers — Global reviewers](managing-reviewers.md#global-reviewers-simple-setup).
 
 | Access profile                 | Entitlement                                        | Assignment                         |
 | ------------------------------ | -------------------------------------------------- | ---------------------------------- |
@@ -192,8 +192,8 @@ If review form created:
     - List of potential matching identities with similarity scores
     - Attributes configured in **List of Fusion account attributes to include in form**
 2. ISC sends email to:
-    - Reviewers assigned via `<Source Name> reviewer` access profiles
-    - Global reviewer (if **Owners are global reviewers?** = Yes)
+    - Reviewers assigned via `<Source Name> reviewer` access profiles (per-source entitlements)
+    - Global reviewers — Fusion source owner and governance group members (when **Owners are global reviewers?** = Yes)
 3. First reviewer to complete form makes decision:
     - **Link to existing identity**: Select an identity from the list
     - **Create new identity**: Choose "Create new" option
@@ -277,8 +277,9 @@ Track these metrics to assess Match effectiveness:
 
 - For algorithm selection and tuning, see [Effective use of matching algorithms](tuning-matching-algorithms.md).
 - For attribute merging strategies, see [Effective use of Map](mapping-attributes.md).
-- For ISC setup (connection, schema, identity profile), see [Use guides overview](../index.md#first-aggregation-checklist).
+- For ISC setup (connection, schema, identity profile), see [Getting started — Setup checklist](../../getting-started/index.md#setup-checklist).
 - For reviewer access profiles and assignment, see [Managing reviewers](managing-reviewers.md).
+
 
 
 

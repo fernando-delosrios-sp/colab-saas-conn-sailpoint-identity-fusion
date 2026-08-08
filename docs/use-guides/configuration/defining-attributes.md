@@ -97,11 +97,13 @@ $Math.floor($Datefns.differenceInDays($Datefns.now(), $hireDate) / 365)
 **Counter format:** `{base value}{counter}` (e.g. `jsmith1`, `jsmith2`)
 **Zero-padding:** Use **Minimum counter digits** to pad counter (e.g. digits=3 → `jsmith001`)
 
-> **Note:** If a **Maximum length** is configured, the connector intelligently truncates the surrounding text to ensure the `$counter` is perfectly preserved without being chopped off, even if the counter is injected in the middle of a string.
+!!! note "Maximum length"
+    If a **Maximum length** is configured, the connector intelligently truncates the surrounding text to ensure the `$counter` is perfectly preserved without being chopped off, even if the counter is injected in the middle of a string.
 
 **`$isUnique(value)` helper:** Unique definitions can call `$isUnique(...)` inside the Velocity expression to test whether a candidate value is currently free after the same trim/case/spaces/normalize/maxLength rules are applied. Use this to choose between candidate formats before the connector falls back to automatic `$counter` disambiguation.
 
-> **Template safety note:** The connector auto-appends `$counter` to unique expressions that do not already reference `$counter` or `$UUID`, but the auto-append is **skipped when the expression contains Velocity directives** (`#if`, `#set`, `#else`, `#end`, etc.) because appending after `#end` would break parsing. In that case include `$counter` explicitly in your expression (or use `$UUID`).
+!!! tip "Template safety"
+    The connector auto-appends `$counter` to unique expressions that do not already reference `$counter` or `$UUID`, but the auto-append is **skipped when the expression contains Velocity directives** (`#if`, `#set`, `#else`, `#end`, etc.) because appending after `#end` would break parsing. In that case include `$counter` explicitly in your expression (or use `$UUID`).
 
 **Examples:**
 
@@ -363,6 +365,7 @@ One can purposely generate an **empty** `nativeIdentity` in conjunction with the
   $email
 #end
 ```
+
 
 
 

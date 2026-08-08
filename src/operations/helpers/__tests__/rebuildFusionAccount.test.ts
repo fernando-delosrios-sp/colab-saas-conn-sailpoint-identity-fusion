@@ -165,7 +165,7 @@ describe('rebuildFusionAccount', () => {
         expect(fetchManagedAccount).toHaveBeenCalledWith('source-a', 'native-99')
     })
 
-    it('warns and skips legacy non-composite account references', async () => {
+    it('warns and skips invalid non-composite account references', async () => {
         const fetchManagedAccount = vi.fn().mockResolvedValue(undefined)
         const log = { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() }
 
@@ -208,9 +208,60 @@ describe('rebuildFusionAccount', () => {
         })
 
         expect(log.warn).toHaveBeenCalledWith(
-            expect.stringContaining('Skipping legacy non-composite managed account reference')
+            expect.stringContaining('Skipping invalid managed account key during fusion account rebuild')
         )
         expect(fetchManagedAccount).not.toHaveBeenCalled()
+    })
+
+    it('fetches composite keys and skips invalid keys without failing read', async () => {
+        const fetchManagedAccount = vi.fn().mockResolvedValue(undefined)
+        const log = { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() }
+        const processFusionAccount = vi.fn().mockResolvedValue({ nativeIdentity: 'fusion-mixed' })
+
+        const registry = {
+            sources: {
+                fetchFusionAccount: vi.fn().mockResolvedValue(undefined),
+                fusionAccountsByNativeIdentity: new Map([
+                    [
+                        'fusion-mixed',
+                        {
+                            nativeIdentity: 'fusion-mixed',
+                            identityId: 'identity-mixed',
+                            attributes: {
+                                accounts: ['legacy-platform-uuid-only', 'source-a::valid-1'],
+                            },
+                        },
+                    ],
+                ]),
+                fetchManagedAccount,
+                getSourceByName: vi.fn(),
+                getSourceById: vi.fn().mockReturnValue(undefined),
+                aggregateManagedSource: vi.fn().mockResolvedValue(undefined),
+                config: { cascadeAggregationEnabled: false },
+            },
+            identities: {
+                fetchIdentityById: vi.fn().mockResolvedValue(undefined),
+                getIdentityById: vi.fn().mockReturnValue({ id: 'identity-mixed', accounts: [] }),
+            },
+            fusion: {
+                processFusionAccount,
+            },
+            log,
+        } as any
+
+        const result = await rebuildFusionAccount('fusion-mixed', {} as any, {
+            fusion: registry.fusion,
+            identities: registry.identities,
+            sources: registry.sources,
+            log: registry.log,
+        })
+
+        expect(result).toEqual({ nativeIdentity: 'fusion-mixed' })
+        expect(fetchManagedAccount).toHaveBeenCalledTimes(1)
+        expect(fetchManagedAccount).toHaveBeenCalledWith('source-a', 'valid-1')
+        expect(log.warn).toHaveBeenCalledWith(
+            expect.stringContaining('Skipping invalid managed account key during fusion account rebuild')
+        )
     })
 
     it('triggers cascade aggregation for managed sources when enabled', async () => {
@@ -267,4 +318,5 @@ describe('rebuildFusionAccount', () => {
         expect(fetchManagedAccount).toHaveBeenCalledWith('source-a', 'user-1')
     })
 })
+
 
