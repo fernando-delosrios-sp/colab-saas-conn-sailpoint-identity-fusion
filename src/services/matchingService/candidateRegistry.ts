@@ -175,7 +175,7 @@ export class CandidateRegistry {
     private candidateKey(fusionAccount: FusionAccount): string | undefined {
         const originAccount = fusionAccount.originAccountId?.trim()
         if (originAccount) {
-            return normalizeCompositeManagedAccountKey(originAccount) ?? originAccount
+            return normalizeCompositeManagedAccountKey(originAccount)
         }
         return fusionAccount.managedKey
     }
@@ -190,4 +190,5 @@ export class CandidateRegistry {
         return coerceBoolean(info.config.deferredMatching) ?? true
     }
 }
+
 

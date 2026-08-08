@@ -2,18 +2,45 @@
 
 Capture and replay ISC API interactions for offline regression and interactive debugging.
 
+**Practical walkthrough:** [Capture scenarios for replay](../use-guides/operation/capture-scenarios-for-replay.md) · **Testing process:** [Testing and validation](../use-guides/validation-and-troubleshooting/testing-and-validation.md)
+
 Artifacts live under `recordings/<tenant>/{scenarioName}/`, where `<tenant>` is derived from connection Base URL (fallback `unknown-tenant`).
+
+---
+
+## End-to-end workflow
+
+```mermaid
+flowchart LR
+    ISC[ISC source\nproxy client] -->|POST operation| PS[Proxy server\nPROXY_PASSWORD set]
+    PS -->|record mode| ART[recordings/tenant/scenario/]
+    ART --> REPLAY[npm run replay]
+    ART --> CI[npm run test-recording]
+    REPLAY --> REPORT[replay-report.json]
+    CI --> EXIT[exit code 0/1]
+```
+
+1. **Build and start proxy server** — `npm run build && PROXY_PASSWORD=secret npm start`
+2. **Configure ISC External Settings** — external processing, proxy mode, chain recording, recording name
+3. **Run aggregation** — artifacts accumulate on the server host
+4. **Replay or verify** — `npm run replay` (interactive) or `npm run test-recording` (CI)
+
+---
 
 ## Capture (canonical: External Settings)
 
 **Recommended:** enable capture on a proxy deployment via ISC **External Settings**:
 
-1. **Enable external processing?** — on  
-2. **Enable proxy mode?** — on (required for filesystem writes on the proxy host)  
-3. **Enable chain recording?** — on  
-4. **Recording chain name** (`recordingName`) — scenario segment only (for example `fernando`)
+| Field | Value |
+| --- | --- |
+| Enable external processing? | On |
+| Enable proxy mode? | On (required for filesystem writes on the proxy host) |
+| Enable chain recording? | On |
+| Recording chain name (`recordingName`) | Scenario segment only (for example `baseline-hr-ad`) |
 
 `safeReadConfig()` bridges this into `config.recording.mode = 'record'` and `config.recording.scenarioName` on the proxy server unless explicit `recording.mode` or env vars override.
+
+### Artifact files
 
 | File | Purpose |
 | --- | --- |
@@ -29,6 +56,17 @@ Artifacts live under `recordings/<tenant>/{scenarioName}/`, where `<tenant>` is 
 
 `reports/matching-results.json` is written at the end of each record-mode account-list operation. Re-record existing scenarios to populate it.
 
+### Environment overrides
+
+When External Settings fields are unset, env vars on the proxy host can enable recording:
+
+| Variable | Effect |
+| --- | --- |
+| `RECORD_MODE=record` | Force record mode |
+| `RECORD_SCENARIO_NAME` | Scenario segment (preferred) |
+| `RECORD_CHAIN_NAME` | Deprecated alias for scenario name |
+| `VERBOSE_RECORDING` | Extra recording diagnostics |
+
 Legacy `record-chain.js` and `replay-chain.js` scripts remain as deprecated wrappers that forward to the scenario scripts above.
 
 ### Legacy `npm run record` (deprecated)
@@ -40,7 +78,7 @@ npm run record
 
 Prints a deprecation warning — prefer External Settings for capture. Enter a scenario reference as **`tenant/scenarioName`** (for example `company12926-poc/fernando`). A bare name works when `BASEURL` or `ISC_BASEURL` is set.
 
-Env vars (fallback when config fields are unset): `RECORD_MODE`, `RECORD_SCENARIO_NAME` (preferred), deprecated `RECORD_CHAIN_NAME`, and `VERBOSE_RECORDING`.
+---
 
 ## Replay (automated, interactive)
 
@@ -63,6 +101,8 @@ Omit the scenario argument to pick from scenarios that have a non-empty `api-log
 
 Replay serves all ISC calls from `api-log.ndjson` via `ReplayApiAdapter` — no live tenant API calls.
 
+---
+
 ## Finalize (recovery)
 
 If the connector exits without writing `scenario.json` (crash, `kill -9`):
@@ -72,6 +112,8 @@ npm run finalize -- "company12926-poc/fernando"
 ```
 
 Normal Ctrl+C on a recording session auto-finalizes; use finalize only for recovery.
+
+---
 
 ## Regression verification (offline)
 
@@ -88,6 +130,14 @@ Auto-runs all steps in `scenario.json`, compares outputs against recorded golden
 | `npm run replay` | Interactive debugging with live connector output |
 | `npm run test-recording` | Fast headless regression in CI or before commit |
 
+Refresh stale report artifacts after connector upgrades:
+
+```bash
+npm run refresh-recording-reports -- "company12926-poc/fernando"
+```
+
+---
+
 ## Harness unit tests
 
 No local recordings required:
@@ -95,3 +145,18 @@ No local recordings required:
 ```bash
 npm test -- src/operations/__tests__/scenario/chain.replay.test.ts
 ```
+
+---
+
+## `reports/matching-results.json` schema
+
+Written after record-mode account-list completes:
+
+- `version`, `recordedAt`, `operation` — artifact metadata
+- `sweepSummary` — `{ processed, exact, partial, deferred, nonMatch }` counts
+- `identityMatches` — identity-origin matches with candidate scores
+- `deferredMatches` — deferred candidate rows with per-attribute scores
+- `nonMatches` — analyzed non-match accounts
+- `failedMatches` — accounts where matching failed
+
+Record mode automatically enables managed-account report capture. Scenarios recorded before this artifact existed must be re-recorded.

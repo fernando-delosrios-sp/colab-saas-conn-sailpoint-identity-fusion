@@ -108,6 +108,8 @@ When validating a scenario or fixture after configuration changes:
 | Topic | Resource |
 | --- | --- |
 | Scenario artifact reference | [Scenario recording](../../reference/scenario-recording.md) |
-| Dry-run tuning workflow | [Dry-run analysis](../operation/dry-run-analysis.md) |
+| Dry-run tuning workflow | [Analyze changes with dry-run](../operation/analyze-with-dry-run.md) |
+| Scenario capture workflow | [Capture scenarios for replay](../operation/capture-scenarios-for-replay.md) |
 | Source and scope setup | [Configuring sources and scope](../configuration/configuring-sources-and-scope.md) |
 | Troubleshooting common issues | [Troubleshooting](troubleshooting.md) |
+

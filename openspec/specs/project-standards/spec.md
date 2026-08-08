@@ -213,8 +213,7 @@ Feature: version-update-procedure
 - **GIVEN** the diff contains only changes to `package.json` and
   `package-lock.json`
 - **WHEN** the agent picks the most-affected guide
-- **THEN** the agent edits `docs/use-guides/operation/connection-and-observability-tuning.md`
-  (the dependency fallback from the map)
+- **THEN** the agent edits `docs/use-guides/operation/index.md` or the most relevant operation guide from that index
 - **AND** the diff contains a meaningful edit to that page
 
 #### Scenario: The diff always contains at least one edited docs guide
@@ -294,4 +293,5 @@ Feature: version-update-procedure
 - **THEN** the agent does not insert a second `### 2.3.0` block
 - **AND** the agent updates the previously-picked guide in place with
   a fresh edit tied to the new change
+
 

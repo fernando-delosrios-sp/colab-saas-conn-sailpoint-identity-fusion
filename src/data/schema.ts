@@ -109,7 +109,7 @@ export const fusionAccountSchemaAttributes: SchemaAttribute[] = [
     {
         name: 'originAccount',
         description:
-            'Origin identity ID or managed account key (set on creation, immutable, persisted even if missing)',
+            'Origin identity ID (Identities source) or composite managed account key sourceId::nativeIdentity (managed source); set on creation, immutable',
         type: 'string',
         multi: false,
         entitlement: false,
@@ -122,3 +122,4 @@ export const fusionAccountSchemaAttributes: SchemaAttribute[] = [
         entitlement: false,
     },
 ]
+

@@ -104,7 +104,10 @@ export class FusionAccount {
 
         fa.collections._internal_missingAccountIds.clear()
         const missingAccountIds = attributeToSet(account.attributes!, FusionAttribute.MissingAccounts)
-        for (const id of missingAccountIds) fa.collections._internal_missingAccountIds.add(id)
+        for (const id of missingAccountIds) {
+            const normalized = normalizeCompositeManagedAccountKey(id)
+            if (normalized) fa.collections._internal_missingAccountIds.add(normalized)
+        }
 
         fa.collections._clearReviews()
         const reviews = attributeToSet(account.attributes!, FusionAttribute.Reviews)
@@ -117,7 +120,12 @@ export class FusionAccount {
         for (const a of actionsSet) fa.collections._internal_actions.add(a)
 
         const prevAccounts = attributeToSet(account.attributes!, FusionAttribute.Accounts)
-        fa.collections._setPreviousAccountIds(prevAccounts)
+        const normalizedPrevAccounts = new Set<string>()
+        for (const id of prevAccounts) {
+            const normalized = normalizeCompositeManagedAccountKey(id)
+            if (normalized) normalizedPrevAccounts.add(normalized)
+        }
+        fa.collections._setPreviousAccountIds(normalizedPrevAccounts)
     }
 
     private static applyOriginMetadata(
@@ -130,9 +138,16 @@ export class FusionAccount {
 
         const originAccount = getAccountStringAttribute(account, FusionAttribute.OriginAccount)
         if (originAccount) {
-            const normalizedOriginAccount = normalizeCompositeManagedAccountKey(originAccount)
             const trimmedOriginAccount = originAccount.trim()
-            fa.layers.originAccount = normalizedOriginAccount ?? (trimmedOriginAccount || undefined)
+            const fromIdentityOrigin =
+                fa.layers.originSource === IDENTITIES_SOURCE_NAME ||
+                fa._attributeBag.current?.originSource === IDENTITIES_SOURCE_NAME ||
+                fa._attributeBag.current?.sourceOrigin === IDENTITIES_SOURCE_NAME
+            if (fromIdentityOrigin) {
+                fa.layers.originAccount = trimmedOriginAccount || undefined
+            } else {
+                fa.layers.originAccount = normalizeCompositeManagedAccountKey(trimmedOriginAccount)
+            }
         }
 
         const fromIdentity =
@@ -857,3 +872,4 @@ export class FusionAccount {
         }
     }
 }
+

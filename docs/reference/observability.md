@@ -1,31 +1,49 @@
 # Observability and log format
 
-This reference describes connector log formats for monitoring, alerting, and external logging integrations. For configuration guidance, see [Connection and observability tuning](../use-guides/operation/connection-and-observability-tuning.md).
+This reference describes connector log formats for monitoring, alerting, and external logging integrations. For configuration guidance, see [Monitor aggregation progress](../use-guides/operation/monitor-aggregation-progress.md) and [Tune API performance](../use-guides/operation/tune-api-performance.md).
 
-## External logging payload
+## External logging delivery
 
-Each log entry is a JSON object. Implementations should accept at least these fields (and may receive additional fields in the future):
+Routing depends on connector role (see `resolveExternalLogRoute` in the connector):
 
-| Field       | Type   | Required | Description                                                    |
-| ----------- | ------ | -------- | -------------------------------------------------------------- |
-| `level`     | string | Yes      | One of: `error`, `warn`, `info`, `debug`                       |
-| `timestamp` | string | Yes      | ISO 8601 date-time (e.g. `2024-01-15T14:30:45.123Z`)           |
-| `message`   | string | Yes      | Log message text                                               |
-| `context`   | object | No       | Additional key-value context (e.g. `sourceId`, `accountCount`) |
+| Role | Route | Destination |
+| --- | --- | --- |
+| Direct ISC, logging on | `http` | HTTP POST to **External target URL** |
+| Proxy client (ISC) | `noop` | No external delivery — server owns logs |
+| Proxy server, logging on | `disk` | Append to `LOG_FILE` or `logs/<tenant>/fusion-{YYYYMMDD}.log` |
 
-**Example log structure:**
+### Plain-text line format
 
-```json
-{
-    "level": "info",
-    "timestamp": "2024-01-15T14:30:45.123Z",
-    "message": "Account aggregation started",
-    "context": {
-        "sourceId": "fusion-source-123",
-        "accountCount": 5420
-    }
-}
+Each log entry is a **plain-text line** sent with `Content-Type: text/plain` (HTTP mode) or appended to disk (proxy server mode):
+
 ```
+HH:MM:SS [LEVEL]  [operation] message body…
+```
+
+**Example:**
+
+```
+14:30:45 [INFO]  [accountList] STATUS phase=4 step=process progress=1200/5400 api=42/3/891 elapsed=183s
+14:30:45 [INFO]  [accountList] EVENT_SUMMARY matches non-match=+12/10s decisions merge=+1/10s
+14:30:55 [WARN]  [accountList] WARN STALL api-queue idle=20s active=GET /v3/accounts?…
+```
+
+Optional HTTP header `x-fusion-baseurl` carries the ISC connection base URL so multi-tenant receivers can route lines.
+
+### Log levels
+
+External logging respects **External logging level** (Error, Warn, Info, Debug). ISC debug logging (`spConnDebugLoggingEnabled`) is separate and does not replace external delivery.
+
+### Local HTTP receiver
+
+For development, the repo includes `log-server.js`:
+
+```bash
+mkdir -p logs
+LOG_FILE=logs/remote-logs-$(date +%Y%m%d).log npm run log-server
+```
+
+Point **External target URL** (with proxy mode off) at `http://your-host:3000/`. The receiver accepts POST bodies as plain text and appends to `LOG_FILE`.
 
 ## Operation log line kinds (`accountList`)
 
@@ -40,19 +58,6 @@ During long `accountList` aggregations, the connector emits standardized text pr
 | `WARN STALL` | Warn | API queue stopped completing requests for two consecutive heartbeat ticks; includes active request labels |
 | `EPILOGUE` | Info | Report epilogue (`START` / `END elapsed=…`; not a numbered phase) |
 | `METRIC` | Info | Phase/step timing metrics |
-
-## Log monitor migration
-
-| Legacy pattern (removed) | Replace with |
-| ------------------------ | ------------ |
-| `Queue Stats:` | `STATUS` (`api=` segment inside STATUS lines) |
-| `Memory usage` | `STATUS` (RSS/heap appear inside STATUS lines) |
-| `PHASE N: Description (elapsed)` | `PHASE N Name END elapsed=…` |
-| `Epilogue: report generation` | `EPILOGUE report END elapsed=…` |
-| Per-account `MATCH FOUND:` / `Triggering correlation` at Info | `EVENT_SUMMARY` (per-account detail remains at Debug) |
-| Per-account merge/new-identity decision prose at Debug only | Info headlines `… DECISION DISCOVERED` / `… DECISION APPLIED` plus `DETAIL` / `EVENT_SUMMARY decisions` |
-| `correlations triggered=` in EVENT_SUMMARY / PHASE END | `correlations link=triggers/accounts merge=triggers/accounts` (see examples below) |
-| Free-form `Loaded N managed source(s)` | `DETAIL sources=N` |
 
 ## Correlation activity format
 

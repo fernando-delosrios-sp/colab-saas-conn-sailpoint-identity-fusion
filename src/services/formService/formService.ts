@@ -1034,7 +1034,10 @@ export class FormService {
             return undefined
         }
 
-        const normalizedAccountId = normalizeCompositeManagedAccountKey(accountId) ?? accountId
+        const normalizedAccountId = normalizeCompositeManagedAccountKey(accountId)
+        if (!normalizedAccountId) {
+            return undefined
+        }
         const workQueue = this.run.managedAccountsById
         assert(workQueue, 'Managed accounts have not been loaded')
 

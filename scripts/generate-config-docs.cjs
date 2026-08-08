@@ -20,9 +20,9 @@ const MENU_SLUGS = {
 /** @type {Record<string, { title: string; path: string; blurb: string }>} */
 const USE_GUIDE_BY_MENU = {
     'Connection Settings': {
-        title: 'Connection and observability tuning',
-        path: '../use-guides/operation/connection-and-observability-tuning.md',
-        blurb: 'PAT setup, queue sizing, retries, timeouts, and log interpretation.',
+        title: 'Tune API performance',
+        path: '../use-guides/operation/tune-api-performance.md',
+        blurb: 'PAT setup, queue sizing, retries, timeouts, and rate-limit tuning.',
     },
     'Source Settings': {
         title: 'Configuring sources and scope',
@@ -45,9 +45,9 @@ const USE_GUIDE_BY_MENU = {
         blurb: 'Match detection workflow, thresholds, and baseline configuration.',
     },
     'Advanced Settings': {
-        title: 'Connection and observability tuning',
-        path: '../use-guides/operation/connection-and-observability-tuning.md',
-        blurb: 'Developer toggles, batch sizing, external logging, and recovery operations.',
+        title: 'Operation guides',
+        path: '../use-guides/operation/index.md',
+        blurb: 'Monitor, tune, proxy, recording, dry-run, and reset workflows.',
     },
 }
 
@@ -529,6 +529,7 @@ function main() {
 }
 
 main()
+
 
 
 

@@ -27,6 +27,25 @@ The account-read operation SHALL load sources and schema, rebuild the target Fus
 - **WHEN** the account-read operation is invoked
 - **THEN** the operation SHALL fail with a message matching `Fusion account not found for identity: <identity>`
 
+### Requirement: Account read accepts only composite managed account keys for fetch
+
+When rebuilding a Fusion account, the account-read operation SHALL resolve managed account references for fetch using only valid composite managed account keys (`sourceId::nativeIdentity`). Values that fail composite key validation SHALL NOT be fetched and SHALL NOT be passed through as lookup keys.
+
+#### Scenario: Invalid managed account key is skipped with diagnostic warning
+
+- **GIVEN** a Fusion account whose `accounts` or `missing-accounts` collection contains a value that is not a valid composite managed account key
+- **WHEN** the account-read operation rebuilds the Fusion account
+- **THEN** the connector SHALL log a warning identifying the invalid key and expected format
+- **AND** SHALL skip fetching that reference
+- **AND** SHALL NOT fail the overall read operation
+
+#### Scenario: Composite keys are fetched normally
+
+- **GIVEN** a Fusion account referencing managed accounts with composite keys `src-a::user-1`
+- **WHEN** the account-read operation rebuilds the Fusion account
+- **THEN** the connector SHALL fetch each referenced managed account by source ID and native identity
+- **AND** SHALL complete the rebuild successfully
+
 ### Requirement: Account read optionally triggers cascade aggregation before managed account fetch
 
 When `cascadeAggregationEnabled` is true in processing control settings, the account-read operation SHALL trigger managed-source aggregation for each source referenced by the Fusion account's managed account keys before fetching managed accounts. Per-source cascade failures SHALL be logged and SHALL NOT fail the overall read operation.
@@ -45,10 +64,4 @@ When `cascadeAggregationEnabled` is true in processing control settings, the acc
 - **WHEN** the account-read operation is invoked
 - **THEN** the connector SHALL NOT trigger cascade aggregation before managed account fetch
 
-#### Scenario: Legacy non-composite managed account keys are skipped with warning
-
-- **GIVEN** a Fusion account referencing a legacy non-composite managed account key
-- **WHEN** the account-read operation rebuilds the Fusion account
-- **THEN** the connector SHALL log a warning for the legacy key
-- **AND** SHALL skip fetching that reference without failing the read
 

@@ -7,14 +7,16 @@ site_dir: site
 docs_dir: docs
 exclude_docs: README.md
 
+extra_css:
+    - stylesheets/extra.css
+
 theme:
     name: material
     features:
         - navigation.instant
         - navigation.tracking
-        - navigation.sections
-        - navigation.expand
         - navigation.top
+        - navigation.prune
         - search.suggest
         - search.highlight
         - content.code.copy
@@ -26,11 +28,7 @@ theme:
 nav:
     - Home: index.md
     - Use guides:
-          - Use guides overview: use-guides/index.md
-          - Getting started:
-                - Overview: getting-started/overview.md
-                - First aggregation: getting-started/first-aggregation.md
-                - Which guide do I need?: getting-started/which-guide.md
+          - Getting started: getting-started/index.md
           - Configuration guides:
                 - Configuring sources and scope: use-guides/configuration/configuring-sources-and-scope.md
                 - Source types: use-guides/configuration/source-types.md
@@ -42,6 +40,19 @@ nav:
                 - Review forms and reviewers: use-guides/configuration/review-forms-and-reviewers.md
                 - Tuning matching algorithms: use-guides/configuration/tuning-matching-algorithms.md
                 - Match tuning cookbooks: use-guides/configuration/match-tuning-cookbooks.md
+          - Operation guides:
+                - Overview: use-guides/operation/index.md
+                - Monitor aggregation progress: use-guides/operation/monitor-aggregation-progress.md
+                - Tune API performance: use-guides/operation/tune-api-performance.md
+                - Analyze changes with dry-run: use-guides/operation/analyze-with-dry-run.md
+                - Run the connector via proxy: use-guides/operation/run-via-proxy.md
+                - Capture scenarios for replay: use-guides/operation/capture-scenarios-for-replay.md
+                - Reset Fusion state: use-guides/operation/reset-fusion-state.md
+          - Validation and troubleshooting:
+                - Testing and validation: use-guides/validation-and-troubleshooting/testing-and-validation.md
+                - Troubleshooting: use-guides/validation-and-troubleshooting/troubleshooting.md
+          - Deployment:
+                - Migrating from Identity Fusion v1: use-guides/deployment/migrating-from-identity-fusion-v1.md
     - Configuration:
           - Configuration reference: configuration/index.md
           - Connection Settings: configuration/connection.md
@@ -50,15 +61,6 @@ nav:
           - Attribute Definition Settings: configuration/definition.md
           - Attribute Matching Settings: configuration/matching.md
           - Advanced Settings: configuration/advanced.md
-          - Operation guides:
-                - Dry-run analysis: use-guides/operation/dry-run-analysis.md
-                - Connection and observability tuning: use-guides/operation/connection-and-observability-tuning.md
-          - Validation and troubleshooting guides:
-                - Testing and validation: use-guides/validation-and-troubleshooting/testing-and-validation.md
-                - Troubleshooting: use-guides/validation-and-troubleshooting/troubleshooting.md
-          - Deployment guides:
-                - Migrating from Identity Fusion v1: use-guides/deployment/migrating-from-identity-fusion-v1.md
-    - Glossary: glossary.md
     - Technical reference:
           - Standard account schema: reference/standard-account-schema.md
           - Velocity context: reference/velocity-context.md
@@ -83,6 +85,8 @@ nav:
                       - Account disable: operations/account-disable.md
                 - Entitlements:
                       - Entitlement list: operations/entitlement-list.md
+    - Glossary:
+          - Glossary: glossary.md
 
 markdown_extensions:
     - admonition
@@ -92,9 +96,3 @@ markdown_extensions:
               - name: mermaid
                 class: mermaid
                 format: !!python/name:pymdownx.superfences.fence_code_format
-
-
-
-
-
-

@@ -173,21 +173,22 @@ Conditional PAT scopes apply: `idn:task-management:read` for **before** mode, `i
 
 | Setting | Effect |
 | --- | --- |
-| **Off (recommended default at scale)** | Only identities with per-source `reviewer:<sourceId>` entitlements receive forms |
-| **On** | Fusion source owner is added to **every** review form across **all** managed sources |
+| **Off** | Only identities with per-source `reviewer:<sourceId>` entitlements (via access profiles) receive forms |
+| **On** | Fusion **source owner** and **governance group** members are added to **every** review form across **all** managed sources |
 
-**Impact of enabling owners as reviewers:**
+**Global reviewer setup (no entitlements required):**
 
-- Ensures at least one reviewer when per-source entitlements are not yet assigned — useful during pilot.
-- Can flood the source owner with forms from every managed source in production.
-- Does **not** replace per-source reviewer entitlements for team-based ownership.
+1. In ISC, assign the Fusion **source owner** (identity or governance group) and/or a **governance group** (management workgroup) on the Fusion source.
+2. Enable **Owners are global reviewers?** in Review Settings.
+3. Run account aggregation.
 
-**How to assign reviewers properly:**
+**Fine-grained setup (per-source entitlements):**
 
 1. Configure managed sources (this guide).
 2. Run **Entitlement Aggregation** on the Fusion source.
-3. Create access profiles with per-source reviewer entitlements.
-4. Optionally enable **Owners are global reviewers?** as a safety net.
+3. Create access profiles with per-source `<Source Name> reviewer` entitlements and assign them to the right users or groups.
+
+You can combine both: enable global reviewers for governance coverage and assign per-source entitlements so individual source teams receive only their forms.
 
 See [Managing reviewers](managing-reviewers.md) and [Review forms and reviewers](review-forms-and-reviewers.md).
 
@@ -223,5 +224,6 @@ See [Managing reviewers](managing-reviewers.md) and [Review forms and reviewers]
 | Match baseline and thresholds | [Matching identities](matching-identities.md) |
 | Reviewer entitlements and access profiles | [Managing reviewers](managing-reviewers.md) |
 | Field keys and defaults | [Source Settings](../../configuration/source.md) |
+
 
 

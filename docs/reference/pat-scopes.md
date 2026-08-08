@@ -106,5 +106,6 @@ Export the source config from ISC (Admin → Connections → Sources → your Fu
 - [Connection Settings](../configuration/connection.md) — PAT ID and secret fields
 - [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) — aggregation mode and correlation mode
 - [Entitlement list](../operations/entitlement-list.md) — status and action entitlements the connector exposes
-- [Connection and observability tuning](../use-guides/operation/connection-and-observability-tuning.md) — resilience settings
+- [Tune API performance](../use-guides/operation/tune-api-performance.md) — resilience settings
+
 

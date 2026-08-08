@@ -143,5 +143,6 @@ With account migration complete, configure the remaining settings:
 
 - For Map and Define capabilities, see [Mapping attributes](../configuration/mapping-attributes.md) and [Defining attributes](../configuration/defining-attributes.md).
 - For Match after migration, see [Matching identities](../configuration/matching-identities.md).
-- For connection and tuning, see [Advanced connection settings](../operation/connection-and-observability-tuning.md) and [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md).
+- For connection and tuning, see [Tune API performance](../operation/tune-api-performance.md) and [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md).
+
 

@@ -87,5 +87,7 @@ Identities and correlated managed accounts form the Match **baseline**. See [Glo
 ## Related guides
 
 - [Troubleshooting](../use-guides/validation-and-troubleshooting/troubleshooting.md)
-- [Connection and observability tuning](../use-guides/operation/connection-and-observability-tuning.md)
+- [Monitor aggregation progress](../use-guides/operation/monitor-aggregation-progress.md)
+- [Tune API performance](../use-guides/operation/tune-api-performance.md)
 - [Account list operation](../operations/account-list.md)
+

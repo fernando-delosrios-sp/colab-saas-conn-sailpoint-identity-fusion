@@ -33,7 +33,7 @@ For algorithm and threshold detail, see [Tuning matching algorithms](tuning-matc
 
 ### Cookbook 1 — dry-run validation
 
-1. Enable dry-run on account-list with `saveFile: true` (see [Dry-run analysis](../operation/dry-run-analysis.md)).
+1. Enable dry-run on account-list with `saveFile: true` (see [Analyze changes with dry-run](../operation/analyze-with-dry-run.md)).
 2. Confirm HTML report shows identity matches for AD rows that overlap HR emails.
 3. Grep logs for `PHASE 4 Process` and `uncorrelated-sweep` — Match discovery lines should appear for partial name matches.
 
@@ -105,6 +105,7 @@ For algorithm and threshold detail, see [Tuning matching algorithms](tuning-matc
 
 ## Related references
 
-- [Which guide do I need?](../../getting-started/which-guide.md)
+- [Getting started — Choose your path](../../getting-started/index.md#choose-your-path)
 - [Config to account-list phases](../../reference/config-to-phases.md)
-- [Dry-run analysis](../operation/dry-run-analysis.md)
+- [Analyze changes with dry-run](../operation/analyze-with-dry-run.md)
+

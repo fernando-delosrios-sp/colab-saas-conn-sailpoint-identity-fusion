@@ -17,10 +17,10 @@ Identity Fusion NG is an **Identity Security Cloud (ISC) connector** that consol
 1. Add the connector to ISC.
 2. Create a Fusion source (mark **Authoritative** when you need Match).
 3. Configure connection — see [ISC PAT scopes](docs/reference/pat-scopes.md) for required API permissions.
-4. Configure Map, Define, and Match — [Configuration reference](docs/configuration/index.md) and [Use guides](docs/use-guides/index.md).
-5. Run **Discover Schema**, then create an identity profile and aggregate.
+4. Configure Map, Define, and Match — [Configuration reference](docs/configuration/index.md) and [Getting started](docs/getting-started/index.md).
+5. Run **Discover Schema**, entitlement aggregation, then account aggregation.
 
-See [Use guides overview](docs/use-guides/index.md) for prerequisites, the first-aggregation checklist, and all setup guides.
+See [Getting started](docs/getting-started/index.md) for prerequisites, the setup checklist, goal-based paths, and all scenario guides.
 
 ## Scenario recording and replay
 
@@ -48,3 +48,4 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 ## License
 
 Distributed under the MIT License. See [LICENSE.txt](LICENSE.txt).
+

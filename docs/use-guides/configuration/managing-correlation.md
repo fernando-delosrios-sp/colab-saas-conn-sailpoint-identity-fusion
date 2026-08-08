@@ -74,7 +74,7 @@ During `accountList`, the connector distinguishes two PATCH-driven correlation p
 
 Both respect the selected **Correlation mode** and dry-run persistence flags. Monitor `completed=` and `pending=` on STATUS lines during Output/Epilogue for queue drain progress.
 
-See [Connection and observability tuning](../operation/connection-and-observability-tuning.md) for log grep patterns.
+See [Observability and log format](../../reference/observability.md) for correlation log grep patterns.
 
 ## Enforced correlation role
 
@@ -99,12 +99,10 @@ See [Managing reviewers](managing-reviewers.md) for entitlement and access-profi
 
 ## Planning correlation load
 
-!!! tip
-
+!!! tip "Initial load correlation"
     Already-processed uncorrelated managed accounts remain in the Fusion work queue internally — disabling correlation during initial load does not block Match. Correlation PATCHes are expensive; plan mode changes and enforced roles before full production cutover.
 
-!!! tip
-
+!!! tip "Uncorrelated accounts enter Match"
     Managed accounts must be **uncorrelated** to enter Match scoring. Correlated managed accounts are treated as part of the baseline. See [Configuring sources and scope](configuring-sources-and-scope.md).
 
 ## Related guides
@@ -114,5 +112,6 @@ See [Managing reviewers](managing-reviewers.md) for entitlement and access-profi
 | Source types, filters, aggregation timing | [Configuring sources and scope](configuring-sources-and-scope.md) · [Source types](source-types.md) |
 | Match rules and thresholds | [Matching identities](matching-identities.md) |
 | Review decisions that drive merge correlation | [Review forms and reviewers](review-forms-and-reviewers.md) |
-| First aggregation setup | [Use guides overview](../index.md#first-aggregation-checklist) |
+| First aggregation setup | [Getting started — Setup checklist](../../getting-started/index.md#setup-checklist) |
+
 
