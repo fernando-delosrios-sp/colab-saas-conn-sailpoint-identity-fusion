@@ -66,15 +66,15 @@ function resolveAccountUpdateLabel(
     fusionDisplayAttribute: string | undefined,
     identity: string
 ): string {
-    return (
-        trimStr(fusionAccount.name) ??
-        trimStr(
-            fusionDisplayAttribute
-                ? (fusionAccount.attributes?.[fusionDisplayAttribute] as string | undefined)
-                : undefined
-        ) ??
-        identity
-    )
+    const name = trimStr(fusionAccount.name)
+    if (name != null) return name
+
+    if (fusionDisplayAttribute) {
+        const displayAttr = trimStr(fusionAccount.attributes?.[fusionDisplayAttribute] as string | undefined)
+        if (displayAttr != null) return displayAttr
+    }
+
+    return identity
 }
 
 function shouldSkipCorrelationStatusRecompute(change: {
