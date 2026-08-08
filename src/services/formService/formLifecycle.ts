@@ -12,7 +12,7 @@ import {
     FormInstanceResponseV2025StateV2025,
 } from 'sailpoint-api-client'
 import { assert } from '../../utils/assert'
-import { readUnknown } from '../../utils/safeRead'
+import { readFirstUnknown } from '../../utils/safeRead'
 import { ClientService } from '../clientService'
 import { LogService } from '../logService'
 import { FusionRun } from '../../model/fusionRun'
@@ -285,11 +285,7 @@ export class FormLifecycle {
     }
 
     readFormDefinitionTimestamp(form: FormDefinitionResponseV2025): Date | undefined {
-        const rawTimestamp =
-            readUnknown(form, 'modified') ??
-            readUnknown(form, 'modifiedAt') ??
-            readUnknown(form, 'created') ??
-            readUnknown(form, 'createdAt')
+        const rawTimestamp = readFirstUnknown(form, 'modified', 'modifiedAt', 'created', 'createdAt')
 
         if (!rawTimestamp) {
             this.deps.log.warn(`Form definition ${form.id || 'unknown'} missing timestamp fields; skipping stale check`)
