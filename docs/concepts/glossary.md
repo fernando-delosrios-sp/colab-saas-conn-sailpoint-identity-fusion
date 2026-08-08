@@ -2,7 +2,9 @@
 
 This page defines the canonical terms used throughout the connector, its configuration, and its documentation.
 
-> This glossary mirrors the canonical ubiquitous language spec at `openspec/specs/ubiquitous-language/spec.md`. The spec is the source of truth; this page is kept aligned for user-facing reference.
+!!! info
+
+    This glossary mirrors the canonical ubiquitous language spec at `openspec/specs/ubiquitous-language/spec.md`. The spec is the source of truth; this page is kept aligned for user-facing reference.
 
 ## Account taxonomy
 
