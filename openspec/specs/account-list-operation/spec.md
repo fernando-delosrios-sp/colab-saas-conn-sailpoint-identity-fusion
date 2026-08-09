@@ -184,6 +184,7 @@ State persistence is all-or-nothing: when the account-list pipeline fails for an
 - **WHEN** `res.send` throws while accounts are being streamed during a persistent aggregation
 - **THEN** attribute state SHALL NOT be saved
 - **AND** batch cumulative counts SHALL NOT be saved
+- **AND** form cleanup and other Output sub-steps after `send-accounts` SHALL NOT run
 
 #### Scenario: Successful run persists state
 - **WHEN** a persistent aggregation completes successfully
@@ -215,7 +216,7 @@ The account-list operation SHALL start an operation heartbeat at the beginning o
 
 ### Requirement: Account-list pipeline logs phase and step boundaries
 
-The account-list operation SHALL emit PHASE START and PHASE END lines at each major phase boundary (Setup, Fetch, Refresh, Process, Output) and STEP START/END lines at named sub-steps within Process and Output (including identity processing, **managed account initialization**, **orphan identity hydration**, correlated sweep, **record unique registration**, uncorrelated sweep, await-disable-ops, form reconciliation, **clear managed accounts** (Output, non-record mode only), form cleanup, send-accounts, save-state, schedule-aggregations, await-form-deletes). PHASE END lines SHALL include `elapsed=` duration and SHALL include correlation activity detail suffix when link, merge, completed, or skip counters are non-zero for that phase. Correlation detail on account-list PHASE END lines SHALL NOT include `correlated-action=`. Phase timing data for HTML report breakdowns SHALL be captured internally without emitting colon-style `PHASE N: Description (elapsed)` host lines.
+The account-list operation SHALL emit PHASE START and PHASE END lines at each major phase boundary (Setup, Fetch, Refresh, Process, Output) and STEP START/END lines at named sub-steps within Process and Output (including identity processing, **managed account initialization**, **orphan identity hydration**, correlated sweep, **record unique registration**, uncorrelated sweep, await-disable-ops, form reconciliation, **clear managed accounts** (Output, non-record mode only), send-accounts, form cleanup, save-state, schedule-aggregations, await-form-deletes). On persistent runs, Output sub-steps after `send-accounts` (`form-cleanup`, `save-state`, `schedule-aggregations`, `await-form-deletes`) SHALL run only after account streaming completes successfully. PHASE END lines SHALL include `elapsed=` duration and SHALL include correlation activity detail suffix when link, merge, completed, or skip counters are non-zero for that phase. Correlation detail on account-list PHASE END lines SHALL NOT include `correlated-action=`. Phase timing data for HTML report breakdowns SHALL be captured internally without emitting colon-style `PHASE N: Description (elapsed)` host lines.
 
 #### Scenario: Process phase visible during long matching run
 
@@ -262,8 +263,15 @@ The account-list operation SHALL emit PHASE START and PHASE END lines at each ma
 
 - **GIVEN** a persistent account-list operation not in record mode
 - **WHEN** the Output phase begins
-- **THEN** a STEP START line for `clear-managed-accounts` SHALL appear before `form-cleanup`
+- **THEN** a STEP START line for `clear-managed-accounts` SHALL appear before `send-accounts`
 - **AND** a matching STEP END line for `clear-managed-accounts` SHALL appear before subsequent Output sub-steps
+
+#### Scenario: Send accounts step runs before persistent-only output side effects
+
+- **GIVEN** a persistent account-list operation not in dry-run mode
+- **WHEN** the Output phase runs through form cleanup and state persistence
+- **THEN** a STEP START line for `send-accounts` SHALL appear before `form-cleanup`
+- **AND** STEP lines for `save-state`, `schedule-aggregations`, and `await-form-deletes` SHALL appear after `send-accounts`
 
 #### Scenario: Clear managed accounts step omitted in record mode
 
@@ -496,5 +504,6 @@ During account-list execution, operational milestones (managed sources loaded, a
 - **AND** no second INFO line describing the same send SHALL appear
 
 ---
+
 
 
