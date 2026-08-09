@@ -95,29 +95,16 @@ export class FusionAccount {
 
     private static applyAttributeCollections(fa: FusionAccount, account: Account): void {
         const statuses = attributeToSet(account.attributes!, FusionAttribute.Statuses)
-        if (statuses.has(StatusEntitlement.Baseline)) {
-            fa.collections._internal_sources.add(IDENTITIES_SOURCE_NAME)
-        }
+        const sources = statuses.has(StatusEntitlement.Baseline) ? [IDENTITIES_SOURCE_NAME] : undefined
 
         fa._attributeBag.current = { ...account.attributes! }
         fa._attributeBag.previous = { ...account.attributes! }
 
-        fa.collections._internal_missingAccountIds.clear()
-        const missingAccountIds = attributeToSet(account.attributes!, FusionAttribute.MissingAccounts)
-        for (const id of missingAccountIds) {
+        const missingAccountIds: string[] = []
+        for (const id of attributeToSet(account.attributes!, FusionAttribute.MissingAccounts)) {
             const normalized = normalizeCompositeManagedAccountKey(id)
-            if (normalized) fa.collections._internal_missingAccountIds.add(normalized)
+            if (normalized) missingAccountIds.push(normalized)
         }
-
-        fa.collections._clearReviews()
-        const reviews = attributeToSet(account.attributes!, FusionAttribute.Reviews)
-        for (const r of reviews) fa.collections._internal_reviews.add(r)
-
-        const statusesSet = attributeToSet(account.attributes!, FusionAttribute.Statuses)
-        for (const s of statusesSet) fa.collections._internal_statuses.add(s)
-
-        const actionsSet = attributeToSet(account.attributes!, FusionAttribute.Actions)
-        for (const a of actionsSet) fa.collections._internal_actions.add(a)
 
         const prevAccounts = attributeToSet(account.attributes!, FusionAttribute.Accounts)
         const normalizedPrevAccounts = new Set<string>()
@@ -125,7 +112,17 @@ export class FusionAccount {
             const normalized = normalizeCompositeManagedAccountKey(id)
             if (normalized) normalizedPrevAccounts.add(normalized)
         }
-        fa.collections._setPreviousAccountIds(normalizedPrevAccounts)
+
+        fa.collections.hydratePersisted({
+            sources,
+            missingAccountIds,
+            reviews: attributeToSet(account.attributes!, FusionAttribute.Reviews),
+            statuses: attributeToSet(account.attributes!, FusionAttribute.Statuses),
+            actions: attributeToSet(account.attributes!, FusionAttribute.Actions),
+            previousAccountIds: normalizedPrevAccounts,
+            clearMissingBeforeAdd: true,
+            clearReviewsBeforeAdd: true,
+        })
     }
 
     private static applyOriginMetadata(
@@ -155,8 +152,10 @@ export class FusionAccount {
             fa._attributeBag.current?.originSource === IDENTITIES_SOURCE_NAME ||
             fa._attributeBag.current?.sourceOrigin === IDENTITIES_SOURCE_NAME
         if (fromIdentity && !fa.collections.statusesSet.has(StatusEntitlement.Baseline)) {
-            fa.collections._internal_statuses.add(StatusEntitlement.Baseline)
-            fa.collections._internal_sources.add(IDENTITIES_SOURCE_NAME)
+            fa.collections.hydratePersisted({
+                statuses: [StatusEntitlement.Baseline],
+                sources: [IDENTITIES_SOURCE_NAME],
+            })
         }
 
         if (!identityInfo?.id) {
@@ -220,33 +219,32 @@ export class FusionAccount {
         if (identityInfo) fa._identityInfo = identityInfo
         fa.layers.isIdentity = true
 
-        fa.collections._internal_sources.add(IDENTITIES_SOURCE_NAME)
-
         if (identity.attributes) {
             fa._attributeBag.current = { ...identity.attributes }
             fa._attributeBag.previous = { ...identity.attributes }
 
-            fa.collections._internal_missingAccountIds.clear()
-            const missingAccountIds = attributeToSet(identity.attributes, FusionAttribute.MissingAccounts)
-            for (const id of missingAccountIds) fa.collections._internal_missingAccountIds.add(id)
-
-            fa.collections._clearReviews()
-            const reviews = attributeToSet(identity.attributes, FusionAttribute.Reviews)
-            for (const r of reviews) fa.collections._internal_reviews.add(r)
-
-            const statusesSet = attributeToSet(identity.attributes, FusionAttribute.Statuses)
-            for (const s of statusesSet) fa.collections._internal_statuses.add(s)
-
-            const actionsSet = attributeToSet(identity.attributes, FusionAttribute.Actions)
-            for (const a of actionsSet) fa.collections._internal_actions.add(a)
+            fa.collections.hydratePersisted({
+                sources: [IDENTITIES_SOURCE_NAME],
+                missingAccountIds: attributeToSet(identity.attributes, FusionAttribute.MissingAccounts),
+                reviews: attributeToSet(identity.attributes, FusionAttribute.Reviews),
+                statuses: attributeToSet(identity.attributes, FusionAttribute.Statuses),
+                actions: attributeToSet(identity.attributes, FusionAttribute.Actions),
+                clearMissingBeforeAdd: true,
+                clearReviewsBeforeAdd: true,
+            })
+        } else {
+            fa.collections.hydratePersisted({
+                sources: [IDENTITIES_SOURCE_NAME],
+            })
         }
 
         fa.layers.originSource = IDENTITIES_SOURCE_NAME
         fa.layers.originAccount = identity.id ?? undefined
-        fa.collections._internal_statuses.add(StatusEntitlement.Baseline)
+        fa.collections.hydratePersisted({
+            statuses: [StatusEntitlement.Baseline],
+        })
         fa.setIdentityIdAttribute(identity.id)
-        fa.collections._internal_statuses.add(StatusEntitlement.Baseline)
-        fa.collections._addHistoryEntry(
+        fa.collections.addHistoryMessage(
             `Set ${trimmedName || identity.name || identity.id} [${IDENTITIES_SOURCE_NAME}] as baseline`
         )
 
@@ -280,34 +278,34 @@ export class FusionAccount {
         if (account.id != null) fa._iscAccountId = account.id
         fa.layers.isIdentity = account.uncorrelated === false
 
-        for (const s of sourceSet) fa.collections._internal_sources.add(s)
-
         if (account.attributes) {
             fa._attributeBag.current = { ...account.attributes }
             fa._attributeBag.previous = { ...account.attributes }
 
-            fa.collections._internal_missingAccountIds.clear()
-            const missingAccountIds = attributeToSet(account.attributes, FusionAttribute.MissingAccounts)
-            for (const id of missingAccountIds) fa.collections._internal_missingAccountIds.add(id)
-
-            fa.collections._clearReviews()
-            const reviews = attributeToSet(account.attributes, FusionAttribute.Reviews)
-            for (const r of reviews) fa.collections._internal_reviews.add(r)
-
-            const statusesSet = attributeToSet(account.attributes, FusionAttribute.Statuses)
-            for (const s of statusesSet) fa.collections._internal_statuses.add(s)
-
-            const actionsSet = attributeToSet(account.attributes, FusionAttribute.Actions)
-            for (const a of actionsSet) fa.collections._internal_actions.add(a)
+            fa.collections.hydratePersisted({
+                sources: sourceSet,
+                missingAccountIds: attributeToSet(account.attributes, FusionAttribute.MissingAccounts),
+                reviews: attributeToSet(account.attributes, FusionAttribute.Reviews),
+                statuses: attributeToSet(account.attributes, FusionAttribute.Statuses),
+                actions: attributeToSet(account.attributes, FusionAttribute.Actions),
+                clearMissingBeforeAdd: true,
+                clearReviewsBeforeAdd: true,
+            })
+        } else {
+            fa.collections.hydratePersisted({
+                sources: sourceSet,
+            })
         }
 
         fa.layers.originSource = account.sourceName ?? undefined
         fa.layers.originAccount = managedAccountKey
-        fa.collections._internal_accountIds.add(managedAccountKey)
-        fa.collections._internal_missingAccountIds.add(managedAccountKey)
+        fa.collections.hydratePersisted({
+            accountIds: [managedAccountKey],
+            missingAccountIds: [managedAccountKey],
+            statuses: [StatusEntitlement.Uncorrelated],
+        })
         fa.layers.uncorrelated = true
-        fa.collections._internal_statuses.add(StatusEntitlement.Uncorrelated)
-        fa.collections._internal_actions.delete(FusionAction.Correlated)
+        fa.collections.removeActionSilent(FusionAction.Correlated)
 
         fa.layers._setManagedAccount(account, false, undefined, {
             sources: fa._attributeBag.sources,
@@ -345,11 +343,13 @@ export class FusionAccount {
 
         fa.layers.originSource = account.sourceName ?? undefined
         fa.layers.originAccount = managedAccountKey
-        fa.collections._internal_accountIds.add(managedAccountKey)
-        fa.collections._internal_missingAccountIds.add(managedAccountKey)
+        fa.collections.hydratePersisted({
+            accountIds: [managedAccountKey],
+            missingAccountIds: [managedAccountKey],
+            statuses: [StatusEntitlement.Uncorrelated],
+        })
         fa.layers.uncorrelated = true
-        fa.collections._internal_statuses.add(StatusEntitlement.Uncorrelated)
-        fa.collections._internal_actions.delete(FusionAction.Correlated)
+        fa.collections.removeActionSilent(FusionAction.Correlated)
 
         return fa
     }
@@ -689,10 +689,6 @@ export class FusionAccount {
         return this.collections.statusesSet
     }
 
-    private get previousAccountIds(): Set<string> {
-        return this.collections._internal_previousAccountIds()
-    }
-
     addStatus(status: string, message?: string): void {
         this.collections.statuses.add(status, message)
     }
@@ -795,7 +791,7 @@ export class FusionAccount {
     }
 
     setManagedAccountInfo(accountId: string, sourceName: string, nativeIdentity: string): void {
-        this.collections._internal_managedAccountInfo.set(accountId, {
+        this.collections.setManagedAccountInfo(accountId, {
             source: { name: sourceName },
             schema: { id: nativeIdentity },
         })
@@ -872,4 +868,5 @@ export class FusionAccount {
         }
     }
 }
+
 

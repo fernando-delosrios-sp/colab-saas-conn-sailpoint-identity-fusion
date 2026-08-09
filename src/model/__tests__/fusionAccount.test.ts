@@ -460,8 +460,8 @@ describe('FusionAccount', () => {
                     accounts: ['src-a::correlated-1', 'src-b::correlated-2'],
                 },
             } as unknown as Account)
-            expect((acc as any).previousAccountIds).toContain('src-a::correlated-1')
-            expect((acc as any).previousAccountIds).toContain('src-b::correlated-2')
+            expect(acc.previousAccountIdsSet.has('src-a::correlated-1')).toBe(true)
+            expect(acc.previousAccountIdsSet.has('src-b::correlated-2')).toBe(true)
         })
 
         it('restores history from persisted attributes', () => {
@@ -610,7 +610,7 @@ describe('FusionAccount', () => {
             } as unknown as Account)
 
             // Ensure previousAccountIds is hydrated from persisted accounts
-            expect((acc as any).previousAccountIds).toContain('src-a::old-1')
+            expect(acc.previousAccountIdsSet.has('src-a::old-1')).toBe(true)
 
             const run = new FusionRun()
             acc.addManagedAccountLayer(run, { pruneDeleted: true })

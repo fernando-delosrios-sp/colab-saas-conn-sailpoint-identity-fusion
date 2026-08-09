@@ -78,59 +78,106 @@ export class FusionCollections {
         return this._previousAccountIds
     }
 
-    /** @internal */
-    _setPreviousAccountIds(set: Set<string>): void {
-        this._previousAccountIds = set
+    // ============================================================================
+    // Hydrate / seed APIs (factory + collaborator construction)
+    // ============================================================================
+
+    /**
+     * Restore collection slices from persisted attribute values.
+     * Additive for sources/statuses/actions/accountIds unless a clear* flag is set.
+     * `previousAccountIds` always replaces when provided.
+     */
+    hydratePersisted(input: {
+        sources?: Iterable<string>
+        statuses?: Iterable<string>
+        actions?: Iterable<string>
+        reviews?: Iterable<string>
+        missingAccountIds?: Iterable<string>
+        accountIds?: Iterable<string>
+        previousAccountIds?: Iterable<string>
+        clearMissingBeforeAdd?: boolean
+        clearReviewsBeforeAdd?: boolean
+    }): void {
+        if (input.clearMissingBeforeAdd) {
+            this._missingAccountIds.clear()
+        }
+        if (input.clearReviewsBeforeAdd) {
+            this._reviews.clear()
+        }
+
+        if (input.sources) {
+            for (const source of input.sources) {
+                this._sources.add(source)
+            }
+        }
+        if (input.statuses) {
+            for (const status of input.statuses) {
+                this._statuses.add(status)
+            }
+        }
+        if (input.actions) {
+            for (const action of input.actions) {
+                this._actions.add(action)
+            }
+        }
+        if (input.reviews) {
+            for (const review of input.reviews) {
+                this._reviews.add(review)
+            }
+        }
+        if (input.accountIds) {
+            for (const id of input.accountIds) {
+                this._accountIds.add(id)
+            }
+        }
+        if (input.missingAccountIds) {
+            for (const id of input.missingAccountIds) {
+                this._missingAccountIds.add(id)
+            }
+        }
+        if (input.previousAccountIds) {
+            this.setPreviousAccountIds(input.previousAccountIds)
+        }
     }
 
-    /** @internal */
-    get _internal_missingAccountIds(): Set<string> {
-        return this._missingAccountIds
+    /** Replace correlated account IDs with the given set. */
+    replaceAccountIds(ids: Iterable<string>): void {
+        this._accountIds = new Set(ids)
     }
 
-    /** @internal */
-    get _internal_accountIds(): Set<string> {
-        return this._accountIds
+    /** Replace missing account IDs with the given set. */
+    replaceMissingAccountIds(ids: Iterable<string>): void {
+        this._missingAccountIds = new Set(ids)
     }
 
-    /** @internal */
-    get _internal_statuses(): Set<string> {
-        return this._statuses
+    /** Replace previous-run account IDs with the given set. */
+    setPreviousAccountIds(ids: Iterable<string>): void {
+        this._previousAccountIds = new Set(ids)
     }
 
-    /** @internal */
-    get _internal_actions(): Set<string> {
-        return this._actions
+    /** Store managed-account display/schema info for a composite account key. */
+    setManagedAccountInfo(accountId: string, info: FusionManagedAccountInfo): void {
+        this._managedAccountInfo.set(accountId, info)
     }
 
-    /** @internal */
-    get _internal_managedAccountInfo(): Map<string, FusionManagedAccountInfo> {
-        return this._managedAccountInfo
+    /** Drop managed-account info for a composite account key. */
+    deleteManagedAccountInfo(accountId: string): void {
+        this._managedAccountInfo.delete(accountId)
     }
 
-    /** @internal */
-    get _internal_sources(): Set<string> {
-        return this._sources
-    }
-
-    /** @internal */
-    _internal_previousAccountIds(): Set<string> {
-        return this._previousAccountIds
-    }
-
-    /** @internal */
-    get _internal_reviews(): Set<string> {
-        return this._reviews
-    }
-
-    /** @internal */
-    _clearReviews(): void {
-        this._reviews.clear()
-    }
-
-    /** @internal */
-    _addHistoryEntry(message: string): void {
+    /** Append a dated history message (same formatting as runtime history writes). */
+    addHistoryMessage(message: string): void {
         this._addHistory(message)
+    }
+
+    /** Whether the actions set contains the given action. */
+    hasAction(action: string): boolean {
+        return this._actions.has(action)
+    }
+
+    /** Remove an action without writing history. */
+    removeActionSilent(action: string): void {
+        this._actions.delete(action)
     }
 
     // ============================================================================
@@ -243,14 +290,14 @@ export class FusionCollections {
         add: (id: string, message?: string): void => {
             this._addToSet(this._accountIds, id, message)
         },
-        remove: (id: string, message?: string): void => {
-            this._removeFromSet(this._accountIds, id, message)
+        remove: (id: string, message?: string): boolean => {
+            return this._removeFromSet(this._accountIds, id, message)
         },
         addMissing: (id: string, message?: string): void => {
             this._addToSet(this._missingAccountIds, id, message)
         },
-        removeMissing: (id: string, message?: string): void => {
-            this._removeFromSet(this._missingAccountIds, id, message)
+        removeMissing: (id: string, message?: string): boolean => {
+            return this._removeFromSet(this._missingAccountIds, id, message)
         },
         getMissingForSource: (sourceName: string): string[] => {
             const result: string[] = []
@@ -457,6 +504,7 @@ export class FusionCollections {
         if (identityId) bag[FusionAttribute.IdentityId] = identityId
     }
 }
+
 
 
 

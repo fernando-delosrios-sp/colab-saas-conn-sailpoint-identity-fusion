@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { FusionCollections } from '../fusionCollections'
 
 describe('FusionCollections', () => {
@@ -26,9 +26,18 @@ describe('FusionCollections', () => {
         })
 
         it('getMissingForSource filters by source name', () => {
-            collections._internal_managedAccountInfo.set('src-a::native-1', { source: { name: 'Source A' }, schema: { id: 'native-1' } })
-            collections._internal_managedAccountInfo.set('src-a::native-2', { source: { name: 'Source A' }, schema: { id: 'native-2' } })
-            collections._internal_managedAccountInfo.set('src-b::native-1', { source: { name: 'Source B' }, schema: { id: 'native-1' } })
+            collections.setManagedAccountInfo('src-a::native-1', {
+                source: { name: 'Source A' },
+                schema: { id: 'native-1' },
+            })
+            collections.setManagedAccountInfo('src-a::native-2', {
+                source: { name: 'Source A' },
+                schema: { id: 'native-2' },
+            })
+            collections.setManagedAccountInfo('src-b::native-1', {
+                source: { name: 'Source B' },
+                schema: { id: 'native-1' },
+            })
 
             collections.accounts.addMissing('src-a::native-1')
             collections.accounts.addMissing('src-a::native-2')
@@ -38,6 +47,82 @@ describe('FusionCollections', () => {
             expect(result).toContain('src-a::native-1')
             expect(result).toContain('src-a::native-2')
             expect(result).not.toContain('src-b::native-1')
+        })
+    })
+
+    describe('hydratePersisted', () => {
+        let hydrateTarget: FusionCollections
+
+        beforeEach(() => {
+            hydrateTarget = new FusionCollections(50)
+        })
+
+        it('restores statuses, actions, reviews, sources, and account sets from iterables', () => {
+            hydrateTarget.hydratePersisted({
+                sources: ['Identities', 'Source A'],
+                statuses: ['baseline', 'uncorrelated'],
+                actions: ['correlated'],
+                reviews: ['https://review/1'],
+                accountIds: ['src-a::acc-1'],
+                missingAccountIds: ['src-a::missing-1'],
+                previousAccountIds: ['src-a::prev-1'],
+                clearMissingBeforeAdd: true,
+                clearReviewsBeforeAdd: true,
+            })
+
+            expect(hydrateTarget.sourcesSet.has('Identities')).toBe(true)
+            expect(hydrateTarget.sourcesSet.has('Source A')).toBe(true)
+            expect(hydrateTarget.statusesSet.has('baseline')).toBe(true)
+            expect(hydrateTarget.statusesSet.has('uncorrelated')).toBe(true)
+            expect(hydrateTarget.actionsSet.has('correlated')).toBe(true)
+            expect(hydrateTarget.reviewsSet.has('https://review/1')).toBe(true)
+            expect(hydrateTarget.accountIds.has('src-a::acc-1')).toBe(true)
+            expect(hydrateTarget.missingAccountIds.has('src-a::missing-1')).toBe(true)
+            expect(hydrateTarget.previousAccountIds.has('src-a::prev-1')).toBe(true)
+        })
+
+        it('clears missing and reviews before add when requested', () => {
+            hydrateTarget.accounts.addMissing('stale-missing')
+            hydrateTarget.reviews.add('https://stale/review')
+
+            hydrateTarget.hydratePersisted({
+                missingAccountIds: ['src-a::fresh-missing'],
+                reviews: ['https://fresh/review'],
+                clearMissingBeforeAdd: true,
+                clearReviewsBeforeAdd: true,
+            })
+
+            expect(hydrateTarget.missingAccountIds.has('stale-missing')).toBe(false)
+            expect(hydrateTarget.missingAccountIds.has('src-a::fresh-missing')).toBe(true)
+            expect(hydrateTarget.reviewsSet.has('https://stale/review')).toBe(false)
+            expect(hydrateTarget.reviewsSet.has('https://fresh/review')).toBe(true)
+        })
+
+        it('replace helpers and managed-account info APIs seed without _internal_ accessors', () => {
+            hydrateTarget.accounts.add('old-account')
+            hydrateTarget.accounts.addMissing('old-missing')
+
+            hydrateTarget.replaceAccountIds(['src-a::new-1', 'src-a::new-2'])
+            hydrateTarget.replaceMissingAccountIds(['src-a::missing-new'])
+            hydrateTarget.setPreviousAccountIds(['src-a::prev-new'])
+            hydrateTarget.setManagedAccountInfo('src-a::new-1', {
+                source: { name: 'Source A' },
+                schema: { id: 'new-1' },
+            })
+
+            expect([...hydrateTarget.accountIds].sort()).toEqual(['src-a::new-1', 'src-a::new-2'])
+            expect([...hydrateTarget.missingAccountIds]).toEqual(['src-a::missing-new'])
+            expect([...hydrateTarget.previousAccountIds]).toEqual(['src-a::prev-new'])
+            expect(hydrateTarget.managedAccountInfo.get('src-a::new-1')?.source.name).toBe('Source A')
+
+            hydrateTarget.deleteManagedAccountInfo('src-a::new-1')
+            expect(hydrateTarget.managedAccountInfo.has('src-a::new-1')).toBe(false)
+
+            expect(hydrateTarget.hasAction('correlated')).toBe(false)
+            hydrateTarget.actions.add('correlated')
+            expect(hydrateTarget.hasAction('correlated')).toBe(true)
+            hydrateTarget.removeActionSilent('correlated')
+            expect(hydrateTarget.hasAction('correlated')).toBe(false)
         })
     })
 
@@ -140,9 +225,9 @@ describe('FusionCollections', () => {
             expect(collections.history).toContain('[2026-01-02] event two')
         })
 
-        it('adds history via _addHistoryEntry', () => {
+        it('adds history via addHistoryMessage', () => {
             const previousLength = collections.history.length
-            collections._addHistoryEntry('test history message')
+            collections.addHistoryMessage('test history message')
             expect(collections.history.length).toBeGreaterThan(previousLength)
             expect(collections.history.some((h) => h.includes('test history message'))).toBe(true)
         })
@@ -171,3 +256,4 @@ describe('FusionCollections', () => {
         })
     })
 })
+
