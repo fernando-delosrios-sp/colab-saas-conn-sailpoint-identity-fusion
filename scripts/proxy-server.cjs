@@ -114,34 +114,40 @@ const runConnectorCommand = async (cmd, res) => {
             }
         })
 
-        await new Promise(async (resolve, reject) => {
+        await new Promise((resolve, reject) => {
             out.on('finish', () => resolve())
             out.on('error', (e) => reject(e))
-            try {
-                if (c.connector == null && c.connectorCustomizer == null) {
-                    return reject(new Error('Connector not found. Did you export it?'))
-                }
-                if (c.connector != null) {
-                    return await c.connector._exec(
+
+            const runConnector = async () => {
+                try {
+                    if (c.connector == null && c.connectorCustomizer == null) {
+                        throw new Error('Connector not found. Did you export it?')
+                    }
+                    if (c.connector != null) {
+                        await c.connector._exec(
+                            cmd.type,
+                            { version: cmd.version, commandType: cmd.type },
+                            cmd.input,
+                            out,
+                            c.connectorCustomizer
+                        )
+                        return
+                    }
+                    const output = await c.connectorCustomizer._exec(
                         cmd.type,
                         { version: cmd.version, commandType: cmd.type },
                         cmd.input,
-                        out,
-                        c.connectorCustomizer
+                        out
                     )
+                    out.write(output)
+                } catch (e) {
+                    reject(e)
+                } finally {
+                    out.end()
                 }
-                const output = await c.connectorCustomizer._exec(
-                    cmd.type,
-                    { version: cmd.version, commandType: cmd.type },
-                    cmd.input,
-                    out
-                )
-                out.write(output)
-            } catch (e) {
-                reject(e)
-            } finally {
-                out.end()
             }
+
+            void runConnector()
         })
         res.status(200)
     })
@@ -207,3 +213,4 @@ app.listen(port, () => {
         console.warn('Warning: PROXY_PASSWORD is not set — external logging may HTTP POST instead of writing under logs/<tenant>/')
     }
 })
+

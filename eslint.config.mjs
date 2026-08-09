@@ -5,7 +5,7 @@ import jsdoc from 'eslint-plugin-jsdoc'
 
 export default [
     {
-        ignores: ['dist/', 'site/', 'babel.config.cjs', '.agents/skills/'],
+        ignores: ['dist/', 'site/', '.venv/', 'babel.config.cjs', '.agents/skills/'],
     },
     { files: ['**/*.{js,mjs,cjs,ts}'] },
     { languageOptions: { globals: globals.node } },
@@ -35,9 +35,12 @@ export default [
     },
     // CommonJS entrypoints and test utilities use require(); keep TypeScript sources on ESM/import style.
     {
-        files: ['**/*.cjs', 'test-data/**/*.js', 'log-server.js', 'scripts/**/*.js'],
+        files: ['**/*.cjs', 'test-data/**/*.js', 'log-server.js', 'scripts/**/*.{js,cjs}'],
         rules: {
             '@typescript-eslint/no-require-imports': 'off',
+            'jsdoc/check-tag-names': 'off',
+            'jsdoc/no-types': 'off',
         },
     },
 ]
+

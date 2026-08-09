@@ -2,7 +2,6 @@
 const { spawnSync } = require('child_process')
 const { resolveScenarioRefFromArgv, resolveChainRefFromArgv, scenarioDir, parseRecordingScenarioRef } = require('./recording-paths.cjs')
 const fs = require('fs')
-const path = require('path')
 
 function resolveScenarioRefFromArgvCompat(argv) {
     return resolveScenarioRefFromArgv(argv) || resolveChainRefFromArgv(argv)
@@ -42,3 +41,4 @@ if (!argScenario) {
 }
 
 runRefresh(argScenario)
+

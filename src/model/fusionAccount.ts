@@ -1,30 +1,23 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
-import {
-    toSetFromAttribute as attributeToSet,
-    getAccountStringAttribute,
-    getAccountAttribute,
-} from '../utils/attributes'
-import { attrSplit } from '../services/mappingService/helpers'
-import { FusionAttribute } from '../data/schema'
-import { readString, trimStr } from '../utils/safeRead'
+import { trimStr } from '../utils/safeRead'
 import { Attributes, ConnectorError, ConnectorErrorType, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { FusionDecision } from './form'
 import { FusionConfig } from './config'
 import { FusionMatch } from '../services/matchingService'
-import { StatusEntitlement } from './statusEntitlement'
-import { FusionAction } from './fusionAction'
 import { FusionAccountKind } from './fusionAccountTypes'
 import type { FusionAttributeBag, IdentityInfo } from './fusionAccountTypes'
 import { buildIdentityInfo } from './fusionAccountUtils'
 import type { FusionRun } from './fusionRun'
-import {
-    buildManagedAccountKey,
-    getManagedAccountKeyFromAccount,
-    normalizeCompositeManagedAccountKey,
-} from './managedAccountKey'
 import { FusionCollections } from './fusionCollections'
 import { FusionCorrelation } from './fusionCorrelation'
 import { FusionLayers, type AddManagedAccountOptions } from './fusionLayers'
+import type { FusionAccountFactorySeed } from './fusionAccountFactorySeed'
+import {
+    buildFromFusionAccount,
+    buildFromFusionDecision,
+    buildFromIdentity,
+    buildFromManagedAccount,
+} from './fusionAccountFactories'
 
 export const IDENTITIES_SOURCE_NAME = 'Identities'
 
@@ -94,269 +87,46 @@ export class FusionAccount {
         return config
     }
 
+    /** Used by fusionAccountFactories during construction. */
+    static createForFactory(): FusionAccount {
+        return new FusionAccount(FusionAccount.ensureConfig())
+    }
+
+    /** Seeds identity fields during factory construction. */
+    applyFactorySeed(seed: FusionAccountFactorySeed): void {
+        if (seed.type !== undefined) this._type = seed.type
+        if (seed.managedKey !== undefined) this._managedKey = seed.managedKey
+        if (seed.iscAccountId !== undefined) this._iscAccountId = seed.iscAccountId
+        if (seed.modified !== undefined) this._modified = seed.modified
+        if (seed.identityInfo !== undefined) this._identityInfo = seed.identityInfo
+        if (seed.name) this._name = seed.name
+        if (seed.sourceName) this._sourceName = seed.sourceName
+        if (seed.attributeBagCurrent !== undefined) {
+            this._attributeBag.current = seed.attributeBagCurrent
+        }
+        if (seed.attributeBagPrevious !== undefined) {
+            this._attributeBag.previous = seed.attributeBagPrevious
+        }
+    }
+
     // ============================================================================
     // Factory methods
     // ============================================================================
 
-    private static applyAttributeCollections(fa: FusionAccount, account: Account): void {
-        const statuses = attributeToSet(account.attributes!, FusionAttribute.Statuses)
-        const sources = statuses.has(StatusEntitlement.Baseline) ? [IDENTITIES_SOURCE_NAME] : undefined
-
-        fa._attributeBag.current = { ...account.attributes! }
-        fa._attributeBag.previous = { ...account.attributes! }
-
-        const missingAccountIds: string[] = []
-        for (const id of attributeToSet(account.attributes!, FusionAttribute.MissingAccounts)) {
-            const normalized = normalizeCompositeManagedAccountKey(id)
-            if (normalized) missingAccountIds.push(normalized)
-        }
-
-        const prevAccounts = attributeToSet(account.attributes!, FusionAttribute.Accounts)
-        const normalizedPrevAccounts = new Set<string>()
-        for (const id of prevAccounts) {
-            const normalized = normalizeCompositeManagedAccountKey(id)
-            if (normalized) normalizedPrevAccounts.add(normalized)
-        }
-
-        fa.collections.hydratePersisted({
-            sources,
-            missingAccountIds,
-            reviews: attributeToSet(account.attributes!, FusionAttribute.Reviews),
-            statuses: attributeToSet(account.attributes!, FusionAttribute.Statuses),
-            actions: attributeToSet(account.attributes!, FusionAttribute.Actions),
-            previousAccountIds: normalizedPrevAccounts,
-            clearMissingBeforeAdd: true,
-            clearReviewsBeforeAdd: true,
-        })
-    }
-
-    private static applyOriginMetadata(
-        fa: FusionAccount,
-        account: Account,
-        identityInfo: ReturnType<typeof buildIdentityInfo>
-    ): void {
-        const originSource = getAccountStringAttribute(account, FusionAttribute.OriginSource)
-        if (originSource) fa.layers.originSource = originSource
-
-        const originAccount = getAccountStringAttribute(account, FusionAttribute.OriginAccount)
-        if (originAccount) {
-            const trimmedOriginAccount = originAccount.trim()
-            const fromIdentityOrigin =
-                fa.layers.originSource === IDENTITIES_SOURCE_NAME ||
-                fa._attributeBag.current?.originSource === IDENTITIES_SOURCE_NAME ||
-                fa._attributeBag.current?.sourceOrigin === IDENTITIES_SOURCE_NAME
-            if (fromIdentityOrigin) {
-                fa.layers.originAccount = trimmedOriginAccount || undefined
-            } else {
-                fa.layers.originAccount = normalizeCompositeManagedAccountKey(trimmedOriginAccount)
-            }
-        }
-
-        const fromIdentity =
-            fa.layers.originSource === IDENTITIES_SOURCE_NAME ||
-            fa._attributeBag.current?.originSource === IDENTITIES_SOURCE_NAME ||
-            fa._attributeBag.current?.sourceOrigin === IDENTITIES_SOURCE_NAME
-        if (fromIdentity && !fa.collections.statusesSet.has(StatusEntitlement.Baseline)) {
-            fa.collections.hydratePersisted({
-                statuses: [StatusEntitlement.Baseline],
-                sources: [IDENTITIES_SOURCE_NAME],
-            })
-        }
-
-        if (!identityInfo?.id) {
-            const identityId = getAccountStringAttribute(account, FusionAttribute.IdentityId)
-            if (identityId && identityId.trim().length > 0) {
-                fa.setIdentityIdAttribute(identityId.trim())
-            }
-        }
-
-        const historyAttr = getAccountAttribute(account, FusionAttribute.History)
-        if (Array.isArray(historyAttr) && historyAttr.length > 0) {
-            fa.collections.historyOps.importFromArray(historyAttr)
-        }
-    }
-
     static fromFusionAccount(account: Account): FusionAccount {
-        const config = this.ensureConfig()
-        const fa = new FusionAccount(config)
-        const identityInfo = buildIdentityInfo(account)
-        const managedKey = account.nativeIdentity as string
-
-        fa._type = FusionAccountKind.Fusion
-        fa._managedKey = managedKey
-        const trimmedName = trimStr(account.name)
-        if (trimmedName) fa._name = trimmedName
-        if (account.sourceName) fa._sourceName = account.sourceName
-        if (account.disabled !== undefined) fa.layers.disabled = account.disabled
-        if (identityInfo) fa._identityInfo = identityInfo
-        if (account.id != null) fa._iscAccountId = account.id
-        if (account.modified !== undefined) fa._modified = account.modified
-        if (account.uncorrelated !== undefined) {
-            fa.layers.uncorrelated = account.uncorrelated
-        }
-
-        if (account.attributes) {
-            FusionAccount.applyAttributeCollections(fa, account)
-            FusionAccount.applyOriginMetadata(fa, account, identityInfo)
-        }
-
-        // Display override applies to identity-origin rows only when reloading persisted Fusion
-        // accounts. Managed-source correlation (account.uncorrelated on the source feed) is
-        // captured via isIdentity in fromManagedAccount / fromFusionDecision factories.
-        fa.layers.isIdentity = fa.fromIdentity
-
-        return fa
+        return buildFromFusionAccount(account)
     }
 
     static fromIdentity(identity: IdentityDocument): FusionAccount {
-        const config = this.ensureConfig()
-        const fa = new FusionAccount(config)
-        const managedKey = `${IDENTITIES_SOURCE_NAME}::${identity.id}`
-        const identityInfo = buildIdentityInfo(identity)
-
-        fa._type = FusionAccountKind.Identity
-        fa._managedKey = managedKey
-        const trimmedName = trimStr(identity.name)
-        if (trimmedName) fa._name = trimmedName
-        fa._sourceName = IDENTITIES_SOURCE_NAME
-        if (identity.disabled !== undefined) fa.layers.disabled = identity.disabled
-        fa.layers.needsRefresh = true
-        if (identityInfo) fa._identityInfo = identityInfo
-        fa.layers.isIdentity = true
-
-        if (identity.attributes) {
-            fa._attributeBag.current = { ...identity.attributes }
-            fa._attributeBag.previous = { ...identity.attributes }
-
-            fa.collections.hydratePersisted({
-                sources: [IDENTITIES_SOURCE_NAME],
-                missingAccountIds: attributeToSet(identity.attributes, FusionAttribute.MissingAccounts),
-                reviews: attributeToSet(identity.attributes, FusionAttribute.Reviews),
-                statuses: attributeToSet(identity.attributes, FusionAttribute.Statuses),
-                actions: attributeToSet(identity.attributes, FusionAttribute.Actions),
-                clearMissingBeforeAdd: true,
-                clearReviewsBeforeAdd: true,
-            })
-        } else {
-            fa.collections.hydratePersisted({
-                sources: [IDENTITIES_SOURCE_NAME],
-            })
-        }
-
-        fa.layers.originSource = IDENTITIES_SOURCE_NAME
-        fa.layers.originAccount = identity.id ?? undefined
-        fa.collections.hydratePersisted({
-            statuses: [StatusEntitlement.Baseline],
-        })
-        fa.setIdentityIdAttribute(identity.id)
-        fa.collections.addHistoryMessage(
-            `Set ${trimmedName || identity.name || identity.id} [${IDENTITIES_SOURCE_NAME}] as baseline`
-        )
-
-        return fa
+        return buildFromIdentity(identity)
     }
 
     static fromManagedAccount(account: Account): FusionAccount {
-        const config = this.ensureConfig()
-        const fa = new FusionAccount(config)
-
-        const sourcesAttr = getAccountAttribute(account, FusionAttribute.Sources)
-        const sourceSet = sourcesAttr ? new Set(attrSplit(String(sourcesAttr))) : new Set<string>()
-
-        const managedAccountKey = getManagedAccountKeyFromAccount(account)
-        if (!managedAccountKey) {
-            throw new ConnectorError(
-                'Managed account is missing sourceId and nativeIdentity; cannot build composite account key.',
-                ConnectorErrorType.Generic
-            )
-        }
-        const identityInfo = buildIdentityInfo(account)
-
-        fa._type = FusionAccountKind.Managed
-        fa._managedKey = managedAccountKey
-        const trimmedName = trimStr(account.name)
-        if (trimmedName) fa._name = trimmedName
-        if (account.sourceName) fa._sourceName = account.sourceName
-        if (account.disabled !== undefined) fa.layers.disabled = account.disabled
-        fa.layers.needsRefresh = true
-        if (identityInfo) fa._identityInfo = identityInfo
-        if (account.id != null) fa._iscAccountId = account.id
-        fa.layers.isIdentity = account.uncorrelated === false
-
-        if (account.attributes) {
-            fa._attributeBag.current = { ...account.attributes }
-            fa._attributeBag.previous = { ...account.attributes }
-
-            fa.collections.hydratePersisted({
-                sources: sourceSet,
-                missingAccountIds: attributeToSet(account.attributes, FusionAttribute.MissingAccounts),
-                reviews: attributeToSet(account.attributes, FusionAttribute.Reviews),
-                statuses: attributeToSet(account.attributes, FusionAttribute.Statuses),
-                actions: attributeToSet(account.attributes, FusionAttribute.Actions),
-                clearMissingBeforeAdd: true,
-                clearReviewsBeforeAdd: true,
-            })
-        } else {
-            fa.collections.hydratePersisted({
-                sources: sourceSet,
-            })
-        }
-
-        fa.layers.originSource = account.sourceName ?? undefined
-        fa.layers.originAccount = managedAccountKey
-        fa.collections.hydratePersisted({
-            accountIds: [managedAccountKey],
-            missingAccountIds: [managedAccountKey],
-            statuses: [StatusEntitlement.Uncorrelated],
-        })
-        fa.layers.uncorrelated = true
-        fa.collections.removeActionSilent(FusionAction.Correlated)
-
-        fa.layers._setManagedAccount(account, false, undefined, {
-            sources: fa._attributeBag.sources,
-        })
-
-        fa.setNeedsReset(true)
-
-        return fa
+        return buildFromManagedAccount(account)
     }
 
     static fromFusionDecision(decision: FusionDecision): FusionAccount {
-        const config = this.ensureConfig()
-        const fa = new FusionAccount(config)
-        const { account } = decision
-        const managedAccountKey = buildManagedAccountKey({
-            sourceId: readString(account, 'sourceId'),
-            nativeIdentity: readString(account, 'nativeIdentity'),
-        })
-        if (!managedAccountKey) {
-            throw new ConnectorError(
-                'Fusion decision account is missing sourceId and nativeIdentity; cannot build composite account key.',
-                ConnectorErrorType.Generic
-            )
-        }
-
-        fa._type = FusionAccountKind.Decision
-        fa._managedKey = managedAccountKey
-        const trimmedName = trimStr(account.name)
-        if (trimmedName) fa._name = trimmedName
-        if (account.sourceName) fa._sourceName = account.sourceName
-        fa.layers.needsRefresh = true
-        const identityInfo = decision.identityId ? buildIdentityInfo(decision) : undefined
-        if (identityInfo) fa._identityInfo = identityInfo
-        fa.layers.isIdentity = (account as any).uncorrelated === false
-
-        fa.layers.originSource = account.sourceName ?? undefined
-        fa.layers.originAccount = managedAccountKey
-        fa.collections.hydratePersisted({
-            accountIds: [managedAccountKey],
-            missingAccountIds: [managedAccountKey],
-            statuses: [StatusEntitlement.Uncorrelated],
-        })
-        fa.layers.uncorrelated = true
-        fa.collections.removeActionSilent(FusionAction.Correlated)
-
-        return fa
+        return buildFromFusionDecision(decision)
     }
 
     // ============================================================================
@@ -728,6 +498,7 @@ export class FusionAccount {
         }
     }
 }
+
 
 
 

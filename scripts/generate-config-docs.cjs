@@ -223,7 +223,7 @@ function anchorForKey(key) {
         .toLowerCase()
 }
 
-function stripHtml(html) {
+function _stripHtml(html) {
     return String(html || '')
         .replace(/<[^>]+>/g, ' ')
         .replace(/\s+/g, ' ')
@@ -529,6 +529,7 @@ function main() {
 }
 
 main()
+
 
 
 

@@ -13,7 +13,7 @@ const DEV_PROCESS_MARKERS = [
 ]
 
 function findBlockingDevProcesses() {
-    let psOutput = ''
+    let psOutput
     try {
         psOutput = execSync('ps aux', { encoding: 'utf8' })
     } catch {
@@ -72,3 +72,4 @@ try {
     console.error('If a dev server is running, stop it and retry.')
     process.exit(1)
 }
+
