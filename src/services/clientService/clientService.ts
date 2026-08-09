@@ -464,22 +464,56 @@ export class ClientService {
         policy: CallPolicy
     ): Promise<T[]> {
         const api = this._apiSurface
-        const ps = this.pageSize
-        const bs = { ...paginate.search, sort: ['id'] }
-        let sa: string[] | undefined, first = true, more = true, pn = 1
-        const all: T[] = []
-        while (more) {
+        const limit = this.pageSize
+        const baseSearch = { ...paginate.search, sort: ['id'] }
+        let searchAfter: string[] | undefined
+        let isFirstPage = true
+        let hasMore = true
+        let pageNumber = 1
+        const allItems: T[] = []
+
+        while (hasMore) {
             if (policy.abortSignal?.aborted) break
-            const pc = policy.context ? `${policy.context} [page ${pn}]` : `search [page ${pn}]`
-            const r = await this.execute<{ data: unknown[] }>(() => fn(api, { search: sa ? { ...bs, searchAfter: sa } : bs, limit: ps, count: first ? true : undefined }), { priority: policy.priority, context: pc, abortSignal: policy.abortSignal })
-            if (!r) throw new PaginationError(`Search pagination failed at page ${pn} (${policy.context ?? 'search'}). ${all.length} item(s) collected before failure.`, all.length)
-            const items = (r.data ?? []) as T[]
-            if (items.length) all.push(...items)
-            policy.onPageProgress?.(all.length, undefined)
-            if (items.length < ps) { more = false } else { const li = (items[items.length - 1] as { id?: string }).id; if (!li) { more = false } else { sa = [li] } }
-            first = false; pn++
+
+            const contextName = policy.context ? `${policy.context} [page ${pageNumber}]` : `search [page ${pageNumber}]`
+
+            const searchParams = searchAfter ? { ...baseSearch, searchAfter } : baseSearch
+            const requestParams = { search: searchParams, limit, count: isFirstPage ? true : undefined }
+
+            const response = await this.execute<{ data: unknown[] }>(
+                () => fn(api, requestParams),
+                { priority: policy.priority, context: contextName, abortSignal: policy.abortSignal }
+            )
+
+            if (!response) {
+                throw new PaginationError(
+                    `Search pagination failed at page ${pageNumber} (${policy.context ?? 'search'}). ${allItems.length} item(s) collected before failure.`,
+                    allItems.length
+                )
+            }
+
+            const items = (response.data ?? []) as T[]
+            if (items.length > 0) {
+                allItems.push(...items)
+            }
+
+            policy.onPageProgress?.(allItems.length, undefined)
+
+            if (items.length < limit) {
+                hasMore = false
+            } else {
+                const lastItem = items[items.length - 1] as { id?: string }
+                if (!lastItem.id) {
+                    hasMore = false
+                } else {
+                    searchAfter = [lastItem.id]
+                }
+            }
+
+            isFirstPage = false
+            pageNumber++
         }
-        return all
+        return allItems
     }
 
     // -------------------------------------------------------------------------
