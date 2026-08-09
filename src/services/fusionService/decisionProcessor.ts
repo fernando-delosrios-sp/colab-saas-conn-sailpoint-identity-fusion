@@ -71,7 +71,7 @@ export class DecisionProcessor {
                 const urls = pendingReviewUrlsByReviewerId.get(identityId)
                 if (urls?.length) {
                     for (const url of urls) {
-                        identity.addFusionReview(url)
+                        identity.collections.reviews.addFusionReview(url)
                     }
                 }
             }
@@ -80,12 +80,12 @@ export class DecisionProcessor {
     }
 
     private reconcileCandidateStatus(account: FusionAccount, candidateIdsNeedingStatus: Set<string>): void {
-        account.removeStatus(StatusEntitlement.Candidate)
-        account.clearFusionReviews()
+        account.collections.statuses.remove(StatusEntitlement.Candidate)
+        account.collections.reviews.clearFusionReviews()
 
         const identityId = account.identityId
         if (identityId && candidateIdsNeedingStatus.has(identityId)) {
-            account.addStatus(StatusEntitlement.Candidate)
+            account.collections.statuses.add(StatusEntitlement.Candidate)
         }
     }
 
@@ -179,7 +179,7 @@ export class DecisionProcessor {
         }
 
         fusionAccount.setNeedsReset(Boolean(fusionDecision.newIdentity))
-        fusionAccount.addFusionDecisionLayer(fusionDecision)
+        fusionAccount.layers.addFusionDecisionLayer(fusionDecision)
 
         const normalizedDecisionKey = normalizeCompositeManagedAccountKey(trimStr(fusionDecision.account.id) ?? '')
         const skipBlendHistoryForManagedKeys = skipBlendHistoryKeysForDecisionAccountId(fusionDecision.account.id)

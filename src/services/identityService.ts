@@ -430,10 +430,10 @@ export class IdentityService {
         // Optimistic: mark as correlated before the API call so the account
         // output reflects a successful correlation without waiting for the queue.
         // If the API call fails, the next aggregation will re-detect it as uncorrelated.
-        fusionAccount.setCorrelatedAccount(accountId)
+        fusionAccount.correlation.markCorrelated(accountId)
 
         const correlationPromise = this.buildCorrelationPromise(accountId, iscAccountId, identityId, kind)
-        fusionAccount.addCorrelationPromise(accountId, correlationPromise)
+        fusionAccount.correlation.addPromise(accountId, correlationPromise)
     }
 
     private buildCorrelationPromise(

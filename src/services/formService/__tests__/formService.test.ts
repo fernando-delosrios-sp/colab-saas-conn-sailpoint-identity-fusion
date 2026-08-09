@@ -527,7 +527,7 @@ describe('FormService createFusionForm', () => {
             sourceName: 'Source A',
             attributes: { email: 'user@example.com' },
         } as any)
-        fusionAccount.addFusionMatch({
+        fusionAccount.layers.addFusionMatch({
             fusionIdentity: {
                 identityId: 'candidate-1',
                 attributes: { displayName: 'Candidate One', email: 'candidate@example.com' },
@@ -599,7 +599,7 @@ describe('FormService createFusionForm', () => {
             sourceName: 'Source A',
             attributes: { email: 'user@example.com' },
         } as any)
-        fusionAccount.addFusionMatch({
+        fusionAccount.layers.addFusionMatch({
             fusionIdentity: {
                 identityId: 'candidate-1',
                 attributes: { displayName: 'Candidate One', email: 'candidate@example.com' },
@@ -678,7 +678,7 @@ describe('FormService createFusionForm', () => {
             sourceName: 'Source A',
             attributes: { email: 'user@example.com' },
         } as any)
-        fusionAccount.addFusionMatch({
+        fusionAccount.layers.addFusionMatch({
             fusionIdentity: {
                 identityId: 'candidate-1',
                 attributes: { displayName: 'Candidate One', email: 'candidate@example.com' },
@@ -761,7 +761,7 @@ describe('FormService createFusionForm', () => {
             sourceName: 'Source A',
             attributes: { email: 'user@example.com' },
         } as any)
-        fusionAccount.addFusionMatch({
+        fusionAccount.layers.addFusionMatch({
             fusionIdentity: {
                 identityId: 'candidate-1',
                 attributes: { displayName: 'Candidate One', email: 'candidate@example.com' },

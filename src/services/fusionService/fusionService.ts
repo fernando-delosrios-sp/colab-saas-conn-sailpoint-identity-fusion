@@ -544,7 +544,7 @@ export class FusionService {
     }
 
     private applyReviewerLayersToFusionAccount(fusionAccount: FusionAccount): void {
-        const reviewerSources = fusionAccount.listReviewerSources()
+        const reviewerSources = fusionAccount.collections.actions.listReviewerSources()
         reviewerSources.forEach((sourceId) => this.setReviewerForSource(fusionAccount, sourceId))
         if (reviewerSources.length > 0) {
             this.populateReviewerFusionReviewsFromPending(fusionAccount)
@@ -564,7 +564,7 @@ export class FusionService {
 
         const mergeDecision = this.forms.getFusionMergeDecision(identityId)
         if (mergeDecision) {
-            fusionAccount.addFusionDecisionLayer(mergeDecision)
+            fusionAccount.layers.addFusionDecisionLayer(mergeDecision)
             logFusionDecisionApplied(this.log, mergeDecision, 'merged')
         }
         this.log.debug(`Applied identity layer for ${fusionAccount.name}: identityId=${identityId}`)
@@ -886,7 +886,7 @@ export class FusionService {
      */
     public async listISCAccounts(): Promise<StdAccountListOutput[]> {
         const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
-        const eligible = this.deleteEmpty ? allAccounts.filter((account) => !account.isOrphan()) : allAccounts
+        const eligible = this.deleteEmpty ? allAccounts.filter((account) => !account.collections.statuses.isOrphan()) : allAccounts
 
         const results = await batchProcess(
             eligible,
@@ -955,7 +955,7 @@ export class FusionService {
         let count = 0
 
         const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
-        const eligibleAccounts = this.deleteEmpty ? allAccounts.filter((account) => !account.isOrphan()) : allAccounts
+        const eligibleAccounts = this.deleteEmpty ? allAccounts.filter((account) => !account.collections.statuses.isOrphan()) : allAccounts
 
         const totalEligible = eligibleAccounts.length
         const totalBatches = Math.ceil(totalEligible / batchSize)
@@ -1004,7 +1004,7 @@ export class FusionService {
         awaitCorrelations = true,
         recomputeCorrelationStatus = true
     ): Promise<StdAccountListOutput | undefined> {
-        await fusionAccount.resolvePendingOperations(awaitCorrelations)
+        await fusionAccount.correlation.resolvePendingOperations(awaitCorrelations)
         // Update correlation status/action based on whatever correlations have resolved so far.
         // accountUpdate may skip this to preserve explicit entitlement removals in the immediate response.
         if (recomputeCorrelationStatus) {
@@ -1073,14 +1073,14 @@ export class FusionService {
         const pendingCandidates = this.run.pendingCandidateIdentityIds
         const needsCandidate = pendingCandidates.has(identityId)
         if (needsCandidate) {
-            fusionAccount.addStatus(StatusEntitlement.Candidate)
+            fusionAccount.collections.statuses.add(StatusEntitlement.Candidate)
         }
 
-        if (fusionAccount.listReviewerSources().length > 0) {
+        if (fusionAccount.collections.actions.listReviewerSources().length > 0) {
             const reviewerUrls = this.run.getReviewerUrls(identityId)
             if (reviewerUrls?.length) {
                 for (const u of reviewerUrls) {
-                    fusionAccount.addFusionReview(u)
+                    fusionAccount.collections.reviews.addFusionReview(u)
                 }
             }
         }
@@ -1163,7 +1163,7 @@ export class FusionService {
      */
     private setReviewerForSource(fusionAccount: FusionAccount, sourceId: string): void {
         this.log.debug(`Setting reviewer for ${fusionAccount.name} -> sourceId=${sourceId}`)
-        fusionAccount.setSourceReviewer(sourceId)
+        fusionAccount.collections.actions.setSourceReviewer(sourceId)
         const reviewers: Set<FusionAccount> = this.run.reviewersBySourceId.get(sourceId) ?? new Set()
         reviewers.add(fusionAccount)
         this.run.reviewersBySourceId.set(sourceId, reviewers)
@@ -1174,13 +1174,13 @@ export class FusionService {
      * Clears existing reviews so only current-run pending URLs are included.
      */
     private populateReviewerFusionReviewsFromPending(reviewer: FusionAccount): void {
-        reviewer.clearFusionReviews()
+        reviewer.collections.reviews.clearFusionReviews()
         const identityId = reviewer.identityId
         if (!identityId) return
         const urls = this.run.getReviewerUrls(identityId)
         if (!urls?.length) return
         for (const url of urls) {
-            reviewer.addFusionReview(url)
+            reviewer.collections.reviews.addFusionReview(url)
         }
     }
 

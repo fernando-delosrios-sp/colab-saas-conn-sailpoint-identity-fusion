@@ -34,7 +34,7 @@ describe('anchorDeferredMatchesForReview', () => {
         })
 
         for (const [index, anchor] of anchors.entries()) {
-            fusionAccount.addFusionMatch({
+            fusionAccount.layers.addFusionMatch({
                 fusionIdentity: anchor,
                 identityName: anchor.name,
                 candidateType: MatchCandidateType.Deferred,

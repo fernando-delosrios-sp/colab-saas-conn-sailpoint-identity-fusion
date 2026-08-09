@@ -102,7 +102,7 @@ describe('FusionAccount', () => {
                 sourceType: SourceType.Authoritative
             } as any
             const acc = FusionAccount.fromFusionDecision(decision)
-            acc.addFusionDecisionLayer(decision)
+            acc.layers.addFusionDecisionLayer(decision)
             expect(acc.statuses).toContain('manual')
         })
     })
@@ -110,52 +110,52 @@ describe('FusionAccount', () => {
     describe('3. Status state machine', () => {
         it('addStatus, removeStatus, hasStatus, statuses', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            acc.addStatus('testStatus')
-            expect(acc.hasStatus('testStatus')).toBe(true)
+            acc.collections.statuses.add('testStatus')
+            expect(acc.collections.statuses.has('testStatus')).toBe(true)
             expect(acc.statuses).toContain('testStatus')
-            acc.removeStatus('testStatus')
-            expect(acc.hasStatus('testStatus')).toBe(false)
+            acc.collections.statuses.remove('testStatus')
+            expect(acc.collections.statuses.has('testStatus')).toBe(false)
         })
     })
 
     describe('4. Action state machine', () => {
         it('addAction, removeAction, actions, setSourceReviewer, removeSourceReviewer, listReviewerSources', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            acc.addAction('testAction')
+            acc.collections.actions.add('testAction')
             expect(acc.actions).toContain('testAction')
-            acc.removeAction('testAction')
+            acc.collections.actions.remove('testAction')
             
-            acc.setSourceReviewer('src-a')
+            acc.collections.actions.setSourceReviewer('src-a')
             expect(acc.actions).toContain('reviewer:src-a')
-            expect(acc.hasStatus('reviewer')).toBe(true)
-            expect(acc.listReviewerSources()).toEqual(['src-a'])
+            expect(acc.collections.statuses.has('reviewer')).toBe(true)
+            expect(acc.collections.actions.listReviewerSources()).toEqual(['src-a'])
             
-            acc.removeSourceReviewer('src-a')
+            acc.collections.actions.removeSourceReviewer('src-a')
             expect(acc.actions).not.toContain('reviewer:src-a')
-            expect(acc.hasStatus('reviewer')).toBe(false)
+            expect(acc.collections.statuses.has('reviewer')).toBe(false)
         })
     })
 
     describe('5. Review tracking', () => {
         it('manages reviews correctly', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            acc.addReview('url1')
+            acc.collections.reviews.add('url1')
             expect(acc.reviews).toContain('url1')
-            acc.removeReview('url1')
+            acc.collections.reviews.remove('url1')
             
-            acc.addFusionReview('url2')
+            acc.collections.reviews.addFusionReview('url2')
             expect(acc.reviews).toContain('url2')
-            expect(acc.hasStatus('activeReviews')).toBe(true)
+            expect(acc.collections.statuses.has('activeReviews')).toBe(true)
             
-            acc.removeFusionReview('url2')
-            expect(acc.hasStatus('activeReviews')).toBe(false)
+            acc.collections.reviews.removeFusionReview('url2')
+            expect(acc.collections.statuses.has('activeReviews')).toBe(false)
             
-            acc.addFusionReview('url3')
-            acc.clearFusionReviews()
+            acc.collections.reviews.addFusionReview('url3')
+            acc.collections.reviews.clearFusionReviews()
             expect(acc.reviews.length).toBe(0)
             
-            acc.addPendingReviewUrl('url4')
-            acc.resolvePendingReviewUrls()
+            acc.collections.reviews.addPendingUrl('url4')
+            acc.correlation.resolvePendingReviewUrls()
             expect(acc.reviews).toContain('url4')
         })
     })
@@ -163,25 +163,25 @@ describe('FusionAccount', () => {
     describe('6. Account ID management', () => {
         it('adds and removes account ids', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            acc.addAccountId('acc-1')
+            acc.collections.accounts.add('acc-1')
             expect(acc.accountIds).toContain('acc-1')
-            acc.removeAccountId('acc-1')
+            acc.collections.accounts.remove('acc-1')
             
-            acc.addMissingAccountId('missing-1')
+            acc.collections.accounts.addMissing('missing-1')
             expect(acc.missingAccountIds).toContain('missing-1')
-            acc.removeMissingAccountId('missing-1')
+            acc.collections.accounts.removeMissing('missing-1')
         })
     })
 
     describe('7. Correlation promises', () => {
         it('handles correlation promises', async () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            acc.addMissingAccountId('acc-1')
-            acc.setCorrelatedAccount('acc-1', Promise.resolve('ok'))
+            acc.collections.accounts.addMissing('acc-1')
+            acc.correlation.markCorrelated('acc-1', Promise.resolve('ok'))
             expect(acc.accountIds).toContain('acc-1')
             expect(acc.missingAccountIds).not.toContain('acc-1')
             
-            await acc.resolvePendingOperations()
+            await acc.correlation.resolvePendingOperations()
         })
     })
 
@@ -204,11 +204,43 @@ describe('FusionAccount', () => {
     describe('9. Collection sync', () => {
         it('syncs collections to attribute bag', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            acc.addStatus('status1')
-            acc.addAction('action1')
+            acc.collections.statuses.add('status1')
+            acc.collections.actions.add('action1')
             acc.syncCollectionAttributesToBag()
             expect(acc.attributes.statuses).toContain('status1')
             expect(acc.attributes.actions).toContain('action1')
+        })
+
+        it('syncCollectionAttributesToBag writes only the current attribute bag', () => {
+            const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
+            acc.attributes.statuses = ['stale-on-current']
+            acc.attributes.actions = ['stale-action']
+            ;(acc as any)._attributeBag.previous = {
+                statuses: ['previous-only-status'],
+                actions: ['previous-only-action'],
+            }
+
+            acc.collections.statuses.add('live-status')
+            acc.collections.actions.add('live-action')
+            acc.syncCollectionAttributesToBag()
+
+            expect(acc.attributes.statuses).toContain('live-status')
+            expect(acc.attributes.actions).toContain('live-action')
+            expect(acc.attributes.statuses).not.toContain('previous-only-status')
+            expect((acc as any)._attributeBag.previous.statuses).toEqual(['previous-only-status'])
+            expect((acc as any)._attributeBag.previous.actions).toEqual(['previous-only-action'])
+        })
+    })
+
+    describe('collaborator presence', () => {
+        it('exposes readonly collections, correlation, and layers on a new FusionAccount', () => {
+            const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
+            expect(acc.collections).toBeDefined()
+            expect(acc.correlation).toBeDefined()
+            expect(acc.layers).toBeDefined()
+            expect(typeof acc.collections.statuses.add).toBe('function')
+            expect(typeof acc.correlation.markCorrelated).toBe('function')
+            expect(typeof acc.layers.addFusionMatch).toBe('function')
         })
     })
 
@@ -216,7 +248,7 @@ describe('FusionAccount', () => {
         it('round trips toISCAccount and fromFusionAccount', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1', attributes: { email: 'a@b.com' } } as any)
             acc.setKey({ simple: { id: 'id-1' } })
-            acc.addStatus(StatusEntitlement.Baseline)
+            acc.collections.statuses.add(StatusEntitlement.Baseline)
             acc.syncCollectionAttributesToBag()
 
             const iscAccount = acc.toISCAccount()
@@ -231,7 +263,7 @@ describe('FusionAccount', () => {
         it('round trips the persisted identityId through attributes', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1', attributes: { email: 'a@b.com' } } as any)
             acc.setKey({ simple: { id: 'id-1' } })
-            acc.addStatus(StatusEntitlement.Baseline)
+            acc.collections.statuses.add(StatusEntitlement.Baseline)
             acc.syncCollectionAttributesToBag()
 
             const iscAccount = acc.toISCAccount()
@@ -293,7 +325,7 @@ describe('FusionAccount', () => {
         it('imports and caps history', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
             const hist = Array.from({ length: 60 }, (_, i) => `[Date] message ${i}`)
-            acc.importHistory(hist)
+            acc.collections.historyOps.importFromArray(hist)
             expect(acc.history.length).toBe(minimalConfig.maxHistoryMessages)
             expect(acc.history[49]).toBe('[Date] message 59')
         })
@@ -307,11 +339,11 @@ describe('FusionAccount', () => {
 
         it('adds fusion match', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            acc.addFusionMatch({ fusionIdentity: {} as any, score: 100 } as any)
+            acc.layers.addFusionMatch({ fusionIdentity: {} as any, score: 100 } as any)
             expect(acc.isMatch).toBe(true)
             expect(acc.fusionMatches.length).toBe(1)
             
-            acc.clearFusionIdentityReferences()
+            acc.layers.clearFusionIdentityReferences()
             expect((acc.fusionMatches[0] as any).fusionIdentity).toBeUndefined()
         })
     })
@@ -591,7 +623,7 @@ describe('FusionAccount', () => {
             const run = new FusionRun()
             acc.addManagedAccountLayer(run, { pruneDeleted: true })
 
-            expect(acc.isOrphan()).toBe(true)
+            expect(acc.collections.statuses.isOrphan()).toBe(true)
             expect(acc.statuses).toContain('orphan')
         })
     })
@@ -634,7 +666,7 @@ describe('FusionAccount', () => {
             const run = new FusionRun()
             acc.addManagedAccountLayer(run, { pruneDeleted: true })
 
-            expect(acc.isOrphan()).toBe(true)
+            expect(acc.collections.statuses.isOrphan()).toBe(true)
             expect(acc.needsRefresh).toBe(false)
         })
     })
@@ -642,7 +674,7 @@ describe('FusionAccount', () => {
     describe('attribute-bag setters', () => {
         it('addAccountId adds to correlated set and sync reflects it', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            acc.addAccountId('src-a::native-1')
+            acc.collections.accounts.add('src-a::native-1')
             acc.syncCollectionAttributesToBag()
             expect(acc.accountIds).toContain('src-a::native-1')
             expect(acc.attributes.accounts).toContain('src-a::native-1')
@@ -650,7 +682,7 @@ describe('FusionAccount', () => {
 
         it('addMissingAccountId adds to missing set and sync reflects it', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            acc.addMissingAccountId('src-a::missing-1')
+            acc.collections.accounts.addMissing('src-a::missing-1')
             acc.syncCollectionAttributesToBag()
             expect(acc.missingAccountIds).toContain('src-a::missing-1')
             expect(acc.attributes['missing-accounts']).toContain('src-a::missing-1')
@@ -658,8 +690,8 @@ describe('FusionAccount', () => {
 
         it('setCorrelatedAccount moves an id from missing to correlated', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
-            acc.addMissingAccountId('src-a::native-1')
-            acc.setCorrelatedAccount('src-a::native-1')
+            acc.collections.accounts.addMissing('src-a::native-1')
+            acc.correlation.markCorrelated('src-a::native-1')
             acc.syncCollectionAttributesToBag()
             expect(acc.accountIds).toContain('src-a::native-1')
             expect(acc.missingAccountIds).not.toContain('src-a::native-1')
@@ -671,15 +703,15 @@ describe('FusionAccount', () => {
         it('collections sub-object reflects account mutations', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
 
-            acc.addAccountId('src-a::native-1')
+            acc.collections.accounts.add('src-a::native-1')
             expect(acc.collections.accountIds.has('src-a::native-1')).toBe(true)
             expect(acc.accountIds).toContain('src-a::native-1')
 
-            acc.addStatus('test-status')
+            acc.collections.statuses.add('test-status')
             expect(acc.collections.statusesSet.has('test-status')).toBe(true)
             expect(acc.statuses).toContain('test-status')
 
-            acc.setCorrelatedAccount('src-a::native-1')
+            acc.correlation.markCorrelated('src-a::native-1')
             expect(acc.collections.accountIds.has('src-a::native-1')).toBe(true)
             expect(acc.collections.missingAccountIds.has('src-a::native-1')).toBe(false)
         })

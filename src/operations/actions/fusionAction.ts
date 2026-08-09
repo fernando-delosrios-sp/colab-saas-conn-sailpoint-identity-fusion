@@ -17,8 +17,8 @@ export const fusionAction = async (
     log.debug(`Fusion action called for account ${fusionAccount.name} with operation ${change.op}`)
 
     if (change.op === AttributeChangeOp.Add) {
-        fusionAccount.addAction('fusion')
+        fusionAccount.collections.actions.add('fusion')
     } else if (change.op === AttributeChangeOp.Remove) {
-        fusionAccount.removeAction('fusion')
+        fusionAccount.collections.actions.remove('fusion')
     }
 }

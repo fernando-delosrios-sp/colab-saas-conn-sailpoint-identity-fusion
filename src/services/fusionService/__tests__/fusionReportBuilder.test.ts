@@ -19,7 +19,7 @@ function buildReportState(
         attributes: {},
     } as any)
 
-    fusionAccount.addFusionMatch({
+    fusionAccount.layers.addFusionMatch({
         identityId: 'identity-1',
         identityName: 'Test Identity',
         candidateType: 'identity',
@@ -99,13 +99,13 @@ describe('buildFusionReport', () => {
             attributes: { displayName: 'A. Ashford' },
         } as any)
 
-        fusionAccount.addFusionMatch({
+        fusionAccount.layers.addFusionMatch({
             identityId: 'isc-alexia',
             identityName: 'Alexia Ashford',
             candidateType: 'identity',
             scores: [{ attribute: COMBINED_SCORE_ROW_ATTRIBUTE, algorithm: 'weighted', score: 85, isMatch: true } as any],
         } as any)
-        fusionAccount.addFusionMatch({
+        fusionAccount.layers.addFusionMatch({
             identityId: undefined,
             identityName: 'A. Ashford anchor',
             candidateType: 'deferred',

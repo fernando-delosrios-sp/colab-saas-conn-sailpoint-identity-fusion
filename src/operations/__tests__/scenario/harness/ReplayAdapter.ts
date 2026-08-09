@@ -554,7 +554,7 @@ function configureNonReplayMocks(
     registry.fusion.correlateMissingAccountsPerSource = vi.fn().mockImplementation(async (fusionAccount) => {
         const missingIds = [...fusionAccount.missingAccountIds]
         for (const accountId of missingIds) {
-            fusionAccount.setCorrelatedAccount(accountId)
+            fusionAccount.correlation.markCorrelated(accountId)
         }
         fusionAccount.updateCorrelationStatus()
     })

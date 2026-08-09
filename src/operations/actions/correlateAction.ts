@@ -22,7 +22,7 @@ export const correlateAction = async (
     } else if (change.op === AttributeChangeOp.Remove) {
         // Removing the correlate action does not undo established correlations.
         // It only clears the entitlement on this update response.
-        fusionAccount.removeAction(FusionAction.Correlated)
+        fusionAccount.collections.actions.remove(FusionAction.Correlated)
         log.debug(`Correlate action removed for account ${fusionAccount.name}`)
     }
 }

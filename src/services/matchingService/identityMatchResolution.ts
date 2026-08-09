@@ -21,7 +21,7 @@ export async function resolveIdentityMatchOutcome(
     callbacks: IdentityMatchResolutionCallbacks
 ): Promise<ResolvedMatch | undefined> {
     if (!deps.accountAssembly.isAggregationAccountListMode()) {
-        fusionAccount.clearFusionIdentityReferences()
+        fusionAccount.layers.clearFusionIdentityReferences()
         return { account, fusionAccount, resolution: 'partial-match' }
     }
     if (deps.config.fusionEnableAutoMerge) {
@@ -38,7 +38,7 @@ export async function resolveIdentityMatchOutcome(
         deps.config.fusionEnableAutoMerge &&
         !!callbacks.resolveAutoMergeTargetId(callbacks.getBestAutoAssignMatch(fusionAccount.fusionMatches))
     if (deps.config.fusionEnableAutoMerge) {
-        fusionAccount.removeDeferredFusionMatches()
+        fusionAccount.layers.removeDeferredFusionMatches()
     }
     if (autoMerge) {
         return {

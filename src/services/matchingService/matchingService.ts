@@ -561,7 +561,7 @@ export class MatchingService {
             scores,
         }
         if (combinedPasses) {
-            fusionAccount.addFusionMatch(fusionMatch)
+            fusionAccount.layers.addFusionMatch(fusionMatch)
         }
     }
 

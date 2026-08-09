@@ -28,7 +28,7 @@ describe('FusionService — aggregation', () => {
                 name: 'Identity One',
                 attributes: { id: 'identity-1', name: 'Identity One' },
             } as any)
-            account.setCorrelatedAccount('src-a::acct-1')
+            account.correlation.markCorrelated('src-a::acct-1')
 
             await ctx.fusionService.getISCAccount(account, false)
 
@@ -139,7 +139,7 @@ describe('FusionService — aggregation', () => {
                 id: identityId,
                 name: 'Reviewer User',
             } as IdentityDocument)
-            fusionAccount.setSourceReviewer('src-1')
+            fusionAccount.collections.actions.setSourceReviewer('src-1')
 
             ctx.mockDefinitionService.getSimpleKey.mockReturnValue(key)
             ctx.mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
@@ -656,7 +656,7 @@ describe('FusionService — aggregation', () => {
             expect(ctx.mockIdentities.markIdentityInScope).toHaveBeenCalledWith(globalOwnerId)
 
             const processed = await ctx.fusionService.processFusionAccount(persisted)
-            expect(processed.isOrphan()).toBe(false)
+            expect(processed.collections.statuses.isOrphan()).toBe(false)
         })
 
         it('warns when global reviewer is enabled but no owner identity IDs resolve', async () => {
@@ -678,12 +678,9 @@ describe('FusionService — aggregation', () => {
                 const configs = (ctx.mockConfig as any).sources ?? []
                 for (const sc of configs) {
                     if (sc.correlationMode === 'reverse' && sc.correlationAttribute) {
-                        const missingForSource =
-                            typeof fusionAccount.getMissingAccountIdsForSource === 'function'
-                                ? fusionAccount.getMissingAccountIdsForSource(sc.name)
-                                : []
+                        const missingForSource = fusionAccount.collections.accounts.getMissingForSource(sc.name)
                         if (missingForSource.length > 0) {
-                            const info = fusionAccount.getManagedAccountInfo(missingForSource[0])
+                            const info = fusionAccount.collections.managedAccountInfo.get(missingForSource[0])
                             if (info) {
                                 fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute, info.schema.id)
                             }
@@ -779,7 +776,7 @@ describe('FusionService — aggregation', () => {
                     const anchor = candidateList.find(
                         (candidate) => candidate.managedAccountId === 'source-a-id::native-seq-1'
                     )
-                    account.addFusionMatch({
+                    account.layers.addFusionMatch({
                         identityId: '',
                         identityName: 'Current operation non-match',
                         candidateType: 'deferred',
@@ -852,7 +849,7 @@ describe('FusionService — aggregation', () => {
                     const anchor = candidateList.find(
                         (candidate) => candidate.managedAccountId === 'source-a-id::native-batch-def-1'
                     )
-                    account.addFusionMatch({
+                    account.layers.addFusionMatch({
                         identityId: '',
                         identityName: 'Current operation non-match',
                         candidateType: 'deferred',
@@ -971,7 +968,7 @@ describe('FusionService — aggregation', () => {
                     maxInFlightDeferredB = Math.max(maxInFlightDeferredB, inFlightDeferredB)
                     await new Promise((resolve) => setTimeout(resolve, 5))
                     if (fusionAccount.sourceName === 'Source B' && candidateList.length > 0) {
-                        fusionAccount.addFusionMatch({
+                        fusionAccount.layers.addFusionMatch({
                             identityId: '',
                             identityName: 'Current operation non-match source B',
                             candidateType: 'deferred',
@@ -993,7 +990,7 @@ describe('FusionService — aggregation', () => {
                 sourceName: 'Source B',
                 attributes: {},
             } as any)
-            preB.setNonMatched()
+            preB.collections.statuses.setNonMatched(preB.name, preB.sourceName)
             ctx.fusionService.setFusionAccount(preB)
             ;(ctx.fusionService as any).run.registerFinalizedDeferredCandidate(preB)
 
@@ -1014,7 +1011,7 @@ describe('FusionService — aggregation', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            sourceAAccount.setNonMatched()
+            sourceAAccount.collections.statuses.setNonMatched(sourceAAccount.name, sourceAAccount.sourceName)
             ctx.fusionService.setFusionAccount(sourceAAccount)
             const sourceBCandidate = FusionAccount.fromManagedAccount({
                 id: 'acct-b-candidate',
@@ -1024,7 +1021,7 @@ describe('FusionService — aggregation', () => {
                 sourceName: 'Source B',
                 attributes: {},
             } as any)
-            sourceBCandidate.setNonMatched()
+            sourceBCandidate.collections.statuses.setNonMatched(sourceBCandidate.name, sourceBCandidate.sourceName)
             ctx.fusionService.setFusionAccount(sourceBCandidate)
             ;(ctx.fusionService as any).run.registerFinalizedDeferredCandidate(sourceBCandidate)
             ;(ctx.fusionService as any).run.sourcesByName.set('Source B', {
@@ -1142,7 +1139,7 @@ describe('FusionService — aggregation', () => {
             ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
                 const n = Array.from(_candidates).length
                 if (candidateType === 'identity') {
-                    account.addFusionMatch({
+                    account.layers.addFusionMatch({
                         identityId: 'identity-1',
                         identityName: 'Identity One',
                         candidateType: 'identity',
@@ -1298,7 +1295,7 @@ describe('FusionService — aggregation', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            nonMatchedCandidate.setNonMatched()
+            nonMatchedCandidate.collections.statuses.setNonMatched(nonMatchedCandidate.name, nonMatchedCandidate.sourceName)
             ctx.fusionService.setFusionAccount(nonMatchedCandidate)
             void (ctx.fusionService as any).run
 
@@ -1310,7 +1307,7 @@ describe('FusionService — aggregation', () => {
             ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
                 if (candidateType === 'deferred') {
-                    account.addFusionMatch({
+                    account.layers.addFusionMatch({
                         identityId: '',
                         identityName: 'Non-matched Candidate',
                         candidateType: 'deferred',
@@ -1359,7 +1356,7 @@ describe('FusionService — aggregation', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            nonMatchedCandidate.setNonMatched()
+            nonMatchedCandidate.collections.statuses.setNonMatched(nonMatchedCandidate.name, nonMatchedCandidate.sourceName)
             ctx.fusionService.setFusionAccount(nonMatchedCandidate)
             void (ctx.fusionService as any).run
 
@@ -1371,7 +1368,7 @@ describe('FusionService — aggregation', () => {
             ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, candidates, candidateType) => {
                 const candidateList = Array.from(candidates)
                 if (candidateType === 'deferred') {
-                    account.addFusionMatch({
+                    account.layers.addFusionMatch({
                         identityId: '',
                         identityName: 'Non-matched Candidate',
                         candidateType: 'deferred',
@@ -1434,7 +1431,7 @@ describe('FusionService — aggregation', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any)
-            nonMatchedCandidate.setNonMatched()
+            nonMatchedCandidate.collections.statuses.setNonMatched(nonMatchedCandidate.name, nonMatchedCandidate.sourceName)
             customReportFusion.setFusionAccount(nonMatchedCandidate)
 
             ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
@@ -1443,7 +1440,7 @@ describe('FusionService — aggregation', () => {
             ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
                 const n = Array.from(_candidates).length
                 if (candidateType === 'deferred') {
-                    account.addFusionMatch({
+                    account.layers.addFusionMatch({
                         identityId: '',
                         identityName: 'Non-matched Candidate CR',
                         candidateType: 'deferred',
@@ -1941,8 +1938,8 @@ describe('FusionService — aggregation', () => {
                 finished: true,
             } as any
 
-            fusionAccount.addFusionDecisionLayer(linkDecision)
-            expect(fusionAccount.getManagedAccountInfo('source-a-id::native-no-meta')).toBeUndefined()
+            fusionAccount.layers.addFusionDecisionLayer(linkDecision)
+            expect(fusionAccount.collections.managedAccountInfo.get('source-a-id::native-no-meta')).toBeUndefined()
 
             await (ctx.fusionService as any).correlationManager.correlatePerSource(fusionAccount, linkDecision)
 
@@ -2022,7 +2019,7 @@ describe('FusionService — aggregation', () => {
                 const candidateList = Array.from(candidates)
                 if (candidateType !== 'deferred') return candidateList.length
                 if (candidateList.length > 0) {
-                    account.addFusionMatch({
+                    account.layers.addFusionMatch({
                         identityId: '',
                         identityName: 'A. Wesker',
                         candidateType: 'deferred',
@@ -2054,7 +2051,7 @@ describe('FusionService — aggregation', () => {
                     statuses: ['nonMatched', 'uncorrelated'],
                 },
             } as any)
-            persistedNonMatch.setNonMatched()
+            persistedNonMatch.collections.statuses.setNonMatched(persistedNonMatch.name, persistedNonMatch.sourceName)
             ctx.fusionService.setFusionAccount(persistedNonMatch)
             ctx.run.registerDeferredCandidate(persistedNonMatch)
 
@@ -2087,7 +2084,7 @@ describe('FusionService — aggregation', () => {
                 if (candidateType === 'deferred') {
                     deferredCandidatesFound = n
                     if (n > 0) {
-                        _account.addFusionMatch({
+                        _account.layers.addFusionMatch({
                             identityId: '',
                             identityName: 'Previously Persisted Non-Match',
                             candidateType: 'deferred',
@@ -2116,7 +2113,7 @@ describe('FusionService — aggregation', () => {
                 attributes: { accounts: ['acct-missing-1'] },
             } as unknown as Account)
             // Simulate the flag that updateCorrelationStatus would set
-            account.addMissingAccountId('acct-missing-1')
+            account.collections.accounts.addMissing('acct-missing-1')
             account.updateCorrelationStatus()
             expect(account.uncorrelated).toBe(true)
 

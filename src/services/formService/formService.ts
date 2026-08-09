@@ -627,7 +627,7 @@ export class FormService {
 
                 const reviewer = reviewerByIdentityId.get(recipient.id)
                 if (reviewer) {
-                    reviewer.addFusionReview(instance.standAloneFormUrl)
+                    reviewer.collections.reviews.addFusionReview(instance.standAloneFormUrl)
                     this.log.debug(`Added existing form instance ${instance.id} to reviewer ${recipient.id} reviews`)
                 }
             }
@@ -674,7 +674,7 @@ export class FormService {
                 hasPreviousInstance
             )
 
-            reviewer.addReviewPromise(reviewPromise)
+            reviewer.collections.reviews.addPromise(reviewPromise)
             reviewPromises.push(reviewPromise)
         }
         if (reviewPromises.length > 0) {

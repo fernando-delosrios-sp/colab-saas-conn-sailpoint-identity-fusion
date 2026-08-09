@@ -19,7 +19,7 @@ describe('FusionService — decisions', () => {
                 attributes: {},
             } as unknown as IdentityDocument
             const existingFusionAccount = FusionAccount.fromIdentity(existingIdentity)
-            existingFusionAccount.setNonMatched()
+            existingFusionAccount.collections.statuses.setNonMatched(existingFusionAccount.name, existingFusionAccount.sourceName)
             ctx.fusionService.setFusionAccount(existingFusionAccount)
 
             const managedAccount = {
@@ -428,8 +428,8 @@ describe('FusionService — decisions', () => {
                 attributes: {},
             } as Account)
 
-            fusionAccount.addStatus(StatusEntitlement.Candidate, 'Set candidate status')
-            fusionAccount.addStatus(StatusEntitlement.Candidate, 'Set candidate status')
+            fusionAccount.collections.statuses.add(StatusEntitlement.Candidate, 'Set candidate status')
+            fusionAccount.collections.statuses.add(StatusEntitlement.Candidate, 'Set candidate status')
 
             const duplicateMessages = fusionAccount.history.filter((h) => h.includes('Set candidate status'))
             expect(duplicateMessages).toHaveLength(1)
@@ -445,7 +445,7 @@ describe('FusionService — decisions', () => {
                 attributes: {},
             } as Account)
 
-            fusionAccount.importHistory(['   ', 'first-entry', 'first-entry', '  second-entry  '])
+            fusionAccount.collections.historyOps.importFromArray(['   ', 'first-entry', 'first-entry', '  second-entry  '])
 
             expect(fusionAccount.history).toEqual(['first-entry', 'second-entry'])
         })

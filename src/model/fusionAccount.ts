@@ -14,7 +14,7 @@ import { FusionMatch } from '../services/matchingService'
 import { StatusEntitlement } from './statusEntitlement'
 import { FusionAction } from './fusionAction'
 import { FusionAccountKind } from './fusionAccountTypes'
-import type { FusionAttributeBag, FusionManagedAccountInfo, IdentityInfo } from './fusionAccountTypes'
+import type { FusionAttributeBag, IdentityInfo } from './fusionAccountTypes'
 import { buildIdentityInfo } from './fusionAccountUtils'
 import type { FusionRun } from './fusionRun'
 import {
@@ -612,29 +612,9 @@ export class FusionAccount {
         )
     }
 
-    addFusionDecisionLayer(decision: FusionDecision): void {
-        this.layers.addFusionDecisionLayer(decision)
-    }
-
     // ============================================================================
-    // Collection delegates
+    // Read-only collection convenience getters
     // ============================================================================
-
-    addAccountId(id: string, message?: string): void {
-        this.collections.accounts.add(id, message)
-    }
-
-    removeAccountId(id: string, message?: string): void {
-        this.collections.accounts.remove(id, message)
-    }
-
-    addMissingAccountId(id: string, message?: string): void {
-        this.collections.accounts.addMissing(id, message)
-    }
-
-    removeMissingAccountId(id: string): void {
-        this.collections.accounts.removeMissing(id)
-    }
 
     get accountIds(): string[] {
         return Array.from(this.collections.accountIds)
@@ -689,118 +669,6 @@ export class FusionAccount {
         return this.collections.statusesSet
     }
 
-    addStatus(status: string, message?: string): void {
-        this.collections.statuses.add(status, message)
-    }
-
-    removeStatus(status: string, message?: string): void {
-        this.collections.statuses.remove(status, message)
-    }
-
-    hasStatus(status: string): boolean {
-        return this.collections.statuses.has(status)
-    }
-
-    setNonMatched(): void {
-        this.collections.statuses.setNonMatched(this._name, this._sourceName)
-    }
-
-    addAction(action: string, message?: string): void {
-        this.collections.actions.add(action, message)
-    }
-
-    removeAction(action: string, message?: string): void {
-        this.collections.actions.remove(action, message)
-    }
-
-    setSourceReviewer(sourceId: string): void {
-        this.collections.actions.setSourceReviewer(sourceId)
-    }
-
-    removeSourceReviewer(sourceId: string): void {
-        this.collections.actions.removeSourceReviewer(sourceId)
-    }
-
-    listReviewerSources(): string[] {
-        return this.collections.actions.listReviewerSources()
-    }
-
-    addReview(review: string, message?: string): void {
-        this.collections.reviews.add(review, message)
-    }
-
-    removeReview(review: string, message?: string): void {
-        this.collections.reviews.remove(review, message)
-    }
-
-    addFusionReview(reviewUrl: string): void {
-        this.collections.reviews.addFusionReview(reviewUrl)
-    }
-
-    removeFusionReview(reviewUrl: string): void {
-        this.collections.reviews.removeFusionReview(reviewUrl)
-    }
-
-    clearFusionReviews(): void {
-        this.collections.reviews.clearFusionReviews()
-    }
-
-    addPendingReviewUrl(reviewUrl: string): void {
-        this.collections.reviews.addPendingUrl(reviewUrl)
-    }
-
-    addReviewPromise(promise: Promise<string | undefined>): void {
-        this.collections.reviews.addPromise(promise)
-    }
-
-    resolvePendingReviewUrls(): void {
-        this.correlation.resolvePendingReviewUrls()
-    }
-
-    async resolvePendingOperations(awaitCorrelations = true): Promise<void> {
-        await this.correlation.resolvePendingOperations(awaitCorrelations)
-    }
-
-    addSource(source: string, message?: string): void {
-        this.collections.sources.add(source, message)
-    }
-
-    removeSource(source: string, message?: string): void {
-        this.collections.sources.remove(source, message)
-    }
-
-    addFusionMatch(fusionMatch: FusionMatch): void {
-        this.layers.addFusionMatch(fusionMatch)
-    }
-
-    clearFusionIdentityReferences(): void {
-        this.layers.clearFusionIdentityReferences()
-    }
-
-    /** Drop deferred anchor rows added transiently for automatic-merge scoring on identity-match accounts. */
-    removeDeferredFusionMatches(): void {
-        this.layers.removeDeferredFusionMatches()
-    }
-
-    importHistory(history: string[]): void {
-        this.collections.historyOps.importFromArray(history)
-    }
-
-    getManagedAccountInfo(accountId: string): FusionManagedAccountInfo | undefined {
-        return this.collections.managedAccountInfo.get(accountId)
-    }
-
-    setManagedAccountInfo(accountId: string, sourceName: string, nativeIdentity: string): void {
-        this.collections.setManagedAccountInfo(accountId, {
-            source: { name: sourceName },
-            schema: { id: nativeIdentity },
-        })
-    }
-
-    getMissingAccountIdsForSource(sourceName: string): string[] {
-        return this.collections.accounts.getMissingForSource(sourceName)
-    }
-
     setReverseCorrelationAttribute(attributeName: string, value: string): void {
         this._attributeBag.current[attributeName] = value
     }
@@ -809,14 +677,9 @@ export class FusionAccount {
         delete this._attributeBag.current[attributeName]
     }
 
-    isOrphan(): boolean {
-        return this.collections.statuses.isOrphan()
-    }
-
-    addFusionDecision(decision: string): void {
-        this.collections.actions.addFusionDecision(decision)
-    }
-
+    /**
+     * Remove a source-account reference, binding origin metadata that collections alone do not own.
+     */
     removeSourceAccount(id: string): void {
         this.collections.accounts.removeSourceAccount(
             id,
@@ -829,14 +692,6 @@ export class FusionAccount {
         this.correlation.updateStatus((v: boolean) => {
             this.layers.uncorrelated = v
         }, onCorrelatedActionGranted)
-    }
-
-    setCorrelatedAccount(accountId: string, promise?: Promise<unknown>): void {
-        this.correlation.markCorrelated(accountId, promise)
-    }
-
-    addCorrelationPromise(_accountId: string, promise: Promise<unknown>): void {
-        this.correlation.addPromise(_accountId, promise)
     }
 
     get correlationPromises(): Array<Promise<unknown>> {
@@ -868,5 +723,6 @@ export class FusionAccount {
         }
     }
 }
+
 
 
