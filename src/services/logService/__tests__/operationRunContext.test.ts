@@ -139,6 +139,16 @@ describe('OperationRunContext', () => {
         expect(ctx.flushPhaseCorrelationSummary()).toBeUndefined()
     })
 
+    it('flushPhaseCorrelationSummary omits correlated-action when aggregation summaries are excluded', () => {
+        const ctx = new OperationRunContext()
+        ctx.excludeCorrelatedActionInSummaries = true
+        ctx.recordCorrelationActivity({ kind: 'link', accounts: 1 })
+        ctx.recordCorrelatedActionGranted()
+
+        const summary = ctx.flushPhaseCorrelationSummary()
+        expect(summary).toEqual({ correlations: 'link=1/1' })
+    })
+
     it('increments refreshedCount', () => {
         const ctx = new OperationRunContext()
         expect(ctx.refreshedCount).toBe(0)
@@ -230,6 +240,7 @@ describe('LogService operation helpers', () => {
         expect(ctx.refreshedCount).toBe(2)
     })
 })
+
 
 
 

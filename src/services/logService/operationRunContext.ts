@@ -166,6 +166,8 @@ export function hasCorrelationActivity(counters: CorrelationActivityCounters): b
  */
 export class OperationRunContext {
     readonly operationStartedAt: number
+    /** When true, correlation summary formatters omit correlated-action segments (account-list aggregation). */
+    excludeCorrelatedActionInSummaries = false
     phase: OperationPhase | null = null
     step: string | null = null
     progress?: ProgressSnapshot
@@ -309,7 +311,10 @@ export class OperationRunContext {
 
     flushPhaseCorrelationSummary(): Record<string, unknown> | undefined {
         if (!hasCorrelationActivity(this.phaseCorrelation)) return undefined
-        const segment = formatCorrelationSummaryValue(this.phaseCorrelation, { cumulative: true })
+        const segment = formatCorrelationSummaryValue(this.phaseCorrelation, {
+            cumulative: true,
+            excludeCorrelatedAction: this.excludeCorrelatedActionInSummaries,
+        })
         this.resetPhaseCorrelationCounters()
         return { correlations: segment }
     }
@@ -322,7 +327,7 @@ export class OperationRunContext {
 /** Value portion for PHASE END / DETAIL (without leading `correlations` label). */
 export function formatCorrelationSummaryValue(
     counters: CorrelationActivityCounters,
-    options?: { intervalMs?: number; cumulative?: boolean }
+    options?: { intervalMs?: number; cumulative?: boolean; excludeCorrelatedAction?: boolean }
 ): string {
     const parts: string[] = []
 
@@ -340,7 +345,7 @@ export function formatCorrelationSummaryValue(
             parts.push(`completed=${totalCompleted}`)
         }
     }
-    if (counters.correlatedAction > 0) {
+    if (counters.correlatedAction > 0 && !options?.excludeCorrelatedAction) {
         if (options?.intervalMs && !options?.cumulative) {
             parts.push(
                 `correlated-action=+${counters.correlatedAction}/${Math.round(options.intervalMs / 1000)}s`
@@ -368,12 +373,13 @@ export function formatCorrelationSummaryValue(
 
 export function formatCorrelationSummarySegment(
     counters: CorrelationActivityCounters,
-    options?: { intervalMs?: number; cumulative?: boolean }
+    options?: { intervalMs?: number; cumulative?: boolean; excludeCorrelatedAction?: boolean }
 ): string {
     const value = formatCorrelationSummaryValue(counters, options)
     if (!value) return ''
     return `correlations ${value}`
 }
+
 
 
 

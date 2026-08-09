@@ -437,7 +437,7 @@ export class SourceService {
         if (!fusionAccount) {
             if (mustExist) {
                 throw new ConnectorError(
-                    `Fusion account not found for native identity "${nativeIdentity}". The account may have been deleted or the identity does not exist.`,
+                    `Fusion account not found for identity: ${nativeIdentity}`,
                     ConnectorErrorType.Generic
                 )
             }

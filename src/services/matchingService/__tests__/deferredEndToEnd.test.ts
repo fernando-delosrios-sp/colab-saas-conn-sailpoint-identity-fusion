@@ -98,9 +98,6 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
             log,
             run,
             matchingService,
-            correlationManager: {
-                applyPerSourceCorrelationIfNeeded: vi.fn().mockResolvedValue(undefined),
-            } as any,
             definitionService,
             mappingService,
             accountAssembly,
@@ -281,3 +278,4 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
         expect(run.getFusionAccountByManagedKey(`${SOURCE_ID}::nat-peer-b`)).toBeDefined()
     })
 })
+

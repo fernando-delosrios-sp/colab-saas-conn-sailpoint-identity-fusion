@@ -27,6 +27,17 @@ The account-read operation SHALL load sources and schema, rebuild the target Fus
 - **WHEN** the account-read operation is invoked
 - **THEN** the operation SHALL fail with a message matching `Fusion account not found for identity: <identity>`
 
+### Requirement: Account read reconciles pending form state before output
+
+Before returning the ISC account, the account-read operation SHALL fetch current pending form data and reconcile transient candidate/reviewer output state via `FusionService.normalizePendingFormStateForOutput()`, matching the output path used by account create, enable, and disable.
+
+#### Scenario: Account read normalizes pending form state before serialization
+
+- **GIVEN** an existing Fusion account for the requested identity
+- **WHEN** the account-read operation completes rebuild and prepares output
+- **THEN** the connector SHALL call `normalizePendingFormStateForOutput()` before `getISCAccount`
+- **AND** the returned account SHALL reflect live pending form state rather than stale persisted candidate/review entries alone
+
 ### Requirement: Account read accepts only composite managed account keys for fetch
 
 When rebuilding a Fusion account, the account-read operation SHALL resolve managed account references for fetch using only valid composite managed account keys (`sourceId::nativeIdentity`). Values that fail composite key validation SHALL NOT be fetched and SHALL NOT be passed through as lookup keys.
@@ -63,5 +74,6 @@ When `cascadeAggregationEnabled` is true in processing control settings, the acc
 - **GIVEN** `cascadeAggregationEnabled` is false or unset
 - **WHEN** the account-read operation is invoked
 - **THEN** the connector SHALL NOT trigger cascade aggregation before managed account fetch
+
 
 

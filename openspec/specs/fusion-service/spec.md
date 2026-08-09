@@ -37,7 +37,7 @@ When a Fusion account is reconstructed from persisted platform attributes, the `
 
 ### Requirement: Factory methods initialize core state consistently
 
-Each static factory method MUST produce a `FusionAccount` whose core scalar fields (`type`, `nativeIdentity`, `name`, `sourceName`, `disabled`, `needsRefresh`, `identityInfo`, `iscAccountId`, `modified`) are set from the provided input.
+Each static factory method MUST produce a `FusionAccount` whose core scalar fields (`type`, `managedKey`, `name`, `sourceName`, `disabled`, `needsRefresh`, `identityInfo`, `iscAccountId`, `modified`) are set from the provided input.
 
 Feature: Fusion account construction
 Rule: `FusionAccount` factory methods initialize core scalar state from their inputs.
@@ -46,7 +46,7 @@ Rule: `FusionAccount` factory methods initialize core scalar state from their in
 - **GIVEN** an `IdentityDocument` with `id: 'id-1'`, `name: 'Jane Doe'`, `disabled: false`
 - **WHEN** `FusionAccount.fromIdentity(identity)` is called
 - **THEN** the resulting account has `type` of `'identity'`
-- **AND** `nativeIdentity` is `'id-1'`
+- **AND** `managedKey` is `'Identities::id-1'`
 - **AND** `name` is `'Jane Doe'`
 - **AND** `sourceName` is `'Identities'`
 - **AND** `disabled` is `false`
@@ -55,7 +55,7 @@ Rule: `FusionAccount` factory methods initialize core scalar state from their in
 - **GIVEN** an SDK `Account` with `sourceId: 'src-a'`, `nativeIdentity: 'nat-1'`, `sourceName: 'Source A'`, `id: 'isc-1'`
 - **WHEN** `FusionAccount.fromManagedAccount(account)` is called
 - **THEN** the resulting account has `type` of `'managed'`
-- **AND** `nativeIdentity` is `'src-a::nat-1'`
+- **AND** `managedKey` is `'src-a::nat-1'`
 - **AND** `sourceName` is `'Source A'`
 - **AND** `iscAccountId` is `'isc-1'`
 
@@ -329,7 +329,7 @@ FusionService SHALL NOT wrap outcome handler methods with single-line delegation
 
 ### Requirement: Unique attributes SHALL be generated Just-In-Time during output streaming
 
-The system SHALL NOT eagerly filter and output Fusion accounts prior to the final output phase to bypass memory constraints. Instead, the system SHALL stream all Fusion accounts uniformly during the final output phase, evaluating and generating unique attributes Just-In-Time immediately prior to serialization.
+The system SHALL NOT eagerly filter and output Fusion accounts prior to the final output phase to bypass memory constraints. Instead, the system SHALL stream all Fusion accounts uniformly during the final output phase via `FusionService.forEachISCAccount`, evaluating and generating unique attributes Just-In-Time immediately prior to serialization. Bulk listing helpers such as `listISCAccounts` SHALL NOT be used on the account-list output path.
 
 #### Scenario: JIT Unique Attribute Generation prevents memory accumulation
 
@@ -348,6 +348,16 @@ The system SHALL NOT eagerly filter and output Fusion accounts prior to the fina
 - **WHEN** the account-list operation runs in dry-run mode and output streaming refreshes unique attributes
 - **THEN** incremental counters MAY advance in-memory to produce projected unique values in streamed accounts
 - **AND** counter persistence to the ISC tenant SHALL NOT occur (persistent output tail skipped in dry-run)
+
+### Requirement: processFusionAccount composes the extended account-assembly recipe
+
+`FusionService.processFusionAccount` SHALL compose the shared `AccountAssembly` steps (`addManagedAccountLayer`, `applyAttributeProcessing`) together with fusion-specific orchestration that callers of the thin `assembleAccount` recipe do not perform: reviewer layers, identity and merge-decision layers, unique-attribute registration, per-source correlation, and run registration. IdentityProcessor and DecisionProcessor SHALL continue to use `AccountAssembly.assembleAccount` for the thin path; Phase-2 refresh and single-account rebuild paths SHALL use `processFusionAccount`.
+
+#### Scenario: Phase-2 refresh uses extended recipe
+- **WHEN** `FusionService.processFusionAccounts` refreshes persisted fusion accounts during aggregation
+- **THEN** each account SHALL be built via `processFusionAccount`
+- **AND** the method SHALL invoke `AccountAssembly.addManagedAccountLayer` and `AccountAssembly.applyAttributeProcessing`
+- **AND** the method SHALL apply reviewer, identity, correlation, and registration steps before returning the processed account
 
 ### Requirement: FusionService delegates mode-gate logic to AccountAssembly
 
@@ -503,6 +513,7 @@ When loading persisted `originAccount` metadata, the connector SHALL accept a pl
 - **WHEN** the connector loads origin metadata
 - **THEN** `originAccount` SHALL NOT be set to the raw UUID
 - **AND** the invalid value SHALL NOT be used as a managed account lookup key
+
 
 
 

@@ -84,11 +84,12 @@ export function parseDryRunInput(input: StdAccountListInput): DryRunInput | unde
 export function buildTerminalSummary(
     serviceRegistry: ServiceRegistry,
     result: { outputCount?: number; fetchResult?: FetchResult; timer: ReturnType<ServiceRegistry['log']['timer']> },
-    dryRun: DryRunInput
+    dryRun: DryRunInput,
+    reportHtmlOutputPath?: string
 ): Record<string, unknown> {
     const { log, sources } = serviceRegistry
     const issueSummary = log.getAggregationIssueSummary()
-    return {
+    const summary: Record<string, unknown> = {
         rowsSent: result.outputCount ?? 0,
         identitiesFound: resolveIdentitiesFound(result.fetchResult, serviceRegistry.identities),
         managedAccountsFound: result.fetchResult?.managedAccountsFound ?? 0,
@@ -98,7 +99,12 @@ export function buildTerminalSummary(
         issueSummary,
         options: { saveFile: dryRun.saveFile ?? false, sendEmail: Boolean(dryRun.sendEmail) },
     }
+    if (reportHtmlOutputPath) {
+        summary.reportHtmlOutputPath = reportHtmlOutputPath
+    }
+    return summary
 }
+
 
 
 

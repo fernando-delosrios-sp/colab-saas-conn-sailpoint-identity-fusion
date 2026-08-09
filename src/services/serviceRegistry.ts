@@ -83,6 +83,9 @@ export class ServiceRegistry {
         const logConfig = operationContext ? { ...config, operationContext } : config
         this.log = context.logService ?? new LogService(logConfig)
         this.runContext = new OperationRunContext()
+        if (operationContext === 'accountList') {
+            this.runContext.excludeCorrelatedActionInSummaries = true
+        }
         this.log.bindRunContext(this.runContext)
         this.run = new FusionRun(this.log, this.config)
         this.locks = context.lockService ?? new InMemoryLockService(this.log)
@@ -196,7 +199,6 @@ export class ServiceRegistry {
             log: this.log,
             run: this.run,
             matchingService: this.matching,
-            correlationManager: this.fusion.correlationManager,
             definitionService: this.definition,
             mappingService: this.mapping,
             accountAssembly: this.fusion.accountAssembly,
@@ -318,6 +320,7 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
+
 
 
 

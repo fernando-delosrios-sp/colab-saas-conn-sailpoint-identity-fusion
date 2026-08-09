@@ -43,6 +43,7 @@ export const accountRead = async (serviceRegistry: ServiceRegistry, input: StdAc
         log.stepEnd('rebuild-fusion-account')
 
         log.stepStart('generate-account')
+        await fusion.normalizePendingFormStateForOutput()
         const iscAccount = await fusion.getISCAccount(fusionAccount)
         assert(iscAccount, 'Failed to generate ISC account from fusion account')
         log.stepEnd('generate-account')
@@ -54,3 +55,4 @@ export const accountRead = async (serviceRegistry: ServiceRegistry, input: StdAc
         log.crash(`Failed to read account ${input.identity}`, error)
     }
 }
+

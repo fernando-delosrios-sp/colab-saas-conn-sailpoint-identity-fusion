@@ -20,7 +20,6 @@ import {
 } from './matchingHelpers'
 import { ManagedAccountAnalysisContext, ManagedAccountMatchingResult, MatchCandidateType, FusionMatch } from './types'
 import { AccountAssembly } from '../accountAssembly'
-import { CorrelationManager } from '../correlationManager'
 import { DefinitionService } from '../definitionService'
 import { MappingService } from '../mappingService'
 import { assert } from '../../utils/assert'
@@ -351,7 +350,6 @@ export interface MatchOutcomeDispatcherDeps {
     readonly log: LogService
     readonly run: FusionRun
     readonly matchingService: MatchingService
-    readonly correlationManager: CorrelationManager
     readonly definitionService: DefinitionService
     readonly mappingService: MappingService
     readonly accountAssembly: AccountAssembly

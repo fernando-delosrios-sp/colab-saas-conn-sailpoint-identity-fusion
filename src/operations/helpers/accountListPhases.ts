@@ -485,10 +485,7 @@ function logDryRunRunSummary(
     outputCount: number | undefined,
     reportHtmlOutputPath?: string
 ): void {
-    const summary = buildTerminalSummary(serviceRegistry, { outputCount, fetchResult, timer }, dryRun)
-    if (reportHtmlOutputPath) {
-        summary.reportHtmlOutputPath = reportHtmlOutputPath
-    }
+    const summary = buildTerminalSummary(serviceRegistry, { outputCount, fetchResult, timer }, dryRun, reportHtmlOutputPath)
     console.log(JSON.stringify(summary, null, 2))
 }
 
@@ -498,7 +495,6 @@ export async function reportEpilogue(
 ): Promise<unknown | undefined> {
     const { log } = serviceRegistry
     const { isPersistent, dryRun, fetchResult, outputCount, timer } = options
-    let deferredError: unknown
 
     log.epilogueStart('report')
     const epilogueStartedAt = log.getRunContext()?.epilogueStartedAt ?? Date.now()
@@ -522,8 +518,8 @@ export async function reportEpilogue(
 
     timer.recordElapsed('Report', Date.now() - epilogueStartedAt)
     log.epilogueEnd('report')
-    return deferredError
 }
+
 
 
 
