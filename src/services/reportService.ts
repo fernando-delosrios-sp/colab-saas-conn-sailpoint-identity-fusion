@@ -14,6 +14,7 @@ import type { LogService } from './logService'
 import type { EmailService } from './emailService'
 import type { SourceService } from './sourceService'
 import { FusionRun } from '../model/fusionRun'
+import { assert } from '../utils/assert'
 import { compileEmailTemplates, renderFusionReport, FusionReportEmailData } from './emailService/helpers'
 import { registerHandlebarsHelpers } from './emailService/messagingHandlebarsRegistration'
 import { sanitizeRecipients } from './emailService/email'
@@ -146,8 +147,8 @@ class FusionReviewDecisionResolver {
                 ? this.fusion.getFusionIdentity(identityId)
                 : undefined
         let iscId = fusionAccountByKey?.iscAccountId ?? fusionAccountByIdentity?.iscAccountId
-        if (!iscId && this.fusion?.fusionIdentities) {
-            for (const fa of this.fusion.fusionIdentities) {
+        if (!iscId) {
+            for (const fa of this.run.allFusionIdentities) {
                 if (fa.managedKey === managedAccountKey && fa.iscAccountId) {
                     iscId = fa.iscAccountId
                     break
@@ -439,7 +440,7 @@ export class ReportService {
         phaseTiming?: AggregationStats['phaseTiming']
     }): { report: FusionReport; stats: DryRunStats } {
         const stats = this.buildDryRunStats(this.aggregationStatsFromFetchResult(args))
-        const tracker = this.fusion.tracker
+        const tracker = this.requireTracker()
         const report = this.fusion.generateReport(tracker, false, stats)
         return { report, stats }
     }
@@ -481,7 +482,7 @@ export class ReportService {
 
         await this.hydrateIdentitiesForReportDecisions()
 
-        const report = this.fusion.generateReport(this.fusion.tracker, false, finalDryRunStats as any)
+        const report = this.fusion.generateReport(this.requireTracker(), false, finalDryRunStats as any)
 
         const baseTiming = finalDryRunStats.phaseTiming ?? []
         const statsForRender: AggregationStats = {
@@ -514,7 +515,7 @@ export class ReportService {
             const reportPhaseTimer = this.log.timer()
             const reportStartedAt = Date.now()
             const stats = this.buildFusionReportStats(aggregationStats)
-            const tracker = this.fusion.tracker
+            const tracker = this.requireTracker()
             const report = this.fusion.generateReport(tracker, includeNonMatches, stats)
             const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
             const locale =
@@ -530,7 +531,7 @@ export class ReportService {
             return
         }
 
-        const tracker = this.fusion.tracker
+        const tracker = this.requireTracker()
         const report = this.fusion.generateReport(tracker, includeNonMatches, undefined)
         const globalOwnerIds = await this.sources.fetchGlobalOwnerIdentityIds()
         const locale =
@@ -549,7 +550,7 @@ export class ReportService {
     ): Promise<Record<string, unknown>> {
         await this.hydrateIdentitiesForReportDecisions()
         const stats = this.buildFusionReportStats(aggregationStats)
-        const tracker = this.fusion.tracker
+        const tracker = this.requireTracker()
         const report = this.fusion.generateReport(tracker, includeNonMatches, stats)
         report.fusionReviewDecisions = this.buildFusionReviewDecisions(this.email?.getDefaultEffectiveLocale?.() ?? 'en')
         report.stats = stats
@@ -573,6 +574,12 @@ export class ReportService {
             totalProcessingTime: args.totalProcessingTime ?? '0s',
             phaseTiming: args.phaseBreakdownThroughOutput ?? args.phaseTiming,
         }
+    }
+
+    private requireTracker(): _AggregationTracker {
+        const tracker = this.run.getTracker()
+        assert(tracker, 'AggregationTracker has not been set on FusionRun')
+        return tracker
     }
 
     /** Build normalized FusionReportStats structure from AggregationStats. */

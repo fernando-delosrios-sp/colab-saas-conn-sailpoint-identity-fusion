@@ -182,7 +182,7 @@ export class FusionService {
         this.urlContext = createUrlContext(config.baseurl)
         this.run.analysisRecorder = new ManagedAccountAnalysisRecorder({
             log: this.log,
-            tracker: () => this.tracker,
+            tracker: () => this.requireTracker(),
             urlContext: this.urlContext,
             reportAttributes: this.reportAttributes,
             sourcesByName: this.run.sourcesByName,
@@ -268,25 +268,14 @@ export class FusionService {
         this.run.setTracker(tracker)
     }
 
-    /**
-     * Retrieves the AggregationTracker instance.
-     */
-    public get tracker(): AggregationTracker {
+    /** Returns the active AggregationTracker, crashing when unset. */
+    private requireTracker(): AggregationTracker {
         const t = this.run.getTracker()
         this.log.assert(!!t, 'AggregationTracker has not been set on FusionRun')
         if (!t) {
             this.log.crash('AggregationTracker has not been set on FusionRun')
         }
         return t!
-    }
-
-    /** Helper getters for stats that delegate to tracker if available */
-    public get newManagedAccountsCount(): number {
-        return this.run.getTracker()?.newManagedAccountsCount ?? 0
-    }
-
-    public get identitiesProcessedCount(): number {
-        return this.run.getTracker()?.identitiesProcessedCount ?? 0
     }
 
     /**
@@ -454,7 +443,7 @@ export class FusionService {
      * Refresh unique attributes for all fusion accounts and identities in batches.
      */
     public async refreshUniqueAttributes(): Promise<number> {
-        const allAccounts = [...this.fusionAccounts, ...this.fusionIdentities]
+        const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
         await batchProcess(
             allAccounts,
             'Unique-attribute generation',
@@ -1269,14 +1258,6 @@ export class FusionService {
     }
 
     /**
-     * Returns an iterable over fusion identity accounts.
-     * Avoids creating a temporary array when only iteration is needed (e.g. scoring).
-     */
-    public get fusionIdentities(): Iterable<FusionAccount> {
-        return this.run.allFusionIdentities
-    }
-
-    /**
      * Returns an iterable over fusion identities, skipping those whose identityId is in `excludeIds`.
      * Used to filter already auto-assigned identities during managed account scoring.
      */
@@ -1286,24 +1267,6 @@ export class FusionService {
                 yield identity
             }
         }
-    }
-
-    /**
-     * Get all fusion accounts keyed by managedKey as an array.
-     * Note: Creates a new array on each access.
-     */
-    public get fusionAccounts(): FusionAccount[] {
-        return this.run.allFusionAccounts
-    }
-
-    /** Total number of fusion accounts (correlated identities + uncorrelated accounts) */
-    public get totalFusionAccountCount(): number {
-        return this.run.totalFusionAccountCount
-    }
-
-    /** Get reviewers by source ID map */
-    public get reviewersBySourceId(): Map<string, Set<FusionAccount>> {
-        return this.run.reviewersBySourceId
     }
 
     private ensureManagedAccountProcessingInitialized(): void {
@@ -1322,7 +1285,7 @@ export class FusionService {
 
         this.run.startManagedAccountProcessing(Math.max(1, getManagedAccountsBatchSize(this.config)))
 
-        this.tracker.newManagedAccountsCount = map.size
+        this.requireTracker().newManagedAccountsCount = map.size
         this.run.clearDeferredCandidates()
         this.run.resetScoringState()
 
@@ -1338,7 +1301,7 @@ export class FusionService {
         // Build the trigram blocking index over all currently-loaded fusion identities so that
         // each managed account can skip the vast majority of identity comparisons.
         // The index is rebuilt each run (identity pool may change between runs).
-        this.matchingService.buildTrigramIndex(this.fusionIdentities)
+        this.matchingService.buildTrigramIndex(this.run.allFusionIdentities)
 
         this.buildLinkedAccountKeyIndex()
         this.matchingService.configureScoring({ captureBreakdown: this.shouldCaptureManagedAccountReportData() })

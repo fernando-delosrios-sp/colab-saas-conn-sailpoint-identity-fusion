@@ -30,24 +30,18 @@ describe('ReportService', () => {
             formInstancesFound: 4,
             answeredFormInstancesProcessed: 5,
         }
-        const fusionRun = {
-        }
         const fusion = {
-            totalFusionAccountCount: 11,
-            newManagedAccountsCount: 13,
-            identitiesProcessedCount: 17,
-            tracker: {},
             generateReport: vi.fn(() => ({ accounts: [], matches: 0 })),
             getFusionIdentity: vi.fn(() => undefined),
             getFusionAccountByManagedKey: vi.fn(() => undefined),
-            fusionIdentities: [],
-            run: fusionRun,
         }
         const email = {
             sendEmail: vi.fn(async () => undefined),
             getRecipientEmails: vi.fn(async () => ['owner@example.com']),
         }
         const run = {
+            getTracker: vi.fn(() => ({})),
+            allFusionIdentities: [],
             ...{
                 managedAccountInventory:
                     (overrides.run as any)?.managedAccountInventory ??
