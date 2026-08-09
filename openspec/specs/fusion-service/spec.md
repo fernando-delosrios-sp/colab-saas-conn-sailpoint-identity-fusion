@@ -146,7 +146,7 @@ Rule: Persisted `identityId` attribute restores the account's identity linkage.
 
 ### Requirement: Callers SHALL use the collaborator API for account mutations
 
-Production and test callers outside `FusionAccount` itself MUST mutate statuses, actions, reviews, account-id sets, history, matches, correlation promises, and layer enrichment through `fusionAccount.collections`, `fusionAccount.correlation`, or `fusionAccount.layers`. `FusionAccount` MUST NOT expose flat 1:1 pass-through mutators for those concerns (for example `addStatus` that only forwards to `collections.statuses.add`).
+Production and test callers outside `FusionAccount` itself MUST mutate statuses, actions, reviews, account-id sets, history, matches, and correlation promises through `fusionAccount.collections` or `fusionAccount.correlation`. `FusionAccount` MUST NOT expose flat 1:1 pass-through mutators for those concerns (for example `addStatus` that only forwards to `collections.statuses.add`). Layer enrichment that must bind the attribute bag and identity fields MAY remain as orchestration methods on `FusionAccount` (for example `addIdentityLayer`, `addManagedAccountLayer`) that delegate to `FusionLayers`.
 
 #### Scenario: Status mutation goes through collections
 
@@ -155,12 +155,12 @@ Production and test callers outside `FusionAccount` itself MUST mutate statuses,
 - **THEN** the caller invokes a method on `fusionAccount.collections` (or a nested collection API it exposes)
 - **AND** `FusionAccount` does not provide a flat `addStatus` pass-through
 
-#### Scenario: Identity layer enrichment goes through layers
+#### Scenario: Identity layer enrichment uses FusionAccount orchestration
 
 - **GIVEN** a `FusionAccount` instance and an `IdentityDocument`
 - **WHEN** a caller applies the identity layer
-- **THEN** the caller invokes `fusionAccount.layers.addIdentityLayer(...)` (or the documented layers API)
-- **AND** `FusionAccount` does not provide a flat `addIdentityLayer` pass-through
+- **THEN** the caller invokes `fusionAccount.addIdentityLayer(identity)` (or an equivalent orchestration API on `FusionAccount`)
+- **AND** that method delegates to `FusionLayers.addIdentityLayer` with the account's attribute bag and identity bindings
 
 ### Requirement: Collaborators SHALL encapsulate their mutable state
 
@@ -426,5 +426,6 @@ When loading persisted `originAccount` metadata, the connector SHALL accept a pl
 - **WHEN** the connector loads origin metadata
 - **THEN** `originAccount` SHALL NOT be set to the raw UUID
 - **AND** the invalid value SHALL NOT be used as a managed account lookup key
+
 
 

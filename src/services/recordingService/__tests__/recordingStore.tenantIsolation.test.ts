@@ -12,6 +12,7 @@ describe('tenant-scoped recording store isolation', () => {
         const config = { mode: 'record' as const, store: 'ndjson' as const }
         const acmeEntry: ApiLogEntry = {
             api: 'accounts',
+            getter: 'accounts',
             method: 'listAccounts',
             args: [{ limit: 1 }],
             response: { tenant: 'acme' },
@@ -19,6 +20,7 @@ describe('tenant-scoped recording store isolation', () => {
         }
         const globexEntry: ApiLogEntry = {
             api: 'accounts',
+            getter: 'accounts',
             method: 'listAccounts',
             args: [{ limit: 1 }],
             response: { tenant: 'globex' },
@@ -46,3 +48,4 @@ describe('tenant-scoped recording store isolation', () => {
         fs.rmSync(dirB, { recursive: true, force: true })
     })
 })
+
