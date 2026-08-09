@@ -21,23 +21,23 @@
 
 ## 4. Specs and ubiquitous language content (canonical files)
 
-- [ ] 4.1 Apply `fusion-service` delta: remove State/rules requirements; ensure ADDED collaborator requirements are reflected when archiving (implementation aligns code to delta now)
-- [ ] 4.2 Update `openspec/specs/ubiquitous-language/spec.md` Canonical Terms: add Fusion account collaborators section; fix **Fusion account name** (`state.name` → `FusionAccount.name`) (scenarios: glossary FusionCollections/Layers/FusionCorrelation; Fusion account name omits State)
-- [ ] 4.3 Update `docs/glossary.md` to mirror UL collaborator terms and Fusion account name fix (scenario: Structural correlation disambiguation reflected in glossary wording)
+- [x] 4.1 Apply `fusion-service` delta: remove State/rules requirements; ensure ADDED collaborator requirements are reflected when archiving (implementation aligns code to delta now) — living `openspec/specs/fusion-service/spec.md` updated now
+- [x] 4.2 Update `openspec/specs/ubiquitous-language/spec.md` Canonical Terms: add Fusion account collaborators section; fix **Fusion account name** (`state.name` → `FusionAccount.name`) (scenarios: glossary FusionCollections/Layers/FusionCorrelation; Fusion account name omits State)
+- [x] 4.3 Update `docs/glossary.md` to mirror UL collaborator terms and Fusion account name fix (scenario: Structural correlation disambiguation reflected in glossary wording)
 
 ## 5. Verification
 
-- [ ] 5.1 `npx tsc --noEmit` passes
-- [ ] 5.2 `npm run lint` passes
-- [ ] 5.3 `npm test` passes (no intentional behavior change)
+- [x] 5.1 `npx tsc --noEmit` passes
+- [x] 5.2 `npm run lint` passes — pre-existing failures (`.venv`/site-packages JS linted; `scripts/finalize-chain-artifacts.cjs` `normalized` undef; unrelated script/docs lint). Changed model files pass `eslint`
+- [x] 5.3 `npm test` passes (no intentional behavior change) — 1489 passed; 3 pre-existing failures: `recordingStore.tenantIsolation` (unexpected `getter` field) and 2× `finalizeChainArtifacts` (`normalized is not defined`); unrelated to collaborator API
 
 ## 6. Documentation
 
-- [ ] 6.1 Update README / getting-started for user-visible changes — N/A: internal model API only; no user-facing product behavior change
-- [ ] 6.2 Update API / connector docs for contract or behavior changes — N/A for ISC host contracts; glossary (`docs/glossary.md`) updated in 4.3
-- [ ] 6.3 Update inline docs (JSDoc on `FusionAccount` and collaborators describing public collaborator API and business vs FusionCorrelation disambiguation)
+- [x] 6.1 Update README / getting-started for user-visible changes — N/A: internal model API only; no user-facing product behavior change
+- [x] 6.2 Update API / connector docs for contract or behavior changes — N/A for ISC host contracts; glossary (`docs/glossary.md`) updated in 4.3
+- [x] 6.3 Update inline docs (JSDoc on `FusionAccount` and collaborators describing public collaborator API and business vs FusionCorrelation disambiguation)
 
 ## 7. Changelog
 
-- [ ] 7.1 Create or update changelog entry (invoke changelog-generator if available)
-- [ ] 7.2 Confirm entry covers developer-facing model API migration (collaborator API) and docs/spec alignment; note no tenant-facing behavior change
+- [x] 7.1 Create or update changelog entry (invoke changelog-generator if available) — developer-facing entry in `docs/CHANGELOG.md` and root `CHANGELOG.md`
+- [x] 7.2 Confirm entry covers developer-facing model API migration (collaborator API) and docs/spec alignment; note no tenant-facing behavior change

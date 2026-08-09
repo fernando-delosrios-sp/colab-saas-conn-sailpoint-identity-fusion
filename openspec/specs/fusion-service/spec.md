@@ -133,51 +133,56 @@ Rule: Persisted `identityId` attribute restores the account's identity linkage.
 - **WHEN** `FusionAccount.fromFusionAccount(account)` is called
 - **THEN** `identityId` is undefined
 
-### Requirement: FusionAccountState SHALL own all mutable data fields
+### Requirement: FusionAccount SHALL expose collaborator sub-objects
 
-The `FusionAccountState` class MUST hold all mutable data fields (core identity, basic info, state flags, collections, attribute bag, timestamps) as public properties with appropriate default values. Read-only configuration fields (`sourceConfigNamesSet`, `fusionAccountRefreshThresholdInSeconds`, `maxHistoryMessages`) MUST be set via constructor and marked `readonly`.
+`FusionAccount` MUST expose three readonly collaborator instances: `collections` (`FusionCollections`), `correlation` (`FusionCorrelation`), and `layers` (`FusionLayers`). `FusionAccount` MUST own core identity fields and the attribute bag. Collaborators MUST own the mutable slices described in ubiquitous language for each collaborator. `FusionAccountState` and `fusionAccountRules/*` MUST NOT exist.
 
-#### Scenario: State object initialized with config
+#### Scenario: Collaborators are present on a new FusionAccount
 
-- **WHEN** `FusionAccountState` is constructed with config containing `sourceConfigNamesSet`, `fusionAccountRefreshThresholdInSeconds`, and `maxHistoryMessages`
-- **THEN** read-only config fields are set and mutable fields have their default values (empty sets, empty arrays, false flags, empty strings)
+- **GIVEN** a configured `FusionAccount`
+- **WHEN** an account is constructed via a factory method
+- **THEN** `account.collections`, `account.correlation`, and `account.layers` are defined
+- **AND** each is an instance of the corresponding collaborator type
 
-### Requirement: FusionAccountState SHALL serialize collections to the attribute bag
+### Requirement: Callers SHALL use the collaborator API for account mutations
 
-The `syncCollectionAttributesToBag()` method MUST copy `accounts`, `missing-accounts`, `statuses`, `actions`, `reviews`, and `sources` from their respective `Set` collections into `attributeBag.current` and `attributeBag.previous`.
+Production and test callers outside `FusionAccount` itself MUST mutate statuses, actions, reviews, account-id sets, history, matches, correlation promises, and layer enrichment through `fusionAccount.collections`, `fusionAccount.correlation`, or `fusionAccount.layers`. `FusionAccount` MUST NOT expose flat 1:1 pass-through mutators for those concerns (for example `addStatus` that only forwards to `collections.statuses.add`).
 
-#### Scenario: Sync copies collection data to attribute bag
+#### Scenario: Status mutation goes through collections
 
-- **WHEN** `syncCollectionAttributesToBag()` is called after adding entries to collection sets
-- **THEN** `attributeBag.current` contains each collection as an array representation of the set
+- **GIVEN** a `FusionAccount` instance
+- **WHEN** a caller adds a status entitlement
+- **THEN** the caller invokes a method on `fusionAccount.collections` (or a nested collection API it exposes)
+- **AND** `FusionAccount` does not provide a flat `addStatus` pass-through
 
-### Requirement: Rule modules SHALL operate on FusionAccountState as functions
+#### Scenario: Identity layer enrichment goes through layers
 
-Each rule module (`constructionRules`, `layerRules`, `statusRules`, `actionRules`, `reviewRules`, `correlationRules`, `historyRules`) MUST export standalone functions that accept `FusionAccountState` as a parameter and mutate it. Rule functions SHALL NOT have side effects outside the passed state object.
+- **GIVEN** a `FusionAccount` instance and an `IdentityDocument`
+- **WHEN** a caller applies the identity layer
+- **THEN** the caller invokes `fusionAccount.layers.addIdentityLayer(...)` (or the documented layers API)
+- **AND** `FusionAccount` does not provide a flat `addIdentityLayer` pass-through
 
-#### Scenario: Rule function mutates only the provided state
+### Requirement: Collaborators SHALL encapsulate their mutable state
 
-- **WHEN** a rule function such as `addStatus(state, "matched")` is called
-- **THEN** only `state.statuses` is modified — no other state object is affected
+`FusionCollections`, `FusionCorrelation`, and `FusionLayers` MUST keep collection and flag state private (or otherwise not publicly mutable sets). Factory and hydrate paths on `FusionAccount` MUST use documented collaborator construction or hydrate methods. Call sites MUST NOT use `_internal_*` accessors to mutate collaborator state from `FusionAccount` factories or from external callers.
 
-### Requirement: FusionAccount facade SHALL delegate all operations to state and rules
+#### Scenario: Factory hydration does not use _internal_ mutators
 
-`FusionAccount` MUST contain only a private `state` field, static factory methods delegating to construction rules, public accessors delegating to `this.state`, and public mutators delegating to the appropriate rule module. No private helpers or internal logic SHALL remain in `FusionAccount.ts`.
+- **GIVEN** a persisted ISC account used with `FusionAccount.fromFusionAccount`
+- **WHEN** collection attributes are restored
+- **THEN** restoration goes through public or package-documented hydrate APIs on `FusionCollections` / `FusionLayers`
+- **AND** the factory path does not call `_internal_*` setters on the collaborator
 
-#### Scenario: Factory method delegates to construction rules
+### Requirement: Collection sync writes the current attribute bag
 
-- **WHEN** `FusionAccount.fromIdentity(identity)` is called
-- **THEN** a new `FusionAccount` is constructed and `buildFromIdentity` is called on its `state`
+`FusionAccount.syncCollectionAttributesToBag()` MUST copy `accounts`, `missing-accounts`, `statuses`, `actions`, `reviews`, and `sources` (and other collection mirrors owned by `FusionCollections`) into `attributeBag.current` via `FusionCollections.syncToBag`. The method MUST NOT be required to mirror those collection arrays into `attributeBag.previous`.
 
-#### Scenario: Mutator delegates to rule module
+#### Scenario: Sync updates current bag
 
-- **WHEN** `fusionAccount.addStatus("test-status")` is called
-- **THEN** `FusionAccountStatusRules.addStatus` is invoked with `fusionAccount.state` and the status
-
-#### Scenario: Accessor reads from state
-
-- **WHEN** `fusionAccount.email` is accessed after `state.email` is set to `"test@example.com"`
-- **THEN** the getter returns `"test@example.com"`
+- **GIVEN** a Fusion account with non-empty status and account-id collections
+- **WHEN** `syncCollectionAttributesToBag()` is called
+- **THEN** `attributeBag.current` contains array representations of those collections
+- **AND** the contract does not require those same collection mirrors to be written into `attributeBag.previous`
 
 ### Requirement: FusionService delegates matching to MatchingService
 
@@ -421,4 +426,5 @@ When loading persisted `originAccount` metadata, the connector SHALL accept a pl
 - **WHEN** the connector loads origin metadata
 - **THEN** `originAccount` SHALL NOT be set to the raw UUID
 - **AND** the invalid value SHALL NOT be used as a managed account lookup key
+
 

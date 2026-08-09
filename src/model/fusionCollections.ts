@@ -10,6 +10,10 @@ import { StatusEntitlement } from './statusEntitlement'
 import { IDENTITIES_SOURCE_NAME } from './fusionAccount'
 import type { FusionManagedAccountInfo } from './fusionAccountTypes'
 
+/**
+ * Fusion account collaborator for collection state: account-id sets, missing-accounts,
+ * statuses, actions, reviews, sources, fusion matches, history, and sync-to-bag.
+ */
 export class FusionCollections {
     private _accountIds = new Set<string>()
     private _missingAccountIds = new Set<string>()
@@ -504,6 +508,7 @@ export class FusionCollections {
         if (identityId) bag[FusionAttribute.IdentityId] = identityId
     }
 }
+
 
 
 

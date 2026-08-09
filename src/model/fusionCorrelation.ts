@@ -2,6 +2,10 @@ import { FusionAction } from './fusionAction'
 import { StatusEntitlement } from './statusEntitlement'
 import type { FusionCollections } from './fusionCollections'
 
+/**
+ * Fusion account collaborator for correlation promises and mark-correlated helpers on one account.
+ * Not the business **correlation** process (linking managed source accounts to an ISC identity).
+ */
 export class FusionCorrelation {
     private _correlationPromises: Array<Promise<unknown>> = []
 
@@ -78,5 +82,6 @@ export class FusionCorrelation {
         this.resolvePendingReviewUrls()
     }
 }
+
 
 

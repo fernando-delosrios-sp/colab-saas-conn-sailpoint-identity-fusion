@@ -22,7 +22,18 @@ This page defines the canonical terms used throughout the connector, its configu
 |------|------------|
 | **Identity alias** | The authoritative account name of the correlated ISC identity, taken from the top-level `displayName` field of the `IdentityDocument` as reported by the SailPoint SDK. This is the only value used for the Fusion account display attribute override (`fusionDisplayAttribute`). |
 | **Identity name** | A human-friendly reference label for the correlated identity. Computed as `IdentityDocument.attributes.displayName`, falling back to `IdentityDocument.name`, then to `FusionAccount.name`. Used in reports, review form candidates, emails, logs, and other user-facing references where a readable label is required. Replaces the former **identity display name** concept. |
-| **Fusion account name** | The `name` property of a `FusionAccount` (`state.name`). It mirrors the ISC `Account.name` / `Identity.name` field of the persisted account and is used for internal logging, history entries, and conflict tracking. It is not the output display attribute unless the display attribute override is configured to consume it. |
+| **Fusion account name** | The `name` property of a `FusionAccount` (`FusionAccount.name`). It mirrors the ISC `Account.name` / `Identity.name` field of the persisted account and is used for internal logging, history entries, and conflict tracking. It is not the output display attribute unless the display attribute override is configured to consume it. |
+
+## Fusion account collaborators
+
+Architecture vocabulary for how a `FusionAccount` is organized. These terms do not replace business terms such as statuses, actions, or **correlation** (ISC linking of managed source accounts to an identity).
+
+| Term | Definition |
+|------|------------|
+| **Fusion account collaborators** | The three behavior-rich parts of a `FusionAccount`: **FusionCollections**, **FusionCorrelation**, and **FusionLayers**. Exposed as readonly `collections`, `correlation`, and `layers` on `FusionAccount`. |
+| **FusionCollections** | The collaborator that owns account-id sets, missing-accounts, statuses, actions, reviews, sources, fusion matches, history, and related collection sync-to-bag behavior. |
+| **FusionLayers** | The collaborator that owns identity / managed-account / fusion-decision enrichment methods and layer-related flags (for example needsRefresh, disabled, origin metadata). |
+| **FusionCorrelation** | The collaborator that owns correlation promises and mark-correlated helpers on a single Fusion account. Distinct from business **correlation** (linking managed source accounts to an ISC identity). |
 
 ## Operation structure
 
@@ -254,6 +265,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Golden artifact** | A pre-validated expected output file (e.g., `output.sweep1.expected.json`) used as the reference for automated test comparison. Generated artifacts are compared against golden artifacts to detect regressions. |
 | **Sweep** (testing) | A single aggregation run within a test scenario. Multi-sweep scenarios (sweep 1, sweep 2) validate stateful behavior across sequential aggregations. |
 | **Side effects** | Non-account changes produced during an aggregation run (e.g., form creation, correlation API calls). Captured in side-effect files for test validation. |
+
 
 
 

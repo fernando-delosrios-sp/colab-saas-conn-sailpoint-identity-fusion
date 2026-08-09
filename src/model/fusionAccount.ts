@@ -28,6 +28,11 @@ import { FusionLayers, type AddManagedAccountOptions } from './fusionLayers'
 
 export const IDENTITIES_SOURCE_NAME = 'Identities'
 
+/**
+ * Consolidated Fusion account: owns identity fields and the attribute bag.
+ * Mutable slices live on readonly collaborators — `collections`, `correlation`, and `layers`.
+ * Prefer those collaborators over flat pass-through mutators for statuses, layers, and promises.
+ */
 export class FusionAccount {
     private static _config?: FusionConfig
 
@@ -723,6 +728,7 @@ export class FusionAccount {
         }
     }
 }
+
 
 
 
