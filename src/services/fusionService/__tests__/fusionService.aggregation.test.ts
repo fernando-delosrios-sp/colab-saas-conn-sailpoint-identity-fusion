@@ -558,6 +558,27 @@ describe('FusionService — aggregation', () => {
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue(undefined)
         })
 
+        it('narrows run.sourcesByName to managed sources only', async () => {
+            const managed = managedSource()
+            const fusionSource = {
+                id: ctx.FUSION_SOURCE_ID,
+                name: 'Identity Fusion',
+                isManaged: false,
+                sourceType: 'authoritative',
+                config: {},
+            }
+
+            ctx.run.sourcesByName.set(fusionSource.name, fusionSource as any)
+            ctx.run.sourcesByName.set(managed.name, managed as any)
+            ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = false
+
+            await ctx.fusionService.initializeSourceReviewers()
+
+            expect(ctx.run.sourcesByName.has('Identity Fusion')).toBe(false)
+            expect(ctx.run.sourcesByName.has(SOURCE_NAME)).toBe(true)
+            expect(ctx.run.sourcesByName.size).toBe(1)
+        })
+
         it('registers global owners as reviewers when owner identity is hydrated but not yet a fusion identity', async () => {
             const globalOwner = {
                 id: 'global-owner-1',

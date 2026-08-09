@@ -401,6 +401,40 @@ describe('SourceService.fetchAllSources', () => {
         expect(service.fusionSourceId).toBe('fusion-source-id')
         expect(service.getSourceByNameSafe('HR Source')?.id).toBe('managed-source-id')
     })
+
+    it('populates _allSources, sourcesById, and run.sourcesByName with the same SourceInfo references', async () => {
+        const { service, client } = createService()
+        ;(service as any)._allSources = undefined
+        ;(service as any)._fusionSourceId = undefined
+        ;(service as any).sourcesById = new Map()
+        service.run.sourcesByName.clear()
+
+        client.paginate.mockResolvedValue([
+            { id: 'managed-source-id', name: 'HR Source', connectorAttributes: {} },
+            {
+                id: 'fusion-source-id',
+                name: 'Fusion Source',
+                owner: { id: 'owner-id', type: 'IDENTITY' },
+                connectorAttributes: { spConnectorInstanceId: 'fusion-id' },
+            },
+        ])
+
+        await service.fetchAllSources()
+
+        const managedFromList = service.allSources.find((s) => s.name === 'HR Source')
+        const fusionFromList = service.allSources.find((s) => s.name === 'Fusion Source')
+        const managedFromId = service.getSourceById('managed-source-id')
+        const fusionFromId = service.getSourceById('fusion-source-id')
+        const managedFromName = service.getSourceByName('HR Source')
+        const fusionFromName = service.getSourceByName('Fusion Source')
+
+        expect(managedFromList).toBeDefined()
+        expect(fusionFromList).toBeDefined()
+        expect(managedFromList).toBe(managedFromId)
+        expect(managedFromList).toBe(managedFromName)
+        expect(fusionFromList).toBe(fusionFromId)
+        expect(fusionFromList).toBe(fusionFromName)
+    })
 })
 
 describe('SourceService source lookup boundaries', () => {

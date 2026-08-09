@@ -1,38 +1,4 @@
-# source-service Spec
-
-## Purpose
-
-The source service (`src/services/sourceService/`) is the connector's read/write adapter for managed sources. It wraps the SailPoint API client's `AccountV2025` resource, provides jmespath-based account filtering, manages the source-specific reverse-correlation error vocabulary, and exposes the per-source type definitions. This spec defines the contract for how the connector resolves accounts from a source, applies the configured filters, and surfaces source-specific failure modes.
-## Requirements
-### Requirement: The source service MUST resolve accounts using the source's configured filters
-
-The source service MUST resolve accounts from a managed source by applying configured filter expressions at fetch time. **Accounts API filter** (`accountFilter`) SHALL be composed into the ISC `listAccounts` `filters` query (server-side). **Accounts JMESPath filter** (`accountJmespathFilter`) SHALL be applied client-side to each fetched account page before accounts are registered on FusionRun. Source-specific reverse-correlation errors MUST be surfaced using the dedicated error vocabulary in `sourceReverseCorrelationErrors.ts` so the rest of the connector can distinguish them from generic upstream failures.
-
-#### Scenario: A jmespath filter narrows the resolved account set
-
-- **REMOVED** — superseded by **Accounts API filter narrows the resolved account set** and **Accounts JMESPath filter narrows each fetched page**. Prior scenario mislabeled ISC search syntax (`attributes.active eq true`) as JMESPath.
-
-#### Scenario: Accounts API filter narrows the resolved account set
-
-- **GIVEN** a managed source with Accounts API filter `attributes.active eq true`
-- **WHEN** the source service fetches accounts for the source via `listAccounts`
-- **THEN** the composed `filters` parameter SHALL include the configured filter clause
-- **AND** only accounts returned by the ISC Accounts API for that query SHALL be registered on FusionRun
-- **AND** accounts excluded by the server-side filter SHALL NOT be surfaced to the operations layer
-
-#### Scenario: Accounts JMESPath filter narrows each fetched page
-
-- **GIVEN** a managed source with Accounts JMESPath filter that selects a subset of accounts from a page
-- **WHEN** the source service processes a page of accounts returned by the ISC Accounts API
-- **THEN** only accounts retained by the JMESPath expression SHALL be registered on FusionRun
-- **AND** accounts removed by the JMESPath filter SHALL NOT be surfaced to the operations layer
-
-#### Scenario: A reverse-correlation failure surfaces a typed error
-
-- **GIVEN** the source service cannot reverse-correlate a result to an account
-- **WHEN** the operation handles the failure
-- **THEN** the error is one of the typed entries from `sourceReverseCorrelationErrors.ts`
-- **AND** the error is distinguishable from generic upstream `ConnectorError`s
+## ADDED Requirements
 
 ### Requirement: SourceService maintains discovery-session source metadata indexes
 
@@ -67,6 +33,10 @@ SourceService `_allSources` and `sourcesById` are discovery-session caches on So
 - **THEN** SourceService SHALL fall back to the static connector `sources` configuration when the name map entry is absent
 - **AND** it SHALL return the configured `SourceConfig` when defined
 
+---
+
+## MODIFIED Requirements
+
 ### Requirement: SourceService writes account data to FusionRun
 
 SourceService SHALL write all **managed account** inventory data to FusionRun rather than maintaining service-local account copies. SourceService SHALL NOT hold its own `managedAccountsAllById` or `managedAccountsByIdentityId` fields. Each fetched managed account SHALL be registered via `run.setManagedAccount`, which SHALL populate both the work queue and the lightweight inventory.
@@ -100,25 +70,3 @@ Source metadata follows a separate contract: SourceService SHALL register discov
 - **THEN** each resolved source SHALL be registered on `run.sourcesByName`
 - **AND** SourceService SHALL populate `sourcesById` in the same discovery pass
 - **AND** managed account fetch SHALL not populate any service-local full-account snapshot map
-
-### Requirement: Managed-account parallel fetch SHALL report page-level progress to the operation heartbeat
-
-When fetching managed accounts via parallel offset pagination, `SourceService` SHALL wire pagination `onPageProgress` so that `LogService.setProgress` is invoked after each page completes with unit `fetched`, using the aggregate loaded count across all in-flight managed sources when multiple sources fetch concurrently.
-
-#### Scenario: Aggregate fetch progress advances on each page completion
-
-- **GIVEN** `fetchManagedAccounts` loading two sources concurrently via parallel pagination
-- **WHEN** any managed-source page completes
-- **THEN** `setProgress` SHALL be called with an updated aggregate loaded count
-- **AND** the progress unit SHALL be `fetched`
-- **AND** the total SHALL reflect known `X-Total-Count` sums when all active sources have known totals
-
-#### Scenario: Single large source shows incremental heartbeat progress
-
-- **GIVEN** a managed source with more than 1000 accounts fetched via parallel pagination
-- **AND** heartbeat interval 10 seconds
-- **WHEN** Fetch phase runs long enough for multiple STATUS ticks
-- **THEN** pipeline progress delta for unit `fetched` SHALL increase on more than one tick before the source completes
-- **AND** increases SHALL correspond to page completions rather than only multi-thousand-account batch jumps
-
-
