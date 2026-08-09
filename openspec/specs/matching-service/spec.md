@@ -3,25 +3,40 @@
 ## Purpose
 
 The match service (`src/services/matchingService/`) provides weighted scoring algorithms and trigram blocking for the Match step. `MatchOutcomeDispatcher` in the same package owns match outcome dispatch and the two-sweep matching lifecycle (identity scoring sweep → deferred drain). All scoring algorithms from the former ScoringService remain in effect under the new name.
-## Requirements
-### Requirement: MatchingService dispatches exact match → automatic merge
 
-When scoring produces an exact match (all evaluated rules score 100, none skipped) and automatic merge is enabled, MatchingService SHALL create a synthetic decision and merge the managed account into the matching Fusion identity without creating a review form.
+## Public API
+
+**MatchingService** (`matchingService.ts`) — scoring and blocking only:
+
+| Method | Caller | Purpose |
+|--------|--------|---------|
+| `configureScoring({ captureBreakdown? })` | FusionService (init) | Run-scoped scoring options |
+| `buildTrigramIndex(identities)` | FusionService (init) | Mandatory-attribute trigram index on FusionRun |
+| `getCandidates(account, log?, excludeIds?)` | MatchOutcomeDispatcher | Pre-filter identity candidates before full scan |
+| `scoreFusionAccount(...)` | MatchOutcomeDispatcher | Score account against identity or deferred candidate pool |
+| `getScore(attribute)` | Callers needing thresholds | Lookup configured fusion score for an attribute |
+
+MatchingService SHALL NOT expose sweep orchestration (`processUncorrelatedManagedAccounts`) or outcome handlers (merge, form creation, non-match registration). Those belong to **MatchOutcomeDispatcher** — see `match-outcome-dispatch/spec.md`.
+
+## Requirements
+### Requirement: MatchOutcomeDispatcher dispatches exact match → automatic merge
+
+When scoring produces an exact match (all evaluated rules score 100, none skipped) and automatic merge is enabled, MatchOutcomeDispatcher SHALL create a synthetic decision and merge the managed account into the matching Fusion identity without creating a review form.
 
 #### Scenario: Exact match triggers automatic merge
 - **GIVEN** automatic merge is enabled and scoring produces an exact match
-- **WHEN** MatchingService handles the outcome
+- **WHEN** MatchOutcomeDispatcher handles the outcome
 - **THEN** a synthetic FusionDecision SHALL be created with `automaticMerge: true`
 - **AND** the managed account SHALL be merged into the matching Fusion identity
 - **AND** no review form SHALL be created
 
-### Requirement: MatchingService dispatches identity match → partial match review
+### Requirement: MatchOutcomeDispatcher dispatches identity match → partial match review
 
-When scoring produces identity-candidate matches but no exact match (or automatic merge is disabled), MatchingService SHALL create a review form with the highest-scoring identity candidates presenting merge-with-existing-identity and create-new-identity options.
+When scoring produces identity-candidate matches but no exact match (or automatic merge is disabled), MatchOutcomeDispatcher SHALL create a review form with the highest-scoring identity candidates presenting merge-with-existing-identity and create-new-identity options.
 
 #### Scenario: Identity match creates review form
 - **GIVEN** scoring produces identity-candidate matches with combined scores above threshold
-- **WHEN** MatchingService handles the outcome
+- **WHEN** MatchOutcomeDispatcher handles the outcome
 - **THEN** a review form SHALL be created via FormService
 - **AND** the form SHALL include the top candidates up to maxCandidatesForForm
 - **AND** the FusionAccount's identity references SHALL be cleared after form creation
@@ -53,18 +68,18 @@ When a managed account belongs to a Record-type source with `includeRecordAccoun
 - **THEN** unique attributes SHALL be registered using the same selective map + register helper as the bulk phase
 - **AND** no Fusion account SHALL be created
 
-### Requirement: MatchingService dispatches non-match per source type
+### Requirement: MatchOutcomeDispatcher dispatches non-match per source type
 
-When no identity candidates meet the threshold, MatchingService SHALL apply source-type-specific policies: authoritative accounts produce new Fusion accounts, record accounts register unique attributes only, orphan accounts may be disabled. Record accounts whose source has `includeRecordAccountsForMatching` false SHALL be registered in the bulk record unique registration phase and SHALL NOT reach this dispatch path during uncorrelated sweep.
+When no identity candidates meet the threshold, MatchOutcomeDispatcher SHALL apply source-type-specific policies: authoritative accounts produce new Fusion accounts, record accounts register unique attributes only, orphan accounts may be disabled. Record accounts whose source has `includeRecordAccountsForMatching` false SHALL be registered in the bulk record unique registration phase and SHALL NOT reach this dispatch path during uncorrelated sweep.
 
 #### Scenario: Authoritative non-match creates new Fusion account
 - **GIVEN** an authoritative managed account with no matches
-- **WHEN** MatchingService handles the outcome
+- **WHEN** MatchOutcomeDispatcher handles the outcome
 - **THEN** a new Fusion account SHALL be created and registered in FusionRun
 
 #### Scenario: Record non-match registers unique attributes
 - **GIVEN** a record-source managed account with no matches and match scoring enabled for that source
-- **WHEN** MatchingService handles the outcome
+- **WHEN** MatchOutcomeDispatcher handles the outcome
 - **THEN** unique attributes SHALL be registered via DefinitionService
 - **AND** no Fusion account SHALL be created
 
@@ -75,9 +90,9 @@ When no identity candidates meet the threshold, MatchingService SHALL apply sour
 - **THEN** the account SHALL NOT appear in the uncorrelated match sweep queue
 - **AND** unique values SHALL already be present in DefinitionService registries
 
-### Requirement: MatchingService handles deferred candidate matching
+### Requirement: MatchOutcomeDispatcher handles deferred candidate matching
 
-When scoring produces deferred-candidate matches, MatchingService SHALL defer identity creation for the incoming managed account by not producing a new Fusion account for that account in the current run. Pending accounts in the deferred drain SHALL be scored against both finalized candidates (persisted fusion anchors from prior runs and materialized non-match anchors from the current sweep) and remaining pending queue peers. When a deferred match includes pending queue peers among its candidates, those peers SHALL be promoted to non-match Fusion accounts and removed from the pending queue.
+When scoring produces deferred-candidate matches, MatchOutcomeDispatcher SHALL defer identity creation for the incoming managed account by not producing a new Fusion account for that account in the current run. Pending accounts in the deferred drain SHALL be scored against both finalized candidates (persisted fusion anchors from prior runs and materialized non-match anchors from the current sweep) and remaining pending queue peers. When a deferred match includes pending queue peers among its candidates, those peers SHALL be promoted to non-match Fusion accounts and removed from the pending queue.
 
 #### Scenario: Deferred match skips the incoming account and promotes matched peers
 - **GIVEN** a managed account with deferred-candidate matches against candidates in the pool (persisted, finalized, or pending)
@@ -155,10 +170,10 @@ MatchingService SHALL receive FusionRun at construction time and read/write all 
 - **WHEN** MatchingService needs the set of existing fusion identities
 - **THEN** it SHALL read from run.fusionIdentityMap, not from a service-local cache
 
-#### Scenario: MatchingService writes match outcomes to FusionRun
-- **WHEN** MatchingService creates a new Fusion account from a non-match
-- **THEN** the account SHALL be written to run.fusionAccountMap
-- **AND** auto-merged identity IDs SHALL be written to run.autoMergedIdentityIds
+#### Scenario: Match outcome dispatch writes domain results to FusionRun
+- **WHEN** MatchOutcomeDispatcher creates a new Fusion account from a non-match or completes an automatic merge
+- **THEN** new or updated accounts SHALL be written to run.fusionAccountMap
+- **AND** auto-merged identity IDs SHALL be written to run.autoMergedIdentityIds when applicable
 
 #### Scenario: MatchingService builds trigram index on FusionRun
 - **WHEN** MatchingService.buildTrigramIndex is called
@@ -419,5 +434,6 @@ When `getCandidates` cannot produce a candidate set because the managed account 
 - **GIVEN** a trigram index where no bucket key overlaps the query value's trigrams
 - **WHEN** `queryAttributeIndex` is called
 - **THEN** an empty set SHALL be returned (not `undefined`)
+
 
 

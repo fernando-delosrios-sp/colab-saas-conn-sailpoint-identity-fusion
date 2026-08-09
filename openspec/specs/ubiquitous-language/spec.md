@@ -359,7 +359,7 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 |------|------------|
 | **MappingService** | The stateless service responsible for the **Map** step — merging attributes from managed source accounts into the Fusion account schema using configurable merge strategies. Located at `src/services/mappingService/`. |
 | **DefinitionService** | The stateless service responsible for the **Define** step — computing normal attributes via Velocity templates and generating persistent unique attributes (UUIDs, counters, disambiguated values). Located at `src/services/definitionService/`. |
-| **MatchingService** | The stateless service responsible for the **Match** step — comparing Fusion accounts against existing identities using weighted scoring rules and routing each scored account to its **Match outcome dispatch** (exact match, partial match, deferred match, non-match). Located at `src/services/matchingService/`. |
+| **MatchingService** | The stateless service responsible for **scoring** in the Match step — weighted rule evaluation, trigram blocking, and normalization caches on FusionRun. Located at `src/services/matchingService/`. Outcome routing (merge, review form, defer, non-match) is **Match outcome dispatch** via `MatchOutcomeDispatcher`, not MatchingService. |
 | **FusionRun** | The centralized state container for a single operation run. Holds all mutable data loaded during the run (managed accounts, identities, Fusion accounts, form decisions, matching state) and serves as the single source of truth that stateless services read from and write to. Exposes `snapshot()` and `restore()` for recording and replay. Located at `src/model/fusionRun.ts`. |
 
 ### Matching and scoring
