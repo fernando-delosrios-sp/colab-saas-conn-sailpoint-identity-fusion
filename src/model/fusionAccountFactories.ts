@@ -237,7 +237,7 @@ export function buildFromManagedAccount(account: Account): FusionAccount {
     fa.layers.uncorrelated = true
     fa.collections.removeActionSilent(FusionAction.Correlated)
 
-    fa.layers._setManagedAccount(account, false, undefined, {
+    fa.layers.setManagedAccount(account, false, undefined, {
         sources: fa.attributeBag.sources,
     })
 
@@ -284,3 +284,4 @@ export function buildFromFusionDecision(decision: FusionDecision): FusionAccount
 
     return fa
 }
+

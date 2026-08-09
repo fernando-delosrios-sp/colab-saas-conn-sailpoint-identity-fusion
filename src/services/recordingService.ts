@@ -167,7 +167,7 @@ function buildScenario(scenarioRef: string, config: FusionConfig, store: Recordi
 }
 
 /** Finalizes a chain from on-disk artifacts (one call per chain per process). */
-export async function finalizeRecordingChain(
+async function finalizeRecordingChain(
     chainName: string,
     config: FusionConfig,
     log: LogService,
@@ -402,6 +402,7 @@ export function resetRecordingLifecycleForTests(): void {
     exitHandlersRegistered = false
     clearRecordingStoreCache()
 }
+
 
 
 

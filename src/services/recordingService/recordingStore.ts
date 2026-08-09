@@ -46,7 +46,7 @@ export interface RecordingStore extends ApiLogReader {
 const storeCache = new Map<string, RecordingStore>()
 
 /** Creates the configured store implementation (default NDJSON). */
-export function createRecordingStore(config: RecordingConfig, chainName: string, baseurl?: string): RecordingStore {
+function createRecordingStore(config: RecordingConfig, chainName: string, baseurl?: string): RecordingStore {
     const storeType = config.store ?? 'ndjson'
     switch (storeType) {
         case 'ndjson':
@@ -112,6 +112,7 @@ export function loadRecordingApiLog(chainDir: string, baseurl?: string): ApiLogE
     const store = createRecordingStore({ mode: 'replay', store: storeType, chainName }, chainName, baseurl)
     return store.loadApiLog()
 }
+
 
 
 

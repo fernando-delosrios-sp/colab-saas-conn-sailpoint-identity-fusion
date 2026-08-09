@@ -229,16 +229,16 @@ export class ClientService {
     public call<T>(fn: (api: IscApiSurface, ...args: any[]) => Promise<any>, policy?: CallPolicy): any {
         const paginate = (policy as PaginatePolicy)?.paginate
         if (!paginate) {
-            return this.execute<T>(() => fn(this._apiSurface), policy ?? {})
+            return this.execute<T>(() => fn(this.apiSurface), policy ?? {})
         }
         switch (paginate.mode) {
-            case 'sequential': return this._paginateSequential<T>(fn as any, paginate, policy!)
-            case 'parallel': return this._paginateParallel<T>(fn as any, paginate, policy!)
-            case 'searchAfter': return this._paginateSearchAfter<T>(fn as any, paginate, policy!)
+            case 'sequential': return this.paginateSequential<T>(fn as any, paginate, policy!)
+            case 'parallel': return this.paginateParallelForCall<T>(fn as any, paginate, policy!)
+            case 'searchAfter': return this.paginateSearchAfter<T>(fn as any, paginate, policy!)
         }
     }
 
-    private get _apiSurface(): IscApiSurface {
+    private get apiSurface(): IscApiSurface {
         const a = this.adapter
         return {
             get accounts() { return a.accountsApi },
@@ -256,7 +256,7 @@ export class ClientService {
         }
     }
 
-    private async _fetchSequentialOffsetPages<T>(
+    private async fetchSequentialOffsetPages<T>(
         fetchPage: (limit: number, offset: number) => Promise<T[] | undefined>,
         config: {
             effectivePageSize: number
@@ -310,17 +310,17 @@ export class ClientService {
         return all
     }
 
-    private async _paginateSequential<T>(
+    private async paginateSequential<T>(
         fn: (api: IscApiSurface, params: any) => Promise<{ data: T[] }>,
         paginate: { baseParams?: Record<string, unknown>; limit?: number },
         policy: CallPolicy
     ): Promise<T[]> {
-        const api = this._apiSurface
+        const api = this.apiSurface
         const eps = Math.min(this.pageSize, this.sailPointListMax)
         const bp = paginate.baseParams ?? {}
         const ctx = (suffix: string) => (policy.context ? `${policy.context} ${suffix}` : suffix)
 
-        return this._fetchSequentialOffsetPages<T>(
+        return this.fetchSequentialOffsetPages<T>(
             async (limit, offset) => {
                 const response = await this.execute<{ data: T[] }>(() => fn(api, { ...bp, limit, offset }), {
                     priority: policy.priority,
@@ -339,7 +339,7 @@ export class ClientService {
         )
     }
 
-    private async *_yieldParallelOffsetPages<T>(
+    private async *yieldParallelOffsetPages<T>(
         initialItems: T[],
         totalCount: number,
         fetchCeiling: number,
@@ -359,7 +359,7 @@ export class ClientService {
             offsets.push(offset)
         }
 
-        yield* this._runParallelOffsetWindow(
+        yield* this.runParallelOffsetWindow(
             offsets,
             batchSize,
             initialItems.length,
@@ -371,12 +371,12 @@ export class ClientService {
         )
     }
 
-    private async *_paginateParallel<T>(
+    private async *paginateParallelForCall<T>(
         fn: (api: IscApiSurface, params: any) => Promise<{ data: T[]; headers?: any }>,
         paginate: { baseParams?: Record<string, unknown>; limit?: number; batchSize?: number },
         policy: CallPolicy
     ): AsyncGenerator<T[], void, unknown> {
-        const api = this._apiSurface
+        const api = this.apiSurface
         const eps = Math.min(this.pageSize, this.sailPointListMax)
         const bs = paginate.batchSize ?? this.parallelBatchSize
         const bp = paginate.baseParams ?? {}
@@ -403,7 +403,7 @@ export class ClientService {
         const fetchCeiling = limit != null ? Math.min(totalCount, limit) : totalCount
         policy.onPageProgress?.(initialItems.length, totalCount > 0 ? fetchCeiling : undefined)
 
-        yield* this._yieldParallelOffsetPages(
+        yield* this.yieldParallelOffsetPages(
             initialItems,
             totalCount,
             fetchCeiling,
@@ -431,7 +431,7 @@ export class ClientService {
      * Fetch offset pages with a sliding window: up to `windowSize` in-flight requests;
      * schedules the next offset when any page completes. Yields pages in ascending offset order.
      */
-    private async *_runParallelOffsetWindow<T>(
+    private async *runParallelOffsetWindow<T>(
         offsets: number[],
         windowSize: number,
         initialLoaded: number,
@@ -458,12 +458,12 @@ export class ClientService {
         yield* scheduler.run()
     }
 
-    private async _paginateSearchAfter<T>(
+    private async paginateSearchAfter<T>(
         fn: (api: IscApiSurface, params: { search: any; limit: number; count?: boolean }) => Promise<{ data: unknown[] }>,
         paginate: { search: any },
         policy: CallPolicy
     ): Promise<T[]> {
-        const api = this._apiSurface
+        const api = this.apiSurface
         const ps = this.pageSize
         const bs = { ...paginate.search, sort: ['id'] }
         let sa: string[] | undefined, first = true, more = true, pn = 1
@@ -591,7 +591,7 @@ export class ClientService {
                   : `list [page, offset ${offset}]`
 
         try {
-            return await this._fetchSequentialOffsetPages<T>(
+            return await this.fetchSequentialOffsetPages<T>(
                 async (limit, offset) => {
                     const params = { ...baseParameters, limit, offset } as TRequestParams
                     const response = await this.execute<{ data: T[] }>(() => callFunction(params), {
@@ -812,7 +812,7 @@ export class ClientService {
         const totalCount = parseInt(initialResponse.headers?.['x-total-count'] || '0', 10)
         const fetchCeiling = limit !== undefined ? Math.min(totalCount, limit) : totalCount
 
-        yield* this._yieldParallelOffsetPages(
+        yield* this.yieldParallelOffsetPages(
             initialItems,
             totalCount,
             fetchCeiling,

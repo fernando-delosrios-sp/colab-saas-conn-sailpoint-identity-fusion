@@ -22,10 +22,10 @@ import { promiseAllBatched } from '../fusionService/collections'
  * Service for managing account schema, dynamic schema building.
  */
 export class SchemaService {
-    private _fusionAccountSchema?: AccountSchema
+    private fusionAccountSchemaValue?: AccountSchema
     private attributeMap: Map<string, AttributeMap> = new Map()
-    private _fusionSchemaAttributeNames: string[] = []
-    private _fusionSchemaAttributeMap: Map<string, SchemaAttribute> = new Map()
+    private fusionSchemaAttributeNames: string[] = []
+    private fusionSchemaAttributeMap: Map<string, SchemaAttribute> = new Map()
     private accountSchemasCache = new Map<string, Promise<AccountSchema>>()
     private readonly attributeMerge: DefaultAttributeMergeMode
     private readonly normalAttributeDefinitions: NormalAttributeDefinition[]
@@ -65,10 +65,10 @@ export class SchemaService {
         if (!attributes) return {}
 
         const fusionAttributes: Attributes = {}
-        for (const attribute of this._fusionSchemaAttributeNames) {
+        for (const attribute of this.fusionSchemaAttributeNames) {
             const value = attributes?.[attribute]
             if (value === null || value === undefined) continue
-            const schemaDef = this._fusionSchemaAttributeMap.get(attribute)
+            const schemaDef = this.fusionSchemaAttributeMap.get(attribute)
             const casted = schemaDef ? this.castAttributeValue(value, schemaDef) : value
             if (casted === null || casted === undefined) continue
             fusionAttributes[attribute] = casted
@@ -147,7 +147,7 @@ export class SchemaService {
 
     /** Fetches the fusion account schema from the fusion source via the API. */
     private async fetchFusionAccountSchema(): Promise<void> {
-        this._fusionAccountSchema = await this.fetchAccountSchema(this.sources.fusionSourceId!)
+        this.fusionAccountSchemaValue = await this.fetchAccountSchema(this.sources.fusionSourceId!)
     }
 
     /** The identity attribute name from the fusion account schema (e.g. "id"). */
@@ -174,30 +174,30 @@ export class SchemaService {
      */
     public async setFusionAccountSchema(accountSchema: AccountSchema | undefined): Promise<void> {
         if (accountSchema) {
-            this._fusionAccountSchema = accountSchema
+            this.fusionAccountSchemaValue = accountSchema
         } else {
             await this.fetchFusionAccountSchema()
         }
-        this._fusionAccountSchema = {
+        this.fusionAccountSchemaValue = {
             ...this.fusionAccountSchema,
             attributes: dedupeSchemaAttributesByName(this.fusionAccountSchema.attributes, this.log),
         }
         const fromSchema = this.fusionAccountSchema.attributes.map((x) => x.name!).filter(Boolean)
-        this._fusionSchemaAttributeNames = [
+        this.fusionSchemaAttributeNames = [
             ...new Set([...fromSchema, ...SchemaService.BASE_FUSION_ATTRIBUTE_NAMES]),
         ].sort()
 
         // Build a lookup map from attribute name to its SchemaAttribute definition
-        this._fusionSchemaAttributeMap = new Map()
+        this.fusionSchemaAttributeMap = new Map()
         for (const attr of this.fusionAccountSchema.attributes) {
             if (attr.name) {
-                this._fusionSchemaAttributeMap.set(attr.name, attr)
+                this.fusionSchemaAttributeMap.set(attr.name, attr)
             }
         }
         // Also include base fusion attributes
         for (const attr of fusionAccountSchemaAttributes) {
-            if (attr.name && !this._fusionSchemaAttributeMap.has(attr.name)) {
-                this._fusionSchemaAttributeMap.set(attr.name, attr)
+            if (attr.name && !this.fusionSchemaAttributeMap.has(attr.name)) {
+                this.fusionSchemaAttributeMap.set(attr.name, attr)
             }
         }
     }
@@ -211,9 +211,9 @@ export class SchemaService {
      * Get schema - build dynamically if not loaded
      */
     private get fusionAccountSchema(): AccountSchema {
-        assert(this._fusionAccountSchema, 'Fusion account schema must be set first')
+        assert(this.fusionAccountSchemaValue, 'Fusion account schema must be set first')
 
-        return this._fusionAccountSchema
+        return this.fusionAccountSchemaValue
     }
 
     /**

@@ -465,7 +465,7 @@ describe('FormService processFetchedFormData pending review queue depletion', ()
             run
         )
 
-        ;(service as any)._fetchedFormInstances = [
+        ;(service as any).fetchedFormInstances = [
             [
                 {
                     id: 'instance-1',

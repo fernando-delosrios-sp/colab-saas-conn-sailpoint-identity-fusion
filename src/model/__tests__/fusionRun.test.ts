@@ -272,8 +272,8 @@ describe('FusionRun', () => {
 
     it('snapshot includes identity-linked fusion accounts separately from managed-key map', () => {
         const run = new FusionRun()
-        ;(run as any)._fusionAccountMap.set('managed-key', { name: 'managed-fa', managedKey: 'managed-key' } as any)
-        ;(run as any)._fusionIdentityMap.set('identity-1', {
+        ;(run as any).fusionAccountMapValue.set('managed-key', { name: 'managed-fa', managedKey: 'managed-key' } as any)
+        ;(run as any).fusionIdentityMapValue.set('identity-1', {
             name: 'identity-fa',
             identityId: 'identity-1',
         } as any)
@@ -315,13 +315,13 @@ describe('FusionRun', () => {
             trigramIndexBuilt: false,
         })
 
-        expect((run as any)._fusionIdentityMap.get('identity-1')?.name).toBe('target')
+        expect((run as any).fusionIdentityMapValue.get('identity-1')?.name).toBe('target')
     })
 
     it('snapshot returns serializable state', () => {
         const run = new FusionRun()
         run.managedAccountsById.set('k1', { name: 'a1' } as any)
-        ;(run as any)._fusionAccountMap.set('k2', { name: 'fa1' } as any)
+        ;(run as any).fusionAccountMapValue.set('k2', { name: 'fa1' } as any)
         run.matchScoringMs = 1500
 
         const snap = run.snapshot()
@@ -343,9 +343,9 @@ describe('FusionRun', () => {
 
     it('snapshot captures form processing state', () => {
         const run = new FusionRun()
-        ;(run as any)._fusionIdentityDecisions = [{ account: { id: 'a1', name: 'test', sourceName: 's1' } } as any]
-        ;(run as any)._pendingCandidateIdentityIds = new Set(['candidate-1'])
-        ;(run as any)._pendingReviewUrlsByReviewerId = new Map([['r1', ['url1']]])
+        ;(run as any).fusionIdentityDecisionsValue = [{ account: { id: 'a1', name: 'test', sourceName: 's1' } } as any]
+        ;(run as any).pendingCandidateIdentityIdsValue = new Set(['candidate-1'])
+        ;(run as any).pendingReviewUrlsByReviewerIdValue = new Map([['r1', ['url1']]])
 
         const snap = run.snapshot()
         expect(snap.fusionIdentityDecisions.length).toBe(1)

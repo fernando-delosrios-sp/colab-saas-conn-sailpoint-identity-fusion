@@ -7,7 +7,7 @@ export interface MatchingResultsRecording {
 }
 
 /** One aggregation report capture from an account-list epilogue. */
-export interface AggregationReportRun {
+interface AggregationReportRun {
     stepId?: string
     recordedAt: string
     report: Record<string, unknown>
@@ -59,3 +59,4 @@ export function loadAggregationReportRecording(raw: unknown): AggregationReportR
     }
     return { version: '1.1.0', runs: [] }
 }
+

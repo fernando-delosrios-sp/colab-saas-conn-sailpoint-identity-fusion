@@ -18,3 +18,4 @@ export const reportAction = async (
         await runReportPipeline(serviceRegistry, false)
     }
 }
+

@@ -518,7 +518,9 @@ export async function reportEpilogue(
 
     timer.recordElapsed('Report', Date.now() - epilogueStartedAt)
     log.epilogueEnd('report')
+    return undefined
 }
+
 
 
 

@@ -71,7 +71,6 @@
         "knip": "^6.23.0",
         "markdownlint-cli": "^0.49.0",
         "prettier": "^3.8.3",
-        "shx": "^0.4.0",
         "typescript": "~5.5.4",
         "typescript-eslint": "^8.59.2",
         "vitest": "^4.1.10",
@@ -91,6 +90,14 @@
         "project": [
             "src/**/*.ts"
         ],
+        "vitest": {
+            "config": [
+                "vitest.config.ts"
+            ]
+        },
+        "rules": {
+            "duplicates": "off"
+        },
         "ignoreBinaries": [
             "python3"
         ]
@@ -105,6 +112,7 @@
         "readdir-glob": "^3.0.0"
     }
 }
+
 
 
 

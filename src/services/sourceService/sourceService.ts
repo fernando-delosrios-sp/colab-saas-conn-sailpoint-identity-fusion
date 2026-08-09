@@ -61,12 +61,12 @@ export class SourceService {
     // Unified source storage - both managed and fusion sources
     private sourcesById: Map<string, SourceInfo> = new Map()
     private aggregationDateCache: Map<string, Promise<Date>> = new Map()
-    private _allSources?: SourceInfo[]
-    private _fusionSourceId?: string
-    private _fusionSourceOwner?: OwnerDto
-    private _fusionSourceManagementWorkgroupId?: string
-    private _workgroupMemberIdsByWorkgroupId = new Map<string, string[]>()
-    private _processLockAcquired = false
+    private allSourcesValue?: SourceInfo[]
+    private fusionSourceIdValue?: string
+    private fusionSourceOwnerValue?: OwnerDto
+    private fusionSourceManagementWorkgroupId?: string
+    private workgroupMemberIdsByWorkgroupId = new Map<string, string[]>()
+    private processLockAcquired = false
     private sourceSchemasCache: Map<string, SchemaV2025[]> = new Map()
 
     /** Per-run cache: managed source names that passed reverse-correlation setup/assert this session. */
@@ -135,21 +135,21 @@ export class SourceService {
     // ------------------------------------------------------------------------
 
     public get fusionSourceId(): string {
-        assert(this._fusionSourceId, 'Fusion source not found')
-        return this._fusionSourceId
+        assert(this.fusionSourceIdValue, 'Fusion source not found')
+        return this.fusionSourceIdValue
     }
 
     public get managedSources(): SourceInfo[] {
-        assert(this._allSources, 'Sources have not been loaded')
-        if (!this._fusionSourceId) {
-            return this._allSources
+        assert(this.allSourcesValue, 'Sources have not been loaded')
+        if (!this.fusionSourceIdValue) {
+            return this.allSourcesValue
         }
-        return this._allSources.filter((s) => s.id !== this.fusionSourceId)
+        return this.allSourcesValue.filter((s) => s.id !== this.fusionSourceId)
     }
 
     public get allSources(): SourceInfo[] {
-        assert(this._allSources, 'Sources have not been loaded')
-        return this._allSources
+        assert(this.allSourcesValue, 'Sources have not been loaded')
+        return this.allSourcesValue
     }
 
     public get managedAccounts(): Account[] {
@@ -171,7 +171,7 @@ export class SourceService {
     }
 
     public get hasFusionSource(): boolean {
-        return !!this._fusionSourceId
+        return !!this.fusionSourceIdValue
     }
 
     public get isCascadeAggregationEnabled(): boolean {
@@ -186,10 +186,10 @@ export class SourceService {
         const deps = this.discoveryDeps
         await fetchAllSourcesImpl(deps, requireFusionSource)
         const { state } = deps
-        this._allSources = state.allSources
-        this._fusionSourceId = state.fusionSourceId
-        this._fusionSourceOwner = state.fusionSourceOwner
-        this._fusionSourceManagementWorkgroupId = state.fusionSourceManagementWorkgroupId
+        this.allSourcesValue = state.allSources
+        this.fusionSourceIdValue = state.fusionSourceId
+        this.fusionSourceOwnerValue = state.fusionSourceOwner
+        this.fusionSourceManagementWorkgroupId = state.fusionSourceManagementWorkgroupId
         this.sourcesById = state.sourcesById
     }
 
@@ -202,8 +202,8 @@ export class SourceService {
     }
 
     public get fusionSourceOwner(): OwnerDto {
-        assert(this._fusionSourceOwner, 'Fusion source owner not found')
-        return this._fusionSourceOwner
+        assert(this.fusionSourceOwnerValue, 'Fusion source owner not found')
+        return this.fusionSourceOwnerValue
     }
 
     public isEmailWorkflowConfigured(): boolean {
@@ -232,7 +232,7 @@ export class SourceService {
             }
         }
 
-        const workgroupId = this._fusionSourceManagementWorkgroupId
+        const workgroupId = this.fusionSourceManagementWorkgroupId
         if (workgroupId) {
             const memberIds = await this.listWorkgroupMemberIdentityIds(workgroupId)
             for (const id of memberIds) ownerIdSet.add(id)
@@ -242,7 +242,7 @@ export class SourceService {
     }
 
     private async listWorkgroupMemberIdentityIds(workgroupId: string): Promise<string[]> {
-        const cached = this._workgroupMemberIdsByWorkgroupId.get(workgroupId)
+        const cached = this.workgroupMemberIdsByWorkgroupId.get(workgroupId)
         if (cached) return cached
 
         const members = await this.client.call<any[]>(
@@ -251,7 +251,7 @@ export class SourceService {
             { priority: QueuePriority.HIGH, context: 'SourceService>fetchGlobalOwnerIdentityIds' }
         )
         const memberIds = (members ?? []).filter((m: any) => m.id).map((m: any) => m.id!)
-        this._workgroupMemberIdsByWorkgroupId.set(workgroupId, memberIds)
+        this.workgroupMemberIdsByWorkgroupId.set(workgroupId, memberIds)
         return memberIds
     }
 
@@ -630,11 +630,11 @@ export class SourceService {
             true,
             'SourceService>setProcessLock'
         )
-        this._processLockAcquired = true
+        this.processLockAcquired = true
     }
 
     public async releaseProcessLock(): Promise<void> {
-        if (!this.concurrencyCheckEnabled || !this._processLockAcquired) {
+        if (!this.concurrencyCheckEnabled || !this.processLockAcquired) {
             return
         }
 
@@ -647,7 +647,7 @@ export class SourceService {
                 false,
                 'SourceService>releaseProcessLock'
             )
-            this._processLockAcquired = false
+            this.processLockAcquired = false
         } catch (error) {
             this.log.error(
                 `Failed to release processing lock: ${error instanceof Error ? error.message : String(error)}`
@@ -839,12 +839,12 @@ export class SourceService {
             state: {
                 sources: this.sources,
                 spConnectorInstanceId: this.spConnectorInstanceId,
-                allSources: this._allSources,
-                fusionSourceId: this._fusionSourceId,
-                fusionSourceOwner: this._fusionSourceOwner,
-                fusionSourceManagementWorkgroupId: this._fusionSourceManagementWorkgroupId,
+                allSources: this.allSourcesValue,
+                fusionSourceId: this.fusionSourceIdValue,
+                fusionSourceOwner: this.fusionSourceOwnerValue,
+                fusionSourceManagementWorkgroupId: this.fusionSourceManagementWorkgroupId,
                 sourcesById: this.sourcesById,
-                workgroupMemberIdsByWorkgroupId: this._workgroupMemberIdsByWorkgroupId,
+                workgroupMemberIdsByWorkgroupId: this.workgroupMemberIdsByWorkgroupId,
                 accountJmespathFiltersBySourceName: this.accountJmespathFiltersBySourceName,
             },
         }

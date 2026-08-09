@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
@@ -16,6 +16,24 @@ import { recordingChainDir } from '../../data/recordingPaths'
 import { FIXTURE_BASEURL } from '../../operations/__tests__/scenario/fixtures/minimalRecordingFixture'
 import { FusionConfig } from '../../model/config'
 
+vi.mock('../clientService/sdkApiAdapter', () => ({
+    SdkApiAdapter: class MockSdkApiAdapter {
+        config = { accessToken: Promise.resolve('mock-token') }
+        accountsApi = {}
+        identitiesApi = {}
+        searchApi = {}
+        sourcesApi = { listSources: vi.fn().mockResolvedValue([]) }
+        customFormsApi = {}
+        workflowsApi = {}
+        entitlementsApi = {}
+        transformsApi = {}
+        governanceGroupsApi = {}
+        taskManagementApi = {}
+        identityProfilesApi = {}
+        identityAttributesApi = {}
+    },
+}))
+
 vi.mock('@sailpoint/connector-sdk', async () => {
     const actual = await vi.importActual<typeof import('@sailpoint/connector-sdk')>('@sailpoint/connector-sdk')
     return {
@@ -26,6 +44,7 @@ vi.mock('@sailpoint/connector-sdk', async () => {
 
 const minimalPlatformConfig = {
     baseurl: FIXTURE_BASEURL,
+    tokenUrlPath: '/oauth/token',
     clientId: 'id',
     clientSecret: 'secret',
     spConnectorInstanceId: 'instance-id',
@@ -249,6 +268,7 @@ describe('loadRecordingApiLog', () => {
         fs.rmSync(tmpDir, { recursive: true, force: true })
     })
 })
+
 
 
 

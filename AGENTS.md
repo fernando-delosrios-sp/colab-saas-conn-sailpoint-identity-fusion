@@ -107,7 +107,9 @@ src/
 - ESLint with `typescript-eslint` recommended rules + `jsdoc` plugin
 - `no-explicit-any`: **off** — `any` is allowed where needed
 - `no-case-declarations`: **error** — wrap in `{}` blocks
-- `_` prefix on field names indicates **conventionally-private** members
+- `_` prefix is reserved for **unused** variables, parameters, and functions (matches ESLint `argsIgnorePattern` / `varsIgnorePattern: '^_'`)
+- Use TypeScript `private` / `protected` for non-public members — no `_` prefix
+- Accessor backing fields use the `Value` suffix (e.g. `private nameValue` backing `get name()`)
 - Import style: ESM `import`/`export` for `.ts` files; `require()` only in `.cjs`/`.js` scripts
 
 ### Formatting (Prettier)

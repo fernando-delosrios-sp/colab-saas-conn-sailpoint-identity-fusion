@@ -2,7 +2,7 @@ import * as path from 'path'
 import { tenantSlugFromBaseurl } from '../utils/url'
 
 /** Root directory for record/replay scenario artifacts (repo-relative: `./recordings`). */
-export const RECORDINGS_DIR = path.resolve('recordings')
+const RECORDINGS_DIR = path.resolve('recordings')
 
 export type ParsedRecordingScenarioRef = {
     tenant: string
@@ -20,17 +20,12 @@ export type ParsedRecordingChainRef = ParsedRecordingScenarioRef & {
 }
 
 /** Sanitize a single tenant or scenario segment for filesystem use. */
-export function sanitizeRecordingSegment(segment: string): string {
+function sanitizeRecordingSegment(segment: string): string {
     return segment.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()
 }
 
-export function normalizeScenarioRefInput(scenarioRef: string): string {
+function normalizeScenarioRefInput(scenarioRef: string): string {
     return scenarioRef.trim().replace(/\\/g, '/').replace(/\/+/g, '/')
-}
-
-/** @deprecated Use `normalizeScenarioRefInput`. */
-export function normalizeChainRefInput(chainRef: string): string {
-    return normalizeScenarioRefInput(chainRef)
 }
 
 /**
@@ -105,3 +100,4 @@ export function recordingChainDir(chainRef: string, baseurl?: string): string {
 export function recordingChainDirRelative(chainRef: string, baseurl?: string): string {
     return recordingScenarioDirRelative(chainRef, baseurl)
 }
+

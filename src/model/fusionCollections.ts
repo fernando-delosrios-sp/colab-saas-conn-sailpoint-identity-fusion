@@ -15,18 +15,18 @@ import type { FusionManagedAccountInfo } from './fusionAccountTypes'
  * statuses, actions, reviews, sources, fusion matches, history, and sync-to-bag.
  */
 export class FusionCollections {
-    private _accountIds = new Set<string>()
-    private _missingAccountIds = new Set<string>()
-    private _statuses = new Set<string>()
-    private _actions = new Set<string>()
-    private _reviews = new Set<string>()
-    private _sources = new Set<string>()
-    private _fusionMatches: FusionMatch[] = []
-    private _history: string[] = []
-    private _previousAccountIds = new Set<string>()
-    private _managedAccountInfo = new Map<string, FusionManagedAccountInfo>()
-    private _pendingReviewUrls = new Set<string>()
-    private _reviewPromises: Array<Promise<string | undefined>> = []
+    private accountIdsValue = new Set<string>()
+    private missingAccountIdsValue = new Set<string>()
+    private statusesValue = new Set<string>()
+    private actionsValue = new Set<string>()
+    private reviewsValue = new Set<string>()
+    private sourcesValue = new Set<string>()
+    private fusionMatchesValue: FusionMatch[] = []
+    private historyValue: string[] = []
+    private previousAccountIdsValue = new Set<string>()
+    private managedAccountInfoValue = new Map<string, FusionManagedAccountInfo>()
+    private pendingReviewUrlsValue = new Set<string>()
+    private reviewPromisesValue: Array<Promise<string | undefined>> = []
 
     constructor(private readonly maxHistoryMessages: number) {}
 
@@ -35,51 +35,51 @@ export class FusionCollections {
     // ============================================================================
 
     get accountIds(): ReadonlySet<string> {
-        return this._accountIds
+        return this.accountIdsValue
     }
 
     get missingAccountIds(): ReadonlySet<string> {
-        return this._missingAccountIds
+        return this.missingAccountIdsValue
     }
 
     get statusesSet(): ReadonlySet<string> {
-        return this._statuses
+        return this.statusesValue
     }
 
     get actionsSet(): ReadonlySet<string> {
-        return this._actions
+        return this.actionsValue
     }
 
     get reviewsSet(): ReadonlySet<string> {
-        return this._reviews
+        return this.reviewsValue
     }
 
     get sourcesSet(): ReadonlySet<string> {
-        return this._sources
+        return this.sourcesValue
     }
 
     get fusionMatches(): readonly FusionMatch[] {
-        return this._fusionMatches
+        return this.fusionMatchesValue
     }
 
     get history(): readonly string[] {
-        return this._history
+        return this.historyValue
     }
 
     get managedAccountInfo(): ReadonlyMap<string, FusionManagedAccountInfo> {
-        return this._managedAccountInfo
+        return this.managedAccountInfoValue
     }
 
     get pendingReviewUrls(): ReadonlySet<string> {
-        return this._pendingReviewUrls
+        return this.pendingReviewUrlsValue
     }
 
     get reviewPromises(): readonly Promise<string | undefined>[] {
-        return this._reviewPromises
+        return this.reviewPromisesValue
     }
 
     get previousAccountIds(): ReadonlySet<string> {
-        return this._previousAccountIds
+        return this.previousAccountIdsValue
     }
 
     // ============================================================================
@@ -103,40 +103,40 @@ export class FusionCollections {
         clearReviewsBeforeAdd?: boolean
     }): void {
         if (input.clearMissingBeforeAdd) {
-            this._missingAccountIds.clear()
+            this.missingAccountIdsValue.clear()
         }
         if (input.clearReviewsBeforeAdd) {
-            this._reviews.clear()
+            this.reviewsValue.clear()
         }
 
         if (input.sources) {
             for (const source of input.sources) {
-                this._sources.add(source)
+                this.sourcesValue.add(source)
             }
         }
         if (input.statuses) {
             for (const status of input.statuses) {
-                this._statuses.add(status)
+                this.statusesValue.add(status)
             }
         }
         if (input.actions) {
             for (const action of input.actions) {
-                this._actions.add(action)
+                this.actionsValue.add(action)
             }
         }
         if (input.reviews) {
             for (const review of input.reviews) {
-                this._reviews.add(review)
+                this.reviewsValue.add(review)
             }
         }
         if (input.accountIds) {
             for (const id of input.accountIds) {
-                this._accountIds.add(id)
+                this.accountIdsValue.add(id)
             }
         }
         if (input.missingAccountIds) {
             for (const id of input.missingAccountIds) {
-                this._missingAccountIds.add(id)
+                this.missingAccountIdsValue.add(id)
             }
         }
         if (input.previousAccountIds) {
@@ -146,74 +146,74 @@ export class FusionCollections {
 
     /** Replace correlated account IDs with the given set. */
     replaceAccountIds(ids: Iterable<string>): void {
-        this._accountIds = new Set(ids)
+        this.accountIdsValue = new Set(ids)
     }
 
     /** Replace missing account IDs with the given set. */
     replaceMissingAccountIds(ids: Iterable<string>): void {
-        this._missingAccountIds = new Set(ids)
+        this.missingAccountIdsValue = new Set(ids)
     }
 
     /** Replace previous-run account IDs with the given set. */
     setPreviousAccountIds(ids: Iterable<string>): void {
-        this._previousAccountIds = new Set(ids)
+        this.previousAccountIdsValue = new Set(ids)
     }
 
     /** Store managed-account display/schema info for a composite account key. */
     setManagedAccountInfo(accountId: string, info: FusionManagedAccountInfo): void {
-        this._managedAccountInfo.set(accountId, info)
+        this.managedAccountInfoValue.set(accountId, info)
     }
 
     /** Drop managed-account info for a composite account key. */
     deleteManagedAccountInfo(accountId: string): void {
-        this._managedAccountInfo.delete(accountId)
+        this.managedAccountInfoValue.delete(accountId)
     }
 
     /** Append a dated history message (same formatting as runtime history writes). */
     addHistoryMessage(message: string): void {
-        this._addHistory(message)
+        this.addHistory(message)
     }
 
     /** Whether the actions set contains the given action. */
     hasAction(action: string): boolean {
-        return this._actions.has(action)
+        return this.actionsValue.has(action)
     }
 
     /** Remove an action without writing history. */
     removeActionSilent(action: string): void {
-        this._actions.delete(action)
+        this.actionsValue.delete(action)
     }
 
     // ============================================================================
     // Private helpers
     // ============================================================================
 
-    private _addHistory(message?: string): void {
+    private addHistory(message?: string): void {
         const normalizedMessage = trimStr(message) ?? ''
         if (missing(normalizedMessage)) return
 
         const now = new Date().toISOString().split('T')[0]
         const datedMessage = `[${now}] ${normalizedMessage}`
-        const previousMessage = this._history[this._history.length - 1]
+        const previousMessage = this.historyValue[this.historyValue.length - 1]
         if (previousMessage === datedMessage) return
-        this._history.push(datedMessage)
+        this.historyValue.push(datedMessage)
 
-        if (this._history.length > this.maxHistoryMessages) {
-            this._history = this._history.slice(-this.maxHistoryMessages)
+        if (this.historyValue.length > this.maxHistoryMessages) {
+            this.historyValue = this.historyValue.slice(-this.maxHistoryMessages)
         }
     }
 
-    private _normalizeHistoryLabel(value: unknown, fallback: string): string {
+    private normalizeHistoryLabel(value: unknown, fallback: string): string {
         return trimStr(value) ?? fallback
     }
 
-    private _formatHistoryAccountInfo(name: unknown, source: unknown): string {
-        const accountLabel = this._normalizeHistoryLabel(name, 'Unknown account')
-        const sourceLabel = this._normalizeHistoryLabel(source, 'Unknown source')
+    private formatHistoryAccountInfo(name: unknown, source: unknown): string {
+        const accountLabel = this.normalizeHistoryLabel(name, 'Unknown account')
+        const sourceLabel = this.normalizeHistoryLabel(source, 'Unknown source')
         return `${accountLabel} [${sourceLabel}]`
     }
 
-    private _resolveHistoryActorLabel(
+    private resolveHistoryActorLabel(
         name: unknown,
         email: unknown,
         id: string | undefined,
@@ -230,8 +230,8 @@ export class FusionCollections {
         return fallback
     }
 
-    private _formatMergeTargetLabel(decision: FusionDecision): string {
-        return this._resolveHistoryActorLabel(
+    private formatMergeTargetLabel(decision: FusionDecision): string {
+        return this.resolveHistoryActorLabel(
             decision.identityName,
             undefined,
             decision.identityId,
@@ -239,15 +239,15 @@ export class FusionCollections {
         )
     }
 
-    private _createDecisionHistoryMessage(decision: FusionDecision, action: string): string {
-        const submitterName = this._resolveHistoryActorLabel(
+    private createDecisionHistoryMessage(decision: FusionDecision, action: string): string {
+        const submitterName = this.resolveHistoryActorLabel(
             decision.submitter.name,
             decision.submitter.email,
             decision.submitter.id,
             'Unknown reviewer'
         )
-        const accountInfo = this._formatHistoryAccountInfo(decision.account.name, decision.account.sourceName)
-        const mergeTargetLabel = this._formatMergeTargetLabel(decision)
+        const accountInfo = this.formatHistoryAccountInfo(decision.account.name, decision.account.sourceName)
+        const mergeTargetLabel = this.formatMergeTargetLabel(decision)
         const sourceType = decision.sourceType ?? SourceType.Authoritative
 
         if (action === 'manual') {
@@ -268,20 +268,20 @@ export class FusionCollections {
         return `Merged ${accountInfo} into ${mergeTargetLabel} by ${submitterName}`
     }
 
-    private _addToSet<T>(set: Set<T>, item: T, message?: string): boolean {
+    private addToSet<T>(set: Set<T>, item: T, message?: string): boolean {
         const initialSize = set.size
         set.add(item)
         const added = set.size > initialSize
         if (added && message) {
-            this._addHistory(message)
+            this.addHistory(message)
         }
         return added
     }
 
-    private _removeFromSet<T>(set: Set<T>, item: T, message?: string): boolean {
+    private removeFromSet<T>(set: Set<T>, item: T, message?: string): boolean {
         const removed = set.delete(item)
         if (removed && message) {
-            this._addHistory(message)
+            this.addHistory(message)
         }
         return removed
     }
@@ -292,21 +292,21 @@ export class FusionCollections {
 
     readonly accounts = {
         add: (id: string, message?: string): void => {
-            this._addToSet(this._accountIds, id, message)
+            this.addToSet(this.accountIdsValue, id, message)
         },
         remove: (id: string, message?: string): boolean => {
-            return this._removeFromSet(this._accountIds, id, message)
+            return this.removeFromSet(this.accountIdsValue, id, message)
         },
         addMissing: (id: string, message?: string): void => {
-            this._addToSet(this._missingAccountIds, id, message)
+            this.addToSet(this.missingAccountIdsValue, id, message)
         },
         removeMissing: (id: string, message?: string): boolean => {
-            return this._removeFromSet(this._missingAccountIds, id, message)
+            return this.removeFromSet(this.missingAccountIdsValue, id, message)
         },
         getMissingForSource: (sourceName: string): string[] => {
             const result: string[] = []
-            for (const id of this._missingAccountIds) {
-                const info = this._managedAccountInfo.get(id)
+            for (const id of this.missingAccountIdsValue) {
+                const info = this.managedAccountInfoValue.get(id)
                 if (info && info.source.name === sourceName) {
                     result.push(id)
                 }
@@ -314,87 +314,87 @@ export class FusionCollections {
             return result
         },
         removeSourceAccount: (id: string, originSource?: string, originIdentityInScope?: boolean): void => {
-            this._removeFromSet(this._accountIds, id, '')
+            this.removeFromSet(this.accountIdsValue, id, '')
 
             const fromIdentity = originSource === IDENTITIES_SOURCE_NAME
 
-            if (this._accountIds.size === 0) {
+            if (this.accountIdsValue.size === 0) {
                 if (!fromIdentity || (fromIdentity && !originIdentityInScope)) {
-                    this._statuses.add(StatusEntitlement.Orphan)
-                    this._addHistory(`Account became orphan after removing source account: ${id}`)
+                    this.statusesValue.add(StatusEntitlement.Orphan)
+                    this.addHistory(`Account became orphan after removing source account: ${id}`)
                 }
             }
 
-            this._addHistory(`Source account removed: ${id}`)
+            this.addHistory(`Source account removed: ${id}`)
         },
     }
 
     readonly statuses = {
         add: (status: string, message?: string): void => {
-            this._addToSet(this._statuses, status, message)
+            this.addToSet(this.statusesValue, status, message)
         },
         remove: (status: string, message?: string): void => {
-            this._removeFromSet(this._statuses, status, message)
+            this.removeFromSet(this.statusesValue, status, message)
         },
         has: (status: string): boolean => {
-            return this._statuses.has(status)
+            return this.statusesValue.has(status)
         },
         setNonMatched: (actorName?: string, sourceName?: string): void => {
-            this._statuses.add(StatusEntitlement.NonMatched)
-            this._addHistory(
-                `Set ${this._formatHistoryAccountInfo(actorName, sourceName)} as NonMatched`
+            this.statusesValue.add(StatusEntitlement.NonMatched)
+            this.addHistory(
+                `Set ${this.formatHistoryAccountInfo(actorName, sourceName)} as NonMatched`
             )
         },
         setUncorrelatedAccount: (accountId: string): void => {
             if (!accountId) return
             this.accounts.add(accountId)
             this.accounts.addMissing(accountId)
-            this._statuses.add(StatusEntitlement.Uncorrelated)
-            this._actions.delete(FusionAction.Correlated)
+            this.statusesValue.add(StatusEntitlement.Uncorrelated)
+            this.actionsValue.delete(FusionAction.Correlated)
         },
         isOrphan: (): boolean => {
-            return this._statuses.has(StatusEntitlement.Orphan)
+            return this.statusesValue.has(StatusEntitlement.Orphan)
         },
         setManual: (decision: FusionDecision): void => {
-            this._statuses.delete(StatusEntitlement.NonMatched)
-            this._statuses.add(StatusEntitlement.Manual)
-            this._addHistory(this._createDecisionHistoryMessage(decision, 'manual'))
+            this.statusesValue.delete(StatusEntitlement.NonMatched)
+            this.statusesValue.add(StatusEntitlement.Manual)
+            this.addHistory(this.createDecisionHistoryMessage(decision, 'manual'))
         },
         setAuthorized: (decision: FusionDecision): void => {
-            this._statuses.delete(StatusEntitlement.NonMatched)
+            this.statusesValue.delete(StatusEntitlement.NonMatched)
             if (decision.automaticMerge === true) {
-                this._statuses.add(StatusEntitlement.Auto)
+                this.statusesValue.add(StatusEntitlement.Auto)
             } else {
-                this._statuses.add(StatusEntitlement.Authorized)
+                this.statusesValue.add(StatusEntitlement.Authorized)
             }
-            this._addHistory(this._createDecisionHistoryMessage(decision, 'authorized'))
+            this.addHistory(this.createDecisionHistoryMessage(decision, 'authorized'))
         },
     }
 
     readonly actions = {
         add: (action: string, message?: string): void => {
-            this._addToSet(this._actions, action, message)
+            this.addToSet(this.actionsValue, action, message)
         },
         remove: (action: string, message?: string): void => {
-            this._removeFromSet(this._actions, action, message)
+            this.removeFromSet(this.actionsValue, action, message)
         },
         addFusionDecision: (decision: string): void => {
             this.actions.add(decision, `Fusion decision added: ${decision}`)
         },
         setSourceReviewer: (sourceId: string): void => {
-            this._actions.add(`${FusionAction.ReviewerPrefix}${sourceId}`)
-            this._statuses.add(StatusEntitlement.Reviewer)
+            this.actionsValue.add(`${FusionAction.ReviewerPrefix}${sourceId}`)
+            this.statusesValue.add(StatusEntitlement.Reviewer)
         },
         removeSourceReviewer: (sourceId: string): void => {
-            this._actions.delete(`${FusionAction.ReviewerPrefix}${sourceId}`)
-            if (!this._actionsHasReviewerScope()) {
-                this._statuses.delete(StatusEntitlement.Reviewer)
+            this.actionsValue.delete(`${FusionAction.ReviewerPrefix}${sourceId}`)
+            if (!this.actionsHasReviewerScope()) {
+                this.statusesValue.delete(StatusEntitlement.Reviewer)
             }
         },
         listReviewerSources: (): string[] => {
             const prefix = FusionAction.ReviewerPrefix
             const result: string[] = []
-            for (const action of this._actions) {
+            for (const action of this.actionsValue) {
                 if (action.startsWith(prefix)) {
                     result.push(action.slice(prefix.length))
                 }
@@ -403,9 +403,9 @@ export class FusionCollections {
         },
     }
 
-    private _actionsHasReviewerScope(): boolean {
+    private actionsHasReviewerScope(): boolean {
         const prefix = FusionAction.ReviewerPrefix
-        for (const action of this._actions) {
+        for (const action of this.actionsValue) {
             if (action.startsWith(prefix)) {
                 return true
             }
@@ -415,59 +415,59 @@ export class FusionCollections {
 
     readonly reviews = {
         add: (review: string, message?: string): void => {
-            this._addToSet(this._reviews, review, message)
+            this.addToSet(this.reviewsValue, review, message)
         },
         remove: (review: string, message?: string): void => {
-            this._removeFromSet(this._reviews, review, message)
+            this.removeFromSet(this.reviewsValue, review, message)
         },
         addFusionReview: (reviewUrl: string): void => {
-            this._reviews.add(reviewUrl)
-            this._statuses.add(StatusEntitlement.ActiveReviews)
+            this.reviewsValue.add(reviewUrl)
+            this.statusesValue.add(StatusEntitlement.ActiveReviews)
         },
         removeFusionReview: (reviewUrl: string): void => {
-            this._reviews.delete(reviewUrl)
-            if (this._reviews.size === 0) {
-                this._statuses.delete(StatusEntitlement.ActiveReviews)
+            this.reviewsValue.delete(reviewUrl)
+            if (this.reviewsValue.size === 0) {
+                this.statusesValue.delete(StatusEntitlement.ActiveReviews)
             }
         },
         clearFusionReviews: (): void => {
-            this._reviews.clear()
-            this._statuses.delete(StatusEntitlement.ActiveReviews)
+            this.reviewsValue.clear()
+            this.statusesValue.delete(StatusEntitlement.ActiveReviews)
         },
         addPendingUrl: (reviewUrl: string): void => {
             if (reviewUrl) {
-                this._pendingReviewUrls.add(reviewUrl)
+                this.pendingReviewUrlsValue.add(reviewUrl)
             }
         },
         addPromise: (promise: Promise<string | undefined>): void => {
             if (promise) {
-                this._reviewPromises.push(promise)
+                this.reviewPromisesValue.push(promise)
             }
         },
     }
 
     readonly sources = {
         add: (source: string, message?: string): void => {
-            this._addToSet(this._sources, source, message)
+            this.addToSet(this.sourcesValue, source, message)
         },
         remove: (source: string, message?: string): void => {
-            this._removeFromSet(this._sources, source, message)
+            this.removeFromSet(this.sourcesValue, source, message)
         },
     }
 
     readonly matches = {
         add: (fusionMatch: FusionMatch): void => {
-            this._fusionMatches.push(fusionMatch)
+            this.fusionMatchesValue.push(fusionMatch)
         },
         clearRefs: (): void => {
-            for (const match of this._fusionMatches) {
+            for (const match of this.fusionMatchesValue) {
                 ;(match as { fusionIdentity?: unknown }).fusionIdentity = undefined
             }
         },
         removeDeferred: (): void => {
-            for (let i = this._fusionMatches.length - 1; i >= 0; i--) {
-                if (this._fusionMatches[i].candidateType === 'deferred') {
-                    this._fusionMatches.splice(i, 1)
+            for (let i = this.fusionMatchesValue.length - 1; i >= 0; i--) {
+                if (this.fusionMatchesValue[i].candidateType === 'deferred') {
+                    this.fusionMatchesValue.splice(i, 1)
                 }
             }
         },
@@ -487,7 +487,7 @@ export class FusionCollections {
                 }
             }
 
-            this._history = dedupedHistory.slice(-this.maxHistoryMessages)
+            this.historyValue = dedupedHistory.slice(-this.maxHistoryMessages)
         },
     }
 
@@ -496,18 +496,19 @@ export class FusionCollections {
     // ============================================================================
 
     syncToBag(bag: Attributes, originSource?: string, originAccount?: string, identityId?: string): void {
-        bag[FusionAttribute.Reviews] = Array.from(this._reviews)
-        bag[FusionAttribute.Accounts] = Array.from(this._accountIds)
-        bag[FusionAttribute.Statuses] = Array.from(this._statuses)
-        bag[FusionAttribute.Actions] = Array.from(this._actions)
-        bag[FusionAttribute.MissingAccounts] = Array.from(this._missingAccountIds)
-        bag[FusionAttribute.Sources] = attrConcat(Array.from(this._sources))
-        bag[FusionAttribute.History] = Array.from(this._history)
+        bag[FusionAttribute.Reviews] = Array.from(this.reviewsValue)
+        bag[FusionAttribute.Accounts] = Array.from(this.accountIdsValue)
+        bag[FusionAttribute.Statuses] = Array.from(this.statusesValue)
+        bag[FusionAttribute.Actions] = Array.from(this.actionsValue)
+        bag[FusionAttribute.MissingAccounts] = Array.from(this.missingAccountIdsValue)
+        bag[FusionAttribute.Sources] = attrConcat(Array.from(this.sourcesValue))
+        bag[FusionAttribute.History] = Array.from(this.historyValue)
         if (originSource !== undefined) bag[FusionAttribute.OriginSource] = originSource
         if (originAccount !== undefined) bag[FusionAttribute.OriginAccount] = originAccount
         if (identityId) bag[FusionAttribute.IdentityId] = identityId
     }
 }
+
 
 
 

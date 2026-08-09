@@ -116,7 +116,7 @@ export class MatchingService {
     private readonly fusionEnableAutoMerge: boolean
     private readonly fusionMaxIdentityMatchCandidates: number
     private readonly fusionScoreMap: Map<string, number>
-    private _scoringOptions: ScoringOptions = {}
+    private scoringOptions: ScoringOptions = {}
 
     /**
      * @param config - Fusion configuration containing matching rules and score thresholds
@@ -137,7 +137,7 @@ export class MatchingService {
      * (`candidateType !== Identity` in `scoreFusionAccount`).
      */
     public configureScoring(options: ScoringOptions): void {
-        this._scoringOptions = options
+        this.scoringOptions = options
     }
 
     /**
@@ -351,7 +351,7 @@ export class MatchingService {
                 ? (maxIdentityMatches ?? this.fusionMaxIdentityMatchCandidates)
                 : undefined
 
-        const captureBreakdown = Boolean(this._scoringOptions.captureBreakdown) || candidateType !== MatchCandidateType.Identity
+        const captureBreakdown = Boolean(this.scoringOptions.captureBreakdown) || candidateType !== MatchCandidateType.Identity
 
         let compared = 0
         // Counter-based yielding avoids modulo on every iteration; reset after each yield.

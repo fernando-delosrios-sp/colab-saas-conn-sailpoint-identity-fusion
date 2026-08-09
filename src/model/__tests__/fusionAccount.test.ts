@@ -215,7 +215,7 @@ describe('FusionAccount', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
             acc.attributes.statuses = ['stale-on-current']
             acc.attributes.actions = ['stale-action']
-            ;(acc as any)._attributeBag.previous = {
+            ;(acc as any).attributeBagValue.previous = {
                 statuses: ['previous-only-status'],
                 actions: ['previous-only-action'],
             }
@@ -227,8 +227,8 @@ describe('FusionAccount', () => {
             expect(acc.attributes.statuses).toContain('live-status')
             expect(acc.attributes.actions).toContain('live-action')
             expect(acc.attributes.statuses).not.toContain('previous-only-status')
-            expect((acc as any)._attributeBag.previous.statuses).toEqual(['previous-only-status'])
-            expect((acc as any)._attributeBag.previous.actions).toEqual(['previous-only-action'])
+            expect((acc as any).attributeBagValue.previous.statuses).toEqual(['previous-only-status'])
+            expect((acc as any).attributeBagValue.previous.actions).toEqual(['previous-only-action'])
         })
     })
 
@@ -284,7 +284,7 @@ describe('FusionAccount', () => {
                 sourceName: 'Identity Fusion NG',
                 attributes: { identityId: 'identity-1' },
             } as any)
-            // _identityInfo is created from the persisted attribute (not from the SDK Account)
+            // identityInfoValue is created from the persisted attribute (not from the SDK Account)
             expect(persisted.identityId).toBe('identity-1')
             expect(persisted.identityIdAttribute).toBe('identity-1')
         })
@@ -301,23 +301,23 @@ describe('FusionAccount', () => {
             expect(persisted.identityIdAttribute).toBeUndefined()
         })
 
-        it('setIdentityIdAttribute trims and stores the id on _identityInfo', () => {
+        it('setIdentityIdAttribute trims and stores the id on identityInfoValue', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
             acc.setIdentityIdAttribute('  identity-42  ')
             expect(acc.identityIdAttribute).toBe('identity-42')
-            expect((acc as any)._identityInfo?.id).toBe('identity-42')
+            expect((acc as any).identityInfoValue?.id).toBe('identity-42')
             // Empty values are stored as empty string; hasValue returns false
             acc.setIdentityIdAttribute('')
             expect(acc.identityIdAttribute).toBe('')
-            expect((acc as any)._identityInfo?.id).toBe('')
+            expect((acc as any).identityInfoValue?.id).toBe('')
         })
 
-        it('preserves name/displayName when setIdentityIdAttribute updates an existing _identityInfo', () => {
+        it('preserves name/displayName when setIdentityIdAttribute updates an existing identityInfoValue', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1', name: 'Jane Doe' } as any)
-            expect((acc as any)._identityInfo?.name).toBeTruthy()
+            expect((acc as any).identityInfoValue?.name).toBeTruthy()
             acc.setIdentityIdAttribute('identity-99')
             expect(acc.identityId).toBe('identity-99')
-            expect((acc as any)._identityInfo?.name).toBeTruthy()
+            expect((acc as any).identityInfoValue?.name).toBeTruthy()
         })
     })
 
