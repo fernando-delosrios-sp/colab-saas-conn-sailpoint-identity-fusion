@@ -237,7 +237,7 @@ describe('FusionService — report', () => {
                 ],
             } as any
 
-            localRun.analysisRecorder!.recordAnalysis({
+            localRun.recordAnalysis({
                 account: { name: 'acct', sourceName: 'HR' } as any,
                 fusionAccount,
                 sourceInfo: undefined,

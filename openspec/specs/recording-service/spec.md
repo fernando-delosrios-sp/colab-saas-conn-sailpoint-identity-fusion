@@ -3,7 +3,35 @@
 ## Purpose
 
 The recording service captures the outcomes of managed-account analysis (matches, deferred candidate matches, non-matches, and failures) into the aggregation tracker so they can be reported to downstream connector operations and aggregation consumers.
+
+This capability spans two layers:
+
+- **Runtime analysis recording** — `ManagedAccountAnalysisRecorder` populates `AggregationTracker` slices during matching. Implemented under `src/services/fusionService/` (fusion report helpers); wired by `FusionService` onto `FusionRun.analysisRecorder`.
+- **Scenario persistence** — `RecordingService` snapshots `FusionRun` and writes disk artifacts (`api-log.ndjson`, `reports/matching-results.json`, etc.) at operation epilogue.
+
+Callers invoke runtime recording through `FusionRun` verbs (`recordAnalysis`, `trackFailed`), not by referencing the concrete recorder class.
 ## Requirements
+### Requirement: ManagedAccountAnalysisRecorder capability ownership and module placement
+
+The recording-service capability SHALL own the behavioral contract for `ManagedAccountAnalysisRecorder`. The implementation SHALL reside at `src/services/fusionService/managedAccountAnalysisRecorder.ts` and SHALL implement the `ManagedAccountAnalysisRecording` port (`src/model/managedAccountAnalysisRecording.ts`). `FusionService` SHALL construct the recorder and attach it to `FusionRun.analysisRecorder`. Match-step and other pipeline callers SHALL invoke recording only through `FusionRun.recordAnalysis()` and `FusionRun.trackFailed()`, not by referencing `run.analysisRecorder` directly.
+
+#### Scenario: Recorder implementation path
+- **WHEN** a developer locates `ManagedAccountAnalysisRecorder` in the repository
+- **THEN** the source file MUST be `src/services/fusionService/managedAccountAnalysisRecorder.ts`
+- **AND** the class MUST implement `ManagedAccountAnalysisRecording`
+
+#### Scenario: FusionService wires recorder onto FusionRun
+- **WHEN** `FusionService` is constructed for an operation run
+- **THEN** it SHALL assign a `ManagedAccountAnalysisRecorder` instance to `run.analysisRecorder`
+- **AND** `FusionRun.analysisRecorder` SHALL be typed as `ManagedAccountAnalysisRecording`, not the concrete class
+
+#### Scenario: Match step uses FusionRun verbs
+- **WHEN** `MatchOutcomeDispatcher` records analysis or failure outcomes
+- **THEN** it SHALL call `run.recordAnalysis()` or `run.trackFailed()`
+- **AND** it SHALL NOT reference `run.analysisRecorder` or `run.analysisRecorder!.tracker`
+
+---
+
 ### Requirement: Record managed account analysis for identity-origin matches
 The `ManagedAccountAnalysisRecorder.recordAnalysis` method SHALL be called exactly once per managed account after the two-sweep analysis (identity scoring + deferred candidate scoring) completes. It SHALL record an identity-origin match by pushing the `FusionAccount` into `tracker.matchAccounts` and logging match discovery information. The method SHALL NOT be called during intermediate phases of the analysis pipeline.
 
@@ -358,4 +386,5 @@ The `npm run record` script MUST print a deprecation warning directing operators
 - **WHEN** a developer runs `npm run record`
 - **THEN** a deprecation warning MUST be printed before the connector starts
 - **AND** the warning MUST reference External Settings as the canonical capture path
+
 

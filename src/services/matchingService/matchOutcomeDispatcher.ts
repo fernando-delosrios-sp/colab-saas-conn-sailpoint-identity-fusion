@@ -906,7 +906,7 @@ export class MatchOutcomeDispatcher {
 
     private async finalizeAuthoritativeNonMatch(fusionAccount: FusionAccount): Promise<FusionAccount> {
         fusionAccount.collections.statuses.setNonMatched(fusionAccount.name, fusionAccount.sourceName)
-        this.deps.run.registerFusionAccount(fusionAccount, this.deps.run.analysisRecorder?.tracker)
+        this.deps.run.registerFusionAccount(fusionAccount)
         if (isDeferredMatchingEnabledForSource(fusionAccount.sourceName, this.deps.run.sourcesByName)) {
             this.deps.run.registerFinalizedDeferredCandidate(fusionAccount)
         }

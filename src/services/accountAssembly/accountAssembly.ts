@@ -8,7 +8,6 @@ import { SourceService } from '../sourceService'
 import { MappingService } from '../mappingService'
 import { DefinitionService } from '../definitionService'
 import { FusionReportBlend } from '../../model/fusionReportBlend'
-import { AggregationTracker } from '../../model/aggregationTracker'
 import { assert } from '../../utils/assert'
 
 export interface AccountAssemblyDeps {
@@ -21,7 +20,6 @@ export interface AccountAssemblyDeps {
     commandType?: StandardCommand
     isAggregationMode?: boolean
     buildFusionBlend?: (fusionAccount: FusionAccount, account: Account) => FusionReportBlend
-    getTracker?: () => AggregationTracker | undefined
 }
 
 export interface AssembleAccountOptions {
@@ -57,10 +55,7 @@ export class AccountAssembly {
 
     private recordBlend(fusionAccount: FusionAccount, account: Account): void {
         if (!this.deps.buildFusionBlend) return
-        this.deps.run.recordFusionBlend(
-            this.deps.buildFusionBlend(fusionAccount, account),
-            this.deps.getTracker?.()
-        )
+        this.deps.run.recordFusionBlend(this.deps.buildFusionBlend(fusionAccount, account))
     }
 
     /**
@@ -129,6 +124,7 @@ export class AccountAssembly {
      * processors do not duplicate the registration logic.
      */
     public registerFusionAccount(fusionAccount: FusionAccount): void {
-        this.deps.run.registerFusionAccount(fusionAccount, this.deps.getTracker?.())
+        this.deps.run.registerFusionAccount(fusionAccount)
     }
 }
+
