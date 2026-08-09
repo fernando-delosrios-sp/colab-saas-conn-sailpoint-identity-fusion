@@ -789,7 +789,7 @@ describe('FusionService — aggregation', () => {
 
             await ctx.fusionService.processManagedAccounts()
 
-            expect(ctx.fusionService.fusionAccounts).toHaveLength(1)
+            expect(ctx.run.allFusionAccounts).toHaveLength(1)
             expect(workQueue.has('source-a-id::native-seq-2')).toBe(false)
             expect(ctx.mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })
@@ -862,7 +862,7 @@ describe('FusionService — aggregation', () => {
 
             await ctx.fusionService.processManagedAccounts()
 
-            expect(ctx.fusionService.fusionAccounts).toHaveLength(1)
+            expect(ctx.run.allFusionAccounts).toHaveLength(1)
             expect(workQueue.has('source-a-id::native-batch-def-2')).toBe(false)
             expect(ctx.mockLog.recordEvent).toHaveBeenCalledWith('match', { type: 'deferred' })
         })

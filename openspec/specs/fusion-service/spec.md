@@ -232,7 +232,17 @@ FusionService SHALL delegate managed-account match outcome dispatch to `MatchOut
 
 ### Requirement: FusionService receives state via FusionRun
 
-FusionService SHALL access all shared run state through FusionRun at construction time. Internal state previously held on FusionService (`_tracker`, `_managedAccountProcessingState`, `_managedAccountProcessingStartedAt`, `_managedAccountProcessingBatchSize`) SHALL live on FusionRun. Pass-through getters (`sourcesByName`, `_reviewersBySourceId`, `_sourcesWithoutReviewers`, `autoMergedIdentityIds`) SHALL NOT exist — callers SHALL access FusionRun directly.
+FusionService SHALL access all shared run state through FusionRun at construction time. Internal state previously held on FusionService (`_tracker`, `_managedAccountProcessingState`, `_managedAccountProcessingStartedAt`, `_managedAccountProcessingBatchSize`) SHALL live on FusionRun. Pass-through getters that expose raw FusionRun maps or sets (`sourcesByName`, `reviewersBySourceId`, `sourcesWithoutReviewers`, `autoMergedIdentityIds`, `fusionAccounts`, `fusionIdentities`, `totalFusionAccountCount`) SHALL NOT exist on FusionService — callers SHALL access FusionRun directly.
+
+FusionService MAY expose a small set of operation-facing methods that delegate to FusionRun without exposing mutable collections:
+
+- `getFusionIdentity(identityId)` — stable lookup API for provisioning operations
+- `setTracker(tracker)` — orchestration hook that delegates to `run.setTracker()`
+- `fusionIdentitiesExcluding(excludeIds)` — filtered identity iteration for scoring prep
+
+FusionService SHALL NOT expose a public `tracker` getter. Internal code that requires a non-null tracker SHALL use a private `requireTracker()` helper with invariant enforcement.
+
+Services that receive FusionRun (ReportService, FormService, MatchOutcomeDispatcher, processors) SHALL read run state from `run` directly, not through FusionService getters.
 
 #### Scenario: FusionService reads fusion accounts from FusionRun
 - **WHEN** FusionService needs to iterate fusion accounts
@@ -247,6 +257,16 @@ FusionService SHALL access all shared run state through FusionRun at constructio
 - **WHEN** FusionService initializes aggregation tracking
 - **THEN** it SHALL call `run.setTracker(tracker)` rather than storing `this._tracker`
 - **AND** sub-components SHALL access the tracker via `run.getTracker()`
+
+#### Scenario: ReportService reads tracker from FusionRun
+- **WHEN** ReportService builds an aggregation or dry-run report
+- **THEN** it SHALL call `run.getTracker()` with local non-null enforcement
+- **AND** it SHALL NOT read tracker via a FusionService getter
+
+#### Scenario: Operation-facing identity lookup remains on FusionService
+- **WHEN** a provisioning operation needs the fusion identity for a processed identity
+- **THEN** it MAY call `fusion.getFusionIdentity(identityId)`
+- **AND** FusionService SHALL delegate to `run.getFusionIdentity(identityId)`
 
 #### Scenario: FusionService delegates processing phase state to FusionRun
 - **WHEN** FusionService manages the managed account processing lifecycle
@@ -458,6 +478,7 @@ When loading persisted `originAccount` metadata, the connector SHALL accept a pl
 - **WHEN** the connector loads origin metadata
 - **THEN** `originAccount` SHALL NOT be set to the raw UUID
 - **AND** the invalid value SHALL NOT be used as a managed account lookup key
+
 
 
 
