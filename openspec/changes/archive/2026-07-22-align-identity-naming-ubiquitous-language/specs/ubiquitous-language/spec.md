@@ -1,3 +1,5 @@
+> **Archive note (2026-08-09):** Terminology in this delta reflects the change at archive time. Current canonical terms: **`MatchOutcomeDispatcher`** (replaces `ManagedAccountPassRunner` / `ManagedAccountMatchingRunner`); **`configureScoring({ captureBreakdown })`** (replaces `setCaptureBreakdown`). See `openspec/changes/archive/README.md` and living specs after `reconcile-matching-delegation-spec`.
+
 ## ADDED Requirements
 
 ### Requirement: Identity reference terms are defined precisely

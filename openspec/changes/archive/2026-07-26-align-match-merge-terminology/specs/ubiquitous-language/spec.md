@@ -1,3 +1,5 @@
+> **Archive note (2026-08-09):** Terminology in this delta reflects the change at archive time. Current canonical terms: **`MatchOutcomeDispatcher`** (replaces `ManagedAccountPassRunner` / `ManagedAccountMatchingRunner`); **`configureScoring({ captureBreakdown })`** (replaces `setCaptureBreakdown`). See `openspec/changes/archive/README.md` and living specs after `reconcile-matching-delegation-spec`.
+
 ## ADDED Requirements
 
 ### Requirement: Glossary defines Match merge terms
@@ -64,7 +66,7 @@ Source code SHALL use the canonical terms from this spec for variable names, fun
 - **WHEN** a developer defines a type, enum, or class for match outcomes
 - **THEN** the type SHALL reference `MatchingService`, not `ScoringService`
 - **WHEN** a developer defines a type, enum, or class for a domain concept
-- **THEN** the type name SHALL use canonical terms (e.g., `MatchCandidateType.Deferred`, not `NewUnmatched`; `ManagedAccountMatchingRunner`, not `ManagedAccountPassRunner`)
+- **THEN** the type name SHALL use canonical terms (e.g., `MatchCandidateType.Deferred`, not `NewUnmatched`; `MatchOutcomeDispatcher`, not `ManagedAccountMatchingRunner` or `ManagedAccountPassRunner`)
 - **WHEN** a developer defines a report decision wire value for joining an existing identity
 - **THEN** the value SHALL be `merge-existing-identity`, not `assign-existing-identity`
 

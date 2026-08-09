@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The match service (`src/services/matchingService/`) is the stateless service responsible for the Match step — comparing Fusion accounts against existing identities using weighted scoring rules and dispatching match outcomes (exact match, partial match, deferred match, non-match). It owns the CandidateRegistry and ManagedAccountMatchingRunner, and orchestrates the two-sweep matching lifecycle. All scoring algorithms from the former ScoringService remain in effect under the new name.
+The match service (`src/services/matchingService/`) provides weighted scoring algorithms and trigram blocking for the Match step. `MatchOutcomeDispatcher` in the same package owns match outcome dispatch and the two-sweep matching lifecycle (identity scoring sweep → deferred drain). All scoring algorithms from the former ScoringService remain in effect under the new name.
 ## Requirements
 ### Requirement: MatchingService dispatches exact match → automatic merge
 
@@ -93,38 +93,42 @@ When scoring produces deferred-candidate matches, MatchingService SHALL defer id
 - **AND** the remaining N−1 matched accounts SHALL be promoted to non-match Fusion account anchors
 - **AND** the deferred match SHALL report all promoted candidates
 
-### Requirement: MatchingService owns the two-sweep matching runner
-
-MatchingService SHALL orchestrate the two-sweep matching lifecycle (identity scoring sweep → deferred drain) via `MatchOutcomeDispatcher`. The identity sweep MAY score accounts in parallel batches. The deferred drain SHALL process pending accounts sequentially within each managed source in deterministic order, mutating the candidate pool after each account.
-
-#### Scenario: Runner executes identity scoring sweep
-- **WHEN** MatchingService processes uncorrelated managed accounts
-- **THEN** MatchOutcomeDispatcher SHALL execute identity-phase scoring for all accounts (parallel batches permitted)
-- **AND** results SHALL be classified as identity-match or deferred-pending
-
-#### Scenario: Runner executes deferred scoring sweep
-- **WHEN** the identity sweep completes with deferred-pending accounts for a source
-- **THEN** MatchOutcomeDispatcher SHALL evaluate each pending account one at a time against the current per-source candidate pool
-- **AND** the pool SHALL include persisted fusion anchors plus materialized non-match anchors from earlier steps in the same drain
-- **AND** results SHALL be classified as deferred-match or non-match before advancing to the next pending account
-
 ### Requirement: MatchingService owns the CandidateRegistry
 
-MatchingService SHALL create and manage the CandidateRegistry for per-source deferred candidate tracking across analysis sweeps. Persisted fusion accounts from prior runs SHALL be seeded into the registry before the deferred drain begins. Pending managed accounts SHALL NOT be bulk-registered before scoring; only materialized anchors and persisted seeds SHALL appear in the pool during drain.
+MatchingService SHALL NOT maintain a separate CandidateRegistry object. Deferred candidate pool state SHALL live on FusionRun. MatchOutcomeDispatcher SHALL read and mutate the deferred candidate pool through FusionRun APIs (`registerPersistedDeferredCandidate`, `registerFinalizedDeferredCandidate`, `currentRunDeferredCandidatesForSource`, and related run methods). FusionService SHALL seed persisted fusion anchors into the pool during `initializeManagedAccountProcessing` before uncorrelated sweep begins.
 
 #### Scenario: Candidates registered during identity sweep
+
 - **WHEN** an authoritative account from a deferred-enabled source has no identity match during identity phase
-- **THEN** the account SHALL be classified as deferred-pending
-- **AND** it SHALL NOT be bulk-registered in CandidateRegistry before the deferred drain
+- **THEN** the account SHALL be classified as deferred-pending by MatchOutcomeDispatcher
+- **AND** it SHALL NOT be bulk-registered in the deferred pool before the deferred drain
 
 #### Scenario: Persisted anchors seeded at sweep start
+
 - **WHEN** managed account processing initializes for a deferred-enabled source with existing fusion accounts
-- **THEN** those fusion accounts SHALL be registered as persisted deferred candidates for the managed source (using `originSource` bucketing)
+- **THEN** those fusion accounts SHALL be registered as persisted deferred candidates on FusionRun for the managed source (using `originSource` bucketing)
 - **AND** they SHALL be visible to the first pending account scored in the deferred drain
 
 #### Scenario: Materialized anchor joins pool
+
 - **WHEN** a pending account is classified as non-match during the deferred drain
-- **THEN** its Fusion account SHALL be registered as an anchor deferred candidate for subsequent pending accounts in the same source during the same sweep
+- **THEN** its Fusion account SHALL be registered as an anchor deferred candidate on FusionRun for subsequent pending accounts in the same source during the same sweep
+
+### Requirement: MatchingService scope is scoring and trigram blocking
+
+MatchingService SHALL provide weighted scoring algorithms, trigram index build and query, and normalization caches on FusionRun. MatchingService SHALL NOT expose `processUncorrelatedManagedAccounts` or own match sweep orchestration. Match outcome dispatch and the two-sweep lifecycle SHALL be owned by `MatchOutcomeDispatcher` in the same package.
+
+#### Scenario: MatchingService has no sweep orchestration entry point
+
+- **WHEN** a developer inspects the public API of MatchingService
+- **THEN** there SHALL be no `processUncorrelatedManagedAccounts` method
+- **AND** sweep orchestration SHALL be invoked through `MatchOutcomeDispatcher.runMatchSweep`
+
+#### Scenario: Trigram and scoring prep remain on MatchingService
+
+- **WHEN** FusionService prepares for managed-account matching during init
+- **THEN** it SHALL call `MatchingService.buildTrigramIndex` and `MatchingService.configureScoring`
+- **AND** those methods SHALL remain the scoring-prep entry points on MatchingService
 
 ### Requirement: MatchingService exposes scoring algorithms
 
@@ -325,18 +329,20 @@ When comparing a managed account against an identity candidate during identity-s
 
 ### Requirement: Run-scoped captureBreakdown configuration on MatchingService
 
-`MatchingService` SHALL expose `setCaptureBreakdown(value: boolean)` to configure whether full score breakdowns are required for identity-sweep comparisons regardless of match outcome. `FusionService` SHALL set this flag during `initializeManagedAccountProcessing` based on whether managed-account report data capture is enabled for the current run. When `captureBreakdown` is true, identity-sweep comparisons SHALL use the full breakdown path for every comparison (preserving report-capture behavior).
+`MatchingService` SHALL expose `configureScoring({ captureBreakdown: boolean })` to configure whether full score breakdowns are required for identity-sweep comparisons regardless of match outcome. `FusionService` SHALL call `configureScoring` during `initializeManagedAccountProcessing` based on whether managed-account report data capture is enabled for the current run. When `captureBreakdown` is true, identity-sweep comparisons SHALL use the full breakdown path for every comparison (preserving report-capture behavior).
 
 #### Scenario: Report capture run enables full breakdown
+
 - **GIVEN** managed-account report data capture is enabled for the run
 - **WHEN** `FusionService.initializeManagedAccountProcessing` completes
-- **THEN** `MatchingService` SHALL have `captureBreakdown` set to true
+- **THEN** `MatchingService` SHALL have been configured with `captureBreakdown: true` via `configureScoring`
 - **AND** identity-sweep comparisons SHALL allocate full score breakdowns as before the optimization
 
 #### Scenario: Normal aggregation disables breakdown for identity sweep
+
 - **GIVEN** managed-account report data capture is disabled for the run
 - **WHEN** `FusionService.initializeManagedAccountProcessing` completes
-- **THEN** `MatchingService` SHALL have `captureBreakdown` set to false
+- **THEN** `MatchingService` SHALL have been configured with `captureBreakdown: false` via `configureScoring`
 - **AND** identity-sweep non-match comparisons SHALL use the fast path
 
 #### Scenario: Deferred candidate comparisons always use full breakdown
@@ -413,4 +419,5 @@ When `getCandidates` cannot produce a candidate set because the managed account 
 - **GIVEN** a trigram index where no bucket key overlaps the query value's trigrams
 - **WHEN** `queryAttributeIndex` is called
 - **THEN** an empty set SHALL be returned (not `undefined`)
+
 

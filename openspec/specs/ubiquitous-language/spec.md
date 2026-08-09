@@ -57,9 +57,25 @@ Source code SHALL use the canonical terms from this spec for variable names, fun
 #### Scenario: Type naming follows ubiquitous language (updated)
 
 - **WHEN** a developer defines a type, enum, or class for match outcomes
-- **THEN** the type SHALL reference `MatchingService`, not `ScoringService`
-- **WHEN** a developer defines a type, enum, or class for a domain concept
-- **THEN** the type name SHALL use canonical terms (e.g., `MatchCandidateType.Deferred`, not `NewUnmatched`; `ManagedAccountMatchingRunner`, not `ManagedAccountPassRunner`)
+- **THEN** the type SHALL reference `MatchingService` for scoring concerns, not `ScoringService`
+- **WHEN** a developer defines a type, enum, or class for match sweep orchestration or outcome dispatch
+- **THEN** the type name SHALL use `MatchOutcomeDispatcher`, not `ManagedAccountMatchingRunner` or `ManagedAccountPassRunner`
+
+### Requirement: Match sweep orchestration term is MatchOutcomeDispatcher
+
+The canonical implementation type for managed-account match sweep orchestration and outcome dispatch SHALL be `MatchOutcomeDispatcher`. Documentation and specs SHALL refer to **Match outcome dispatch** and the two-sweep lifecycle (identity scoring sweep → deferred drain) in terms of `MatchOutcomeDispatcher.runMatchSweep`, not `ManagedAccountMatchingRunner`.
+
+#### Scenario: Specs reference MatchOutcomeDispatcher for sweeps
+
+- **WHEN** a living spec describes who orchestrates the two-sweep match lifecycle
+- **THEN** it SHALL name `MatchOutcomeDispatcher` as the orchestrator
+- **AND** it SHALL NOT require `ManagedAccountMatchingRunner` as an active type
+
+#### Scenario: Correlated account sweep is distinct from two-sweep lifecycle
+
+- **WHEN** documentation describes the correlated account sweep
+- **THEN** it SHALL treat that sweep as a FusionService pipeline pre-pass
+- **AND** it SHALL NOT conflate the correlated account sweep with the identity-scoring or deferred-drain sweeps inside `MatchOutcomeDispatcher`
 
 ### Requirement: Configuration uses canonical terms
 
@@ -557,7 +573,8 @@ The following terms are retired and SHALL NOT be used in new code, configuration
 | `analyzeIdentityPhase` | `scoreIdentityCandidates` |
 | `analyzeDeferredPhase` | `scoreDeferredCandidates` |
 | `hasNewUnmatchedPeerMatches` | `hasDeferredCandidateMatches` |
-| `ManagedAccountPassRunner` | `ManagedAccountMatchingRunner` |
+| `ManagedAccountPassRunner` | `MatchOutcomeDispatcher` |
+| `ManagedAccountMatchingRunner` | `MatchOutcomeDispatcher` |
 | `processing run` | operation run, or the specific operation name when referring to the command definition |
 | `AttributeService` | `MappingService` (for attribute mapping/merging) + `DefinitionService` (for attribute computation and unique value generation) |
 | `ScoringService` | `MatchingService` (scoring remains as the computation technique within matching) |
