@@ -837,7 +837,7 @@ export class FusionService {
         const yieldEveryManaged = getManagedAccountEventLoopYieldEvery(this.config)
         for (const resolved of sweepResult.resolved) {
             const analysis = resolved.analysis!
-            this.run.analysisRecorder!.recordAnalysis(analysis)
+            this.run.recordAnalysis(analysis)
             const { fusionAccount, account } = analysis
             if (hasDeferredOnlyCandidateMatches(fusionAccount)) {
                 logDeferredMatchDiscoveryForReview(

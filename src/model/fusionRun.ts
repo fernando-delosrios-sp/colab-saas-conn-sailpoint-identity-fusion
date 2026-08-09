@@ -11,6 +11,7 @@ import { hasValue, readString, trimStr } from '../utils/safeRead'
 import { assert } from '../utils/assert'
 import { buildManagedAccountKey } from './managedAccountKey'
 import { CandidateRegistry } from '../services/matchingService/candidateRegistry'
+import { ManagedAccountAnalysisContext } from '../services/matchingService/types'
 import { resolveFusionAccountNameOrDisplayName } from './fusionAccountUtils'
 
 export type ManagedAccountInfo = {
@@ -350,6 +351,14 @@ export class FusionRun {
      */
     trackFailed(fusionAccount: FusionAccount, message: string): void {
         this.analysisRecorder?.trackFailed(fusionAccount, message)
+    }
+
+    /**
+     * Record managed-account analysis through the run's analysis recorder.
+     * No-op when no recorder is attached.
+     */
+    recordAnalysis(analysis: ManagedAccountAnalysisContext): void {
+        this.analysisRecorder?.recordAnalysis(analysis)
     }
 
     registerFusionAccount(fusionAccount: FusionAccount, tracker?: AggregationTracker): void {
