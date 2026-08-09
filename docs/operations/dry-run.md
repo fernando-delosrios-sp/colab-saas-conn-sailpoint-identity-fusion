@@ -53,7 +53,7 @@ flowchart TD
     Fetch --> Refresh[3. Refresh fusion accounts]
     Refresh --> Process[4. Process — full Match and Correlation logic]
     Process --> Output[5. Output — stream accounts with JIT unique attributes]
-    Output --> Epilogue[Epilogue — HTML report and/or email, then terminal summary]
+    Output --> Epilogue[Epilogue — HTML report and/or email, then console run summary]
     Epilogue --> End([End])
 ```
 
@@ -89,21 +89,23 @@ flowchart TD
 
 ### Account stream
 
-Dry-run emits the same `StdAccountListOutput` rows as a persistent aggregation for the same ISC input state, including JIT unique attributes refreshed during Phase 5.
+Dry-run emits the same `StdAccountListOutput` rows as a persistent aggregation for the same ISC input state, including JIT unique attributes refreshed during Phase 5. No summary or metadata object is sent via `res.send`.
 
-### Terminal summary
+### Console run summary
 
-The final `res.send` call is a summary object:
+After the pipeline completes, the connector logs a JSON run summary to `console.log`:
 
 | Field | Description |
 | ----- | ----------- |
-| `rowsSent` | Number of account rows streamed before the summary |
+| `rowsSent` | Number of account rows streamed via `res.send` |
 | `identitiesFound` | Identities loaded during the run (scope fetch plus supplemental loads such as global reviewer or report-target owners) |
 | `managedAccountsFound` | Managed accounts loaded during fetch |
+| `fusionAccountsFound` | Fusion accounts loaded from the Fusion source |
 | `totalProcessingTime` | Total elapsed time for the run |
 | `phaseTiming` | Per-phase elapsed breakdown |
 | `issueSummary` | Warning and error counts with sampled messages |
 | `options` | `{ saveFile, sendEmail }` reflecting the input used |
+| `reportHtmlOutputPath` | Present when `saveFile` wrote an HTML report |
 
 ### HTML report (`saveFile` or `sendEmail`)
 
@@ -125,7 +127,7 @@ When report artifacts are requested, the epilogue runs in this order:
 
 1. Write HTML report file (`saveFile`)
 2. Deliver report email (`sendEmail`)
-3. Send terminal summary via `res.send` (always last)
+3. Log run summary to `console.log`
 
 The epilogue runs **even when the pipeline fails** partway through, so report files and emails are attempted before the operation error is propagated.
 
@@ -154,6 +156,7 @@ See [Proxy mode](../reference/proxy-mode.md) for architecture and setup.
 - [Matching identities](../use-guides/configuration/matching-identities.md) — tuning thresholds; includes a dry-run workflow note
 - [Tuning matching algorithms](../use-guides/configuration/tuning-matching-algorithms.md) — recommended testing approach
 - [Glossary: dry-run mode](../concepts/glossary.md) — canonical term definition
+
 
 
 

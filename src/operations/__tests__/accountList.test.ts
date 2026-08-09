@@ -246,9 +246,10 @@ describe('accountList dry-run mode', () => {
         vi.restoreAllMocks()
     })
 
-    it('streams accounts and sends terminal summary when dryRun.enabled is true', async () => {
+    it('streams accounts and logs run summary to console when dryRun.enabled is true', async () => {
         const { registry, sources, fusion } = createMockRegistry([])
         const res = registry.res
+        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
         const outputAccounts = [{ identity: 'acct-1' }, { identity: 'acct-2' }]
         fusion.forEachISCAccount.mockImplementation(async (sendFn: (account: unknown) => void) => {
             for (const account of outputAccounts) {
@@ -263,18 +264,13 @@ describe('accountList dry-run mode', () => {
         expect(sources.setProcessLock).not.toHaveBeenCalled()
         expect(sources.releaseProcessLock).not.toHaveBeenCalled()
         expect(fusion.forEachISCAccount).toHaveBeenCalledWith(expect.any(Function), true)
+        expect(res.send).toHaveBeenCalledTimes(outputAccounts.length)
         expect(res.send).toHaveBeenCalledWith(outputAccounts[0])
         expect(res.send).toHaveBeenCalledWith(outputAccounts[1])
-        expect(res.send).toHaveBeenCalledWith(
-            expect.objectContaining({
-                rowsSent: outputAccounts.length,
-                identitiesFound: expect.any(Number),
-                managedAccountsFound: expect.any(Number),
-                totalProcessingTime: expect.any(String),
-                issueSummary: expect.any(Object),
-                options: expect.objectContaining({ saveFile: false, sendEmail: false }),
-            })
+        expect(consoleSpy).toHaveBeenCalledWith(
+            expect.stringContaining('"rowsSent": 2')
         )
+        consoleSpy.mockRestore()
     })
 
     it('rejects dry-run when recording mode is active', async () => {
@@ -372,10 +368,14 @@ describe('accountList report epilogue', () => {
         expect(sources.releaseProcessLock).toHaveBeenCalledTimes(1)
     })
 
-    it('saves dry-run report artifacts before a failing summary send', async () => {
-        const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
+    it('writes dry-run report artifacts even when res.send fails mid-stream', async () => {
+        const { registry, fusion } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         const reports = registry.reports as any
         reports.generateDryRunReport = vi.fn().mockResolvedValue({ reportHtmlOutputPath: './reports/dry-run.html' })
+        fusion.forEachISCAccount.mockImplementation(async (sendFn: (a: unknown) => void) => {
+            sendFn({ id: 'a1' })
+            return { sent: 1, eligible: 1 }
+        })
         ;(registry.res.send as Mock).mockImplementation(() => {
             throw new Error('write after end')
         })
@@ -384,39 +384,39 @@ describe('accountList report epilogue', () => {
         await expect(accountList(registry, input)).rejects.toThrow('write after end')
 
         expect(reports.generateDryRunReport).toHaveBeenCalledTimes(1)
-        expect(reports.generateDryRunReport.mock.invocationCallOrder[0]).toBeLessThan(
-            (registry.res.send as Mock).mock.invocationCallOrder[0]
-        )
     })
 
-    it('sends the summary even when dry-run report artifacts fail', async () => {
+    it('logs run summary to console even when dry-run report artifacts fail', async () => {
         const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         const reports = registry.reports as any
+        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
         reports.generateDryRunReport = vi.fn().mockRejectedValue(new Error('email down'))
         const input = { dryRun: { enabled: true, saveFile: true }, schema: { attributes: [] } } as any
 
         await accountList(registry, input)
 
-        expect(registry.res.send).toHaveBeenCalledWith(expect.objectContaining({ rowsSent: expect.any(Number) }))
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"rowsSent"'))
+        consoleSpy.mockRestore()
     })
 
-    it('emits report artifacts before the summary on a clean dry-run', async () => {
+    it('logs run summary after report artifacts on a clean dry-run', async () => {
         const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         const reports = registry.reports as any
+        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
         reports.generateDryRunReport = vi.fn().mockResolvedValue({ reportHtmlOutputPath: './reports/dry-run.html' })
         const input = { dryRun: { enabled: true, saveFile: true }, schema: { attributes: [] } } as any
 
         await accountList(registry, input)
 
-        expect(reports.generateDryRunReport.mock.invocationCallOrder[0]).toBeLessThan(
-            (registry.res.send as Mock).mock.invocationCallOrder[0]
-        )
-        expect(registry.res.send).toHaveBeenCalledWith(expect.objectContaining({ rowsSent: expect.any(Number) }))
+        expect(reports.generateDryRunReport.mock.invocationCallOrder[0]).toBeLessThan(consoleSpy.mock.invocationCallOrder[0])
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"reportHtmlOutputPath"'))
+        consoleSpy.mockRestore()
     })
 
     it('delegates sendEmail string input to dry-run report delivery', async () => {
         const { registry } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         const reports = registry.reports as any
+        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
         reports.generateDryRunReport = vi.fn().mockResolvedValue({})
         const input = {
             dryRun: { enabled: true, sendEmail: 'reviewer@example.com' },
@@ -428,9 +428,8 @@ describe('accountList report epilogue', () => {
         expect(reports.generateDryRunReport).toHaveBeenCalledWith(
             expect.objectContaining({ sendEmail: ['reviewer@example.com'], saveFile: false })
         )
-        expect(registry.res.send).toHaveBeenCalledWith(
-            expect.objectContaining({ options: expect.objectContaining({ sendEmail: true }) })
-        )
+        expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('"sendEmail": true'))
+        consoleSpy.mockRestore()
     })
 
     it('logs phase START, Epilogue labels, and no legacy heartbeats', async () => {
@@ -452,6 +451,7 @@ describe('accountList report epilogue', () => {
         logSpy.mockRestore()
     })
 })
+
 
 
 

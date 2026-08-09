@@ -80,23 +80,26 @@ export function parseDryRunInput(input: StdAccountListInput): DryRunInput | unde
     return { enabled, saveFile, sendEmail: sendEmail.length > 0 ? sendEmail : undefined }
 }
 
+/** Build the dry-run run summary object logged to console after the pipeline completes. */
 export function buildTerminalSummary(
     serviceRegistry: ServiceRegistry,
     result: { outputCount?: number; fetchResult?: FetchResult; timer: ReturnType<ServiceRegistry['log']['timer']> },
     dryRun: DryRunInput
 ): Record<string, unknown> {
-    const { log } = serviceRegistry
+    const { log, sources } = serviceRegistry
     const issueSummary = log.getAggregationIssueSummary()
     return {
         rowsSent: result.outputCount ?? 0,
         identitiesFound: resolveIdentitiesFound(result.fetchResult, serviceRegistry.identities),
         managedAccountsFound: result.fetchResult?.managedAccountsFound ?? 0,
+        fusionAccountsFound: sources.fusionAccountCount,
         totalProcessingTime: result.timer.totalElapsed(),
         phaseTiming: result.timer.getPhaseBreakdown(),
         issueSummary,
         options: { saveFile: dryRun.saveFile ?? false, sendEmail: Boolean(dryRun.sendEmail) },
     }
 }
+
 
 
 

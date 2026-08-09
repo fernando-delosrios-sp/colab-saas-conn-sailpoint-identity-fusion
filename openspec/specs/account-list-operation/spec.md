@@ -75,12 +75,25 @@ In dry-run mode, the account-list operation SHALL stream `StdAccountListOutput` 
 - **WHEN** the account-list operation runs in dry-run mode
 - **THEN** streamed account rows SHALL include generated unique attribute values produced by the same JIT output path as persistent aggregation
 
-### Requirement: Dry-run mode sends a terminal summary object
-After streaming all rows, the account-list operation in dry-run mode SHALL send a terminal summary object via `res.send` containing: total rows sent, identity/managed-account/fusion-account totals, issue summary (warnings/errors), total processing time, and report output paths (if applicable).
+### Requirement: Dry-run mode streams only account rows via res.send
 
-#### Scenario: Terminal summary after row streaming
+In dry-run mode, `res.send` SHALL emit only `StdAccountListOutput` account rows, matching persistent aggregation for the same ISC input state. The operation SHALL NOT send a summary or other non-account payload via `res.send`.
+
+#### Scenario: Dry-run res.send matches persistent aggregation
+
 - **WHEN** the account-list operation completes row streaming in dry-run mode
-- **THEN** the system SHALL send a summary object as the final `res.send` call
+- **THEN** every `res.send` call SHALL be a standard account row
+- **AND** no summary or metadata object SHALL be sent via `res.send`
+
+### Requirement: Dry-run mode logs a run summary to console
+
+After the pipeline completes (and after any dry-run report artifacts are written when requested), the account-list operation in dry-run mode SHALL log a run summary object to `console.log` containing: total rows sent, identity/managed-account/fusion-account totals, issue summary (warnings/errors), total processing time, and report output paths (if applicable).
+
+#### Scenario: Run summary logged after row streaming
+
+- **WHEN** the account-list operation completes in dry-run mode
+- **THEN** the system SHALL log a summary object to `console.log`
+- **AND** `rowsSent` in the summary SHALL equal the number of account rows sent via `res.send`
 
 ### Requirement: Dry-run report aligns with aggregation report
 The dry-run report SHALL use `includeNonMatches: false` (consolidated counters only, no per-account non-matched rows) and SHALL render through the same Handlebars template and email delivery path as the aggregation report. The report title SHALL use the `'Identity Fusion Dry Run Report'` constant to distinguish analysis from persisted aggregation.
@@ -146,25 +159,23 @@ In dry-run mode, the account-list operation SHALL NOT mutate the ISC tenant. All
 - **WHEN** the account-list operation runs in dry-run mode
 - **THEN** the delayed-aggregation sender workflow SHALL NOT be fetched
 
-### Requirement: Dry-run emits report artifacts before the terminal summary
-In dry-run mode with `saveFile` and/or `sendEmail` requested, the operation SHALL write the HTML report file and/or deliver the report email BEFORE sending the terminal summary via `res.send` (most-durable-first ordering). The terminal summary SHALL remain the final `res.send` call of the operation. If the terminal summary send fails after an otherwise successful pipeline, the operation SHALL fail, but only after all report artifacts have been attempted.
+### Requirement: Dry-run emits report artifacts before the console run summary
+In dry-run mode with `saveFile` and/or `sendEmail` requested, the operation SHALL write the HTML report file and/or deliver the report email BEFORE logging the run summary to `console.log` (most-durable-first ordering).
 
-#### Scenario: Report file written before summary send
+#### Scenario: Report file written before console summary
 - **GIVEN** a dry-run invocation with `{ dryRun: { enabled: true, saveFile: true } }`
 - **WHEN** the pipeline completes
-- **THEN** the HTML report file SHALL be written before the terminal summary is sent
-- **AND** the terminal summary SHALL be the final `res.send` call
+- **THEN** the HTML report file SHALL be written before the run summary is logged to `console.log`
 
-#### Scenario: Report email delivered before summary send
+#### Scenario: Report email delivered before console summary
 - **GIVEN** a dry-run invocation with `{ dryRun: { enabled: true, sendEmail: "reviewer@example.com" } }`
 - **WHEN** the pipeline completes
-- **THEN** the report email SHALL be delivered before the terminal summary is sent
+- **THEN** the report email SHALL be delivered before the run summary is logged to `console.log`
 
-#### Scenario: Summary send failure preserves report artifacts
+#### Scenario: Report artifacts preserved when account streaming fails
 - **GIVEN** a dry-run invocation with `saveFile` requested
-- **WHEN** the pipeline succeeds but the terminal summary `res.send` throws
-- **THEN** the HTML report file SHALL already exist on disk
-- **AND** the operation SHALL fail with the summary-send error
+- **WHEN** the pipeline fails during account streaming but the epilogue runs
+- **THEN** the HTML report file SHALL still be attempted on disk
 
 ### Requirement: Failed aggregations persist no state
 State persistence is all-or-nothing: when the account-list pipeline fails for any reason, including a mid-stream `res.send` failure, the operation SHALL NOT persist attribute state or batch cumulative counts.
@@ -423,7 +434,7 @@ In dry-run mode, the account-list operation SHALL execute the same Setup, Fetch,
 - **GIVEN** a dry-run invocation with `{ dryRun: { enabled: true } }`
 - **WHEN** the pipeline reaches Phase 5 Output
 - **THEN** the system SHALL invoke `forEachISCAccount` and stream each account via `res.send`
-- **AND** `rowsSent` in the terminal summary SHALL equal the number of account rows sent
+- **AND** `rowsSent` in the console run summary SHALL equal the number of account rows sent
 
 #### Scenario: Dry-run runs Match and Correlation logic
 
@@ -485,4 +496,5 @@ During account-list execution, operational milestones (managed sources loaded, a
 - **AND** no second INFO line describing the same send SHALL appear
 
 ---
+
 

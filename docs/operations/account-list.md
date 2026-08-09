@@ -181,7 +181,7 @@ To reduce email/report payload growth:
 
 The account list operation supports an optional **dry-run mode** for non-persistent analysis. Pass `{ dryRun: { enabled: true } }` on the input to run the full pipeline with `DryRunApiAdapter` write inhibition: account rows stream identically to persistent aggregation, while ISC PATCH/POST/DELETE calls are suppressed. Process lock acquisition and delayed-aggregation scheduling remain skipped in dry-run.
 
-Dry-run is intended for local or out-of-platform execution when tuning Match, validating Map/Define output, previewing streamed account rows, or generating an HTML report before production changes. Optional `saveFile` and `sendEmail` input flags write or email a report titled **Identity Fusion Dry Run Report**; a terminal summary object is always sent last.
+Dry-run is intended for local or out-of-platform execution when tuning Match, validating Map/Define output, previewing streamed account rows, or generating an HTML report before production changes. Optional `saveFile` and `sendEmail` input flags write or email a report titled **Identity Fusion Dry Run Report**; a run summary is always logged to `console.log` after the epilogue.
 
 See [Dry-run mode](dry-run.md) for the full contract, adapter-based write suppression, and invocation examples.
 
@@ -211,6 +211,7 @@ Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion
 ### Preventing Fusion account creation (empty nativeIdentity skip pattern)
 
 One can purposely generate an empty `nativeIdentity` (by designing attribute definitions that produce an empty fusion identity attribute) in conjunction with the "Skip accounts with a missing identifier" processing option. When the fusion identity attribute evaluates to empty and the skip option is enabled, the account is omitted from the output, effectively preventing specific managed accounts or identities from generating Fusion accounts.
+
 
 
 
