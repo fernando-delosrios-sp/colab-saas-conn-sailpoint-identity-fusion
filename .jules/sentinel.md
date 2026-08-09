@@ -42,3 +42,7 @@
 **Vulnerability:** The LogService (`src/services/logService/logService.ts`) fetched data directly from a user-configured `externalLoggingUrl` without validating the scheme, making it vulnerable to Server-Side Request Forgery (SSRF) if a user supplied a malicious URL scheme like `file://` or an internal metadata endpoint.
 **Learning:** External or user-provided URLs must always be validated prior to making network requests, especially in Node.js where `fetch` or HTTP clients might attempt to resolve arbitrary schemes or hostnames.
 **Prevention:** Enforce strict URL scheme validation (e.g., checking for `http://` or `https://`) whenever initializing requests with configured URLs.
+## 2026-08-09 - Fix Stack Trace Leak in LogService
+**Vulnerability:** The LogService (`src/services/logService/logService.ts`) included raw error stack traces (`data.stack`) in log outputs. Since the external logging endpoint (`externalLoggingUrl`) or local log files might be exposed or sent to less secure destinations, this exposes internal application paths, structure, and potentially sensitive debugging variables in scope.
+**Learning:** Stack traces should not be globally serialized into log messages intended for unstructured, general-purpose logging sinks. In security contexts, explicit serialization of `.stack` leaks implementation details.
+**Prevention:** Do not serialize `error.stack` into text logs unless the destination is verified as a secure, isolated diagnostic sink. Output only the error name and message for general diagnostic logs.

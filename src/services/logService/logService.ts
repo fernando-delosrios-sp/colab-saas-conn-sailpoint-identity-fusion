@@ -513,7 +513,8 @@ export class LogService {
 
         // Handle Error objects
         if (data instanceof Error) {
-            return `${prefix}${originPart}${message} [Error: ${data.name}: ${data.message}${data.stack ? ' | Stack: ' + data.stack : ''}]`
+            // 🛡️ Sentinel: Do not leak stack traces in logs to prevent exposure of internal application structure
+            return `${prefix}${originPart}${message} [Error: ${data.name}: ${data.message}]`
         }
 
         // Handle primitives (string, number, boolean, bigint, symbol)
