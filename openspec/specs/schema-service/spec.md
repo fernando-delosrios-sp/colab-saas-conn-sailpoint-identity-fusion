@@ -14,10 +14,10 @@ The connector MUST export a TypeScript `enum` named `FusionAttribute` from `src/
 - **THEN** its value is the string `"missing-accounts"`
 - **AND** the same is true for every other member of the enum
 
-#### Scenario: The enum contains the ten current default attributes
+#### Scenario: The enum contains the eleven current default attributes
 
 - **WHEN** a developer iterates the enum members
-- **THEN** it contains exactly: `History`, `Statuses`, `Actions`, `Accounts`, `MissingAccounts`, `Reviews`, `Sources`, `MainAccount`, `OriginSource`, `OriginAccount`
+- **THEN** it contains exactly: `History`, `Statuses`, `Actions`, `Accounts`, `MissingAccounts`, `Reviews`, `Sources`, `MainAccount`, `OriginSource`, `OriginAccount`, `IdentityId`
 
 #### Scenario: The enum excludes the structural identity keys
 
@@ -32,7 +32,7 @@ Every internal call site that reads, writes, or otherwise references a default F
 
 - **WHEN** the connector reads the persisted `missing-accounts` collection during `FusionAccount.fromFusionAccount`
 - **THEN** the call is `attributeToSet(attributes, FusionAttribute.MissingAccounts)`
-- **AND** the same pattern is used for `History`, `Statuses`, `Actions`, `Accounts`, `Reviews`, `Sources`, `MainAccount`, `OriginSource`, and `OriginAccount` at every site that currently uses a raw string
+- **AND** the same pattern is used for `History`, `Statuses`, `Actions`, `Accounts`, `Reviews`, `Sources`, `MainAccount`, `OriginSource`, `OriginAccount`, and `IdentityId` at every site that currently uses a raw string
 
 #### Scenario: Production code references the enum for writes
 
@@ -54,7 +54,7 @@ Every internal call site that reads, writes, or otherwise references a default F
 A unit test in `src/data/__tests__/schema.test.ts` MUST assert the contract between `FusionAttribute` and `fusionAccountSchemaAttributes`:
 
 - Every enum member's string value MUST equal the `name` of some entry in `fusionAccountSchemaAttributes`.
-- The enum MUST have exactly ten members (the current count, after excluding `name` and `id`).
+- The enum MUST have exactly eleven members (the current count, after excluding `name` and `id`).
 - The enum MUST NOT contain the string values `"name"` or `"id"`.
 
 #### Scenario: A default attribute is added in only one place
@@ -152,4 +152,5 @@ The `fusionAccountSchemaAttributes` descriptions for `accounts`, `missing-accoun
 - **THEN** the description SHALL state that identity-origin accounts store an identity ID
 - **AND** managed-source origins SHALL require a composite managed account key
 - **AND** SHALL NOT mention legacy managed source account ID backwards compatibility
+
 
