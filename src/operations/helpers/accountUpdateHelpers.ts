@@ -1,11 +1,9 @@
 import {
-    AttributeChangeOp,
     StdAccountUpdateInput,
 } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { rebuildFusionAccount } from './rebuildFusionAccount'
 import { FusionAttribute } from '../../data/schema'
-import { FusionAction } from '../../model/fusionAction'
 import { assert } from '../../utils/assert'
 import { trimStr } from '../../utils/safeRead'
 import { executeActions } from '../actions'
@@ -77,17 +75,6 @@ function resolveAccountUpdateLabel(
     )
 }
 
-function shouldSkipCorrelationStatusRecompute(change: {
-    op?: AttributeChangeOp
-    value?: unknown
-}): boolean {
-    if (change.op !== AttributeChangeOp.Remove) {
-        return false
-    }
-    const actionValues = [change.value].flat().map((value) => String(value).split(':')[0])
-    return actionValues.some((value) => value === 'correlate' || value === FusionAction.Correlated)
-}
-
 /**
  * Runs the account-update pipeline: setup, rebuild, action processing, and output.
  */
@@ -128,14 +115,10 @@ export async function runAccountUpdatePipeline(
     log.stepEnd('rebuild-fusion-account')
 
     log.stepStart('process-changes', { count: input.changes.length })
-    let shouldRecomputeCorrelationStatus = true
     for (const change of input.changes) {
         assert(change.attribute, 'Change attribute is required')
 
         if (change.attribute === FusionAttribute.Actions) {
-            if (shouldSkipCorrelationStatusRecompute(change)) {
-                shouldRecomputeCorrelationStatus = false
-            }
             await executeActions(fusionAccount, change, serviceRegistry)
         } else {
             log.crash(`Unsupported entitlement change: ${change.attribute}`)
@@ -146,7 +129,7 @@ export async function runAccountUpdatePipeline(
     restoreReverseCorrelationSnapshot(fusionAccount, reverseCorrelationSnapshot)
 
     log.stepStart('generate-account')
-    const iscAccount = await fusion.getISCAccount(fusionAccount, true, shouldRecomputeCorrelationStatus)
+    const iscAccount = await fusion.getISCAccount(fusionAccount, true)
     assert(iscAccount, 'Failed to generate ISC account from fusion account')
     log.stepEnd('generate-account')
 
@@ -154,4 +137,5 @@ export async function runAccountUpdatePipeline(
     timer.end(`✓ Account update completed for ${accountLabel}`)
     return accountLabel
 }
+
 

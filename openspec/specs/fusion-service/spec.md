@@ -173,9 +173,27 @@ Production and test callers outside `FusionAccount` itself MUST mutate statuses,
 - **THEN** restoration goes through public or package-documented hydrate APIs on `FusionCollections` / `FusionLayers`
 - **AND** the factory path does not call `_internal_*` setters on the collaborator
 
+### Requirement: Previous bag preserves prior-aggregation collection mirrors
+
+When a Fusion account is constructed from persisted ISC account attributes (for example via `FusionAccount.fromFusionAccount` or other factory paths that seed `attributeBagPrevious` from stored attributes), `attributeBag.previous` MUST be populated with the persisted collection mirror attributes (`accounts`, `missing-accounts`, `statuses`, `actions`, `reviews`, `sources`, `history`, and other collection-backed fields present on the stored account). That snapshot MUST remain available for Velocity as `$previous` for the duration of the aggregation run. `syncCollectionAttributesToBag` MUST NOT overwrite `attributeBag.previous`.
+
+#### Scenario: Persisted fusion account exposes collection mirrors in $previous
+
+- **GIVEN** a persisted fusion account whose stored attributes include `statuses`, `actions`, and `accounts`
+- **WHEN** the account is loaded via the fusion-account factory
+- **THEN** `attributeBag.previous` contains those collection mirror arrays
+- **AND** Velocity context `$previous.statuses`, `$previous.actions`, and `$previous.accounts` are available for attribute definitions
+
+#### Scenario: Sync does not clobber the previous snapshot
+
+- **GIVEN** a fusion account whose `attributeBag.previous` was seeded at factory load
+- **WHEN** collection sets are mutated during the run and `syncCollectionAttributesToBag()` is called
+- **THEN** `attributeBag.previous` retains the factory-seeded collection mirror values
+- **AND** only `attributeBag.current` receives the updated collection mirrors from sync
+
 ### Requirement: Collection sync writes the current attribute bag
 
-`FusionAccount.syncCollectionAttributesToBag()` MUST copy `accounts`, `missing-accounts`, `statuses`, `actions`, `reviews`, and `sources` (and other collection mirrors owned by `FusionCollections`) into `attributeBag.current` via `FusionCollections.syncToBag`. The method MUST NOT be required to mirror those collection arrays into `attributeBag.previous`.
+`FusionAccount.syncCollectionAttributesToBag()` MUST copy `accounts`, `missing-accounts`, `statuses`, `actions`, `reviews`, and `sources` (and other collection mirrors owned by `FusionCollections`) into `attributeBag.current` via `FusionCollections.syncToBag`. The method MUST NOT mirror those collection arrays into `attributeBag.previous`; prior-aggregation collection mirrors in `attributeBag.previous` are seeded at factory load (see previous requirement).
 
 #### Scenario: Sync updates current bag
 
@@ -383,7 +401,7 @@ FusionService SHALL provide `disableResetAccounts()` and `disableResetForms()` m
 
 ### Requirement: Correlated entitlement reflects missing-accounts outcome
 
-When a Fusion account is built or rebuilt for output, the connector SHALL evaluate the internal missing-account reference set and SHALL grant the `correlated` action entitlement on the returned Fusion account if and only if no missing managed source accounts remain. When missing accounts remain, the `correlated` action entitlement SHALL NOT appear on the returned account. This is an outcome of the Fusion account build process, not an independently removed entitlement.
+When a Fusion account is built or rebuilt for output, the connector SHALL evaluate the internal missing-account reference set and SHALL grant the `correlated` action entitlement on the returned Fusion account if and only if no missing managed source accounts remain. When missing accounts remain, the `correlated` action entitlement SHALL NOT appear on the returned account. This is an outcome of the Fusion account build process, not an independently removed entitlement. On provisioning paths (`accountCreate`, `accountUpdate`), a Remove change for `correlate` or `correlated` action tokens SHALL fail the operation with message matching `Correlated entitlement cannot be removed: <value>`; the connector SHALL NOT honor entitlement revocation for derived correlated state.
 
 #### Scenario: Correlated granted when no missing accounts remain
 
@@ -398,6 +416,13 @@ When a Fusion account is built or rebuilt for output, the connector SHALL evalua
 - **WHEN** correlation status is updated for output
 - **THEN** the returned Fusion account actions SHALL NOT include the `correlated` action entitlement
 - **AND** the `Uncorrelated` status entitlement SHALL be present
+
+#### Scenario: Correlated Remove rejected on provisioning path
+
+- **GIVEN** a Fusion account whose missing-account reference set is empty
+- **WHEN** a Remove change for the `correlated` action entitlement is processed on a provisioning path
+- **THEN** the operation SHALL fail with a message matching `Correlated entitlement cannot be removed: correlated`
+- **AND** the connector SHALL NOT mutate correlation links or missing-account state
 
 ### Requirement: Correlate action assignment triggers direct PATCH for missing accounts on provisioning paths
 
@@ -478,6 +503,7 @@ When loading persisted `originAccount` metadata, the connector SHALL accept a pl
 - **WHEN** the connector loads origin metadata
 - **THEN** `originAccount` SHALL NOT be set to the raw UUID
 - **AND** the invalid value SHALL NOT be used as a managed account lookup key
+
 
 
 

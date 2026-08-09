@@ -1,11 +1,12 @@
 import { AttributeChangeOp } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
-import { FusionAction } from '../../model/fusionAction'
 import { ServiceRegistry } from '../../services/serviceRegistry'
+import { assert } from '../../utils/assert'
 import { ActionChange } from './types'
 
 /**
- * Correlate action handler - correlates missing source accounts.
+ * Correlate action handler — on Add, correlates missing managed source accounts (ISC PATCH).
+ * Remove is invalid: the correlated entitlement is derived from missing-accounts state.
  * @param serviceRegistry - Request-scoped registry (required for concurrent updates to avoid global state)
  */
 export const correlateAction = async (
@@ -20,9 +21,6 @@ export const correlateAction = async (
     if (change.op === AttributeChangeOp.Add) {
         await fusion.correlateMissingAccountsPerSource(fusionAccount)
     } else if (change.op === AttributeChangeOp.Remove) {
-        // Removing the correlate action does not undo established correlations.
-        // It only clears the entitlement on this update response.
-        fusionAccount.collections.actions.remove(FusionAction.Correlated)
-        log.debug(`Correlate action removed for account ${fusionAccount.name}`)
+        assert(false, `Correlated entitlement cannot be removed: ${change.value}`)
     }
 }
