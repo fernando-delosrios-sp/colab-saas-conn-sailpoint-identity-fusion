@@ -32,6 +32,13 @@ function createRegistry() {
     return registry
 }
 
+function mockCrashThrows(registry: ReturnType<typeof createRegistry>) {
+    const log = registry.log as any
+    log.crash = vi.fn((message: string) => {
+        throw new ConnectorError(message, ConnectorErrorType.Generic)
+    })
+}
+
 describe('accountRead', () => {
     afterEach(() => {
         vi.restoreAllMocks()
@@ -67,6 +74,18 @@ describe('accountRead', () => {
         await expect(accountRead(registry, {} as any)).rejects.toBeTruthy()
     })
 
+    it('fails with observable message when fusion account is not found', async () => {
+        const registry = createRegistry()
+        mockCrashThrows(registry)
+        ;(rebuildFusionAccount as Mock).mockResolvedValue(undefined)
+
+        await expect(
+            accountRead(registry, { identity: 'missing-fusion', schema: { attributes: [] } } as any)
+        ).rejects.toMatchObject({ message: 'Fusion account not found for identity: missing-fusion' })
+
+        expect(registry.res.send).not.toHaveBeenCalled()
+    })
+
     it('re-throws a ConnectorError when encountered', async () => {
         const registry = createRegistry()
         const error = new ConnectorError('Custom error', ConnectorErrorType.NotFound)
@@ -87,4 +106,5 @@ describe('accountRead', () => {
         expect(registry.log.crash).toHaveBeenCalledWith('Failed to read account fusion-1', error)
     })
 })
+
 

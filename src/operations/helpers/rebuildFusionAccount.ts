@@ -122,11 +122,11 @@ export const rebuildFusionAccount = async (
 ): Promise<FusionAccount | undefined> => {
     const { fusion, identities, sources, log } = services
 
-    await sources.fetchFusionAccount(nativeIdentity)
-    const fusionAccountsMap = sources.fusionAccountsByNativeIdentity
-    assert(fusionAccountsMap, 'Fusion accounts have not been loaded')
-    const account = fusionAccountsMap.get(nativeIdentity)
-    assert(account, 'Fusion account not found')
+    await sources.fetchFusionAccount(nativeIdentity, false)
+    const account = sources.fusionAccountsByNativeIdentity?.get(nativeIdentity)
+    if (!account) {
+        return undefined
+    }
     assert(account.identityId, 'Identity ID not found')
 
     await identities.fetchIdentityById(account.identityId)
@@ -159,5 +159,6 @@ export const rebuildFusionAccount = async (
 
     return await fusion.processFusionAccount(account, attributeOperations, originIdentityInScope)
 }
+
 
 

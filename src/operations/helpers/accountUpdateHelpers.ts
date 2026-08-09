@@ -30,7 +30,7 @@ async function captureReverseCorrelationSnapshot(
     }
 
     const { sources } = serviceRegistry
-    await sources.fetchFusionAccount(identity)
+    await sources.fetchFusionAccount(identity, false)
     const fusionSourceAccount = sources.fusionAccountsByNativeIdentity?.get(identity)
     const fusionSourceAttributes = (fusionSourceAccount?.attributes ?? {}) as Record<string, unknown>
     for (const attributeName of attributeNames) {
@@ -154,3 +154,4 @@ export async function runAccountUpdatePipeline(
     timer.end(`✓ Account update completed for ${accountLabel}`)
     return accountLabel
 }
+
