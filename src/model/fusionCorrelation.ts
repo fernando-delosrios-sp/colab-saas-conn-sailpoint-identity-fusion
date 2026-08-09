@@ -7,17 +7,17 @@ import type { FusionCollections } from './fusionCollections'
  * Not the business **correlation** process (linking managed source accounts to an ISC identity).
  */
 export class FusionCorrelation {
-    private _correlationPromises: Array<Promise<unknown>> = []
+    private correlationPromises: Array<Promise<unknown>> = []
 
     constructor(private readonly collections: FusionCollections) {}
 
     get promises(): readonly Promise<unknown>[] {
-        return this._correlationPromises
+        return this.correlationPromises
     }
 
     addPromise(_accountId: string, promise: Promise<unknown>): void {
         if (!promise) return
-        this._correlationPromises.push(promise)
+        this.correlationPromises.push(promise)
     }
 
     updateStatus(
@@ -47,7 +47,7 @@ export class FusionCorrelation {
         }
     }
 
-    private async _resolveReviewPromises(): Promise<void> {
+    private async resolveReviewPromises(): Promise<void> {
         const promises = this.collections.reviewPromises
         if (promises.length === 0) return
 
@@ -59,10 +59,10 @@ export class FusionCorrelation {
         }
     }
 
-    private async _resolveCorrelationPromises(): Promise<void> {
-        if (this._correlationPromises.length === 0) return
-        await Promise.allSettled(this._correlationPromises)
-        this._correlationPromises = []
+    private async resolveCorrelationPromises(): Promise<void> {
+        if (this.correlationPromises.length === 0) return
+        await Promise.allSettled(this.correlationPromises)
+        this.correlationPromises = []
     }
 
     resolvePendingReviewUrls(): void {
@@ -75,13 +75,14 @@ export class FusionCorrelation {
     }
 
     async resolvePendingOperations(awaitCorrelations = true): Promise<void> {
-        await this._resolveReviewPromises()
+        await this.resolveReviewPromises()
         if (awaitCorrelations) {
-            await this._resolveCorrelationPromises()
+            await this.resolveCorrelationPromises()
         }
         this.resolvePendingReviewUrls()
     }
 }
+
 
 
 

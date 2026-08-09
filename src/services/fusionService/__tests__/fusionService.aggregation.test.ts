@@ -120,9 +120,9 @@ describe('FusionService — aggregation', () => {
             ctx.mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
             ctx.mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
-            ;(ctx.run as any)._pendingCandidateIdentityIds = new Set([identityId])
-            ;(ctx.run as any)._pendingReviewUrlsByCandidateId = new Map([[identityId, [reviewUrl]]])
-            ;(ctx.run as any)._pendingReviewUrlsByReviewerId = new Map()
+            ;(ctx.run as any).pendingCandidateIdentityIdsValue = new Set([identityId])
+            ;(ctx.run as any).pendingReviewUrlsByCandidateIdValue = new Map([[identityId, [reviewUrl]]])
+            ;(ctx.run as any).pendingReviewUrlsByReviewerIdValue = new Map()
 
             const output = await ctx.fusionService.getISCAccount(fusionAccount)
 
@@ -145,9 +145,9 @@ describe('FusionService — aggregation', () => {
             ctx.mockSchemas.getFusionAttributeSubset.mockImplementation((attrs) => ({ ...attrs }))
             ctx.mockSchemas.listSchemaAttributeNames.mockReturnValue(['id', 'name', 'actions', 'statuses', 'reviews'])
 
-            ;(ctx.run as any)._pendingCandidateIdentityIds = new Set()
-            ;(ctx.run as any)._pendingReviewUrlsByCandidateId = new Map()
-            ;(ctx.run as any)._pendingReviewUrlsByReviewerId = new Map([[identityId, [reviewUrl]]])
+            ;(ctx.run as any).pendingCandidateIdentityIdsValue = new Set()
+            ;(ctx.run as any).pendingReviewUrlsByCandidateIdValue = new Map()
+            ;(ctx.run as any).pendingReviewUrlsByReviewerIdValue = new Map([[identityId, [reviewUrl]]])
 
             const output = await ctx.fusionService.getISCAccount(fusionAccount)
 

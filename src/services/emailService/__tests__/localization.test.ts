@@ -1,4 +1,4 @@
-import type { FusionConfig } from '../../model/config'
+import type { FusionConfig } from '../../../model/config'
 import {
     isLocalizationEnabled,
     resolveEffectiveLocale,
@@ -221,5 +221,6 @@ describe('localization', () => {
         })
     })
 })
+
 
 

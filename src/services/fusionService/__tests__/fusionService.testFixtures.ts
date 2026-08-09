@@ -70,7 +70,7 @@ export function createFusionServiceTestContext(): FusionServiceTestContext {
     run.log = mockLog
     const mockClient = {} as any
     const mockSources = new SourceService(mockConfig, mockLog, mockClient, run) as Mocked<SourceService>
-    ;(mockSources as any)._fusionSourceId = FUSION_SOURCE_ID
+    ;(mockSources as any).fusionSourceIdValue = FUSION_SOURCE_ID
     Object.defineProperty(mockSources, 'fusionSourceId', {
         get: vi.fn(() => FUSION_SOURCE_ID),
         configurable: true,

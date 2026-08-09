@@ -25,7 +25,7 @@ export const FERNANDO_SCENARIO_REF = 'company12926-poc/fernando'
 const SOURCE_ID = 'fe0b4096bb02418e8225a54806f9b86f'
 const SOURCE_NAME = 'Umbrella Corporation'
 
-export function fernandoRecordingDir(): string {
+function fernandoRecordingDir(): string {
     return recordingScenarioDir(FERNANDO_SCENARIO_REF)
 }
 
@@ -34,7 +34,7 @@ export function isFernandoRecordingAvailable(): boolean {
     return fs.existsSync(path.join(dir, 'scenario.json')) || fs.existsSync(path.join(dir, 'reports', 'matching-results.json'))
 }
 
-export function loadFernandoScenarioConfig(): FusionConfig {
+function loadFernandoScenarioConfig(): FusionConfig {
     const scenario = JSON.parse(fs.readFileSync(path.join(fernandoRecordingDir(), 'scenario.json'), 'utf8'))
     const raw = { ...scenario.config, ...getInternalConfigFlat() }
     const matching = readMatchingSettings(raw)
@@ -194,3 +194,4 @@ export async function buildFernandoStep10MatchingSnapshot(): Promise<MatchingRes
         }
     )
 }
+

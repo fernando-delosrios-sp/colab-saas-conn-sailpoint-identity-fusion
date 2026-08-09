@@ -2,7 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { ReplayApiAdapter } from '../../../../services/clientService/replayApiAdapter'
 import { loadRecordingApiLog } from '../../../../services/recordingService/recordingStore'
-import { sanitizeScenarioConfigForReplay, type ScenarioConfig, type ScenararioConfig } from '../../../scenarioReplay'
+import { sanitizeScenarioConfigForReplay, type ScenarioConfig } from '../../../scenarioReplay'
 import { ChainState } from './ChainState'
 import { ChainContext } from './ChainContext'
 
@@ -16,8 +16,6 @@ export interface StepDefinition {
     expectedStateDelta?: Record<string, unknown>
 }
 
-export type { ScenarioConfig, ScenararioConfig }
-
 export interface ScenarioDefinition {
     version: string
     scenarioName?: string
@@ -29,9 +27,6 @@ export interface ScenarioDefinition {
     steps: StepDefinition[]
     referenceValues?: Record<string, Record<string, unknown>>
 }
-
-/** @deprecated Use ScenarioDefinition */
-export type ChainScenario = ScenarioDefinition
 
 export interface StepResult {
     stepId: string
@@ -50,9 +45,6 @@ export interface ScenarioResult {
     stepResults: StepResult[]
     finalState: Record<string, unknown>
 }
-
-/** @deprecated Use ScenarioResult */
-export type ChainResult = ScenarioResult
 
 function loadStepTimestamps(stepsPath: string): Record<string, string> {
     if (!fs.existsSync(stepsPath)) return {}
@@ -252,11 +244,6 @@ export class ScenarioRunner {
     }
 }
 
-/** @deprecated Use ScenarioRunner */
-export const ChainRunner = ScenarioRunner
-
-export { sanitizeScenarioConfigForReplay }
-
 const stepFns = new Map<string, (step: StepDefinition, context: ChainContext) => Promise<unknown>>()
 
 export function registerStepFn(
@@ -269,4 +256,5 @@ export function registerStepFn(
 function getStepFn(operation: string): ((step: StepDefinition, context: ChainContext) => Promise<unknown>) | undefined {
     return stepFns.get(operation)
 }
+
 

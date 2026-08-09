@@ -1,6 +1,5 @@
 import { StepDefinition } from '../framework/ScenarioRunner'
 import { ChainContext, MockRegistry } from '../framework/ChainContext'
-import { compareOutputs } from '../../../scenarioReplay'
 import { createOperationTestRegistry, SourceConfigLike } from '../../harness/operationTestRegistry'
 import { createTestRegistry } from '../../harness/testRegistry'
 import { FusionConfig } from '../../../../model/config'
@@ -722,5 +721,4 @@ export function collectOutputs(context: ChainContext): unknown[] {
     return sent
 }
 
-export { compareOutputs }
 

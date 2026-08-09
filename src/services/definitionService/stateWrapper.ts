@@ -104,7 +104,7 @@ export class StateWrapper {
         }
     }
 
-    private _doInit(key: string, start: number) {
+    private doInit(key: string, start: number) {
         if (!this.state.has(key)) {
             this.state.set(key, start - 1)
             logDebug(`Initialized counter ${key} to ${start - 1} (first value will be ${start})`)
@@ -120,10 +120,10 @@ export class StateWrapper {
         const lockKey = `counter:${key}`
         if (this.locks) {
             await this.locks.withLock(lockKey, async () => {
-                this._doInit(key, start)
+                this.doInit(key, start)
             })
         } else {
-            this._doInit(key, start)
+            this.doInit(key, start)
         }
     }
 

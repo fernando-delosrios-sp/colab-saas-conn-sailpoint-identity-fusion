@@ -19,9 +19,6 @@ export interface ScenarioConfig {
     [key: string]: unknown
 }
 
-/** @deprecated Use ScenarioConfig */
-export type ScenararioConfig = ScenarioConfig
-
 /** Removes end-of-session runtime fields persisted into recorded scenario config. */
 export function sanitizeScenarioConfigForReplay(config: ScenarioConfig): ScenarioConfig {
     const clean = { ...config }
@@ -31,3 +28,4 @@ export function sanitizeScenarioConfigForReplay(config: ScenarioConfig): Scenari
     delete clean.cloudCacheUpdate
     return clean
 }
+

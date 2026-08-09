@@ -27,25 +27,25 @@ export const IDENTITIES_SOURCE_NAME = 'Identities'
  * Prefer those collaborators over flat pass-through mutators for statuses, layers, and promises.
  */
 export class FusionAccount {
-    private static _config?: FusionConfig
+    private static config?: FusionConfig
 
-    private _key?: SimpleKeyType
-    private _managedKey?: string
-    private _iscAccountId?: string
-    private _email?: string
-    private _name?: string
-    private _sourceName = ''
-    private _type: FusionAccountKind = FusionAccountKind.Fusion
-    private _modified?: string
-    private _identityInfo?: IdentityInfo
-    private _attributeBag: FusionAttributeBag = {
+    private keyValue?: SimpleKeyType
+    private managedKeyValue?: string
+    private iscAccountIdValue?: string
+    private emailValue?: string
+    private nameValue?: string
+    private sourceNameValue = ''
+    private typeValue: FusionAccountKind = FusionAccountKind.Fusion
+    private modifiedValue?: string
+    private identityInfoValue?: IdentityInfo
+    private attributeBagValue: FusionAttributeBag = {
         previous: {},
         current: {},
         identity: {},
         sourceAccountContexts: [],
         sources: new Map(),
     }
-    private _sourceAttributeMapCache?: Map<string, Attributes[]>
+    private sourceAttributeMapCache?: Map<string, Attributes[]>
 
     readonly collections: FusionCollections
     readonly correlation: FusionCorrelation
@@ -67,7 +67,7 @@ export class FusionAccount {
     // ============================================================================
 
     static configure(config: FusionConfig): void {
-        FusionAccount._config = config
+        FusionAccount.config = config
     }
 
     static buildIdentityInfo(
@@ -77,7 +77,7 @@ export class FusionAccount {
     }
 
     private static ensureConfig(): FusionConfig {
-        const config = FusionAccount._config
+        const config = FusionAccount.config
         if (!config) {
             throw new ConnectorError(
                 'FusionAccount is not configured. Call FusionAccount.configure(config) before creating accounts.',
@@ -94,18 +94,18 @@ export class FusionAccount {
 
     /** Seeds identity fields during factory construction. */
     applyFactorySeed(seed: FusionAccountFactorySeed): void {
-        if (seed.type !== undefined) this._type = seed.type
-        if (seed.managedKey !== undefined) this._managedKey = seed.managedKey
-        if (seed.iscAccountId !== undefined) this._iscAccountId = seed.iscAccountId
-        if (seed.modified !== undefined) this._modified = seed.modified
-        if (seed.identityInfo !== undefined) this._identityInfo = seed.identityInfo
-        if (seed.name) this._name = seed.name
-        if (seed.sourceName) this._sourceName = seed.sourceName
+        if (seed.type !== undefined) this.typeValue = seed.type
+        if (seed.managedKey !== undefined) this.managedKeyValue = seed.managedKey
+        if (seed.iscAccountId !== undefined) this.iscAccountIdValue = seed.iscAccountId
+        if (seed.modified !== undefined) this.modifiedValue = seed.modified
+        if (seed.identityInfo !== undefined) this.identityInfoValue = seed.identityInfo
+        if (seed.name) this.nameValue = seed.name
+        if (seed.sourceName) this.sourceNameValue = seed.sourceName
         if (seed.attributeBagCurrent !== undefined) {
-            this._attributeBag.current = seed.attributeBagCurrent
+            this.attributeBagValue.current = seed.attributeBagCurrent
         }
         if (seed.attributeBagPrevious !== undefined) {
-            this._attributeBag.previous = seed.attributeBagPrevious
+            this.attributeBagValue.previous = seed.attributeBagPrevious
         }
     }
 
@@ -135,11 +135,11 @@ export class FusionAccount {
 
     setIdentityIdAttribute(value: string | undefined): void {
         const trimmed = trimStr(value) ?? ''
-        if (!this._identityInfo) {
-            this._identityInfo = { id: trimmed, name: '', displayName: '' }
+        if (!this.identityInfoValue) {
+            this.identityInfoValue = { id: trimmed, name: '', displayName: '' }
             return
         }
-        this._identityInfo.id = trimmed
+        this.identityInfoValue.id = trimmed
     }
 
     // ============================================================================
@@ -147,87 +147,87 @@ export class FusionAccount {
     // ============================================================================
 
     get type(): FusionAccountKind {
-        return this._type
+        return this.typeValue
     }
 
     get managedKey(): string | undefined {
-        return this._managedKey
+        return this.managedKeyValue
     }
 
     get managedKeyOrUndefined(): string | undefined {
-        return this._managedKey
+        return this.managedKeyValue
     }
 
     get managedAccountId(): string | undefined {
-        return this._managedKey
+        return this.managedKeyValue
     }
 
     get iscAccountId(): string | undefined {
-        return this._iscAccountId
+        return this.iscAccountIdValue
     }
 
     get key(): SimpleKeyType | undefined {
-        return this._key
+        return this.keyValue
     }
 
     setKey(key: SimpleKeyType): void {
-        this._key = key
+        this.keyValue = key
     }
 
     get email(): string | undefined {
-        return this._email
+        return this.emailValue
     }
 
     setEmail(email: string | undefined): void {
-        this._email = email
+        this.emailValue = email
     }
 
     get name(): string | undefined {
-        return this._name
+        return this.nameValue
     }
 
     setName(name: string | undefined): void {
-        this._name = name
+        this.nameValue = name
     }
 
     get displayName(): string | undefined {
-        return this._name
+        return this.nameValue
     }
 
     setDisplayName(displayName: string | undefined): void {
-        this._name = displayName
+        this.nameValue = displayName
     }
 
     get sourceName(): string {
-        return this._sourceName
+        return this.sourceNameValue
     }
 
     setSourceName(sourceName: string): void {
-        this._sourceName = sourceName
+        this.sourceNameValue = sourceName
     }
 
     get identityId(): string | undefined {
-        return this._identityInfo?.id
+        return this.identityInfoValue?.id
     }
 
     get identityIdAttribute(): string | undefined {
-        return this._identityInfo?.id
+        return this.identityInfoValue?.id
     }
 
     get identityInfo(): IdentityInfo | undefined {
-        return this._identityInfo
+        return this.identityInfoValue
     }
 
     get identityName(): string | undefined {
-        return this._identityInfo?.name
+        return this.identityInfoValue?.name
     }
 
     get identityAlias(): string | undefined {
-        return this._identityInfo?.displayName
+        return this.identityInfoValue?.displayName
     }
 
     get identityDisplayName(): string | undefined {
-        return this._identityInfo?.displayName
+        return this.identityInfoValue?.displayName
     }
 
     get disabled(): boolean {
@@ -263,7 +263,7 @@ export class FusionAccount {
     }
 
     get isManaged(): boolean {
-        return this._type === FusionAccountKind.Managed
+        return this.typeValue === FusionAccountKind.Managed
     }
 
     get isIdentity(): boolean {
@@ -271,8 +271,8 @@ export class FusionAccount {
     }
 
     get fromIdentity(): boolean {
-        const originFromAttributes = this._attributeBag.current?.originSource
-        const legacyOriginFromAttributes = this._attributeBag.current?.sourceOrigin
+        const originFromAttributes = this.attributeBagValue.current?.originSource
+        const legacyOriginFromAttributes = this.attributeBagValue.current?.sourceOrigin
         return (
             this.layers.originSource === IDENTITIES_SOURCE_NAME ||
             originFromAttributes === IDENTITIES_SOURCE_NAME ||
@@ -301,7 +301,7 @@ export class FusionAccount {
     }
 
     get modified(): string | undefined {
-        return this._modified
+        return this.modifiedValue
     }
 
     // ============================================================================
@@ -309,27 +309,27 @@ export class FusionAccount {
     // ============================================================================
 
     get attributes(): Attributes {
-        return this._attributeBag.current
+        return this.attributeBagValue.current
     }
 
     get currentAttributes(): Attributes {
-        return this._attributeBag.current
+        return this.attributeBagValue.current
     }
 
     get previousAttributes(): Attributes {
-        return this._attributeBag.previous
+        return this.attributeBagValue.previous
     }
 
     get attributeBag(): FusionAttributeBag {
-        return this._attributeBag
+        return this.attributeBagValue
     }
 
     get sourceAttributeMap(): Map<string, Attributes[]> | undefined {
-        return this._sourceAttributeMapCache
+        return this.sourceAttributeMapCache
     }
 
     getAttribute(name: string): Attributes[string] | undefined {
-        return this._attributeBag.current[name]
+        return this.attributeBagValue.current[name]
     }
 
     getStringAttribute(name: string): string | undefined {
@@ -338,11 +338,11 @@ export class FusionAccount {
     }
 
     hasAttribute(name: string): boolean {
-        return name in this._attributeBag.current
+        return name in this.attributeBagValue.current
     }
 
     setMappedAttributes(attributes: Attributes): void {
-        this._attributeBag.current = attributes
+        this.attributeBagValue.current = attributes
     }
 
     // ============================================================================
@@ -352,14 +352,14 @@ export class FusionAccount {
     addIdentityLayer(identity: IdentityDocument): void {
         this.layers.addIdentityLayer(
             identity,
-            this._attributeBag,
-            this._identityInfo,
-            this._modified,
+            this.attributeBagValue,
+            this.identityInfoValue,
+            this.modifiedValue,
             (email: string) => {
-                this._email = email
+                this.emailValue = email
             },
             (info: IdentityInfo) => {
-                this._identityInfo = info
+                this.identityInfoValue = info
             }
         )
     }
@@ -370,18 +370,18 @@ export class FusionAccount {
     ): void {
         this.layers.addManagedAccountLayer(
             workQueue,
-            this._attributeBag,
-            this._identityInfo,
-            this._modified,
-            this._iscAccountId,
+            this.attributeBagValue,
+            this.identityInfoValue,
+            this.modifiedValue,
+            this.iscAccountIdValue,
             (id: string) => {
-                this._iscAccountId = id
+                this.iscAccountIdValue = id
             },
             (name: string) => {
-                this._sourceName = name
+                this.sourceNameValue = name
             },
             () => {
-                this._sourceAttributeMapCache = undefined
+                this.sourceAttributeMapCache = undefined
             },
             options
         )
@@ -445,11 +445,11 @@ export class FusionAccount {
     }
 
     setReverseCorrelationAttribute(attributeName: string, value: string): void {
-        this._attributeBag.current[attributeName] = value
+        this.attributeBagValue.current[attributeName] = value
     }
 
     clearReverseCorrelationAttribute(attributeName: string): void {
-        delete this._attributeBag.current[attributeName]
+        delete this.attributeBagValue.current[attributeName]
     }
 
     /**
@@ -483,21 +483,22 @@ export class FusionAccount {
 
     syncCollectionAttributesToBag(): void {
         this.collections.syncToBag(
-            this._attributeBag.current,
+            this.attributeBagValue.current,
             this.layers.originSource,
             this.layers.originAccount,
-            this._identityInfo?.id
+            this.identityInfoValue?.id
         )
     }
 
     toISCAccount(): any {
         return {
-            attributes: this._attributeBag.current,
+            attributes: this.attributeBagValue.current,
             disabled: this.layers.disabled,
-            key: this._key,
+            key: this.keyValue,
         }
     }
 }
+
 
 
 

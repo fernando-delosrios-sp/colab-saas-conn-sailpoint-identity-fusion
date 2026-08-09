@@ -17,6 +17,25 @@ export default [
             'no-unused-labels': 'off',
             'no-unused-vars': 'off',
             '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+            '@typescript-eslint/naming-convention': [
+                'error',
+                {
+                    selector: 'classProperty',
+                    format: null,
+                    leadingUnderscore: 'forbid',
+                },
+                {
+                    selector: 'classMethod',
+                    format: null,
+                    leadingUnderscore: 'forbid',
+                },
+                {
+                    selector: 'parameterProperty',
+                    format: ['camelCase'],
+                    leadingUnderscore: 'allow',
+                    filter: { regex: '^_', match: true },
+                },
+            ],
             'no-explicit-any': 'off',
             '@typescript-eslint/no-explicit-any': 'off',
             'no-case-declarations': 'error',
@@ -43,4 +62,5 @@ export default [
         },
     },
 ]
+
 

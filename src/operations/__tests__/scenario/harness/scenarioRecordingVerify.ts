@@ -13,7 +13,7 @@ import { accountRead } from '../../../../operations/accountRead'
 import { accountUpdate } from '../../../../operations/accountUpdate'
 import { testConnection } from '../../../../operations/testConnection'
 
-export interface StepVerifyResult {
+interface StepVerifyResult {
     stepId: string
     operation: string
     success: boolean
@@ -29,9 +29,6 @@ export interface ScenarioVerifyResult {
     drifts: string[]
     stepResults: StepVerifyResult[]
 }
-
-/** @deprecated Use ScenarioVerifyResult */
-export type ChainVerifyResult = ScenarioVerifyResult
 
 let stepFnsRegistered = false
 
@@ -196,17 +193,6 @@ export function registerScenarioStepFns(): void {
     })
 }
 
-/** @deprecated Use registerScenarioStepFns */
-export const registerChainStepFns = registerScenarioStepFns
-
-/** Resets step registration (for tests that need a clean registry). */
-export function resetScenarioStepFnsForTests(): void {
-    stepFnsRegistered = false
-}
-
-/** @deprecated Use resetScenarioStepFnsForTests */
-export const resetChainStepFnsForTests = resetScenarioStepFnsForTests
-
 /**
  * Executes all steps in a recorded scenario and compares outputs against goldens.
  * Returns structured pass/fail/drift results suitable for CLI or unit test assertions.
@@ -272,9 +258,6 @@ export async function verifyScenarioRecording(scenarioPath: string): Promise<Sce
     }
 }
 
-/** @deprecated Use verifyScenarioRecording */
-export const verifyChainRecording = verifyScenarioRecording
-
 /** Prints a human-readable verification report to stdout. */
 export function printScenarioVerifyReport(result: ScenarioVerifyResult, scenarioLabel: string): void {
     console.log('')
@@ -312,6 +295,4 @@ export function printScenarioVerifyReport(result: ScenarioVerifyResult, scenario
     console.log('')
 }
 
-/** @deprecated Use printScenarioVerifyReport */
-export const printChainVerifyReport = printScenarioVerifyReport
 

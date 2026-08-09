@@ -73,13 +73,13 @@ export class FormService {
     private readonly formDeleteQueueConcurrency = 1
     private fusionMergeDecisionMap: Map<string, FusionDecision> = new Map()
     /** Pending (unanswered) form instance URLs by recipient identityId, populated during fetchFormData. */
-    private _pendingReviewContextByAccountId: Map<
+    private pendingReviewContextByAccountIdValue: Map<
         string,
         { forms: Map<string, PendingReviewFormContext>; reviewerIds: Set<string>; candidateIds: Set<string> }
     > = new Map()
     /** Finished decisions processed from answered form instances (assignment + newIdentity/no-match). */
-    private _finishedFusionDecisions: FusionDecision[] = []
-    private _fetchedFormInstances: FormInstanceResponseV2025[][] = []
+    private finishedFusionDecisionsValue: FusionDecision[] = []
+    private fetchedFormInstances: FormInstanceResponseV2025[][] = []
     private readonly fusionFormNamePattern: string
     private readonly fusionFormExpirationDays: number
     private readonly fusionFormAttributes?: string[]
@@ -194,7 +194,7 @@ export class FormService {
         // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
         // to prevent API rate limiting issues when iterating over a large number of forms
         if (activeForms.length === 0) {
-            this._fetchedFormInstances = []
+            this.fetchedFormInstances = []
             this.log.debug('Fetched 0 instance(s) from 0 form definition(s)')
             return
         }
@@ -203,7 +203,7 @@ export class FormService {
         let formsProcessed = 0
         let instanceCount = 0
 
-        this._fetchedFormInstances = await promiseAllBatched(activeForms, async (form) => {
+        this.fetchedFormInstances = await promiseAllBatched(activeForms, async (form) => {
             const instances = await this.fetchFormInstancesByDefinitionId(form.id)
             formsProcessed++
             instanceCount += instances.length
@@ -221,7 +221,7 @@ export class FormService {
      * Process form instances that were fetched by fetchFormInstances.
      */
     public async processFetchedFormData(): Promise<void> {
-        const formInstancesResults = this._fetchedFormInstances
+        const formInstancesResults = this.fetchedFormInstances
 
         // Process all instances (single pass) to:
         // - extract assignment/new-identity decisions
@@ -234,7 +234,7 @@ export class FormService {
                 await this.processFusionFormInstances(instances)
             }
         }
-        this._fetchedFormInstances = []
+        this.fetchedFormInstances = []
 
         const fusionDecisionsCount = this.run.fusionIdentityDecisions.length
         this.log.debug(`Form data fetch completed - ${fusionDecisionsCount} fusion decision(s)`)
@@ -245,12 +245,12 @@ export class FormService {
         this.run.clearFinishedFusionDecisions()
         this.fusionMergeDecisionMap = new Map()
         this.run.clearReviewUrls()
-        this._pendingReviewContextByAccountId = new Map()
-        this._finishedFusionDecisions = []
+        this.pendingReviewContextByAccountIdValue = new Map()
+        this.finishedFusionDecisionsValue = []
         this.run.formsFound = 0
         this.run.formInstancesFound = 0
         this.run.answeredFormInstancesProcessed = 0
-        this._fetchedFormInstances = []
+        this.fetchedFormInstances = []
     }
 
     public async deleteExistingForms(): Promise<void> {
@@ -802,7 +802,7 @@ export class FormService {
 
     /** All finished decisions processed from answered form instances in this run */
     public get finishedFusionDecisions(): FusionDecision[] {
-        return this._finishedFusionDecisions
+        return this.finishedFusionDecisionsValue
     }
 
     /**
@@ -811,7 +811,7 @@ export class FormService {
      * processFusionIdentityDecisions (new-identity/no-match decisions from forms).
      */
     public registerFinishedDecision(decision: FusionDecision, includeInProcessingQueue: boolean = false): void {
-        this._finishedFusionDecisions.push(decision)
+        this.finishedFusionDecisionsValue.push(decision)
         this.run.addFinishedFusionDecision(decision)
         if (!includeInProcessingQueue) return
         assert(this.run.fusionIdentityDecisions, 'Fusion identity decisions not fetched')
@@ -849,7 +849,7 @@ export class FormService {
     public seedFinishedFusionDecisions(decisions: FusionDecision[]): void {
         for (const decision of decisions) {
             if (!decision.finished) continue
-            this._finishedFusionDecisions.push(decision)
+            this.finishedFusionDecisionsValue.push(decision)
             this.run.addFinishedFusionDecision(decision)
             if (!decision.newIdentity && decision.identityId) {
                 this.fusionMergeDecisionMap.set(decision.identityId, decision)
@@ -887,7 +887,7 @@ export class FormService {
     public get pendingReviewContextByAccountId(): Map<string, PendingReviewAccountContext> {
         const output = new Map<string, PendingReviewAccountContext>()
 
-        for (const [accountId, context] of this._pendingReviewContextByAccountId.entries()) {
+        for (const [accountId, context] of this.pendingReviewContextByAccountIdValue.entries()) {
             const reviewers = Array.from(context.reviewerIds)
                 .map((reviewerId) => getReviewerInfo(reviewerId, this.identities))
                 .filter(Boolean) as PendingReviewReviewerContext[]
@@ -961,14 +961,14 @@ export class FormService {
         reviewerIds: Set<string>
         candidateIds: Set<string>
     } {
-        let context = this._pendingReviewContextByAccountId.get(accountId)
+        let context = this.pendingReviewContextByAccountIdValue.get(accountId)
         if (!context) {
             context = {
                 forms: new Map<string, PendingReviewFormContext>(),
                 reviewerIds: new Set<string>(),
                 candidateIds: new Set<string>(),
             }
-            this._pendingReviewContextByAccountId.set(accountId, context)
+            this.pendingReviewContextByAccountIdValue.set(accountId, context)
         }
         return context
     }
@@ -1006,7 +1006,7 @@ export class FormService {
         }
 
         if (decisionsAdded > 0) {
-            const discovered = this._finishedFusionDecisions.slice(-decisionsAdded)
+            const discovered = this.finishedFusionDecisionsValue.slice(-decisionsAdded)
             const counts = summarizeDecisionCounts(discovered)
             this.log.detail({
                 action: 'fusion decisions discovered from forms',

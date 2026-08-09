@@ -32,15 +32,15 @@ export interface AddManagedAccountOptions {
  * and layer flags (needsRefresh, disabled, origin metadata, and related).
  */
 export class FusionLayers {
-    _needsRefresh = false
-    _needsReset = false
-    _isIdentity = false
-    _isMatch = false
-    _disabled = false
-    _uncorrelated = false
-    _originSource?: string
-    _originAccount?: string
-    _originIdentityInScope?: boolean
+    private needsRefreshValue = false
+    private needsResetValue = false
+    private isIdentityValue = false
+    private isMatchValue = false
+    private disabledValue = false
+    private uncorrelatedValue = false
+    private originSourceValue?: string
+    private originAccountValue?: string
+    private originIdentityInScopeValue?: boolean
 
     constructor(
         private readonly collections: FusionCollections,
@@ -49,63 +49,63 @@ export class FusionLayers {
     ) {}
 
     get needsRefresh(): boolean {
-        return this._needsRefresh
+        return this.needsRefreshValue
     }
     set needsRefresh(v: boolean) {
-        this._needsRefresh = v
+        this.needsRefreshValue = v
     }
 
     get needsReset(): boolean {
-        return this._needsReset
+        return this.needsResetValue
     }
     set needsReset(v: boolean) {
-        this._needsReset = v
+        this.needsResetValue = v
     }
 
     get isIdentity(): boolean {
-        return this._isIdentity
+        return this.isIdentityValue
     }
     set isIdentity(v: boolean) {
-        this._isIdentity = v
+        this.isIdentityValue = v
     }
 
     get isMatch(): boolean {
-        return this._isMatch
+        return this.isMatchValue
     }
 
     get disabled(): boolean {
-        return this._disabled
+        return this.disabledValue
     }
     set disabled(v: boolean) {
-        this._disabled = v
+        this.disabledValue = v
     }
 
     get uncorrelated(): boolean {
-        return this._uncorrelated
+        return this.uncorrelatedValue
     }
     set uncorrelated(v: boolean) {
-        this._uncorrelated = v
+        this.uncorrelatedValue = v
     }
 
     get originSource(): string | undefined {
-        return this._originSource
+        return this.originSourceValue
     }
     set originSource(v: string | undefined) {
-        this._originSource = v
+        this.originSourceValue = v
     }
 
     get originAccount(): string | undefined {
-        return this._originAccount
+        return this.originAccountValue
     }
     set originAccount(v: string | undefined) {
-        this._originAccount = v
+        this.originAccountValue = v
     }
 
     get originIdentityInScope(): boolean | undefined {
-        return this._originIdentityInScope
+        return this.originIdentityInScopeValue
     }
     set originIdentityInScope(v: boolean | undefined) {
-        this._originIdentityInScope = v
+        this.originIdentityInScopeValue = v
     }
 
     // ============================================================================
@@ -130,8 +130,8 @@ export class FusionLayers {
         // Identity layer enriches Velocity blending only. isIdentity (managed-source
         // correlation) is set by factory methods from source account.uncorrelated.
 
-        if (!this._needsRefresh && isNewerThan(identity.modified, modified)) {
-            this._needsRefresh = true
+        if (!this.needsRefreshValue && isNewerThan(identity.modified, modified)) {
+            this.needsRefreshValue = true
         }
 
         for (const account of identity.accounts ?? []) {
@@ -189,7 +189,7 @@ export class FusionLayers {
             normalizeManagedAccountKeySet(new Set(this.collections.accountIds))
         )
 
-        this._processIdentityMatchedAccounts(
+        this.processIdentityMatchedAccounts(
             workQueue,
             attributeBag,
             addBlendHistory,
@@ -197,14 +197,14 @@ export class FusionLayers {
             onBlend,
             identityInfo?.id
         )
-        this._processDeclaredAccountIds(
+        this.processDeclaredAccountIds(
             workQueue,
             attributeBag,
             addBlendHistory,
             skipBlendHistoryForManagedKeys,
             onBlend
         )
-        this._processPreviousRunMatchedAccounts(
+        this.processPreviousRunMatchedAccounts(
             workQueue,
             attributeBag,
             addBlendHistory,
@@ -215,28 +215,28 @@ export class FusionLayers {
         const inventoryKeys = new Set(workQueue.managedAccountInventory.keys())
 
         if (pruneDeleted) {
-            this._pruneDeletedManagedAccounts(inventoryKeys)
+            this.pruneDeletedManagedAccounts(inventoryKeys)
         }
 
-        this._preserveMissingAccountContext(workQueue.managedAccountInventory)
+        this.preserveMissingAccountContext(workQueue.managedAccountInventory)
 
         if (this.collections.accountIds.size === 0) {
             const originFromAttributes = attributeBag.current?.originSource
             const legacyOriginFromAttributes = attributeBag.current?.sourceOrigin
             const fromIdentity =
-                this._originSource === IDENTITIES_SOURCE_NAME ||
+                this.originSourceValue === IDENTITIES_SOURCE_NAME ||
                 originFromAttributes === IDENTITIES_SOURCE_NAME ||
                 legacyOriginFromAttributes === IDENTITIES_SOURCE_NAME
 
             if (fromIdentity) {
-                const originIdentityId = this._originAccount ?? identityInfo?.id
-                if (originIdentityId && !this._originIdentityInScope) {
+                const originIdentityId = this.originAccountValue ?? identityInfo?.id
+                if (originIdentityId && !this.originIdentityInScopeValue) {
                     this.collections.statuses.add(StatusEntitlement.Orphan)
-                    this._needsRefresh = false
+                    this.needsRefreshValue = false
                 }
             } else {
                 this.collections.statuses.add(StatusEntitlement.Orphan)
-                this._needsRefresh = false
+                this.needsRefreshValue = false
             }
         } else {
             this.collections.statuses.remove(StatusEntitlement.Orphan)
@@ -256,7 +256,7 @@ export class FusionLayers {
             )
         }
         this.collections.statuses.setUncorrelatedAccount(managedKey)
-        this._uncorrelated = true
+        this.uncorrelatedValue = true
         this.collections.statuses.add(StatusEntitlement.Uncorrelated)
         this.collections.removeActionSilent('correlated')
 
@@ -277,7 +277,7 @@ export class FusionLayers {
 
     addFusionMatch(fusionMatch: FusionMatch): void {
         this.collections.matches.add(fusionMatch)
-        this._isMatch = true
+        this.isMatchValue = true
     }
 
     clearFusionIdentityReferences(): void {
@@ -292,7 +292,7 @@ export class FusionLayers {
     // Private: setManagedAccount
     // ============================================================================
 
-    _setManagedAccount(
+    setManagedAccount(
         account: Account,
         addBlendHistory: boolean = true,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
@@ -313,7 +313,7 @@ export class FusionLayers {
         const isNewAccount = !this.collections.previousAccountIds.has(accountId)
 
         if (isNewAccount) {
-            this._needsRefresh = true
+            this.needsRefreshValue = true
             if (recordBlendHistory) {
                 const accountLabel = trimStr(account.name ?? account.nativeIdentity ?? accountId) || accountId
                 const sourceLabel = account.sourceName ?? ''
@@ -322,10 +322,10 @@ export class FusionLayers {
                 )
             }
         }
-        if (!this._needsRefresh) {
+        if (!this.needsRefreshValue) {
             const thresholdMs = this.fusionAccountRefreshThresholdInSeconds * 1000
             if (isNewerThan(account.modified, undefined, thresholdMs)) {
-                this._needsRefresh = true
+                this.needsRefreshValue = true
             }
         }
 
@@ -364,7 +364,7 @@ export class FusionLayers {
     // Private: Matcher functions (inlined from fusionAccountMatcher.ts)
     // ============================================================================
 
-    private _processIdentityMatchedAccounts(
+    private processIdentityMatchedAccounts(
         queue: FusionRun,
         attributeBag: { sources: Map<string, Attributes[]> },
         addBlendHistory: boolean,
@@ -382,7 +382,7 @@ export class FusionLayers {
             if (account) {
                 this.collections.accounts.add(id)
                 this.collections.accounts.removeMissing(id)
-                const blended = this._setManagedAccount(
+                const blended = this.setManagedAccount(
                     account,
                     addBlendHistory,
                     skipBlendHistoryForManagedKeys,
@@ -400,7 +400,7 @@ export class FusionLayers {
      * {@link addIdentityLayer} identity.accounts links) when they exist in the
      * work queue but were not reached by the identity-id index or previous-run paths.
      */
-    private _processDeclaredAccountIds(
+    private processDeclaredAccountIds(
         queue: FusionRun,
         attributeBag: { sources: Map<string, Attributes[]> },
         addBlendHistory: boolean,
@@ -410,14 +410,14 @@ export class FusionLayers {
         if (this.collections.accountIds.size === 0) return
 
         for (const accountId of this.collections.accountIds) {
-            if (this._hasSourceSnapshot(accountId, attributeBag.sources)) continue
+            if (this.hasSourceSnapshot(accountId, attributeBag.sources)) continue
 
             const account = queue.get(accountId)
             if (!account) continue
 
             this.collections.accounts.add(accountId)
             this.collections.accounts.removeMissing(accountId)
-            const blended = this._setManagedAccount(
+            const blended = this.setManagedAccount(
                 account,
                 addBlendHistory,
                 skipBlendHistoryForManagedKeys,
@@ -428,7 +428,7 @@ export class FusionLayers {
         }
     }
 
-    private _hasSourceSnapshot(accountId: string, sources: Map<string, Attributes[]>): boolean {
+    private hasSourceSnapshot(accountId: string, sources: Map<string, Attributes[]>): boolean {
         for (const snapshots of sources.values()) {
             for (const snapshot of snapshots) {
                 if (getManagedAccountSnapshotKey(snapshot) === accountId) {
@@ -439,7 +439,7 @@ export class FusionLayers {
         return false
     }
 
-    private _processPreviousRunMatchedAccounts(
+    private processPreviousRunMatchedAccounts(
         queue: FusionRun,
         attributeBag: { sources: Map<string, Attributes[]> },
         addBlendHistory: boolean,
@@ -453,10 +453,10 @@ export class FusionLayers {
                 continue
 
             this.collections.statuses.setUncorrelatedAccount(id)
-            this._uncorrelated = true
+            this.uncorrelatedValue = true
             this.collections.statuses.add(StatusEntitlement.Uncorrelated)
             this.collections.removeActionSilent('correlated')
-            const blended = this._setManagedAccount(
+            const blended = this.setManagedAccount(
                 account,
                 addBlendHistory,
                 skipBlendHistoryForManagedKeys,
@@ -467,7 +467,7 @@ export class FusionLayers {
         }
     }
 
-    private _preserveMissingAccountContext(inventory: ReadonlyMap<string, ManagedAccountInfo>): void {
+    private preserveMissingAccountContext(inventory: ReadonlyMap<string, ManagedAccountInfo>): void {
         for (const accountId of this.collections.missingAccountIds) {
             if (this.collections.managedAccountInfo.has(accountId)) continue
             const info = inventory.get(accountId)
@@ -481,7 +481,7 @@ export class FusionLayers {
         }
     }
 
-    private _pruneDeletedManagedAccounts(inventoryKeys: ReadonlySet<string>): void {
+    private pruneDeletedManagedAccounts(inventoryKeys: ReadonlySet<string>): void {
         const trackedIds = new Set<string>([
             ...this.collections.accountIds,
             ...this.collections.missingAccountIds,
@@ -504,10 +504,11 @@ export class FusionLayers {
             this.collections.deleteManagedAccountInfo(accountId)
         }
         if (removedAnyReference) {
-            this._needsRefresh = true
+            this.needsRefreshValue = true
         }
     }
 }
+
 
 
 

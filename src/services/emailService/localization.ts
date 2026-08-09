@@ -140,10 +140,10 @@ export function decisionLabelKey(decisionType: string): string {
 }
 
 /** Prefix embedded in form definition descriptions to track localization locale. */
-export const FORM_DEFINITION_LOCALE_PREFIX = 'fusion-locale:'
+const FORM_DEFINITION_LOCALE_PREFIX = 'fusion-locale:'
 
 /** Bump when localized form element labels change so existing definitions are patched. */
-export const FORM_DEFINITION_LOCALIZATION_VERSION = 3
+const FORM_DEFINITION_LOCALIZATION_VERSION = 3
 
 const COMBINED_SCORE_ATTRIBUTE_NAMES = new Set([
     'Combined score',
@@ -179,7 +179,7 @@ export function buildFormDefinitionDescription(locale: string, enableLocalizatio
 }
 
 /** Parses locale/version marker from a stored form definition description. */
-export function parseFormDefinitionLocaleMarker(description: string | undefined): ParsedFormDefinitionLocaleMarker {
+function parseFormDefinitionLocaleMarker(description: string | undefined): ParsedFormDefinitionLocaleMarker {
     if (!description?.startsWith(FORM_DEFINITION_LOCALE_PREFIX)) {
         return {}
     }
@@ -292,4 +292,5 @@ export function scoreAttributeLabel(attribute: string | undefined, locale: strin
     }
     return name
 }
+
 

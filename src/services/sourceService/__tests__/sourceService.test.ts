@@ -68,7 +68,7 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         sourceType: (sourceConfigOverrides.sourceType as SourceInfo['sourceType']) ?? SourceType.Authoritative,
         config: config.sources[0],
     }
-    ;(service as any)._allSources = [sourceInfo]
+    ;(service as any).allSourcesValue = [sourceInfo]
     ;(service as any).sourcesById = new Map([[sourceInfo.id, sourceInfo]])
     ;(service.run as any).sourcesByName = new Map([[sourceInfo.name, sourceInfo]])
 
@@ -99,7 +99,7 @@ describe('SourceService Accounts JMESPath filter', () => {
                 } as any,
             ]
         })
-        ;(service as any)._allSources = [sourceInfo]
+        ;(service as any).allSourcesValue = [sourceInfo]
         await service.fetchManagedAccounts()
 
         expect((service as any).run.managedAccountsById.size).toBe(1)
@@ -119,7 +119,7 @@ describe('SourceService Accounts JMESPath filter', () => {
                 onPageProgress?.(300, 300)
             }
         )
-        ;(service as any)._allSources = [sourceInfo]
+        ;(service as any).allSourcesValue = [sourceInfo]
 
         await service.fetchManagedAccounts()
 
@@ -175,7 +175,7 @@ describe('SourceService Accounts JMESPath filter', () => {
             sourceType: SourceType.Authoritative,
             config: config.sources[1],
         }
-        ;(service as any)._allSources = [sourceA, sourceB]
+        ;(service as any).allSourcesValue = [sourceA, sourceB]
         ;(service as any).sourcesById = new Map([
             [sourceA.id, sourceA],
             [sourceB.id, sourceB],
@@ -378,8 +378,8 @@ describe('SourceService fetchManagedAccount (sourceId + nativeIdentity)', () => 
 describe('SourceService.fetchAllSources', () => {
     it('syncs discovered sources back to service state', async () => {
         const { service, client } = createService()
-        ;(service as any)._allSources = undefined
-        ;(service as any)._fusionSourceId = undefined
+        ;(service as any).allSourcesValue = undefined
+        ;(service as any).fusionSourceIdValue = undefined
         ;(service as any).sourcesById = new Map()
         service.run.sourcesByName.clear()
 
@@ -402,10 +402,10 @@ describe('SourceService.fetchAllSources', () => {
         expect(service.getSourceByNameSafe('HR Source')?.id).toBe('managed-source-id')
     })
 
-    it('populates _allSources, sourcesById, and run.sourcesByName with the same SourceInfo references', async () => {
+    it('populates allSourcesValue, sourcesById, and run.sourcesByName with the same SourceInfo references', async () => {
         const { service, client } = createService()
-        ;(service as any)._allSources = undefined
-        ;(service as any)._fusionSourceId = undefined
+        ;(service as any).allSourcesValue = undefined
+        ;(service as any).fusionSourceIdValue = undefined
         ;(service as any).sourcesById = new Map()
         service.run.sourcesByName.clear()
 
@@ -492,7 +492,7 @@ describe('SourceService reverse correlation setup hardening', () => {
             correlationDisplayName: 'Reverse Native Identity',
         })
 
-        ;(service as any)._fusionSourceId = 'fusion-source-id'
+        ;(service as any).fusionSourceIdValue = 'fusion-source-id'
         ;service.run.sourcesByName.set('Fusion Source', {
             id: 'fusion-source-id',
             name: 'Fusion Source',
@@ -592,7 +592,7 @@ describe('SourceService reverse correlation setup hardening', () => {
                 sourceType,
             })
 
-            ;(service as any)._fusionSourceId = 'fusion-source-id'
+            ;(service as any).fusionSourceIdValue = 'fusion-source-id'
             ;service.run.sourcesByName.set('Fusion Source', {
                 id: 'fusion-source-id',
                 name: 'Fusion Source',
@@ -650,7 +650,7 @@ describe('SourceService authoritative reverse correlation identity profile mappi
             config: undefined,
         }
         const managedSource = service.run.sourcesByName.get('HR Source')
-        ;(service as any)._fusionSourceId = 'fusion-source-id'
+        ;(service as any).fusionSourceIdValue = 'fusion-source-id'
         ;(service as any).sourcesById = new Map([
             [fusionSource.id, fusionSource],
             [managedSource.id, managedSource],
@@ -699,7 +699,7 @@ describe('SourceService authoritative reverse correlation identity profile mappi
             config: undefined,
         }
         const managedSource = service.run.sourcesByName.get('HR Source')
-        ;(service as any)._fusionSourceId = 'fusion-source-id'
+        ;(service as any).fusionSourceIdValue = 'fusion-source-id'
         ;(service as any).sourcesById = new Map([
             [fusionSource.id, fusionSource],
             [managedSource.id, managedSource],
@@ -881,7 +881,7 @@ describe('ensureIdentityAttribute', () => {
 describe('SourceService fetchGlobalOwnerIdentityIds', () => {
     it('expands GOVERNANCE_GROUP source owners to member identity IDs', async () => {
         const { service, client } = createService()
-        ;(service as any)._fusionSourceOwner = { id: 'owner-workgroup', type: 'GOVERNANCE_GROUP' }
+        ;(service as any).fusionSourceOwnerValue = { id: 'owner-workgroup', type: 'GOVERNANCE_GROUP' }
         client.governanceGroupsApi = {
             listWorkgroupMembers: vi.fn().mockResolvedValue({
                 data: [{ id: 'member-1' }, { id: 'member-2' }],
@@ -899,7 +899,7 @@ describe('SourceService fetchGlobalOwnerIdentityIds', () => {
 
     it('uses identity owner ID directly when owner type is IDENTITY', async () => {
         const { service, client } = createService()
-        ;(service as any)._fusionSourceOwner = { id: 'owner-identity', type: 'IDENTITY' }
+        ;(service as any).fusionSourceOwnerValue = { id: 'owner-identity', type: 'IDENTITY' }
         client.governanceGroupsApi = { listWorkgroupMembers: vi.fn() }
 
         const ids = await service.fetchGlobalOwnerIdentityIds()
