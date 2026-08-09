@@ -1,3 +1,5 @@
+> **Archive note (2026-08-09):** Terminology in this delta reflects the change at archive time. Current canonical terms: **`MatchOutcomeDispatcher`** (replaces `ManagedAccountPassRunner` / `ManagedAccountMatchingRunner`); **`configureScoring({ captureBreakdown })`** (replaces `setCaptureBreakdown`). See `openspec/changes/archive/README.md` and living specs after `reconcile-matching-delegation-spec`.
+
 ## MODIFIED Requirements
 
 ### Requirement: Canonical terms are defined in the glossary
@@ -140,7 +142,7 @@ Code symbols that represent domain concepts SHALL be renamed to match canonical 
 
 #### Scenario: Runner class is renamed
 - **WHEN** the managed account matching orchestrator is referenced
-- **THEN** it is named `ManagedAccountMatchingRunner`, not `ManagedAccountPassRunner`
+- **THEN** match sweep orchestration uses `MatchOutcomeDispatcher` (historically renamed from `ManagedAccountPassRunner` → `ManagedAccountMatchingRunner` before dispatcher extraction)
 
 #### Scenario: Analyzer methods are renamed
 - **WHEN** the analyzer scores identity or deferred candidates
