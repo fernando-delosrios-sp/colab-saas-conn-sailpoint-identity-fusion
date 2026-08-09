@@ -317,6 +317,102 @@ describe('rebuildFusionAccount', () => {
         expect(aggregateManagedSource).toHaveBeenCalledWith('source-a', false)
         expect(fetchManagedAccount).toHaveBeenCalledWith('source-a', 'user-1')
     })
+
+    it('passes origin identity scope to processFusionAccount for identity-origin accounts', async () => {
+        const processFusionAccount = vi.fn().mockResolvedValue({ nativeIdentity: 'fusion-origin' })
+        const isIdentityInScope = vi.fn().mockResolvedValue(true)
+
+        const registry = {
+            sources: {
+                fetchFusionAccount: vi.fn().mockResolvedValue(undefined),
+                fusionAccountsByNativeIdentity: new Map([
+                    [
+                        'fusion-origin',
+                        {
+                            nativeIdentity: 'fusion-origin',
+                            identityId: 'identity-origin',
+                            attributes: {
+                                originSource: 'Identities',
+                            },
+                        },
+                    ],
+                ]),
+                fetchManagedAccount: vi.fn().mockResolvedValue(undefined),
+                getSourceByName: vi.fn().mockReturnValue(undefined),
+                getSourceById: vi.fn().mockReturnValue(undefined),
+                aggregateManagedSource: vi.fn().mockResolvedValue(undefined),
+                config: { cascadeAggregationEnabled: false },
+            },
+            identities: {
+                fetchIdentityById: vi.fn().mockResolvedValue(undefined),
+                getIdentityById: vi.fn().mockReturnValue({ id: 'identity-origin', accounts: [] }),
+                isIdentityInScope,
+            },
+            fusion: {
+                processFusionAccount,
+            },
+            log: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+        } as any
+
+        await rebuildFusionAccount('fusion-origin', {} as any, {
+            fusion: registry.fusion,
+            identities: registry.identities,
+            sources: registry.sources,
+            log: registry.log,
+        })
+
+        expect(isIdentityInScope).toHaveBeenCalledWith('identity-origin')
+        expect(processFusionAccount).toHaveBeenCalledWith(
+            registry.sources.fusionAccountsByNativeIdentity.get('fusion-origin'),
+            {},
+            true
+        )
+    })
+
+    it('does not call isIdentityInScope for managed-origin accounts', async () => {
+        const processFusionAccount = vi.fn().mockResolvedValue({ nativeIdentity: 'fusion-managed' })
+        const isIdentityInScope = vi.fn()
+
+        const account = {
+            nativeIdentity: 'fusion-managed',
+            identityId: 'identity-managed',
+            attributes: {
+                originSource: 'HR Source',
+            },
+        }
+
+        const registry = {
+            sources: {
+                fetchFusionAccount: vi.fn().mockResolvedValue(undefined),
+                fusionAccountsByNativeIdentity: new Map([['fusion-managed', account]]),
+                fetchManagedAccount: vi.fn().mockResolvedValue(undefined),
+                getSourceByName: vi.fn().mockReturnValue(undefined),
+                getSourceById: vi.fn().mockReturnValue(undefined),
+                aggregateManagedSource: vi.fn().mockResolvedValue(undefined),
+                config: { cascadeAggregationEnabled: false },
+            },
+            identities: {
+                fetchIdentityById: vi.fn().mockResolvedValue(undefined),
+                getIdentityById: vi.fn().mockReturnValue({ id: 'identity-managed', accounts: [] }),
+                isIdentityInScope,
+            },
+            fusion: {
+                processFusionAccount,
+            },
+            log: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+        } as any
+
+        await rebuildFusionAccount('fusion-managed', {} as any, {
+            fusion: registry.fusion,
+            identities: registry.identities,
+            sources: registry.sources,
+            log: registry.log,
+        })
+
+        expect(isIdentityInScope).not.toHaveBeenCalled()
+        expect(processFusionAccount).toHaveBeenCalledWith(account, {}, undefined)
+    })
 })
+
 
 

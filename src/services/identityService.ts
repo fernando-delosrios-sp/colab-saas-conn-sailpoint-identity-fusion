@@ -43,6 +43,8 @@ function buildIdentityQuery(queryString: string): Search {
 export class IdentityService {
     /** Identity IDs loaded by the last `fetchIdentities()` call, which respects `includeIdentities` and `identityScopeQuery`. */
     private identityIdsInScope: Set<string> = new Set()
+    /** True after `fetchIdentities()` has applied scope semantics for this run (full or empty scope set). */
+    private identityScopeFetchCompleted = false
     private readonly identityScopeQuery?: string
     private readonly includeIdentities: boolean
 
@@ -141,11 +143,13 @@ export class IdentityService {
                 this.identityIdsInScope = new Set(
                     identities.filter((identity) => !identity.protected).map((identity) => identity.id)
                 )
+                this.identityScopeFetchCompleted = true
             }, `Failed to fetch identities using scope query "${this.identityScopeQuery}"`)
         } else if (this.includeIdentities) {
             this.log.info('No identity scope query defined, skipping global identity fetch.')
             this.run.clearIdentities()
             this.identityIdsInScope = new Set()
+            this.identityScopeFetchCompleted = true
         }
 
         if (additionalIdentityIds?.length) {
@@ -496,11 +500,39 @@ export class IdentityService {
     }
 
     /**
+     * Checks whether an identity is in the configured scope, using the cached scope
+     * set when available or a targeted search when single-account rebuilds have not
+     * run a full `fetchIdentities()` pass.
+     */
+    public async isIdentityInScope(id: string): Promise<boolean> {
+        if (!id) return false
+        if (this.hasIdentityInScope(id)) return true
+        if (!this.includeIdentities) return false
+        if (!this.identityScopeQuery) return false
+        if (this.identityScopeFetchCompleted) return false
+
+        const query = buildIdentityQuery(`id:"${id}" AND (${this.identityScopeQuery})`)
+
+        return wrapConnectorError(async () => {
+            const identities = await this.client.call<IdentityDocument>(
+                (api: any, params: any) => api.search.searchPost(params).then((r: any) => r.data as IdentityDocument[]),
+                {
+                    paginate: { mode: 'searchAfter', search: query as any },
+                    priority: QueuePriority.HIGH,
+                    context: 'IdentityService>isIdentityInScope searchPost',
+                }
+            )
+            return identities.some((identity) => identity.id === id && !identity.protected)
+        }, `Failed to check identity scope for "${id}"`)
+    }
+
+    /**
      * Clear the identity cache
      */
     public clear(): void {
         this.run.clearIdentities()
         this.identityIdsInScope.clear()
+        this.identityScopeFetchCompleted = false
     }
 
     /**
@@ -530,6 +562,7 @@ export class IdentityService {
             })
     }
 }
+
 
 
 
