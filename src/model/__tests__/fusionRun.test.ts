@@ -205,6 +205,37 @@ describe('FusionRun', () => {
         })
     })
 
+    describe('recordAnalysis', () => {
+        it('delegates to the analysis recorder', () => {
+            const run = new FusionRun()
+            const recorder = makeMockRecorder({ tracker: new AggregationTracker() })
+            run.analysisRecorder = recorder
+            const analysis = {
+                account: { name: 'acct', sourceName: 'Source A' } as Account,
+                fusionAccount: { name: 'fa', sourceName: 'Source A' } as FusionAccount,
+                sourceType: 'authoritative' as const,
+                hasIdentityCandidateMatches: false,
+                fusionIdentityComparisons: 0,
+            }
+
+            run.recordAnalysis(analysis)
+            expect(recorder.recordAnalysisCalls).toEqual([analysis])
+        })
+
+        it('is a no-op when no recorder is attached', () => {
+            const run = new FusionRun()
+            expect(() =>
+                run.recordAnalysis({
+                    account: {} as Account,
+                    fusionAccount: {} as FusionAccount,
+                    sourceType: 'authoritative',
+                    hasIdentityCandidateMatches: false,
+                    fusionIdentityComparisons: 0,
+                })
+            ).not.toThrow()
+        })
+    })
+
     it('inventory retains key after claimAccount', () => {
         const run = new FusionRun()
         const account = {
@@ -397,13 +428,20 @@ function makeMockRecorder(options: { tracker: AggregationTracker; run?: FusionRu
         shouldCaptureReportData: () => true,
     })
     ;(recorder as any).trackFailedCalls = []
+    ;(recorder as any).recordAnalysisCalls = []
     const originalTrackFailed = recorder.trackFailed.bind(recorder)
     recorder.trackFailed = (fusionAccount: FusionAccount, error: string) => {
         ;(recorder as any).trackFailedCalls.push([fusionAccount, error])
         originalTrackFailed(fusionAccount, error)
     }
+    const originalRecordAnalysis = recorder.recordAnalysis.bind(recorder)
+    recorder.recordAnalysis = (analysis) => {
+        ;(recorder as any).recordAnalysisCalls.push(analysis)
+        originalRecordAnalysis(analysis)
+    }
     return recorder
 }
+
 
 
 

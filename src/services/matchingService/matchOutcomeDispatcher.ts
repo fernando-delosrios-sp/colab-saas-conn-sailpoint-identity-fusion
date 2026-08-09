@@ -616,9 +616,7 @@ export class MatchOutcomeDispatcher {
             )
 
             for (const scored of identityResults) {
-                if (run.analysisRecorder) {
-                    run.analysisRecorder.recordAnalysis(scored.analysis)
-                }
+                run.recordAnalysis(scored.analysis)
                 const resolved = await this.dispatchOutcome(scored)
                 processedCount++
                 updateProgress()
@@ -916,7 +914,7 @@ export class MatchOutcomeDispatcher {
     }
 
     private recordAnalysisIfPresent(analysis: ManagedAccountAnalysisContext): void {
-        this.deps.run.analysisRecorder?.recordAnalysis(analysis)
+        this.deps.run.recordAnalysis(analysis)
     }
 
     private recordNonMatchOutcome(sweepResult?: MatchSweepResult): void {
