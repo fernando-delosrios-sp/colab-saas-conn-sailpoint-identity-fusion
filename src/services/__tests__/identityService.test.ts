@@ -120,6 +120,67 @@ describe('IdentityService.fetchIdentities with identityScopeQuery', () => {
     })
 })
 
+describe('IdentityService.isIdentityInScope', () => {
+    it('returns true without search when the identity is already in the cached scope set', async () => {
+        const { service, client } = makeService({
+            config: { identityScopeQuery: 'source.name:Employees' },
+            searchResultsByQuery: {
+                'source.name:Employees': [makeIdentity('id-1')],
+            },
+        })
+
+        await service.fetchIdentities()
+
+        await expect(service.isIdentityInScope('id-1')).resolves.toBe(true)
+        expect(client.call).toHaveBeenCalledTimes(1)
+    })
+
+    it('returns false without search when fetchIdentities already resolved scope', async () => {
+        const { service, client } = makeService({
+            config: { identityScopeQuery: 'source.name:Employees' },
+            searchResultsByQuery: {
+                'source.name:Employees': [makeIdentity('id-1')],
+            },
+        })
+
+        await service.fetchIdentities()
+
+        await expect(service.isIdentityInScope('id-out')).resolves.toBe(false)
+        expect(client.call).toHaveBeenCalledTimes(1)
+    })
+
+    it('uses a targeted scoped search when the scope set has not been loaded', async () => {
+        const scopedQuery = 'id:"id-1" AND (source.name:Employees)'
+        const { service } = makeService({
+            config: { identityScopeQuery: 'source.name:Employees' },
+            searchResultsByQuery: {
+                [scopedQuery]: [makeIdentity('id-1')],
+            },
+        })
+
+        await expect(service.isIdentityInScope('id-1')).resolves.toBe(true)
+        await expect(service.isIdentityInScope('id-2')).resolves.toBe(false)
+    })
+
+    it('returns false when identity fetching is disabled', async () => {
+        const { service, client } = makeService({
+            config: { includeIdentities: false, identityScopeQuery: 'source.name:Employees' },
+        })
+
+        await expect(service.isIdentityInScope('id-1')).resolves.toBe(false)
+        expect(client.call).not.toHaveBeenCalled()
+    })
+
+    it('returns false when no identity scope query is configured', async () => {
+        const { service, client } = makeService({
+            config: { identityScopeQuery: '' },
+        })
+
+        await expect(service.isIdentityInScope('id-1')).resolves.toBe(false)
+        expect(client.call).not.toHaveBeenCalled()
+    })
+})
+
 
 describe('IdentityService.ensureIdentityById', () => {
     it('returns cached identity without API calls', async () => {
@@ -313,4 +374,5 @@ describe('IdentityService.correlateAccounts', () => {
         expect(log.recordCorrelationActivity).toHaveBeenCalledWith({ kind: 'link', accounts: 1 })
     })
 })
+
 

@@ -4,7 +4,8 @@ import { FusionAccount } from '../../model/account'
 import { AttributeOperations } from '../../services/definitionService/types'
 import { buildManagedAccountKey, parseManagedAccountKey } from '../../model/managedAccountKey'
 import { FusionAttribute } from '../../data/schema'
-import { toSetFromAttribute as attributeToSet } from '../../utils/attributes'
+import { getAccountStringAttribute, toSetFromAttribute as attributeToSet } from '../../utils/attributes'
+import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
 import { readString } from '../../utils/safeRead'
 import { IdentityDocument } from 'sailpoint-api-client'
 import type { FusionService } from '../../services/fusionService'
@@ -16,6 +17,12 @@ import type { Account } from 'sailpoint-api-client'
 interface ParsedAccountKey {
     sourceId: string
     nativeIdentity: string
+}
+
+function isIdentityOriginAccount(account: Account): boolean {
+    const originSource = getAccountStringAttribute(account, FusionAttribute.OriginSource)
+    const legacyOriginSource = (account.attributes as Record<string, unknown> | undefined)?.sourceOrigin
+    return originSource === IDENTITIES_SOURCE_NAME || legacyOriginSource === IDENTITIES_SOURCE_NAME
 }
 
 /**
@@ -144,6 +151,13 @@ export const rebuildFusionAccount = async (
     await promiseAllBatched(parsedKeys, async (parsed) => {
         await sources.fetchManagedAccount(parsed.sourceId, parsed.nativeIdentity)
     })
-    return await fusion.processFusionAccount(account, attributeOperations)
+
+    let originIdentityInScope: boolean | undefined
+    if (isIdentityOriginAccount(account as Account)) {
+        originIdentityInScope = await identities.isIdentityInScope(account.identityId)
+    }
+
+    return await fusion.processFusionAccount(account, attributeOperations, originIdentityInScope)
 }
+
 

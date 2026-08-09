@@ -49,7 +49,8 @@ Feature: Identity-origin orphan detection
 - **AND** the account has no managed source accounts
 - **WHEN** an `accountRead` operation rebuilds the account
 - **THEN** the account is marked `orphan`
-- **AND** the returned account is omitted when `deleteEmpty` is enabled
+- **AND** the returned ISC account includes the orphan status
+- **AND** `deleteEmpty` does not suppress single-account read output (it applies only when aggregation emits accounts)
 
 #### Scenario: deleteEmpty filters identity-origin orphans from aggregation output
 - **GIVEN** a Fusion account was created from identity `idn-1`
@@ -58,4 +59,5 @@ Feature: Identity-origin orphan detection
 - **AND** `deleteEmpty` is enabled
 - **WHEN** the aggregation emits accounts
 - **THEN** the account is not sent to the platform
+
 
