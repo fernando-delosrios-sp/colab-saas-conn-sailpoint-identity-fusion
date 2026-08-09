@@ -128,11 +128,11 @@ Unique attribute refresh (unique definitions) runs after all matching completes,
 
 ### Phase 5 — Output
 
-Sub-steps map to `STEP` log markers inside `PHASE 5 Output`:
+Sub-steps map to `STEP` log markers inside `PHASE 5 Output` (in execution order):
 
-- **`send-accounts`**: Iterates through all processed fusion accounts and sends them to ISC. Accounts whose fusion identity attribute is empty are omitted when "Skip accounts with a missing identifier" is enabled (see Behavior Notes).
 - **`clear-managed-accounts`**: Clears managed account caches before streaming (skipped in recording mode).
-- **`form-cleanup`**, **`save-state`**, **`schedule-aggregations`**, **`await-form-deletes`**: Persistent-run only — form cleanup, attribute counter persistence, batch cumulative counts, delayed aggregation scheduling, and pending form deletion drain. State is saved _after_ output generation so that a failure during transmission prevents stale state from being persisted.
+- **`send-accounts`**: Iterates through all processed fusion accounts and sends them to ISC. Accounts whose fusion identity attribute is empty are omitted when "Skip accounts with a missing identifier" is enabled (see Behavior Notes). Dry-run runs through this step and returns before persistent-only sub-steps below.
+- **`form-cleanup`**, **`save-state`**, **`schedule-aggregations`**, **`await-form-deletes`**: Persistent-run only — form cleanup, attribute counter persistence, batch cumulative counts, delayed aggregation scheduling, and pending form deletion drain. These run _after_ account streaming so that a failure during transmission prevents stale state or form cleanup side effects from being applied.
 
 After Phase 5, fusion account caches are cleared from memory and the process lock is released in a `finally` block (also on failure).
 
@@ -211,6 +211,7 @@ Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion
 ### Preventing Fusion account creation (empty nativeIdentity skip pattern)
 
 One can purposely generate an empty `nativeIdentity` (by designing attribute definitions that produce an empty fusion identity attribute) in conjunction with the "Skip accounts with a missing identifier" processing option. When the fusion identity attribute evaluates to empty and the skip option is enabled, the account is omitted from the output, effectively preventing specific managed accounts or identities from generating Fusion accounts.
+
 
 
 
