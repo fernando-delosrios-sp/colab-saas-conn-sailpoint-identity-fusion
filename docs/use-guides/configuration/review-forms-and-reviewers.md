@@ -48,9 +48,10 @@ To run report-like analysis without persisting changes, invoke `std:account:list
 Dry-run mode:
 
 - Executes the full Map, Define, and Match pipeline without persistence.
-- Sends a terminal summary with totals and diagnostics (rowsSent, identities/managed-accounts found, issue summary, timing) via `res.send`.
-- When `saveFile` is enabled, writes an HTML report to `./reports/` before the terminal summary (durable-first ordering).
-- When `sendEmail` is set, delivers the report email using the same template as the aggregation report, titled **Identity Fusion Dry Run Report**, before the terminal summary.
+- Streams account rows via `res.send` identically to persistent aggregation.
+- Logs a run summary with totals and diagnostics to `console.log` after the pipeline completes.
+- When `saveFile` is enabled, writes an HTML report to `./reports/` before the console summary (durable-first ordering).
+- When `sendEmail` is set, delivers the report email using the same template as the aggregation report, titled **Identity Fusion Dry Run Report**, before the console summary.
 
 Use dry-run mode while tuning matching thresholds, validating source precedence, or reviewing correlation context before enabling/adjusting production automation. See [Dry-run mode](../../operations/dry-run.md) for input options, suppressed side effects, and invocation examples.
 
@@ -279,6 +280,7 @@ Track these metrics to assess Match effectiveness:
 - For attribute merging strategies, see [Effective use of Map](mapping-attributes.md).
 - For ISC setup (connection, schema, identity profile), see [Getting started — Setup checklist](../../getting-started/index.md#setup-checklist).
 - For reviewer access profiles and assignment, see [Managing reviewers](managing-reviewers.md).
+
 
 
 

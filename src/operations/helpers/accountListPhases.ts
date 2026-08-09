@@ -450,9 +450,9 @@ async function generateDryRunReportEpilogue(
     fetchResult: FetchResult,
     timer: ReportEpilogueOptions['timer'],
     outputCount: number | undefined
-): Promise<void> {
+): Promise<string | undefined> {
     const { log, reports } = serviceRegistry
-    if (!dryRun.saveFile && !dryRun.sendEmail) return
+    if (!dryRun.saveFile && !dryRun.sendEmail) return undefined
 
     try {
         const reportPhaseStartedAt = Date.now()
@@ -470,28 +470,26 @@ async function generateDryRunReportEpilogue(
         if (reportHtmlOutputPath) {
             log.detail({ action: 'dry-run HTML report written', path: reportHtmlOutputPath })
         }
+        return reportHtmlOutputPath
     } catch (error) {
         log.warn(`Report epilogue: dry-run report failed: ${(error as Error).message}`)
+        return undefined
     }
 }
 
-async function sendTerminalSummaryEpilogue(
+function logDryRunRunSummary(
     serviceRegistry: ServiceRegistry,
     dryRun: DryRunInput,
     fetchResult: FetchResult,
     timer: ReportEpilogueOptions['timer'],
-    outputCount: number | undefined
-): Promise<unknown | undefined> {
-    const { log, res } = serviceRegistry
-
-    try {
-        const summary = buildTerminalSummary(serviceRegistry, { outputCount, fetchResult, timer }, dryRun)
-        res.send(summary)
-        return undefined
-    } catch (error) {
-        log.warn(`Report epilogue: terminal summary send failed: ${(error as Error).message}`)
-        return error
+    outputCount: number | undefined,
+    reportHtmlOutputPath?: string
+): void {
+    const summary = buildTerminalSummary(serviceRegistry, { outputCount, fetchResult, timer }, dryRun)
+    if (reportHtmlOutputPath) {
+        summary.reportHtmlOutputPath = reportHtmlOutputPath
     }
+    console.log(JSON.stringify(summary, null, 2))
 }
 
 export async function reportEpilogue(
@@ -512,20 +510,21 @@ export async function reportEpilogue(
     }
 
     if (dryRun && fetchResult) {
-        await generateDryRunReportEpilogue(serviceRegistry, dryRun, fetchResult, timer, outputCount)
-        deferredError = await sendTerminalSummaryEpilogue(
+        const reportHtmlOutputPath = await generateDryRunReportEpilogue(
             serviceRegistry,
             dryRun,
             fetchResult,
             timer,
             outputCount
         )
+        logDryRunRunSummary(serviceRegistry, dryRun, fetchResult, timer, outputCount, reportHtmlOutputPath)
     }
 
     timer.recordElapsed('Report', Date.now() - epilogueStartedAt)
     log.epilogueEnd('report')
     return deferredError
 }
+
 
 
 

@@ -60,7 +60,7 @@ Recommended starting point for Match tuning (100–500 managed accounts is a pra
 | --- | --- | --- |
 | `enabled` | `false` | Set `true` for non-persistent analysis |
 | `saveFile` | `false` | Write HTML report to `./reports/dry-run-<host>-<timestamp>.html` |
-| `sendEmail` | — | Deliver report email before terminal summary |
+| `sendEmail` | — | Deliver the dry-run report email |
 
 Full field reference: [Dry-run mode — Input options](../../operations/dry-run.md#input-options).
 
@@ -76,9 +76,9 @@ When `saveFile` or `sendEmail` is set, the connector generates **Identity Fusion
 
 Reports are written under `./reports/` on the connector host. Review match outcomes before changing production thresholds.
 
-### 4. Compare with terminal summary
+### 4. Review the console run summary
 
-The final `res.send` summary includes `rowsSent`, `identitiesFound`, `managedAccountsFound`, `totalProcessingTime`, `phaseTiming`, `issueSummary`, and `options`.
+After the run completes, the connector logs a JSON summary to `console.log` with `rowsSent`, identity/managed/fusion account totals, `issueSummary`, timing, and report paths when applicable.
 
 ---
 
@@ -122,3 +122,4 @@ Dry-run cannot be combined with recording mode (`recording.mode: record` or `rep
 | Input/output schema and process flow | [Dry-run mode (account list)](../../operations/dry-run.md) |
 | Scenario recording for regression | [Capture scenarios for replay](capture-scenarios-for-replay.md) |
 | Pre-release validation checklist | [Testing and validation](../validation-and-troubleshooting/testing-and-validation.md) |
+
