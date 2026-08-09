@@ -98,7 +98,7 @@ function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
         const matches = fusionMatches.map((match) => mapFusionMatchToReportCandidate(match, state))
 
         // Release fusionIdentity refs after extracting report data (on-demand report path)
-        fusionAccount.clearFusionIdentityReferences()
+        fusionAccount.layers.clearFusionIdentityReferences()
 
         const sourceInfo = state.sourcesByName.get(fusionAccount.sourceName)
         accounts.push({

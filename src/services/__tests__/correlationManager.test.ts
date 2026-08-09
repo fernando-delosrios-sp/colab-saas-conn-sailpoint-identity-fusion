@@ -20,7 +20,8 @@ function createManager(
 }
 
 function createFusionAccount(overrides: Record<string, unknown> = {}) {
-    return {
+    const getManagedInfo = vi.fn().mockReturnValue({ source: { name: 'HR' } })
+    const base = {
         missingAccountIdsSet: new Set(['acct-1']),
         missingAccountIds: ['acct-1'],
         identityId: 'id-1',
@@ -28,8 +29,20 @@ function createFusionAccount(overrides: Record<string, unknown> = {}) {
         isManaged: false,
         type: FusionAccountKind.Fusion,
         fromIdentity: false,
-        getManagedAccountInfo: vi.fn().mockReturnValue({ source: { name: 'HR' } }),
-        ...overrides,
+        collections: {
+            managedAccountInfo: {
+                get: getManagedInfo,
+            },
+        },
+    }
+    const { getManagedAccountInfo, collections, ...rest } = overrides as any
+    if (typeof getManagedAccountInfo === 'function') {
+        getManagedInfo.mockImplementation(getManagedAccountInfo)
+    }
+    return {
+        ...base,
+        ...(collections ? { collections } : {}),
+        ...rest,
     } as any
 }
 
@@ -96,7 +109,13 @@ describe('CorrelationManager aggregation correlation', () => {
     it('records noSourceContext skip when managed account metadata is missing', async () => {
         const { manager, log, identities } = createManager()
         await manager.applyPerSourceCorrelationIfNeeded(
-            createFusionAccount({ getManagedAccountInfo: vi.fn().mockReturnValue(undefined) })
+            createFusionAccount({
+                collections: {
+                    managedAccountInfo: {
+                        get: vi.fn().mockReturnValue(undefined),
+                    },
+                },
+            })
         )
         expect(log.recordCorrelationSkipped).toHaveBeenCalledWith('noSourceContext')
         expect(identities.correlateAccounts).not.toHaveBeenCalled()

@@ -539,7 +539,7 @@ export class MatchOutcomeDispatcher {
 
     /** Updates the deferred pool during analysis-only scoring without registering fusion accounts. */
     private registerPoolAnchorForAnalysis(fusionAccount: FusionAccount): void {
-        fusionAccount.setNonMatched()
+        fusionAccount.collections.statuses.setNonMatched(fusionAccount.name, fusionAccount.sourceName)
         if (isDeferredMatchingEnabledForSource(fusionAccount.sourceName, this.deps.run.sourcesByName)) {
             this.deps.run.registerFinalizedDeferredCandidate(fusionAccount)
         }
@@ -825,7 +825,7 @@ export class MatchOutcomeDispatcher {
             const message = error instanceof Error ? error.message : String(error)
             this.deps.run.trackFailed(fusionAccount, `Form creation failed: ${message}`)
         }
-        fusionAccount.clearFusionIdentityReferences()
+        fusionAccount.layers.clearFusionIdentityReferences()
     }
 
     private async handleDeferredMatch(
@@ -907,7 +907,7 @@ export class MatchOutcomeDispatcher {
     }
 
     private async finalizeAuthoritativeNonMatch(fusionAccount: FusionAccount): Promise<FusionAccount> {
-        fusionAccount.setNonMatched()
+        fusionAccount.collections.statuses.setNonMatched(fusionAccount.name, fusionAccount.sourceName)
         this.deps.run.registerFusionAccount(fusionAccount, this.deps.run.analysisRecorder?.tracker)
         if (isDeferredMatchingEnabledForSource(fusionAccount.sourceName, this.deps.run.sourcesByName)) {
             this.deps.run.registerFinalizedDeferredCandidate(fusionAccount)

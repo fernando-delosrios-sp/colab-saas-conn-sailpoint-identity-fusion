@@ -45,7 +45,7 @@ export class CorrelationManager {
      * `mergeDecision` (link-to-existing form outcome): when managed-account metadata is
      * missing for the assigned account id, `decision.account.sourceName` supplies the source for
      * the correlate check so aggregation still PATCHes when that source is `correlationMode: correlate`.
-     * All other missing rows still follow `getManagedAccountInfo` + per-source mode only.
+     * All other missing rows still follow `collections.managedAccountInfo` + per-source mode only.
      */
     private async correlatePerSource(
         fusionAccount: FusionAccount,
@@ -61,7 +61,7 @@ export class CorrelationManager {
                 this.log.recordCorrelationSkipped('noIdentity')
                 continue
             }
-            const info = fusionAccount.getManagedAccountInfo(accountId)
+            const info = fusionAccount.collections.managedAccountInfo.get(accountId)
             if (!info) {
                 this.log.recordCorrelationSkipped('noSourceContext')
                 continue
@@ -74,7 +74,7 @@ export class CorrelationManager {
 
         const directCorrelateIds = canDirectCorrelate
             ? missingIds.filter((accountId) => {
-                  const info = fusionAccount.getManagedAccountInfo(accountId)
+                  const info = fusionAccount.collections.managedAccountInfo.get(accountId)
                   if (!info) {
                       this.log.debug(
                           `Skipping per-source correlation for missing managed key "${accountId}" on ${fusionAccount.name}: source context not available`

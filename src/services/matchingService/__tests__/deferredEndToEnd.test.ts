@@ -166,7 +166,7 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
                         statuses: ['nonMatched', 'uncorrelated'],
                     },
                 } as unknown as Account)
-                persisted.setNonMatched()
+                persisted.collections.statuses.setNonMatched(persisted.name, persisted.sourceName)
                 run.registerFusionAccount(persisted)
                 run.registerPersistedDeferredCandidate(persisted)
             }
@@ -217,7 +217,7 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
                 statuses: ['nonMatched', 'uncorrelated'],
             },
         } as unknown as Account)
-        persisted.setNonMatched()
+        persisted.collections.statuses.setNonMatched(persisted.name, persisted.sourceName)
         run.registerFusionAccount(persisted)
         run.registerPersistedDeferredCandidate(persisted)
 
@@ -248,7 +248,7 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
                 statuses: ['nonMatched', 'uncorrelated'],
             },
         } as unknown as Account)
-        persisted.setNonMatched()
+        persisted.collections.statuses.setNonMatched(persisted.name, persisted.sourceName)
         run.registerFusionAccount(persisted)
         run.registerPersistedDeferredCandidate(persisted)
 
@@ -262,7 +262,7 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
             if (candidateType !== 'deferred') return 0
             for (const candidate of candidates) {
                 if (candidate === persisted) continue
-                fusionAccount.addFusionMatch({
+                fusionAccount.layers.addFusionMatch({
                     identityId: '',
                     identityName: candidate.name ?? 'peer',
                     candidateType: 'deferred',

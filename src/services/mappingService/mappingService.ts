@@ -191,7 +191,7 @@ export class MappingService {
             .filter((entry) => entry.length > 0)
 
         if (history.length === 0) return
-        fusionAccount.importHistory(history)
+        fusionAccount.collections.historyOps.importFromArray(history)
     }
 }
 

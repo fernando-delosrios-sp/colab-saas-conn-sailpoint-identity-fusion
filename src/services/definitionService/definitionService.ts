@@ -200,10 +200,10 @@ export class DefinitionService {
     public refreshReverseCorrelationAttributes(fusionAccount: FusionAccount): void {
         if (fusionAccount.missingAccountIds.length === 0) return
         for (const sc of this.reverseSources) {
-            const missingForSource = fusionAccount.getMissingAccountIdsForSource(sc.name)
+            const missingForSource = fusionAccount.collections.accounts.getMissingForSource(sc.name)
             if (missingForSource.length > 0) {
                 const firstAccountId = missingForSource[0]
-                const info = fusionAccount.getManagedAccountInfo(firstAccountId)
+                const info = fusionAccount.collections.managedAccountInfo.get(firstAccountId)
                 if (info) {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(

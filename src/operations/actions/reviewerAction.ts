@@ -23,8 +23,8 @@ export const reviewerAction = async (
     assert(sourceId, `Missing reviewer source id in action value: ${change.value}`)
 
     if (change.op === AttributeChangeOp.Add) {
-        fusionAccount.setSourceReviewer(sourceId)
+        fusionAccount.collections.actions.setSourceReviewer(sourceId)
     } else if (change.op === AttributeChangeOp.Remove) {
-        fusionAccount.removeSourceReviewer(sourceId)
+        fusionAccount.collections.actions.removeSourceReviewer(sourceId)
     }
 }

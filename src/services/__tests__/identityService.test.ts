@@ -331,8 +331,10 @@ describe('IdentityService.correlateAccounts', () => {
             name: 'Test Fusion',
             identityId: 'identity-1',
             missingAccountIds: ['src-hr::acct-1', 'src-hr::acct-2'],
-            setCorrelatedAccount: vi.fn(),
-            addCorrelationPromise: vi.fn(),
+            correlation: {
+                markCorrelated: vi.fn(),
+                addPromise: vi.fn(),
+            },
             ...overrides,
         } as any
     }

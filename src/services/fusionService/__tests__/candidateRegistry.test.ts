@@ -54,7 +54,7 @@ describe('CandidateRegistry', () => {
                 statuses: ['nonMatched', 'uncorrelated'],
             },
         } as any)
-        persisted.setNonMatched()
+        persisted.collections.statuses.setNonMatched(persisted.name, persisted.sourceName)
         registry.registerPersisted(persisted)
         expect([...registry.queryForSource('Source A')]).toEqual([persisted])
         expect([...registry.queryForSource('Identity Fusion NG')]).toHaveLength(0)

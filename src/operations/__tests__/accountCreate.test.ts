@@ -31,7 +31,7 @@ function createRegistry() {
     const fusion = registry.fusion as any
     fusion.preProcessFusionAccounts = vi.fn().mockResolvedValue([])
     fusion.processIdentity = vi.fn().mockResolvedValue(undefined)
-    fusion.getFusionIdentity = vi.fn().mockReturnValue({ managedKey: 'fusion-id-1', addStatus: vi.fn() })
+    fusion.getFusionIdentity = vi.fn().mockReturnValue({ managedKey: 'fusion-id-1', collections: { statuses: { add: vi.fn() } } })
     fusion.normalizePendingFormStateForOutput = vi.fn().mockResolvedValue(undefined)
     fusion.getISCAccount = vi.fn().mockResolvedValue({ id: 'isc-created' })
 
@@ -78,7 +78,7 @@ describe('accountCreate', () => {
         )
         expect(registry.fusion.preProcessFusionAccounts).toHaveBeenCalledTimes(1)
         expect(registry.fusion.processIdentity).toHaveBeenCalledWith({ id: 'id-1', name: 'Alice Doe' })
-        expect(registry.fusion.getFusionIdentity().addStatus).toHaveBeenCalledWith(
+        expect(registry.fusion.getFusionIdentity().collections.statuses.add).toHaveBeenCalledWith(
             StatusEntitlement.Requested,
             'Status set by accountCreate operation'
         )

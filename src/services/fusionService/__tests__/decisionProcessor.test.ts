@@ -36,7 +36,7 @@ describe('DecisionProcessor', () => {
             sourceName: 'Source 1',
             attributes: {},
         } as Account)
-        account.addStatus(StatusEntitlement.Candidate, 'stale')
+        account.collections.statuses.add(StatusEntitlement.Candidate, 'stale')
         account.setIdentityIdAttribute('identity-pending')
         run.registerFusionAccount(account)
         run.pendingCandidateIdentityIds.add('identity-pending')
@@ -55,7 +55,7 @@ describe('DecisionProcessor', () => {
             sourceName: 'Source 1',
             attributes: {},
         } as Account)
-        account.addStatus(StatusEntitlement.Candidate, 'was candidate')
+        account.collections.statuses.add(StatusEntitlement.Candidate, 'was candidate')
         account.setIdentityIdAttribute('identity-done')
         run.registerFusionAccount(account)
 
