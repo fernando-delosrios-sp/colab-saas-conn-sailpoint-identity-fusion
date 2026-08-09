@@ -144,7 +144,7 @@ describe('accountUpdate', () => {
             changes: [{ attribute: 'actions', op: 'Add', value: 'correlate:id-1' }],
         } as any)
 
-        expect(registry.sources.fetchFusionAccount).toHaveBeenCalledWith('fusion-1')
+        expect(registry.sources.fetchFusionAccount).toHaveBeenCalledWith('fusion-1', false)
         expect(fusionAccount.attributes.reverseNativeIdentity).toBe('native-before-update')
     })
 
@@ -167,6 +167,23 @@ describe('accountUpdate', () => {
 
         expect(registry.res.send).not.toHaveBeenCalled()
     })
+
+    it('fails with observable message when fusion account is not found', async () => {
+        const registry = createRegistry()
+        mockCrashThrows(registry)
+        ;(rebuildFusionAccount as Mock).mockResolvedValue(undefined)
+
+        await expect(
+            accountUpdate(registry, {
+                identity: 'missing-fusion',
+                schema: { attributes: [] },
+                changes: [{ attribute: 'actions', op: 'Add', value: 'correlate:id-1' }],
+            } as any)
+        ).rejects.toMatchObject({ message: 'Fusion account not found for identity: missing-fusion' })
+
+        expect(registry.res.send).not.toHaveBeenCalled()
+    })
 })
+
 
 

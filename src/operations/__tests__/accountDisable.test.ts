@@ -1,5 +1,6 @@
 import { accountDisable } from '../accountDisable'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
+import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import type { Mock } from 'vitest'
 
 vi.mock('../helpers/rebuildFusionAccount', () => ({
@@ -29,6 +30,13 @@ function createRegistry() {
     log.crash = vi.fn()
 
     return registry
+}
+
+function mockCrashThrows(registry: ReturnType<typeof createRegistry>) {
+    const log = registry.log as any
+    log.crash = vi.fn((message: string) => {
+        throw new ConnectorError(message, ConnectorErrorType.Generic)
+    })
 }
 
 describe('accountDisable', () => {
@@ -63,5 +71,18 @@ describe('accountDisable', () => {
         expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-disabled' })
     })
+
+    it('fails with observable message when fusion account is not found', async () => {
+        const registry = createRegistry()
+        mockCrashThrows(registry)
+        ;(rebuildFusionAccount as Mock).mockResolvedValue(undefined)
+
+        await expect(
+            accountDisable(registry, { identity: 'missing-fusion', schema: { attributes: [] } } as any)
+        ).rejects.toMatchObject({ message: 'Fusion account not found for identity: missing-fusion' })
+
+        expect(registry.res.send).not.toHaveBeenCalled()
+    })
 })
+
 

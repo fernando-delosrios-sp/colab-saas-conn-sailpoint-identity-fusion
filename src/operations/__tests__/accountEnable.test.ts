@@ -1,4 +1,4 @@
-import { ConnectorError } from '@sailpoint/connector-sdk'
+import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { accountEnable } from '../accountEnable'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
 import type { Mock } from 'vitest'
@@ -38,6 +38,13 @@ function createRegistry() {
     return registry
 }
 
+function mockCrashThrows(registry: ReturnType<typeof createRegistry>) {
+    const log = registry.log as any
+    log.crash = vi.fn((message: string) => {
+        throw new ConnectorError(message, ConnectorErrorType.Generic)
+    })
+}
+
 describe('accountEnable', () => {
     afterEach(() => {
         vi.restoreAllMocks()
@@ -74,6 +81,18 @@ describe('accountEnable', () => {
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-enabled' })
     })
 
+    it('fails with observable message when fusion account is not found', async () => {
+        const registry = createRegistry()
+        mockCrashThrows(registry)
+        ;(rebuildFusionAccount as Mock).mockResolvedValue(undefined)
+
+        await expect(
+            accountEnable(registry, { identity: 'missing-fusion', schema: { attributes: [] } } as any)
+        ).rejects.toMatchObject({ message: 'Fusion account not found for identity: missing-fusion' })
+
+        expect(registry.res.send).not.toHaveBeenCalled()
+    })
+
     it('throws ConnectorError when caught', async () => {
         const registry = createRegistry()
         const error = new ConnectorError('Connector error')
@@ -94,3 +113,4 @@ describe('accountEnable', () => {
         expect(registry.log.crash).toHaveBeenCalledWith('Failed to enable account fusion-1', error)
     })
 })
+

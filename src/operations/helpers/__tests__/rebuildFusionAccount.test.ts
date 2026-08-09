@@ -412,7 +412,44 @@ describe('rebuildFusionAccount', () => {
         expect(isIdentityInScope).not.toHaveBeenCalled()
         expect(processFusionAccount).toHaveBeenCalledWith(account, {}, undefined)
     })
+
+    it('returns undefined when the fusion account is not found', async () => {
+        const fetchFusionAccount = vi.fn().mockResolvedValue(undefined)
+        const processFusionAccount = vi.fn()
+
+        const registry = {
+            sources: {
+                fetchFusionAccount,
+                fusionAccountsByNativeIdentity: undefined,
+                fetchManagedAccount: vi.fn(),
+                getSourceByName: vi.fn(),
+                getSourceById: vi.fn(),
+                aggregateManagedSource: vi.fn(),
+                config: { cascadeAggregationEnabled: false },
+            },
+            identities: {
+                fetchIdentityById: vi.fn(),
+                getIdentityById: vi.fn(),
+            },
+            fusion: {
+                processFusionAccount,
+            },
+            log: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+        } as any
+
+        const result = await rebuildFusionAccount('missing-fusion', {} as any, {
+            fusion: registry.fusion,
+            identities: registry.identities,
+            sources: registry.sources,
+            log: registry.log,
+        })
+
+        expect(fetchFusionAccount).toHaveBeenCalledWith('missing-fusion', false)
+        expect(result).toBeUndefined()
+        expect(processFusionAccount).not.toHaveBeenCalled()
+    })
 })
+
 
 
 
