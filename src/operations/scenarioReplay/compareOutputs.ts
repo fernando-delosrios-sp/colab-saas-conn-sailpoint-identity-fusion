@@ -1,20 +1,22 @@
+import { FusionAttribute } from '../../data/schema'
+
 export function normalizeAccountCompareField(key: string, val: unknown): unknown {
-    if (key === 'statuses' && Array.isArray(val)) {
+    if (key === FusionAttribute.Statuses && Array.isArray(val)) {
         return [...val]
             .filter((entry) => entry !== 'candidate' && entry !== 'activeReviews')
             .map((entry) => (entry === 'auto' ? 'nonMatched' : entry))
             .sort()
     }
-    if (key === 'actions' && Array.isArray(val)) {
+    if (key === FusionAttribute.Actions && Array.isArray(val)) {
         return [...val]
             .map(String)
             .filter((entry) => entry !== 'correlated' && !entry.startsWith('reviewer:'))
             .sort()
     }
-    if (key === 'reviews' && Array.isArray(val)) {
+    if (key === FusionAttribute.Reviews && Array.isArray(val)) {
         return [...val].map(String).sort()
     }
-    if (key === 'history' && Array.isArray(val)) {
+    if (key === FusionAttribute.History && Array.isArray(val)) {
         return val
             .filter((entry) => typeof entry !== 'string' || !entry.includes('Auto-merged'))
             .map((entry) => (typeof entry === 'string' ? entry.replace(/^\[\d{4}-\d{2}-\d{2}\]/, '[DATE]') : entry))
@@ -30,7 +32,7 @@ export function sanitizeHistoryDates(val: any): any {
     if (typeof val === 'object') {
         const copy: any = {}
         for (const [k, v] of Object.entries(val)) {
-            if (k === 'history' && Array.isArray(v)) {
+            if (k === FusionAttribute.History && Array.isArray(v)) {
                 copy[k] = v.map((h) => (typeof h === 'string' ? h.replace(/^\[\d{4}-\d{2}-\d{2}\]/, '[DATE]') : h))
             } else {
                 copy[k] = sanitizeHistoryDates(v)
@@ -124,7 +126,7 @@ export function compareOutputs(
 
                         if (
                             isMidChainAccountListStep(stepId) &&
-                            attrKey === 'accounts' &&
+                            attrKey === FusionAttribute.Accounts &&
                             Array.isArray(expectedAttr) &&
                             Array.isArray(actualAttr)
                         ) {
@@ -151,7 +153,7 @@ export function compareOutputs(
 
                         if (
                             isMidChainAccountListStep(stepId) &&
-                            attrKey === 'reviews' &&
+                            attrKey === FusionAttribute.Reviews &&
                             Array.isArray(expectedAttr) &&
                             Array.isArray(actualAttr) &&
                             expectedAttr.length > 0 &&
@@ -189,3 +191,4 @@ export function compareOutputs(
 
     return { match: drift.length === 0, drift }
 }
+
