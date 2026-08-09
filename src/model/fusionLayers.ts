@@ -27,6 +27,10 @@ export interface AddManagedAccountOptions {
     onBlend?: (account: Account) => void
 }
 
+/**
+ * Fusion account collaborator for identity / managed-account / fusion-decision enrichment
+ * and layer flags (needsRefresh, disabled, origin metadata, and related).
+ */
 export class FusionLayers {
     _needsRefresh = false
     _needsReset = false
@@ -504,5 +508,6 @@ export class FusionLayers {
         }
     }
 }
+
 
 

@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-08-09
+
+### 🔧 Improvements
+
+- **FusionAccount collaborator API** — Internal TypeScript callers mutate account state through `collections` / `correlation` / `layers` instead of flat `FusionAccount` pass-throughs. No tenant-facing connector behavior change.
+
+### 📚 Documentation
+
+- **Specs and glossary aligned to collaborator model** — Living `fusion-service` requirements replace deleted `FusionAccountState` / rule-module / facade contracts. Ubiquitous language and glossary define Fusion account collaborators and fix **Fusion account name** (`FusionAccount.name`, not `state.name`). `FusionCorrelation` is disambiguated from business correlation.
+
+---
+
 ## 2026-08-08
 ### ⚠️ Breaking Changes
 - **Legacy raw managed account IDs removed from schema attributes** — The `accounts`, `missing-accounts`, and `originAccount` attributes no longer accept plain ISC account UUIDs without the composite `sourceId::nativeIdentity` form (except `originAccount` when `originSource` is `Identities`, which continues to store an identity ID). Non-composite values are dropped during load with a diagnostic warning. **Migration:** Before upgrading, patch persisted Fusion account attributes to composite managed account keys or re-aggregate sources so references are rewritten.
