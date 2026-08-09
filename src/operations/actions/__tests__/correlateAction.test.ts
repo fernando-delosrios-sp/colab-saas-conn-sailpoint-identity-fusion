@@ -27,16 +27,30 @@ describe('correlateAction', () => {
         expect(fusionAccount.collections.actions.remove).not.toHaveBeenCalled()
     })
 
-    it('removes correlated action entitlement on Remove', async () => {
+    it('rejects correlated action entitlement Remove', async () => {
         const fusionAccount = makeFusionAccount()
         const serviceRegistry = {
             log: { debug: vi.fn() },
             fusion: { correlateMissingAccountsPerSource: vi.fn().mockResolvedValue(undefined) },
         } as any
 
-        await correlateAction(fusionAccount, { op: AttributeChangeOp.Remove, value: FusionAction.Correlated }, serviceRegistry)
+        await expect(
+            correlateAction(fusionAccount, { op: AttributeChangeOp.Remove, value: FusionAction.Correlated }, serviceRegistry)
+        ).rejects.toMatchObject({ message: 'Correlated entitlement cannot be removed: correlated' })
 
-        expect(fusionAccount.collections.actions.remove).toHaveBeenCalledWith(FusionAction.Correlated)
+        expect(fusionAccount.collections.actions.remove).not.toHaveBeenCalled()
         expect(serviceRegistry.fusion.correlateMissingAccountsPerSource).not.toHaveBeenCalled()
+    })
+
+    it('rejects correlate token Remove', async () => {
+        const fusionAccount = makeFusionAccount()
+        const serviceRegistry = {
+            log: { debug: vi.fn() },
+            fusion: { correlateMissingAccountsPerSource: vi.fn().mockResolvedValue(undefined) },
+        } as any
+
+        await expect(
+            correlateAction(fusionAccount, { op: AttributeChangeOp.Remove, value: 'correlate' }, serviceRegistry)
+        ).rejects.toMatchObject({ message: 'Correlated entitlement cannot be removed: correlate' })
     })
 })

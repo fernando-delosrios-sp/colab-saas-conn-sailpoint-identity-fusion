@@ -995,7 +995,6 @@ export class FusionService {
     ): Promise<StdAccountListOutput | undefined> {
         await fusionAccount.correlation.resolvePendingOperations(awaitCorrelations)
         // Update correlation status/action based on whatever correlations have resolved so far.
-        // accountUpdate may skip this to preserve explicit entitlement removals in the immediate response.
         if (recomputeCorrelationStatus) {
             fusionAccount.updateCorrelationStatus(
                 this.accountAssembly.isAggregationAccountListMode()

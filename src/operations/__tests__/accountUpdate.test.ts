@@ -79,22 +79,48 @@ describe('accountUpdate', () => {
         )
         expect(executeActions).toHaveBeenCalledWith(fusionAccount, input.changes[0], registry)
         expect(registry.fusion.normalizePendingFormStateForOutput).not.toHaveBeenCalled()
-        expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(fusionAccount, true, true)
+        expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(fusionAccount, true)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-updated' })
     })
 
-    it('skips correlation status recompute when removing correlated action', async () => {
+    it('fails when removing correlated action entitlement', async () => {
         const registry = createRegistry()
-        const fusionAccount = { managedKey: 'fusion-1', name: 'Fusion User' }
-        ;(rebuildFusionAccount as Mock).mockResolvedValue(fusionAccount)
+        mockCrashThrows(registry)
+        const { executeActions: realExecuteActions } = await vi.importActual<typeof import('../actions')>(
+            '../actions'
+        )
+        vi.mocked(executeActions).mockImplementation(realExecuteActions)
+        ;(rebuildFusionAccount as Mock).mockResolvedValue({ managedKey: 'fusion-1', name: 'Fusion User' })
 
-        await accountUpdate(registry, {
-            identity: 'fusion-1',
-            schema: { attributes: [] },
-            changes: [{ attribute: 'actions', op: 'Remove', value: FusionAction.Correlated }],
-        } as any)
+        await expect(
+            accountUpdate(registry, {
+                identity: 'fusion-1',
+                schema: { attributes: [] },
+                changes: [{ attribute: 'actions', op: 'Remove', value: FusionAction.Correlated }],
+            } as any)
+        ).rejects.toMatchObject({ message: 'Correlated entitlement cannot be removed: correlated' })
 
-        expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(fusionAccount, true, false)
+        expect(registry.res.send).not.toHaveBeenCalled()
+    })
+
+    it('fails when removing correlate action token', async () => {
+        const registry = createRegistry()
+        mockCrashThrows(registry)
+        const { executeActions: realExecuteActions } = await vi.importActual<typeof import('../actions')>(
+            '../actions'
+        )
+        vi.mocked(executeActions).mockImplementation(realExecuteActions)
+        ;(rebuildFusionAccount as Mock).mockResolvedValue({ managedKey: 'fusion-1', name: 'Fusion User' })
+
+        await expect(
+            accountUpdate(registry, {
+                identity: 'fusion-1',
+                schema: { attributes: [] },
+                changes: [{ attribute: 'actions', op: 'Remove', value: 'correlate' }],
+            } as any)
+        ).rejects.toMatchObject({ message: 'Correlated entitlement cannot be removed: correlate' })
+
+        expect(registry.res.send).not.toHaveBeenCalled()
     })
 
     it('logs crash for unsupported entitlement change attribute', async () => {
@@ -184,6 +210,7 @@ describe('accountUpdate', () => {
         expect(registry.res.send).not.toHaveBeenCalled()
     })
 })
+
 
 
 
