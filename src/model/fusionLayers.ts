@@ -175,21 +175,15 @@ export class FusionLayers {
             return result
         }
 
-        this.collections._setPreviousAccountIds(
+        this.collections.setPreviousAccountIds(
             normalizeManagedAccountKeySet(new Set(this.collections.previousAccountIds))
         )
-        const normMissing = normalizeManagedAccountKeySet(
-            new Set(this.collections.missingAccountIds)
+        this.collections.replaceMissingAccountIds(
+            normalizeManagedAccountKeySet(new Set(this.collections.missingAccountIds))
         )
-        this.collections._internal_missingAccountIds.clear()
-        for (const id of normMissing) {
-            this.collections._internal_missingAccountIds.add(id)
-        }
-        const normAccountIds = normalizeManagedAccountKeySet(new Set(this.collections.accountIds))
-        this.collections._internal_accountIds.clear()
-        for (const id of normAccountIds) {
-            this.collections._internal_accountIds.add(id)
-        }
+        this.collections.replaceAccountIds(
+            normalizeManagedAccountKeySet(new Set(this.collections.accountIds))
+        )
 
         this._processIdentityMatchedAccounts(
             workQueue,
@@ -233,15 +227,15 @@ export class FusionLayers {
             if (fromIdentity) {
                 const originIdentityId = this._originAccount ?? identityInfo?.id
                 if (originIdentityId && !this._originIdentityInScope) {
-                    this.collections._internal_statuses.add(StatusEntitlement.Orphan)
+                    this.collections.statuses.add(StatusEntitlement.Orphan)
                     this._needsRefresh = false
                 }
             } else {
-                this.collections._internal_statuses.add(StatusEntitlement.Orphan)
+                this.collections.statuses.add(StatusEntitlement.Orphan)
                 this._needsRefresh = false
             }
         } else {
-            this.collections._internal_statuses.delete(StatusEntitlement.Orphan)
+            this.collections.statuses.remove(StatusEntitlement.Orphan)
         }
     }
 
@@ -259,8 +253,8 @@ export class FusionLayers {
         }
         this.collections.statuses.setUncorrelatedAccount(managedKey)
         this._uncorrelated = true
-        this.collections._internal_statuses.add(StatusEntitlement.Uncorrelated)
-        this.collections._internal_actions.delete('correlated')
+        this.collections.statuses.add(StatusEntitlement.Uncorrelated)
+        this.collections.removeActionSilent('correlated')
 
         const sourceType = decision.sourceType ?? SourceType.Authoritative
 
@@ -319,7 +313,9 @@ export class FusionLayers {
             if (recordBlendHistory) {
                 const accountLabel = trimStr(account.name ?? account.nativeIdentity ?? accountId) || accountId
                 const sourceLabel = account.sourceName ?? ''
-                this.collections._addHistoryEntry(`Blended managed account ${accountLabel} [${sourceLabel || 'Unknown source'}]`)
+                this.collections.addHistoryMessage(
+                    `Blended managed account ${accountLabel} [${sourceLabel || 'Unknown source'}]`
+                )
             }
         }
         if (!this._needsRefresh) {
@@ -332,7 +328,7 @@ export class FusionLayers {
         if (account.sourceName && attributeBag) {
             const parsedKey = parseManagedAccountKey(accountId)
             const schemaNative = trimStr(account.nativeIdentity ?? parsedKey?.nativeIdentity) || accountId
-            this.collections._internal_managedAccountInfo.set(accountId, {
+            this.collections.setManagedAccountInfo(accountId, {
                 source: { name: account.sourceName },
                 schema: { id: schemaNative },
             })
@@ -353,8 +349,8 @@ export class FusionLayers {
 
             const existingSourceAccounts = attributeBag.sources.get(account.sourceName) || []
             existingSourceAccounts.push(contextAttributes)
-            this.collections._internal_sources.delete(IDENTITIES_SOURCE_NAME)
-            this.collections._internal_sources.add(account.sourceName)
+            this.collections.sources.remove(IDENTITIES_SOURCE_NAME)
+            this.collections.sources.add(account.sourceName)
             attributeBag.sources.set(account.sourceName, existingSourceAccounts)
         }
         return recordBlendHistory && isNewAccount
@@ -454,8 +450,8 @@ export class FusionLayers {
 
             this.collections.statuses.setUncorrelatedAccount(id)
             this._uncorrelated = true
-            this.collections._internal_statuses.add(StatusEntitlement.Uncorrelated)
-            this.collections._internal_actions.delete('correlated')
+            this.collections.statuses.add(StatusEntitlement.Uncorrelated)
+            this.collections.removeActionSilent('correlated')
             const blended = this._setManagedAccount(
                 account,
                 addBlendHistory,
@@ -474,7 +470,7 @@ export class FusionLayers {
             if (!info?.sourceName) continue
             const parsed = parseManagedAccountKey(accountId)
             const nativeId = trimStr(info.nativeIdentity ?? parsed?.nativeIdentity) || accountId
-            this.collections._internal_managedAccountInfo.set(accountId, {
+            this.collections.setManagedAccountInfo(accountId, {
                 source: { name: info.sourceName },
                 schema: { id: nativeId },
             })
@@ -492,20 +488,21 @@ export class FusionLayers {
         for (const accountId of trackedIds) {
             if (inventoryKeys.has(accountId)) continue
 
-            const removedFromAccounts = this.collections._internal_accountIds.delete(accountId)
-            const removedFromMissing = this.collections._internal_missingAccountIds.delete(accountId)
+            const removedFromAccounts = this.collections.accounts.remove(accountId)
+            const removedFromMissing = this.collections.accounts.removeMissing(accountId)
             if (removedFromAccounts || removedFromMissing) {
                 removedAnyReference = true
-                this.collections._addHistoryEntry(`Removed managed account missing reference: ${accountId}`)
+                this.collections.addHistoryMessage(`Removed managed account missing reference: ${accountId}`)
             }
             const prev = new Set(this.collections.previousAccountIds)
             prev.delete(accountId)
-            this.collections._setPreviousAccountIds(prev)
-            this.collections._internal_managedAccountInfo.delete(accountId)
+            this.collections.setPreviousAccountIds(prev)
+            this.collections.deleteManagedAccountInfo(accountId)
         }
         if (removedAnyReference) {
             this._needsRefresh = true
         }
     }
 }
+
 
