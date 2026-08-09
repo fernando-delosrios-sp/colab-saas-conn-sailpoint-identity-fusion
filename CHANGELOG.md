@@ -11,6 +11,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 ### 📚 Documentation
 - **Specs and glossary aligned to collaborator model** — Living `fusion-service` requirements replace deleted `FusionAccountState` / rule-module / facade contracts. Ubiquitous language and glossary define Fusion account collaborators and fix **Fusion account name** (`FusionAccount.name`, not `state.name`). `FusionCorrelation` is disambiguated from business correlation.
 - **Matching delegation specs reconciled** — Living specs document the three-layer match architecture (FusionService pipeline → `MatchOutcomeDispatcher` → `MatchingService` scoring). Retires `ManagedAccountMatchingRunner`; aligns `configureScoring({ captureBreakdown })`. Spec-only; no connector behavior change.
+- **Source metadata index specs reconciled** — Living `fusion-run` and `source-service` specs document the dual-index pattern (`sourcesById` discovery session + `run.sourcesByName` cross-service), managed-only name map after reviewer initialization, and name-only snapshot contract. Spec-only; no connector behavior change.
 ... [lean-ctx: omitted 1 lines]
 ## 2026-08-08
 ### ⚠️ Breaking Changes
