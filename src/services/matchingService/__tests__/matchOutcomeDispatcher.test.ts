@@ -80,7 +80,6 @@ describe('MatchOutcomeDispatcher', () => {
             registerFinishedDecision: vi.fn(),
             createAutomaticMergeDecision,
         } as any
-        const correlationManager = { applyPerSourceCorrelationIfNeeded: vi.fn().mockResolvedValue(undefined) } as any
         const decisionProcessor = { processFusionIdentityDecision: vi.fn().mockResolvedValue(undefined) }
 
         const dispatcher = new MatchOutcomeDispatcher({
@@ -88,7 +87,6 @@ describe('MatchOutcomeDispatcher', () => {
             log,
             run,
             matchingService,
-            correlationManager,
             definitionService,
             mappingService,
             accountAssembly,
@@ -106,7 +104,6 @@ describe('MatchOutcomeDispatcher', () => {
             mappingService,
             definitionService,
             forms,
-            correlationManager,
             decisionProcessor,
         }
     }

@@ -61,7 +61,7 @@ MatchOutcomeDispatcher SHALL orchestrate the two-sweep matching lifecycle (ident
 
 ### Requirement: MatchOutcomeDispatcher depends on real collaborators, not closures
 
-`MatchOutcomeDispatcher` SHALL receive its dependencies through the ServiceRegistry as explicit constructor parameters: `FusionRun`, `FormService`, `CorrelationManager`, `DefinitionService`, `MatchingService`, the account-assembly module, `FusionConfig`, and `LogService`. It SHALL NOT receive closures over private methods of `FusionService`.
+`MatchOutcomeDispatcher` SHALL receive its dependencies through the ServiceRegistry as explicit constructor parameters: `FusionRun`, `FormService`, `DefinitionService`, `MatchingService`, the account-assembly module, `FusionConfig`, and `LogService`. It SHALL NOT receive closures over private methods of `FusionService`.
 
 #### Scenario: Outcome dispatch uses FormService directly
 - **WHEN** `MatchOutcomeDispatcher` handles a partial match
@@ -188,6 +188,7 @@ When `MatchOutcomeDispatcher.handlePartialMatch` successfully creates or reuses 
 - **GIVEN** `createFusionForm` returns `formDefinitionReady: false` or throws
 - **WHEN** partial match handling completes
 - **THEN** `run.claimAccount` SHALL NOT be invoked for that account solely due to partial-match dispatch
+
 
 
 

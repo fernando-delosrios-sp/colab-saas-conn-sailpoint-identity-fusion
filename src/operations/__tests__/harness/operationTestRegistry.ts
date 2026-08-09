@@ -88,7 +88,6 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
     fusion.normalizePendingFormStateForOutput = vi.fn().mockResolvedValue(undefined)
     fusion.forEachISCAccount = vi.fn().mockResolvedValue({ sent: 0, eligible: 0 })
     fusion.streamAndClearEligibleAccounts = vi.fn().mockResolvedValue({ sent: 0, eligible: 0 })
-    fusion.refreshUniqueAttributes = vi.fn().mockResolvedValue(0)
     fusion.initializeManagedAccountProcessing = vi.fn().mockImplementation(async () => {
         fusion.run.startManagedAccountProcessing(1)
     })

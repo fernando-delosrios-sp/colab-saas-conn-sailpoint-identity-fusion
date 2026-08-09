@@ -220,7 +220,10 @@ export function formatStatusLine(
         parts.push(`refreshed(${runContext.refreshedCount})`)
         const phaseCorrelation = runContext.getPhaseCorrelationCounters()
         if (phaseCorrelation.linkTriggers > 0 || phaseCorrelation.mergeTriggers > 0) {
-            const segment = formatCorrelationSummarySegment(phaseCorrelation, { cumulative: true })
+            const segment = formatCorrelationSummarySegment(phaseCorrelation, {
+                cumulative: true,
+                excludeCorrelatedAction: runContext.excludeCorrelatedActionInSummaries,
+            })
             if (segment) parts.push(segment)
         }
     }
@@ -261,7 +264,8 @@ export function formatStatusLine(
 export function formatEventSummaryLines(
     events: EventCounters,
     phase: OperationPhase | null = null,
-    intervalMs: number
+    intervalMs: number,
+    options?: { excludeCorrelatedAction?: boolean }
 ): string[] {
     const lines: string[] = []
     const inProcessPhase = phase === 'Process'
@@ -311,7 +315,11 @@ export function formatEventSummaryLines(
     }
 
     if (hasCorrelationActivity(events.correlation)) {
-        const segment = formatCorrelationSummarySegment(events.correlation, { intervalMs, cumulative: false })
+        const segment = formatCorrelationSummarySegment(events.correlation, {
+            intervalMs,
+            cumulative: false,
+            excludeCorrelatedAction: options?.excludeCorrelatedAction,
+        })
         if (segment) lines.push(`EVENT_SUMMARY ${segment}`)
     }
 
@@ -514,7 +522,9 @@ export class OperationHeartbeat {
         }
 
         const events = runContext.flushEventCounters()
-        for (const line of formatEventSummaryLines(events, runContext.phase, snapshot.intervalMs)) {
+        for (const line of formatEventSummaryLines(events, runContext.phase, snapshot.intervalMs, {
+            excludeCorrelatedAction: runContext.excludeCorrelatedActionInSummaries,
+        })) {
             this.log.info(line)
         }
 
@@ -530,6 +540,7 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
+
 
 
 

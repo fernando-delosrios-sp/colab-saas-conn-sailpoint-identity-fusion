@@ -16,7 +16,7 @@ import {
 } from '../matchingService/matchingHelpers'
 import { assert } from '../../utils/assert'
 import { createUrlContext, UrlContext } from '../../utils/url'
-import { forEachBatched, compact } from './collections'
+import { forEachBatched } from './collections'
 import { FusionDecision } from '../../model/form'
 import { SchemaService } from '../schemaService'
 import { FusionReport, FusionReportAccount as _FusionReportAccount, FusionReportStats } from './types'
@@ -439,22 +439,6 @@ export class FusionService {
     }
 
     /**
-     * Refresh unique attributes for all fusion accounts and identities in batches.
-     */
-    public async refreshUniqueAttributes(): Promise<number> {
-        const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
-        await batchProcess(
-            allAccounts,
-            'Unique-attribute generation',
-            (account) => this.definitionService.refreshUniqueAttributes(account),
-            this.config,
-            this.log,
-            getManagedAccountsBatchSize(this.config)
-        )
-        return allAccounts.length
-    }
-
-    /**
      * Process a single fusion account.
      *
      * This method builds a complete fusion account by layering data from multiple sources:
@@ -860,31 +844,6 @@ export class FusionService {
     // ------------------------------------------------------------------------
     // Public Output/Listing Methods
     // ------------------------------------------------------------------------
-
-    /**
-     * Lists all ISC accounts (fusion accounts and identity accounts) for platform output.
-     * Optionally filters out orphan accounts when deleteEmpty is enabled.
-     *
-     * Performance Optimization:
-     * - Iterates Maps directly instead of creating intermediate arrays
-     * - Uses promiseAllBatched to bound concurrent getISCAccount calls
-     * - Avoids spread operator to combine arrays
-     *
-     * @returns Array of formatted account outputs ready for the platform
-     */
-    public async listISCAccounts(): Promise<StdAccountListOutput[]> {
-        const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
-        const eligible = this.deleteEmpty ? allAccounts.filter((account) => !account.collections.statuses.isOrphan()) : allAccounts
-
-        const results = await batchProcess(
-            eligible,
-            'ISC accounts',
-            (x) => this.getISCAccount(x),
-            this.config,
-            this.log
-        )
-        return compact(results)
-    }
 
     private shouldLogBatchProgress(
         currentBatch: number,
