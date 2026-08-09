@@ -90,8 +90,8 @@ function buildScenario(chainName, steps, dir) {
     return {
         version: '1.0.0',
         recordedAt: new Date().toISOString(),
-        scenarioName: normalized,
-        chainName: normalized,
+        scenarioName: chainName,
+        chainName: chainName,
         config,
         initialState,
         steps: scenarioSteps,
@@ -157,5 +157,6 @@ function finalizeChainArtifacts(chainRef) {
 }
 
 module.exports = { finalizeChainArtifacts, countNdjsonLines, loadStepsFromDisk, buildScenario, loadExistingConfig }
+
 
 
