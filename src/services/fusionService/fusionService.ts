@@ -154,7 +154,6 @@ export class FusionService {
             commandType,
             isAggregationMode: isAggregationMode ?? false,
             buildFusionBlend: (fa, account) => this.buildFusionBlend(fa, account),
-            getTracker: () => this.run.getTracker(),
         })
         this.correlationManager = new CorrelationManager(config, log, this.sources, this.identities, () =>
             this.accountAssembly.isAggregationAccountListMode()

@@ -192,7 +192,7 @@ FusionRun SHALL expose domain verbs for managed account processing state mutatio
 
 ### Requirement: FusionRun exposes analysis recording verbs
 
-FusionRun SHALL expose domain verbs that hide the internal `analysisRecorder` from callers: `trackFailed(fusionAccount, message)` and any other recorder operations needed by the Match step. External code SHALL NOT directly reference `run.analysisRecorder`.
+FusionRun SHALL expose domain verbs that hide the internal `analysisRecorder` from callers: `recordAnalysis(analysis)`, `trackFailed(fusionAccount, message)`, and any other recorder operations needed by the Match step. The `analysisRecorder` field SHALL be typed as `ManagedAccountAnalysisRecording` (port in `src/model/managedAccountAnalysisRecording.ts`). External pipeline code SHALL NOT directly reference `run.analysisRecorder`; `FusionService` MAY assign the concrete `ManagedAccountAnalysisRecorder` at construction time.
 
 #### Scenario: Match module records a failed form
 - **WHEN** `MatchOutcomeDispatcher` fails to create a review form
@@ -439,5 +439,6 @@ FusionRun SHALL provide `fusionAccountsIterable()` returning an iterable over fu
 - **WHEN** a caller accesses `run.allFusionAccounts`
 - **THEN** a new array copy SHALL be returned
 - **AND** mutating the returned array SHALL NOT mutate internal run state
+
 
 

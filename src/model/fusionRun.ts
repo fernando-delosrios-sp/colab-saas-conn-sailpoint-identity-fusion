@@ -2,8 +2,8 @@ import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount, FusionAccountKind } from './account'
 import { SourceInfo } from '../services/sourceService'
 import { FusionDecision } from './form'
-import { ManagedAccountAnalysisRecorder } from '../services/fusionService/managedAccountAnalysisRecorder'
 import { AggregationTracker } from './aggregationTracker'
+import { ManagedAccountAnalysisRecording } from './managedAccountAnalysisRecording'
 import { FusionReportBlend } from './fusionReportBlend'
 import { LogService } from '../services/logService'
 import { FusionConfig } from './config'
@@ -103,7 +103,7 @@ export class FusionRun {
     fusionBlends: FusionReportBlend[] = []
     matchScoringMs = 0
     fullScanFallbackCount = 0
-    analysisRecorder?: ManagedAccountAnalysisRecorder
+    analysisRecorder?: ManagedAccountAnalysisRecording
     phaseTimings: { phase: string; elapsed: string }[] = []
     private _pendingDisableOperations = new Set<Promise<void>>()
     private _disableOperationFactory?: (account: Account) => Promise<void>
@@ -337,7 +337,7 @@ export class FusionRun {
      */
     removeMatchAccount(managedAccountId: string | undefined): void {
         if (!managedAccountId) return
-        const tracker = this.analysisRecorder?.tracker
+        const tracker = this.getTracker()
         if (!tracker) return
         const idx = tracker.matchAccounts.findIndex((x) => x.managedAccountId === managedAccountId)
         if (idx !== -1) {
@@ -361,7 +361,8 @@ export class FusionRun {
         this.analysisRecorder?.recordAnalysis(analysis)
     }
 
-    registerFusionAccount(fusionAccount: FusionAccount, tracker?: AggregationTracker): void {
+    registerFusionAccount(fusionAccount: FusionAccount): void {
+        const tracker = this.getTracker()
         const identityId = fusionAccount.identityId
         if (hasValue(identityId) && fusionAccount.type !== FusionAccountKind.Managed) {
             const existingFusionAccount = this._fusionIdentityMap.get(identityId!)
@@ -589,7 +590,8 @@ export class FusionRun {
         this._pendingCandidateIdentityIds.add(candidateId)
     }
 
-    recordFusionBlend(blend: FusionReportBlend, tracker?: AggregationTracker): void {
+    recordFusionBlend(blend: FusionReportBlend): void {
+        const tracker = this.getTracker()
         if (!tracker) return
         tracker.fusionBlends.push(blend)
     }

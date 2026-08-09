@@ -15,6 +15,7 @@ import {
     logFusionMatchDiscovery,
 } from '../matchingService/matchingHelpers'
 import { ManagedAccountAnalysisContext } from '../matchingService/types'
+import { ManagedAccountAnalysisRecording } from '../../model/managedAccountAnalysisRecording'
 import { resolveFusionMaxCandidatesForForm } from '../../data/config'
 import { resolveReportAccountId } from './reportAccountResolver'
 
@@ -30,16 +31,8 @@ export interface ManagedAccountAnalysisRecorderDeps {
     shouldCaptureReportData: () => boolean
 }
 
-export class ManagedAccountAnalysisRecorder {
+export class ManagedAccountAnalysisRecorder implements ManagedAccountAnalysisRecording {
     constructor(private readonly deps: ManagedAccountAnalysisRecorderDeps) {}
-
-    get tracker(): AggregationTracker | undefined {
-        try {
-            return this.deps.tracker()
-        } catch {
-            return undefined
-        }
-    }
 
     recordAnalysis(analysis: ManagedAccountAnalysisContext): void {
         const { account, fusionAccount, sourceType, hasIdentityCandidateMatches, fusionIdentityComparisons } = analysis
@@ -128,6 +121,7 @@ export class ManagedAccountAnalysisRecorder {
         })
     }
 }
+
 
 
 

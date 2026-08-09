@@ -114,7 +114,8 @@ describe('AccountAssembly', () => {
         it('delegates registration to FusionRun', () => {
             const account = FusionAccount.fromIdentity({ id: 'id-1', name: 'Identity 1' })
             assembly.registerFusionAccount(account)
-            expect(mockRun.registerFusionAccount).toHaveBeenCalledWith(account, undefined)
+            expect(mockRun.registerFusionAccount).toHaveBeenCalledWith(account)
         })
     })
 })
+

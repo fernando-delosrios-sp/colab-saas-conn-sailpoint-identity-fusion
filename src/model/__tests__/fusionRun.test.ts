@@ -1,11 +1,12 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { FusionRun, RunStateSnapshot } from '../fusionRun'
 import { AggregationTracker } from '../aggregationTracker'
-import { ManagedAccountAnalysisRecorder } from '../../services/fusionService/managedAccountAnalysisRecorder'
+import { ManagedAccountAnalysisRecording } from '../managedAccountAnalysisRecording'
 import { SourceInfo } from '../../services/sourceService'
 import { SourceType } from '../config'
 import { FusionAccount } from '../account'
+import { ManagedAccountAnalysisContext } from '../../services/matchingService/types'
 
 describe('FusionRun', () => {
     it('initializes with empty maps and sets', () => {
@@ -155,12 +156,12 @@ describe('FusionRun', () => {
     })
 
     describe('removeMatchAccount', () => {
-        it('removes a managed account from the analysis recorder tracker', () => {
+        it('removes a managed account from the run tracker', () => {
             const run = new FusionRun()
             const tracker = new AggregationTracker()
             const fusionAccount = { managedAccountId: 'managed-1' } as FusionAccount
             tracker.matchAccounts.push(fusionAccount)
-            run.analysisRecorder = makeMockRecorder({ tracker })
+            run.setTracker(tracker)
 
             run.removeMatchAccount('managed-1')
             expect(tracker.matchAccounts).toHaveLength(0)
@@ -173,7 +174,7 @@ describe('FusionRun', () => {
 
         it('is a no-op for undefined ids', () => {
             const run = new FusionRun()
-            run.analysisRecorder = makeMockRecorder({ tracker: new AggregationTracker() })
+            run.setTracker(new AggregationTracker())
             expect(() => run.removeMatchAccount(undefined)).not.toThrow()
         })
 
@@ -181,7 +182,7 @@ describe('FusionRun', () => {
             const run = new FusionRun()
             const tracker = new AggregationTracker()
             tracker.matchAccounts.push({ managedAccountId: 'managed-1' } as FusionAccount)
-            run.analysisRecorder = makeMockRecorder({ tracker })
+            run.setTracker(tracker)
 
             run.removeMatchAccount('managed-2')
             expect(tracker.matchAccounts).toHaveLength(1)
@@ -191,7 +192,7 @@ describe('FusionRun', () => {
     describe('trackFailed', () => {
         it('delegates to the analysis recorder', () => {
             const run = new FusionRun()
-            const recorder = makeMockRecorder({ tracker: new AggregationTracker() })
+            const recorder = makeMockRecorder()
             run.analysisRecorder = recorder
             const fusionAccount = { name: 'fa', sourceName: 's' } as FusionAccount
 
@@ -208,7 +209,7 @@ describe('FusionRun', () => {
     describe('recordAnalysis', () => {
         it('delegates to the analysis recorder', () => {
             const run = new FusionRun()
-            const recorder = makeMockRecorder({ tracker: new AggregationTracker() })
+            const recorder = makeMockRecorder()
             run.analysisRecorder = recorder
             const analysis = {
                 account: { name: 'acct', sourceName: 'Source A' } as Account,
@@ -410,37 +411,23 @@ describe('FusionRun', () => {
     })
 })
 
-function makeMockRecorder(options: { tracker: AggregationTracker; run?: FusionRun }) {
-    const urlContext = {
-        humanAccount: vi.fn().mockReturnValue(''),
-        identity: vi.fn().mockReturnValue(''),
-    }
-    const run = options.run ?? new FusionRun({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any)
-    const recorder = new ManagedAccountAnalysisRecorder({
-        log: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn(), assert: vi.fn(), crash: vi.fn() } as any,
-        tracker: () => options.tracker,
-        urlContext: urlContext as any,
-        reportAttributes: [],
-        sourcesByName: new Map(),
-        config: {} as any,
-        sources: { managedAccountInventory: new Map() } as any,
-        run,
-        shouldCaptureReportData: () => true,
-    })
-    ;(recorder as any).trackFailedCalls = []
-    ;(recorder as any).recordAnalysisCalls = []
-    const originalTrackFailed = recorder.trackFailed.bind(recorder)
-    recorder.trackFailed = (fusionAccount: FusionAccount, error: string) => {
-        ;(recorder as any).trackFailedCalls.push([fusionAccount, error])
-        originalTrackFailed(fusionAccount, error)
-    }
-    const originalRecordAnalysis = recorder.recordAnalysis.bind(recorder)
-    recorder.recordAnalysis = (analysis) => {
-        ;(recorder as any).recordAnalysisCalls.push(analysis)
-        originalRecordAnalysis(analysis)
+function makeMockRecorder(): ManagedAccountAnalysisRecording & {
+    trackFailedCalls: [FusionAccount, string][]
+    recordAnalysisCalls: ManagedAccountAnalysisContext[]
+} {
+    const recorder = {
+        trackFailedCalls: [] as [FusionAccount, string][],
+        recordAnalysisCalls: [] as ManagedAccountAnalysisContext[],
+        recordAnalysis(analysis: ManagedAccountAnalysisContext) {
+            recorder.recordAnalysisCalls.push(analysis)
+        },
+        trackFailed(fusionAccount: FusionAccount, message: string) {
+            recorder.trackFailedCalls.push([fusionAccount, message])
+        },
     }
     return recorder
 }
+
 
 
 
