@@ -939,12 +939,8 @@
                             "required": false,
                             "parentKey": "enableLocalization",
                             "parentValue": "true",
-                            "helpKey": "Connector-wide fallback when the reviewer's identity language is not set. Also the only locale used for Fusion review forms. See [Default Language](configuration/matching.md#defaultlanguage).",
+                            "helpKey": "Leave unset for English. When set, connector-wide fallback when the reviewer's identity language is not set. Also the only locale used for Fusion review forms. See [Default Language](configuration/matching.md#defaultlanguage).",
                             "options": [
-                                {
-                                    "label": "English",
-                                    "value": "en"
-                                },
                                 {
                                     "label": "Spanish",
                                     "value": "es"
