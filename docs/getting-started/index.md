@@ -1,6 +1,6 @@
 # Getting started
 
-Install, connect, and configure Identity Fusion NG in ISC — then run and verify your first aggregation. This page covers prerequisites, the setup checklist, first-aggregation steps, deployment concepts, and how to find the right guide for your goal or reading order.
+Install, connect, and configure Identity Fusion NG in ISC — then run and verify your first aggregation. This page is a **router**: prerequisites, setup checklist, first-aggregation verification, and links to topic guides.
 
 For exact field keys, types, defaults, and allowed values, use the [Configuration reference](../configuration/index.md).
 
@@ -20,7 +20,7 @@ The shortest path from a new Fusion source to a working aggregation:
 1. **Add the connector to ISC** — Upload the Identity Fusion NG connector (for example via SailPoint CLI or your organization's process).
 2. **Create the source** — In Admin → Connections → Sources, create a source with the Identity Fusion NG connector. Set **Authoritative** when you need Match (umbrella mode).
 3. **Configure connection** — Set the Identity Security Cloud API URL and Personal Access Token (ID and secret). Use **Review and Test** to verify connectivity. See [ISC PAT scopes](../reference/pat-scopes.md) for required API permissions.
-4. **Configure the connector** — Use the [Configuration reference](../configuration/index.md) and [Guides to read](#guides-to-read) below for Map, Define, and Match settings. Start with [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md), then:
+4. **Configure the connector** — Use the [Configuration reference](../configuration/index.md) and [Configuration guides overview](../use-guides/configuration/index.md). Start with [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md), then:
     - **Map:** [Mapping attributes](../use-guides/configuration/mapping-attributes.md) (merge strategy and per-attribute mappings).
     - **Define:** [Defining attributes](../use-guides/configuration/defining-attributes.md) (Velocity, unique IDs, UUIDs, counters).
     - **Match (if used):** [Matching identities](../use-guides/configuration/matching-identities.md), [Managing correlation](../use-guides/configuration/managing-correlation.md), and [Managing reviewers](../use-guides/configuration/managing-reviewers.md) after sources and baseline are correct.
@@ -50,32 +50,16 @@ After connection and Map/Define/Match configuration are in place:
 | **No reset flags stuck** | **Reset accounts?** / **Reset forms?** auto-disable after one run | Clear flags in Developer Settings if a run aborted mid-flight |
 | **Log phases complete** | `PHASE N … END elapsed=` for phases 1–5; epilogue runs | [Config to account-list phases](../reference/config-to-phases.md) |
 
-## Operation modes
+## Deployment and source types
 
-Each managed source has a **Source type** that controls processing. See [Source types](../use-guides/configuration/source-types.md) for full behavior.
+Umbrella vs side-car deployment, source types (**Authoritative**, **Records**, **Orphan**), and scope are covered in:
 
-| Mode | Behavior | Typical use |
-| --- | --- | --- |
-| **Authoritative accounts** (default) | Full Map, Define, and Match; non-matched rows can create identities when Fusion is authoritative | Fusion owns correlation decisions for that source |
-| **Records** | Map and Define run; unique values register without emitting Fusion accounts for non-matched rows | Identifier generation without new identities |
-| **Orphan accounts** | Non-matched rows are dropped (optional disable on managed source) | Supplemental data for Match only |
-
-## Deployment patterns
-
-| Goal | Fusion authoritative? | Managed sources |
-| --- | --- | --- |
-| **Match** (correlation and deduplication) | **Yes** (umbrella mode) | One or more Authoritative account sources |
-| **Map and Define only** (unique IDs, consolidated attributes) | Usually **no** (side-car mode) | Optional; depends on Map requirements |
-| **Records** (register unique values without new identities) | Usually non-authoritative | Records-type sources |
-| **Orphan** (match-only supplemental data) | Non-authoritative | Orphan-type sources |
-
-The connector can run side by side with other ISC sources. In **umbrella mode**, Fusion determines which incoming managed accounts create a new identity and which correlate to an existing one. In **side-car mode**, Fusion enriches or assists without owning identity creation.
-
-See also: [Umbrella mode](../glossary.md#deployment-and-integration), [Side-car mode](../glossary.md#deployment-and-integration), [Sources scope](../glossary.md#deployment-and-integration), [Identity scope](../glossary.md#deployment-and-integration).
+- [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) — umbrella vs side-car, managed sources, identity scope
+- [Source types](../use-guides/configuration/source-types.md) — per-source processing behavior
 
 ## Finding the right guide
 
-Know your goal? Use **Choose your path**. Prefer a reading order? Work through **Guides to read** from top to bottom — each step builds on the previous.
+Know your goal? Use **Choose your path** below. For a suggested reading order across configuration topics, see **Guides to read**.
 
 ## Choose your path
 
@@ -91,40 +75,20 @@ Know your goal? Use **Choose your path**. Prefer a reading order? Work through *
 
 ## Guides to read
 
-Scenario-based guides ordered from immediate setup concepts toward deeper tuning and operations.
+Suggested order for first-time configuration. Each link is a standalone topic guide.
 
-### Start here (every deployment)
+| # | Guide | Topic |
+| --- | --- | --- |
+| 1 | [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) | Scope, managed sources, aggregation |
+| 2 | [Source types](../use-guides/configuration/source-types.md) | Authoritative, Records, Orphan |
+| 3 | [Mapping attributes](../use-guides/configuration/mapping-attributes.md) | Attribute merging |
+| 4 | [Defining attributes](../use-guides/configuration/defining-attributes.md) | Velocity, unique IDs |
+| 5 | [Matching identities](../use-guides/configuration/matching-identities.md) | Match rules and thresholds |
+| 6 | [Managing reviewers](../use-guides/configuration/managing-reviewers.md) | Reviewer assignment |
+| 7 | [Review forms and reviewers](../use-guides/configuration/review-forms-and-reviewers.md) | Review form settings |
+| 8 | [Managing correlation](../use-guides/configuration/managing-correlation.md) | Correlation modes |
+| 9 | [Tuning matching algorithms](../use-guides/configuration/tuning-matching-algorithms.md) | Algorithms and score blending |
+| 10 | [Match tuning cookbooks](../use-guides/configuration/match-tuning-cookbooks.md) | Worked deployment examples |
 
-1. **[Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md)** — Scope, managed sources, umbrella vs side-car; required before anything else.
-2. **[Source types](../use-guides/configuration/source-types.md)** — Authoritative, Records, and Orphan; pick before adding managed sources.
+**Operations and validation:** [Configuration guides overview](../use-guides/configuration/index.md) · [Operation guides overview](../use-guides/operation/index.md) · [Match flow reference](../reference/match-flow.md) · [Testing and validation](../use-guides/validation-and-troubleshooting/testing-and-validation.md) · [Troubleshooting](../use-guides/validation-and-troubleshooting/troubleshooting.md) · [Migrating from Identity Fusion v1](../use-guides/deployment/migrating-from-identity-fusion-v1.md)
 
-### Map and Define (attribute processing)
-
-3. **[Mapping attributes](../use-guides/configuration/mapping-attributes.md)** — Merge and consolidate attributes from multiple sources.
-4. **[Defining attributes](../use-guides/configuration/defining-attributes.md)** — Velocity, unique IDs, UUIDs, counters.
-
-### Match (correlation and review)
-
-5. **[Matching identities](../use-guides/configuration/matching-identities.md)** — Baseline Match rules and thresholds.
-6. **[Managing reviewers](../use-guides/configuration/managing-reviewers.md)** — Global reviewers (source owner + governance group) or per-source entitlement assignments.
-7. **[Review forms and reviewers](../use-guides/configuration/review-forms-and-reviewers.md)** — End-to-end manual review flow.
-8. **[Managing correlation](../use-guides/configuration/managing-correlation.md)** — Reverse correlation and enforced roles; read when correlation behavior needs tuning.
-
-### Advanced Match tuning
-
-9. **[Tuning matching algorithms](../use-guides/configuration/tuning-matching-algorithms.md)** — Algorithms, thresholds, score blending.
-10. **[Match tuning cookbooks](../use-guides/configuration/match-tuning-cookbooks.md)** — HR+AD, Records pool, and Orphan worked examples.
-11. **[Analyze changes with dry-run](../use-guides/operation/analyze-with-dry-run.md)** — Non-persistent `std:account:list` analysis before production changes.
-
-### Operate, validate, and migrate
-
-See [Operation guides overview](../use-guides/operation/index.md) for goal-based navigation.
-
-12. **[Monitor aggregation progress](../use-guides/operation/monitor-aggregation-progress.md)** — External logging and log-based health checks.
-13. **[Tune API performance](../use-guides/operation/tune-api-performance.md)** — Queue, retry, and timeout tuning.
-14. **[Run the connector via proxy](../use-guides/operation/run-via-proxy.md)** — Self-hosted processing.
-15. **[Capture scenarios for replay](../use-guides/operation/capture-scenarios-for-replay.md)** — Regression recording and CI replay.
-16. **[Reset Fusion state](../use-guides/operation/reset-fusion-state.md)** — Account rebuild and form recovery.
-17. **[Testing and validation](../use-guides/validation-and-troubleshooting/testing-and-validation.md)** — Scenario replay verification and regression checklist.
-18. **[Troubleshooting](../use-guides/validation-and-troubleshooting/troubleshooting.md)** — Common issues and recovery.
-19. **[Migrating from Identity Fusion v1](../use-guides/deployment/migrating-from-identity-fusion-v1.md)** — Upgrade path only.

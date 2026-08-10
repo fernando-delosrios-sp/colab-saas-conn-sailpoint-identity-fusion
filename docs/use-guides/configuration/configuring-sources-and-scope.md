@@ -167,30 +167,9 @@ Use **Aggregate before processing** to synchronize with other aggregation schedu
 
 Conditional PAT scopes apply: `idn:task-management:read` for **before** mode, `idn:accounts-state:manage` for **delayed** mode and orphan disable. See [ISC PAT scopes](../../reference/pat-scopes.md).
 
-## Owners as global reviewers
+## Reviewers
 
-**Owners are global reviewers?** lives under **Attribute Matching Settings → Review**, but it interacts directly with source configuration because it determines who can resolve Match outcomes per managed source.
-
-| Setting | Effect |
-| --- | --- |
-| **Off** | Only identities with per-source `reviewer:<sourceId>` entitlements (via access profiles) receive forms |
-| **On** | Fusion **source owner** and **governance group** members are added to **every** review form across **all** managed sources |
-
-**Global reviewer setup (no entitlements required):**
-
-1. In ISC, assign the Fusion **source owner** (identity or governance group) and/or a **governance group** (management workgroup) on the Fusion source.
-2. Enable **Owners are global reviewers?** in Review Settings.
-3. Run account aggregation.
-
-**Fine-grained setup (per-source entitlements):**
-
-1. Configure managed sources (this guide).
-2. Run **Entitlement Aggregation** on the Fusion source.
-3. Create access profiles with per-source `<Source Name> reviewer` entitlements and assign them to the right users or groups.
-
-You can combine both: enable global reviewers for governance coverage and assign per-source entitlements so individual source teams receive only their forms.
-
-See [Managing reviewers](managing-reviewers.md) and [Review forms and reviewers](review-forms-and-reviewers.md).
+**Owners are global reviewers?** (under **Attribute Matching Settings → Review**) determines who receives review forms. Global reviewers use the Fusion source owner and governance group; per-source reviewers use entitlement access profiles. See [Managing reviewers](managing-reviewers.md).
 
 ## Processing control
 
@@ -224,6 +203,7 @@ See [Managing reviewers](managing-reviewers.md) and [Review forms and reviewers]
 | Match baseline and thresholds | [Matching identities](matching-identities.md) |
 | Reviewer entitlements and access profiles | [Managing reviewers](managing-reviewers.md) |
 | Field keys and defaults | [Source Settings](../../configuration/source.md) |
+
 
 
 

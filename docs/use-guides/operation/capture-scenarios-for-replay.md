@@ -2,7 +2,7 @@
 
 Use this guide when you need to **record real ISC API traffic and replay aggregations offline** — for regression testing, CI pipelines, or interactive debugging without live tenant calls.
 
-**Reference:** [Scenario recording](../../reference/scenario-recording.md) · **Testing process:** [Testing and validation](../validation-and-troubleshooting/testing-and-validation.md) · **Prerequisite:** [Run the connector via proxy](run-via-proxy.md)
+**Reference:** [Scenario recording](../../reference/scenario-recording.md) · **Regression checklist:** [Testing and validation](../validation-and-troubleshooting/testing-and-validation.md#required-assertions-regression-checklist) · **Prerequisite:** [Run the connector via proxy](run-via-proxy.md)
 
 !!! note "Didactic guide"
     This page covers the capture-and-replay workflow. For artifact schemas, CLI flags, and harness tests, see [Scenario recording](../../reference/scenario-recording.md).
@@ -90,20 +90,7 @@ Replay serves all ISC calls from `api-log.ndjson` — no live tenant API traffic
 
 ## Workflow: validate after config changes
 
-When validating a recorded scenario after configuration changes:
-
-- Sweep 1 should create potential/candidate matching state without over-correlation
-- Sweep 2 (when present) should apply submitted review decisions deterministically
-- Correlation and non-match counts should be stable across replays
-
-Full regression checklist: [Testing and validation](../validation-and-troubleshooting/testing-and-validation.md).
-
-Harness unit tests (no recordings required):
-
-```bash
-npm test -- src/operations/__tests__/scenario/chain.replay.test.ts
-npm test -- src/operations/__tests__/scenario/orchestrator.integration.test.ts
-```
+Use the [regression checklist](../validation-and-troubleshooting/testing-and-validation.md#required-assertions-regression-checklist) in **Testing and validation** after configuration changes. For harness unit tests and the `matching-results.json` schema, see the same guide.
 
 ---
 
@@ -125,3 +112,4 @@ npm test -- src/operations/__tests__/scenario/orchestrator.integration.test.ts
 | Artifact schema and CLI reference | [Scenario recording](../../reference/scenario-recording.md) |
 | Proxy server setup | [Run the connector via proxy](run-via-proxy.md) |
 | Dry-run before production changes | [Analyze changes with dry-run](analyze-with-dry-run.md) |
+

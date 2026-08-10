@@ -4,7 +4,7 @@ This guide covers reviewer assignment, access profiles, and workload patterns fo
 
 **Configuration reference:** [Attribute Matching Settings — Review](../../configuration/matching.md)
 
-For form fields, expiration, automatic merge, and the end-to-end Match flow, see [Review forms and reviewers](review-forms-and-reviewers.md).
+For form fields, expiration, and review settings, see [Review forms and reviewers](review-forms-and-reviewers.md). For runtime flow, see [Match flow reference](../../reference/match-flow.md).
 
 !!! note "Didactic guide"
     This page explains **how and when** to assign and govern reviewers. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
@@ -80,10 +80,11 @@ Enable **Send report to owner on aggregation?** in Review Settings to email aggr
 
 When **Enable localized user communications?** is on:
 
-- Emails and aggregation reports can use reviewer identity language when **Identity Language Attribute** is set.
-- **Fusion review forms** use **Default Language** only (shared form definitions are not per-reviewer).
+- **Default Language** is the connector-wide fallback.
+- **Identity Language Attribute** overrides **Default Language** for emails and aggregation reports when the attribute is set on the reviewer's identity.
+- **Fusion review forms** always use **Default Language** only. They do not use the identity language attribute because form definitions are shared across reviewers — one locale applies to every form.
 
-Set **Default Language** to the locale most reviewers expect on form labels and help text.
+Set **Default Language** to the locale most reviewers should see on form labels and help text.
 
 ## Workload and SLA tuning
 
@@ -101,7 +102,7 @@ Monitor review metrics:
 | **Reviewer overload** | Form backlog → enable automatic merge or add reviewers |
 | **Form expiration rate** | Many timeouts → increase expiration days or notify reviewers |
 
-See [Review forms and reviewers — Tuning and optimization](review-forms-and-reviewers.md#tuning-and-optimization) for the full tuning workflow.
+See [Match tuning cookbooks](match-tuning-cookbooks.md) and [Tuning matching algorithms](tuning-matching-algorithms.md) for threshold and algorithm tuning.
 
 ## Enforced correlation role (reviewer context)
 
@@ -111,16 +112,16 @@ See [Managing correlation](managing-correlation.md) for correlation mode details
 
 ## Dry-run before production review load
 
-Use dry-run mode (`std:account:list` with `{ dryRun: { enabled: true } }`) to preview match volume and report content without creating forms or persisting correlation. Helpful when validating reviewer assignment before enabling Match in production.
-
-See [Analyze changes with dry-run](../operation/analyze-with-dry-run.md).
+To preview match volume and report content without creating forms or persisting correlation, see [Analyze changes with dry-run](../operation/analyze-with-dry-run.md).
 
 ## Related guides
 
 | Topic | Guide |
 | --- | --- |
-| Form attributes, flow, automatic merge | [Review forms and reviewers](review-forms-and-reviewers.md) |
+| Form attributes and review settings | [Review forms and reviewers](review-forms-and-reviewers.md) |
+| Match runtime flow | [Match flow reference](../../reference/match-flow.md) |
 | Match rules and thresholds | [Matching identities](matching-identities.md) |
 | Correlation after link decisions | [Managing correlation](managing-correlation.md) |
 | First aggregation setup | [Getting started — Setup checklist](../../getting-started/index.md#setup-checklist) |
+
 

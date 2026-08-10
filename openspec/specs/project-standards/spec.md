@@ -56,6 +56,26 @@ TypeScript, formatting, naming, error-handling, and testing conventions SHALL be
 - **WHEN** a contributor writes tests
 - **THEN** they find documented conventions for Vitest globals, file naming, directory placement, and timeout
 
+### Requirement: Use guide documentation roles are enforced
+
+Use guides under `docs/use-guides/` SHALL follow documented information-architecture roles. Each topic guide MUST cover one configuration or operation concern. Router pages (`getting-started/index.md`, `use-guides/configuration/index.md`, `use-guides/operation/index.md`, `validation-and-troubleshooting/troubleshooting.md`) MUST link to canonical topic guides instead of embedding full workflows for topics that already have an owner page.
+
+Field-level reference material SHALL live under `docs/configuration/`, `docs/reference/`, or `docs/operations/` — not duplicated as embedded mini-guides inside topic pages.
+
+#### Scenario: Topic guide has a single concern
+- **WHEN** a contributor adds or edits a file under `docs/use-guides/` (other than `index.md` routers)
+- **THEN** the page addresses one practical configuration or operation goal
+- **AND** detailed workflows for other topics are linked, not copied inline
+
+#### Scenario: Use guide structure is validated locally and in CI
+- **WHEN** a contributor runs `npm run lint:docs-guides` or CI runs `ci:docs-review`
+- **THEN** `scripts/check-use-guide-structure.cjs` verifies duplicate H2 headings and owned-section violations across use guides
+- **AND** the command exits non-zero when a non-allowlisted duplicate H2 or embedded owned section is detected
+
+#### Scenario: Documentation conventions are documented for contributors
+- **WHEN** a contributor edits MkDocs use guides
+- **THEN** `AGENTS.md` documents router vs topic vs reference roles and the `lint:docs-guides` command
+
 ### Requirement: Dead Code Prevention
 The CI/CD pipeline and local build process SHALL error out if there are any unused exports, types, or variables in the codebase.
 
@@ -293,5 +313,6 @@ Feature: version-update-procedure
 - **THEN** the agent does not insert a second `### 2.3.0` block
 - **AND** the agent updates the previously-picked guide in place with
   a fresh edit tied to the new change
+
 
 

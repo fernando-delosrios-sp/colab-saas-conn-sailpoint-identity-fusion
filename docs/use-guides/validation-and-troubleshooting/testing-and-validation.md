@@ -8,53 +8,11 @@ Identity Fusion NG supports two complementary test layers: **scenario recording/
 - Re-run aggregations deterministically with the same recorded or fixture data.
 - Capture generated outputs, side effects, and match score breakdowns for diff review.
 
-## Scenario recording and replay (recommended)
+## Scenario recording and replay
 
-Recorded scenarios live under `recordings/<tenant>/{scenarioName}/`. See the full reference in [Scenario recording](../../reference/scenario-recording.md).
+For capture, replay, and proxy prerequisites, see [Capture scenarios for replay](../operation/capture-scenarios-for-replay.md).
 
-### Artifact layout
-
-| File | When written | Contents |
-| --- | --- | --- |
-| `api-log.ndjson` | During operation | ISC API request/response pairs for replay |
-| `steps.ndjson` | Per operation step | Inputs, outputs, and `FusionRun` state snapshots |
-| `phases.ndjson` | Account-list phases | Phase boundaries with elapsed time and counts |
-| `scenario.json` | Process exit | Compiled replay scenario with config and goldens |
-| `manifest.json` | Process exit | Store type, artifact paths, entry counts |
-| `reports/aggregation.json` | Report epilogue (when enabled) | Aggregation report payload |
-| `reports/matching-results.json` | Record-mode account-list | Match outcomes with score breakdowns |
-| `replay-report.json` | After `npm run replay` | Per-step pass/fail from last replay |
-
-### Capture
-
-Enable recording on a proxy deployment via **External Settings** (see [Scenario recording — Capture](../../reference/scenario-recording.md#capture-canonical-external-settings)):
-
-1. **Enable external processing?** — on
-2. **Enable proxy mode?** — on
-3. **Enable chain recording?** — on
-4. Set **Recording chain name** (`recordingName`) to your scenario segment (for example `fernando`)
-
-Run a representative account-list aggregation against your tenant. Artifacts accumulate under `recordings/<tenant>/{scenarioName}/`.
-
-### Replay and verify
-
-```bash
-npm run build
-
-# Interactive replay with golden comparison
-npm run replay -- "company1296-poc/my-scenario"
-
-# Headless regression (CI-friendly)
-npm run test-recording -- "company1296-poc/my-scenario"
-```
-
-| Command | Use when |
-| --- | --- |
-| `npm run replay` | Interactive debugging with live connector output |
-| `npm run test-recording` | Fast headless regression before commit or in CI |
-| `npm run finalize -- "tenant/scenario"` | Recover `scenario.json` after an unclean exit |
-
-Replay serves all ISC calls from `api-log.ndjson` — no live tenant API calls during verification.
+Artifact schemas and External Settings field reference: [Scenario recording](../../reference/scenario-recording.md).
 
 ### Harness unit tests (no recordings required)
 
@@ -80,18 +38,7 @@ Record mode automatically enables managed-account report capture. Scenarios reco
 
 ## Dry-run validation (pre-production)
 
-Before changing Match thresholds or source settings in production, run a [dry-run](../../operations/dry-run.md) against a representative sample (100–500 managed accounts is a practical starting point):
-
-```json
-{
-  "dryRun": {
-    "enabled": true,
-    "saveFile": true
-  }
-}
-```
-
-Review the HTML report under `./reports/` for potential matches, score breakdowns, and issue summaries. Dry-run performs no write side effects.
+Before changing Match thresholds or source settings in production, run a non-persistent dry-run against a representative sample. See [Analyze changes with dry-run](../operation/analyze-with-dry-run.md).
 
 ## Required assertions (regression checklist)
 
@@ -107,9 +54,8 @@ When validating a scenario or fixture after configuration changes:
 
 | Topic | Resource |
 | --- | --- |
+| Scenario capture workflow | [Capture scenarios for replay](../operation/capture-scenarios-for-replay.md) |
 | Scenario artifact reference | [Scenario recording](../../reference/scenario-recording.md) |
 | Dry-run tuning workflow | [Analyze changes with dry-run](../operation/analyze-with-dry-run.md) |
-| Scenario capture workflow | [Capture scenarios for replay](../operation/capture-scenarios-for-replay.md) |
 | Source and scope setup | [Configuring sources and scope](../configuration/configuring-sources-and-scope.md) |
 | Troubleshooting common issues | [Troubleshooting](troubleshooting.md) |
-

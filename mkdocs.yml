@@ -30,16 +30,20 @@ nav:
     - Use guides:
           - Getting started: getting-started/index.md
           - Configuration guides:
-                - Configuring sources and scope: use-guides/configuration/configuring-sources-and-scope.md
-                - Source types: use-guides/configuration/source-types.md
-                - Mapping attributes: use-guides/configuration/mapping-attributes.md
-                - Defining attributes: use-guides/configuration/defining-attributes.md
-                - Matching identities: use-guides/configuration/matching-identities.md
-                - Managing correlation: use-guides/configuration/managing-correlation.md
-                - Managing reviewers: use-guides/configuration/managing-reviewers.md
-                - Review forms and reviewers: use-guides/configuration/review-forms-and-reviewers.md
-                - Tuning matching algorithms: use-guides/configuration/tuning-matching-algorithms.md
-                - Match tuning cookbooks: use-guides/configuration/match-tuning-cookbooks.md
+                - Overview: use-guides/configuration/index.md
+                - Scope and sources:
+                      - Configuring sources and scope: use-guides/configuration/configuring-sources-and-scope.md
+                      - Source types: use-guides/configuration/source-types.md
+                - Map and Define:
+                      - Mapping attributes: use-guides/configuration/mapping-attributes.md
+                      - Defining attributes: use-guides/configuration/defining-attributes.md
+                - Match:
+                      - Matching identities: use-guides/configuration/matching-identities.md
+                      - Managing correlation: use-guides/configuration/managing-correlation.md
+                      - Managing reviewers: use-guides/configuration/managing-reviewers.md
+                      - Review forms and reviewers: use-guides/configuration/review-forms-and-reviewers.md
+                      - Tuning matching algorithms: use-guides/configuration/tuning-matching-algorithms.md
+                      - Match tuning cookbooks: use-guides/configuration/match-tuning-cookbooks.md
           - Operation guides:
                 - Overview: use-guides/operation/index.md
                 - Monitor aggregation progress: use-guides/operation/monitor-aggregation-progress.md
@@ -66,6 +70,7 @@ nav:
           - Velocity context: reference/velocity-context.md
           - ISC PAT scopes: reference/pat-scopes.md
           - Observability: reference/observability.md
+          - Match flow: reference/match-flow.md
           - Proxy deployment: reference/proxy-mode.md
           - Scenario recording: reference/scenario-recording.md
           - Configuration to account-list phases: reference/config-to-phases.md
@@ -96,3 +101,4 @@ markdown_extensions:
               - name: mermaid
                 class: mermaid
                 format: !!python/name:pymdownx.superfences.fence_code_format
+

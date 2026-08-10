@@ -26,4 +26,5 @@ If you prefer to read top to bottom, follow this sequence — each step builds o
 5. **[Capture scenarios for replay](capture-scenarios-for-replay.md)** — regression recording and CI replay
 6. **[Reset Fusion state](reset-fusion-state.md)** — recovery when you need a clean rebuild
 
-For first-time setup, start with [Getting started](../../getting-started/index.md). For configuration, see [Configuration guides](../configuration/configuring-sources-and-scope.md).
+For first-time setup, start with [Getting started](../../getting-started/index.md). For configuration, see [Configuration guides overview](../configuration/index.md).
+
