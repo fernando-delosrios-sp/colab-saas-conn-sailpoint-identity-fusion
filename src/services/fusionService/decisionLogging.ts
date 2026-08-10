@@ -60,42 +60,27 @@ function formatAccountLabel(decision: FusionDecision): string {
     return `${decision.account.name} [${decision.account.sourceName}]`
 }
 
-function formatDecisionHeadline(decision: FusionDecision): string {
-    const eventType = resolveDecisionEventType(decision)
-    switch (eventType) {
-        case 'autoMerge':
-            return 'AUTO-MERGE DECISION'
-        case 'noMatch':
-            return 'NO-MATCH DECISION'
-        case 'newIdentity':
-            return 'NEW IDENTITY DECISION'
-        case 'merge':
-            return 'MERGE DECISION'
-    }
+const DECISION_HEADLINES: Record<DecisionEventType, string> = {
+    autoMerge: 'AUTO-MERGE DECISION',
+    noMatch: 'NO-MATCH DECISION',
+    newIdentity: 'NEW IDENTITY DECISION',
+    merge: 'MERGE DECISION',
 }
 
-function formatOutcomeSuffix(outcome: DecisionApplyOutcome | undefined): string {
-    if (!outcome) return ''
-    switch (outcome) {
-        case 'registered':
-            return ' → registered as fusion account'
-        case 'merged':
-            return ' → merged into target identity'
-        case 'reused-target':
-            return ' → applied to existing fusion account'
-        case 'dropped-orphan':
-            return ' → dropped (orphan no-match)'
-        case 'dropped-record':
-            return ' → registered unique attributes only (record no-match)'
-    }
+const OUTCOME_SUFFIXES: Record<DecisionApplyOutcome, string> = {
+    registered: ' → registered as fusion account',
+    merged: ' → merged into target identity',
+    'reused-target': ' → applied to existing fusion account',
+    'dropped-orphan': ' → dropped (orphan no-match)',
+    'dropped-record': ' → registered unique attributes only (record no-match)',
 }
 
 /** Builds the primary decision log line (headline + account + reviewer/target context). */
 export function formatFusionDecisionLog(decision: FusionDecision, options: DecisionLogOptions): string {
-    const headline = formatDecisionHeadline(decision)
     const accountLabel = formatAccountLabel(decision)
     const reviewer = resolveReviewerLabel(decision)
     const eventType = resolveDecisionEventType(decision)
+    const headline = DECISION_HEADLINES[eventType]
     const phaseLabel = options.phase === 'discovered' ? ' DISCOVERED' : ' APPLIED'
 
     let summary: string
@@ -109,7 +94,7 @@ export function formatFusionDecisionLog(decision: FusionDecision, options: Decis
         summary = `${accountLabel} by ${reviewer}`
     }
 
-    const outcomeSuffix = options.phase === 'applied' ? formatOutcomeSuffix(options.outcome) : ''
+    const outcomeSuffix = options.phase === 'applied' && options.outcome ? OUTCOME_SUFFIXES[options.outcome] : ''
     const debugSuffix = options.debugSuffix ?? ''
     return `${headline}${phaseLabel}: ${summary}${outcomeSuffix}${debugSuffix}`
 }

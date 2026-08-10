@@ -1,0 +1,3 @@
+## 2026-08-10 - Refactor decisionLogging headlines and suffixes to lookup objects
+**Learning:** In the identity-fusion repository, replacing repetitive switch statements (e.g., `formatDecisionHeadline` and `formatOutcomeSuffix`) with explicit static dictionary mapping objects significantly clarifies intent. It prevents redundant evaluation calls (e.g., avoiding calling `resolveDecisionEventType` twice) and makes the logic concise.
+**Action:** Identify small opportunities (like format helper switches) that can be easily simplified into static mapping lookups (`Record<Type, string>`) to improve readability and enforce DRYness across utility files.
