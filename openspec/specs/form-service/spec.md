@@ -133,10 +133,10 @@ When `enableLocalization` is true, the form service MUST translate user-facing r
 
 #### Scenario: Recipient language does not override form locale
 
-- **GIVEN** `enableLocalization` is true and `defaultLanguage` is `en`
+- **GIVEN** `enableLocalization` is true and `defaultLanguage` is unset (English fallback)
 - **AND** the reviewer identity has a supported language attribute set to `ja`
 - **WHEN** `FormService` creates a fusion review form definition
-- **THEN** form strings MUST be English from `defaultLanguage`
+- **THEN** form strings MUST be English from the unset `defaultLanguage` fallback
 - **AND** the review email MAY still be Japanese via `resolveEffectiveLocale` for that recipient
 
 #### Scenario: Localization disabled
@@ -160,5 +160,6 @@ When `enableLocalization` is true, the form service MUST translate user-facing r
 - **GIVEN** localization is enabled with `defaultLanguage` `es`
 - **WHEN** `buildFormFields` runs with locale `es`
 - **THEN** no hardcoded English user-facing literals MUST remain outside `translate()` / `translateWithParams()`
+
 
 

@@ -80,11 +80,11 @@ Enable **Send report to owner on aggregation?** in Review Settings to email aggr
 
 When **Enable localized user communications?** is on:
 
-- **Default Language** is the connector-wide fallback.
+- **Default Language** is the connector-wide fallback. Leave it unset for English.
 - **Identity Language Attribute** overrides **Default Language** for emails and aggregation reports when the attribute is set on the reviewer's identity.
 - **Fusion review forms** always use **Default Language** only. They do not use the identity language attribute because form definitions are shared across reviewers — one locale applies to every form.
 
-Set **Default Language** to the locale most reviewers should see on form labels and help text.
+Set **Default Language** only when most reviewers should see a non-English locale on form labels and help text.
 
 ## Workload and SLA tuning
 
@@ -123,5 +123,6 @@ To preview match volume and report content without creating forms or persisting 
 | Match rules and thresholds | [Matching identities](matching-identities.md) |
 | Correlation after link decisions | [Managing correlation](managing-correlation.md) |
 | First aggregation setup | [Getting started — Setup checklist](../../getting-started/index.md#setup-checklist) |
+
 
 
