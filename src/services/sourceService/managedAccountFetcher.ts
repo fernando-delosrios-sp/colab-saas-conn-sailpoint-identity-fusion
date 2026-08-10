@@ -1,5 +1,6 @@
 import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { FusionRun } from '../../model/fusionRun'
+import { promiseAllBatched } from '../fusionService/collections'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { wrapConnectorError } from '../../utils/error'
 import { LogService } from '../logService'
@@ -194,10 +195,10 @@ export async function fetchManagedAccounts(
             log.setProgress(sumLoaded, allTotalsKnown ? sumTotal : sumLoaded, 'fetched')
         }
 
-        await Promise.all(
-            sourcesWithLimits.map(async ({ source, effectiveLimit }) => {
-                log.info(`Fetching accounts from source: ${source.name}`)
-                let collectedCount = 0
+        // Performance optimization: Bound concurrency using promiseAllBatched to prevent memory spikes and API rate limit issues when fetching accounts from multiple sources
+        await promiseAllBatched(sourcesWithLimits, async ({ source, effectiveLimit }) => {
+            log.info(`Fetching accounts from source: ${source.name}`)
+            let collectedCount = 0
                 let discardedMachineCount = 0
 
                 for await (const batch of fetchAccountsBySourceIdGenerator(
@@ -235,7 +236,7 @@ export async function fetchManagedAccounts(
                     batchCumulativeCount[source.name] = collectedCount
                     log.debug(`Source ${source.name}: updated cumulative count to ${collectedCount}`)
                 }
-            })
+            }
         )
         log.debug(`Total managed accounts loaded: ${run.managedAccountsById.size}`)
     }, 'Failed to fetch managed accounts')

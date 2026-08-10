@@ -1,4 +1,5 @@
 import { Search, SearchApiSearchPostRequest, SourcesV2025ApiImportAccountsRequest, TaskManagementV2025ApiGetTaskStatusRequest } from 'sailpoint-api-client'
+import { promiseAllBatched } from '../fusionService/collections'
 import { assert } from '../../utils/assert'
 import { getDateFromISOString } from '../../utils/date'
 import { coerceBoolean } from '../../utils/safeRead'
@@ -85,13 +86,13 @@ export async function aggregateManagedSources(deps: SourceAggregatorDeps): Promi
 
     const disableOptimization = (source: SourceInfo) => coerceBoolean(source.config?.optimizedAggregation) === false
 
-    await Promise.all(
-        aggregationChecks
-            .filter(({ shouldAggregate }) => shouldAggregate)
-            .map(({ source }) => {
-                log.info(`Aggregating source before processing: ${source.name}`)
-                return aggregateManagedSource(deps, source.id, disableOptimization(source))
-            })
+    // Performance optimization: Bound concurrency using promiseAllBatched to prevent rate limits/memory spikes when processing many sources
+    await promiseAllBatched(
+        aggregationChecks.filter(({ shouldAggregate }) => shouldAggregate),
+        async ({ source }) => {
+            log.info(`Aggregating source before processing: ${source.name}`)
+            return aggregateManagedSource(deps, source.id, disableOptimization(source))
+        }
     )
     log.debug('Pre-processing source aggregation completed')
 }
@@ -118,29 +119,28 @@ export async function aggregateDelayedSources(
 
     log.info(`Scheduling delayed aggregation for ${delayedSources.length} source(s)`)
 
-    await Promise.all(
-        delayedSources.map(async (source) => {
-            const delayMinutes = source.config?.aggregationDelay ?? 5
-            const disableOpt = coerceBoolean(source.config?.optimizedAggregation) === false
+    // Performance optimization: Bound concurrency using promiseAllBatched to prevent rate limits/memory spikes when scheduling many sources
+    await promiseAllBatched(delayedSources, async (source) => {
+        const delayMinutes = source.config?.aggregationDelay ?? 5
+        const disableOpt = coerceBoolean(source.config?.optimizedAggregation) === false
 
-            log.info(
-                `Source ${source.name}: scheduling delayed aggregation in ${delayMinutes} minute(s), disableOptimization=${disableOpt}`
+        log.info(
+            `Source ${source.name}: scheduling delayed aggregation in ${delayMinutes} minute(s), disableOptimization=${disableOpt}`
+        )
+
+        try {
+            await scheduleAggregation({
+                sourceId: source.id,
+                delayMinutes,
+                disableOptimization: disableOpt,
+            })
+        } catch (err) {
+            log.error(
+                `Failed to schedule delayed aggregation for source ${source.name}: ${err instanceof Error ? err.message : String(err)
+                }`
             )
-
-            try {
-                await scheduleAggregation({
-                    sourceId: source.id,
-                    delayMinutes,
-                    disableOptimization: disableOpt,
-                })
-            } catch (err) {
-                log.error(
-                    `Failed to schedule delayed aggregation for source ${source.name}: ${err instanceof Error ? err.message : String(err)
-                    }`
-                )
-            }
-        })
-    )
+        }
+    })
 }
 
 /**
