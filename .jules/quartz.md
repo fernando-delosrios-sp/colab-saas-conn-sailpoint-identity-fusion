@@ -12,3 +12,6 @@
 
 **Learning:** When multiple functions iterate over mixed-type arrays (e.g., parsing varying SDK shapes like strings or objects) to extract normalized string values, the loop and type-checking logic is often duplicated (e.g. in `toSetFromAttribute` and `normalizeActionTokens`).
 **Action:** Encapsulate the loop and type-checking logic into a shared helper function (like `normalizeArrayItems`) to eliminate duplicate code blocks, clarify intent, and ensure consistency when handling these mixed-type arrays.
+## 2026-08-10 - Variadic Object Fallback Readability
+**Learning:** Repetitive object property fallback chains (e.g., chained nullish coalescing `??` operations like `readUnknown(attrs, 'email') ?? readUnknown(attrs, 'mail')`) reduce scanability.
+**Action:** Replaced with a dedicated variadic helper function `readFirstUnknown(item, 'id', 'value', 'name')` to encapsulate the fallback logic, improve DRYness, and clarify intent.
