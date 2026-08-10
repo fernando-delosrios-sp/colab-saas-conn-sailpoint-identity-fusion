@@ -73,7 +73,8 @@ Configure **Source Settings → Scope** to define the baseline of identities to 
 | **Identity Scope Query**             | `attributes.cloudLifecycleState:active`      | Only active identities                   | Exclude terminated employees from comparisons        |
 | **Identity Scope Query**             | `source.name:"Workday" OR source.name:"ADP"` | Identities from specific sources         | Only HR-sourced identities                           |
 
-**Without a baseline:** If **Include identities in the scope?** is No or Identity Scope Query returns zero identities, there is **no baseline** to compare accounts against. Match cannot detect existing identities—only merge new accounts from configured sources.
+!!! warning "Without a baseline"
+    If **Include identities in the scope?** is No or Identity Scope Query returns zero identities, there is **no baseline** to compare accounts against. Match cannot detect existing identities—only merge new accounts from configured sources.
 
 **Screenshot placeholder:** Source Settings showing identity scope for baseline.
 
