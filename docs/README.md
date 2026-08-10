@@ -11,6 +11,7 @@ Identity Fusion NG documentation is published as an MkDocs site with five top-le
 | **Configuration reference** | [Configuration reference](configuration/index.md) | Generated field reference from `connector-spec.json` |
 | **Glossary** | [Glossary](glossary.md) | Canonical domain terms |
 | **Technical reference** | [Standard account schema](reference/standard-account-schema.md) | Schema, Velocity context, observability, operations, config-to-phases, PAT scopes |
+| **Changelog** | [Changelog](CHANGELOG.md) | Release history (copied from root `CHANGELOG.md` on `docs:prepare`) |
 
 ## Getting started
 
@@ -38,3 +39,4 @@ npm run docs:serve
 ```
 
 Generated Configuration reference pages live under `docs/configuration/` and are recreated on each `docs:prepare` run. The Home page is authored in `docs/index.md`.
+
