@@ -2,7 +2,7 @@ name: Build and release connector
 
 on:
     push:
-        branches: [main, '2.2.0/preview', '2.1/fixes']
+        branches: [main]
     workflow_dispatch:
 
 permissions:
@@ -13,6 +13,7 @@ env:
 
 jobs:
     release:
+        if: github.ref == 'refs/heads/main'
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
@@ -51,5 +52,6 @@ jobs:
                   name: ${{ steps.pkg.outputs.name }} v${{ steps.pkg.outputs.version }}
                   generate_release_notes: true
                   files: dist/*.zip
+
 
 
