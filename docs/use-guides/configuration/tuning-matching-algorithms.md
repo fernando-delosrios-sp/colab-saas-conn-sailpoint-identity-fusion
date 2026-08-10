@@ -704,5 +704,5 @@ Dates are notoriously poor candidates for pure string-matching algorithms due to
 
 **Next steps:**
 
-- For full Match setup, see [Identity Fusion for Match](matching-identities.md).
+- For Match rule configuration, see [Matching identities](matching-identities.md).
 - For attribute merging and mapping, see [Map](mapping-attributes.md).

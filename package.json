@@ -28,9 +28,10 @@
         "lint": "npx eslint . && npx knip",
         "lint:docs-code": "npx eslint \"src/**/*.{ts,js,mjs,cjs}\"",
         "lint:markdown": "npx markdownlint \"README.md\" \"docs/**/*.md\"",
+        "lint:docs-guides": "node scripts/check-use-guide-structure.cjs",
         "ci:refactor-review": "node scripts/ci-eslint-changed.cjs",
         "ci:docs-code-review": "node scripts/ci-eslint-changed.cjs",
-        "ci:docs-review": "node scripts/ci-markdown-changed.cjs && node scripts/check-lean-ctx-docs.cjs && npm run docs:prepare && (python3 -m pip install --user -r requirements-docs.txt || true) && python3 -m mkdocs build && node scripts/ci-check-readme-changelog.cjs",
+        "ci:docs-review": "node scripts/ci-markdown-changed.cjs && node scripts/check-lean-ctx-docs.cjs && node scripts/check-use-guide-structure.cjs && npm run docs:prepare && (python3 -m pip install --user -r requirements-docs.txt || true) && python3 -m mkdocs build && node scripts/ci-check-readme-changelog.cjs",
         "prettier": "npx prettier --write .",
         "prepack-zip": "npm ci && npm run build",
         "pack-zip": "spcx package",
@@ -112,6 +113,7 @@
         "readdir-glob": "^3.0.0"
     }
 }
+
 
 
 

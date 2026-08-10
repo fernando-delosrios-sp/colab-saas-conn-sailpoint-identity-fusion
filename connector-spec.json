@@ -930,7 +930,7 @@
                             "label": "Enable localized user communications?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Translate emails, reports, and Fusion reviews to the recipient's preferred language. See [Enable localized user communications?](configuration/matching.md#enablelocalization)."
+                            "helpKey": "Localize emails, aggregation reports, and Fusion review forms. Identity Language Attribute overrides Default Language for emails and reports; Fusion review forms use Default Language only. See [Enable localized user communications?](configuration/matching.md#enablelocalization)."
                         },
                         {
                             "key": "defaultLanguage",
@@ -939,7 +939,7 @@
                             "required": false,
                             "parentKey": "enableLocalization",
                             "parentValue": "true",
-                            "helpKey": "The default language to use when the recipient's language cannot be determined. See [Default Language](configuration/matching.md#defaultlanguage).",
+                            "helpKey": "Connector-wide fallback when the reviewer's identity language is not set. Also the only locale used for Fusion review forms. See [Default Language](configuration/matching.md#defaultlanguage).",
                             "options": [
                                 {
                                     "label": "English",
@@ -990,7 +990,7 @@
                             "required": false,
                             "parentKey": "enableLocalization",
                             "parentValue": "true",
-                            "helpKey": "Identity attribute containing the user's preferred language. See [Identity Language Attribute](configuration/matching.md#identitylanguageattribute)."
+                            "helpKey": "Identity attribute containing the reviewer's preferred language. Overrides Default Language for emails and reports; does not affect Fusion review forms. See [Identity Language Attribute](configuration/matching.md#identitylanguageattribute)."
                         }
                     ]
                 }

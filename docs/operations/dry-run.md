@@ -153,9 +153,11 @@ See [Proxy mode](../reference/proxy-mode.md) for architecture and setup.
 ## Related documentation
 
 - [Account list operation](account-list.md) — full persistent aggregation flow
-- [Matching identities](../use-guides/configuration/matching-identities.md) — tuning thresholds; includes a dry-run workflow note
+- [Matching identities](../use-guides/configuration/matching-identities.md) — Match rules and thresholds
+- [Analyze changes with dry-run](../use-guides/operation/analyze-with-dry-run.md) — non-persistent validation workflow
 - [Tuning matching algorithms](../use-guides/configuration/tuning-matching-algorithms.md) — recommended testing approach
 - [Glossary: dry-run mode](../concepts/glossary.md) — canonical term definition
+
 
 
 

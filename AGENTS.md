@@ -68,13 +68,27 @@ Full detail: [superpowers-bridge README §Entry & exit gates](https://github.com
 | `npm run test:coverage` | Vitest with v8 coverage |
 | `npm run lint` | ESLint + knip (dead code check) |
 | `npm run lint:markdown` | markdownlint on README + docs |
+| `npm run lint:docs-guides` | Use-guide IA check (duplicate headings, owned sections) |
 | `npm run dev` | Run connector locally with spcx + source maps |
 | `npm run docs:serve` | Build and serve MkDocs site locally |
 | `npm run prettier` | Format all files with Prettier |
 
-**Before committing:** run `npm run lint` (catches type issues, unused code, and style violations).
+**Before committing:** run `npm run lint` (catches type issues, unused code, and style violations). For documentation edits under `docs/use-guides/`, also run `npm run lint:docs-guides`.
 
-## Project Structure
+## Documentation
+
+MkDocs site under `docs/`. Use guides follow **one topic per page**; routers link out instead of embedding other topics.
+
+| Role | Location | Rule |
+| --- | --- | --- |
+| **Router** | `getting-started/index.md`, `use-guides/configuration/index.md`, `use-guides/operation/index.md`, `validation-and-troubleshooting/troubleshooting.md` | Tables and links; minimal how-to prose |
+| **Topic guide** | `docs/use-guides/**` (except `index.md`) | One configuration or operation concern per file |
+| **Reference** | `docs/configuration/`, `docs/reference/`, `docs/operations/` | Field keys, APIs, runtime behavior (e.g. `reference/match-flow.md`) |
+| **Cookbook** | e.g. `match-tuning-cookbooks.md` | Self-contained scenarios; may repeat settings tables |
+
+**Do:** cross-link related guides. **Don't:** copy workflow sections that already have a canonical owner (dry-run → `operation/analyze-with-dry-run.md`, reviewers → `configuration/managing-reviewers.md`, capture/replay → `operation/capture-scenarios-for-replay.md`).
+
+Verify: `npm run lint:docs-guides` · `npm run lint:markdown` · `npm run docs:prepare`
 
 ```
 src/

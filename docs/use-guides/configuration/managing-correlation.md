@@ -49,7 +49,7 @@ Each managed source exposes **Correlation mode** under **Source Settings → Pro
 
 !!! warning "Match merge decisions"
 
-    When merging a new managed account with an existing identity, automatic managed-account correlation occurs only when **Correlation mode** is **Correlate missing accounts on aggregation** **or** an **enforced correlation role** is configured. See [Matching identities](matching-identities.md).
+    When merging a new managed account with an existing identity, automatic managed-account correlation occurs only when **Correlation mode** is **Correlate missing accounts on aggregation** **or** an **enforced correlation role** is configured. See [Managing correlation](managing-correlation.md).
 
 ### Reverse correlation from managed source
 
@@ -111,7 +111,8 @@ See [Managing reviewers](managing-reviewers.md) for entitlement and access-profi
 | --- | --- |
 | Source types, filters, aggregation timing | [Configuring sources and scope](configuring-sources-and-scope.md) · [Source types](source-types.md) |
 | Match rules and thresholds | [Matching identities](matching-identities.md) |
-| Review decisions that drive merge correlation | [Review forms and reviewers](review-forms-and-reviewers.md) |
+| Review decisions that drive merge correlation | [Match flow reference](../../reference/match-flow.md) · [Review forms and reviewers](review-forms-and-reviewers.md) |
 | First aggregation setup | [Getting started — Setup checklist](../../getting-started/index.md#setup-checklist) |
+
 
 

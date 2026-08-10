@@ -18,5 +18,7 @@ runNode('generate-config-docs.cjs')
 runNode('copy-license-for-docs.cjs')
 runNode('copy-changelog-for-docs.cjs')
 runNode('check-lean-ctx-docs.cjs')
+runNode('check-use-guide-structure.cjs')
+
 
 
