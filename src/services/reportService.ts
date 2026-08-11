@@ -1,6 +1,6 @@
 import { SourceType } from '../model/config'
 import { FusionDecision } from '../model/form'
-import { isCompositeManagedAccountKey } from '../model/managedAccountKey'
+import { resolveIdentityDocumentDisplayName } from '../model/fusionAccountUtils'
 import { readString, trimStr } from '../utils/safeRead'
 import { createUrlContext } from '../utils/url'
 import { PhaseTimer } from './logService'
@@ -8,7 +8,8 @@ import { mkdir, writeFile } from 'fs/promises'
 import * as path from 'path'
 import type { FusionService } from './fusionService'
 import { AggregationTracker as _AggregationTracker } from './fusionService/aggregationTracker'
-import { resolveReportAccountId } from './fusionService/reportAccountResolver'
+import { promiseAllBatched } from './fusionService/collections'
+import { resolveManagedAccountIscIdForReport } from './fusionService/reportAccountResolver'
 import type { AggregationStats, FusionReport, FusionReportDecision, FusionReportStats } from './fusionService/types'
 import type { FormService } from './formService'
 import type { IdentityService } from './identityService'
@@ -121,13 +122,7 @@ class FusionReviewDecisionResolver {
 
     resolveReviewerName(reviewerId?: string): string | undefined {
         if (!reviewerId) return undefined
-        const reviewer = this.identities?.getIdentityById?.(reviewerId)
-        return (
-            (reviewer as any)?.displayName ||
-            (reviewer as any)?.attributes?.displayName ||
-            (reviewer as any)?.name ||
-            undefined
-        )
+        return resolveIdentityDocumentDisplayName(this.identities?.getIdentityById?.(reviewerId))
     }
 
     resolveReviewerUrl(reviewerId?: string): string | undefined {
@@ -151,47 +146,10 @@ class FusionReviewDecisionResolver {
         identityId?: string,
         iscAccountId?: string
     ): string | undefined {
-        const storedId = trimStr(iscAccountId)
-        if (storedId && !isCompositeManagedAccountKey(storedId)) {
-            return storedId
-        }
-
-        if (!managedAccountKey) return undefined
-
-        const fromSources = trimStr(this.sources?.resolveIscAccountIdForManagedKey?.(managedAccountKey))
-        if (fromSources && !isCompositeManagedAccountKey(fromSources)) {
-            return fromSources
-        }
-
-        const info = this.run?.getManagedAccountInfo(managedAccountKey)
-        const inventoryIscId = trimStr(info?.id)
-        if (inventoryIscId && !isCompositeManagedAccountKey(inventoryIscId)) {
-            return inventoryIscId
-        }
-
-        const fusionAccountByKey = this.fusion?.getFusionAccountByManagedKey?.(managedAccountKey)
-        const fusionAccountByIdentity =
-            identityId && typeof this.fusion?.getFusionIdentity === 'function'
-                ? this.fusion.getFusionIdentity(identityId)
-                : undefined
-
-        for (const fusionAccount of [fusionAccountByKey, fusionAccountByIdentity]) {
-            const resolved = fusionAccount ? resolveReportAccountId(fusionAccount, this.sources) : undefined
-            if (resolved && !isCompositeManagedAccountKey(resolved)) {
-                return resolved
-            }
-        }
-
-        for (const fusionAccount of this.run.allFusionIdentities) {
-            if (fusionAccount.managedKey === managedAccountKey) {
-                const resolved = resolveReportAccountId(fusionAccount, this.sources)
-                if (resolved && !isCompositeManagedAccountKey(resolved)) {
-                    return resolved
-                }
-            }
-        }
-
-        return undefined
+        return resolveManagedAccountIscIdForReport(managedAccountKey, this.sources, this.run, {
+            storedIscAccountId: iscAccountId,
+            identityId,
+        })
     }
 
     resolveIdentityContext(
@@ -199,11 +157,7 @@ class FusionReviewDecisionResolver {
     ): { selectedIdentityName?: string; selectedIdentityUrl?: string } {
         if (!identityId) return {}
         const identity = this.identities?.getIdentityById?.(identityId)
-        const selectedIdentityName =
-            (identity as any)?.displayName ||
-            (identity as any)?.attributes?.displayName ||
-            (identity as any)?.name ||
-            undefined
+        const selectedIdentityName = resolveIdentityDocumentDisplayName(identity as any)
         return { selectedIdentityName, selectedIdentityUrl: this.urlContext.identity(identityId) }
     }
 }
@@ -343,10 +297,22 @@ export class ReportService {
         const finishedDecisions = this.forms?.finishedFusionDecisions ?? []
         const idsToHydrate = new Set<string>()
         for (const decision of finishedDecisions) {
-            if (decision?.submitter?.id) idsToHydrate.add(decision.submitter.id)
-            if (decision?.identityId) idsToHydrate.add(decision.identityId)
+            const submitterId = trimStr(decision?.submitter?.id)
+            if (submitterId && submitterId !== 'system') idsToHydrate.add(submitterId)
+            const identityId = trimStr(decision?.identityId)
+            if (identityId) idsToHydrate.add(identityId)
+            const correlatedIdentityId = trimStr(readString(decision, 'correlatedIdentityId'))
+            if (correlatedIdentityId) idsToHydrate.add(correlatedIdentityId)
         }
-        await this.hydrateIdentitiesById([...idsToHydrate])
+        const identityIds = [...idsToHydrate]
+        if (identityIds.length === 0 || !this.identities) return
+
+        if (typeof (this.identities as IdentityService).ensureIdentityById === 'function') {
+            await promiseAllBatched(identityIds, (id) => (this.identities as IdentityService).ensureIdentityById(id), 10)
+            return
+        }
+
+        await this.hydrateIdentitiesById(identityIds)
     }
 
     /** Reload identity records needed for report email/metadata after earlier pipeline cache clears. */

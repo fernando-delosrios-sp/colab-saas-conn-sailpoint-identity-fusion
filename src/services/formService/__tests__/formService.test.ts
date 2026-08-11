@@ -969,10 +969,94 @@ describe('formInstanceAnalyzer', () => {
         expect(result.instancesToProcess).toHaveLength(1)
     })
 })
+describe('FormService finished decision reporting metadata', () => {
+    it('stores iscAccountId when registering finished decisions', () => {
+        const managedKey = 'source-a-id::native-report-1'
+        const managedAccountInventory = new Map<string, any>([
+            [managedKey, { id: 'isc-report-1', name: 'Report User', sourceName: 'Source A' }],
+        ])
+        const run = {
+            fusionIdentityDecisions: [],
+            addFinishedFusionDecision: vi.fn(),
+            addDecision: vi.fn(),
+            managedAccountsById: new Map(),
+            managedAccountInventory,
+            hasManagedAccount: (key: string) => managedAccountInventory.has(key),
+            getManagedAccountInfo: (key: string) => managedAccountInventory.get(key),
+            getFusionAccountByManagedKey: vi.fn(() => undefined),
+            getFusionIdentity: vi.fn(() => undefined),
+            allFusionAccounts: [],
+            allFusionIdentities: [],
+        }
+        const sources = {
+            resolveIscAccountIdForManagedKey: vi.fn((key: string) => managedAccountInventory.get(key)?.id),
+        }
+        const service = new FormService(
+            { fusionFormNamePattern: 'Fusion Review', fusionFormExpirationDays: 1 } as any,
+            { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+            {} as any,
+            sources as any,
+            undefined,
+            undefined,
+            run as any
+        )
 
+        ;(service as any).registerFinishedDecision({
+            submitter: { id: 'system', email: '', name: 'System (automatic merge)' },
+            account: { id: managedKey, name: 'Report User', sourceName: 'Source A' },
+            newIdentity: false,
+            identityId: 'identity-report-1',
+            comments: 'Automatically merged',
+            finished: true,
+            automaticMerge: true,
+        })
 
+        expect((service as any).finishedFusionDecisionsValue[0].account.iscAccountId).toBe('isc-report-1')
+    })
+})
+describe('FormService finished decision reviewer metadata', () => {
+    it('stores submitter display name when registering finished decisions', () => {
+        const reviewerId = 'reviewer-report-1'
+        const identities = {
+            getIdentityById: vi.fn((id?: string) =>
+                id === reviewerId ? { id, name: 'Reviewer Display' } : undefined
+            ),
+        }
+        const run = {
+            fusionIdentityDecisions: [],
+            addFinishedFusionDecision: vi.fn(),
+            addDecision: vi.fn(),
+            managedAccountsById: new Map(),
+            managedAccountInventory: new Map(),
+            hasManagedAccount: vi.fn(() => false),
+            getManagedAccountInfo: vi.fn(() => undefined),
+            getFusionAccountByManagedKey: vi.fn(() => undefined),
+            getFusionIdentity: vi.fn(() => undefined),
+            allFusionAccounts: [],
+            allFusionIdentities: [],
+        }
+        const sources = { resolveIscAccountIdForManagedKey: vi.fn(() => undefined) }
+        const service = new FormService(
+            { fusionFormNamePattern: 'Fusion Review', fusionFormExpirationDays: 1 } as any,
+            { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+            {} as any,
+            sources as any,
+            identities as any,
+            undefined,
+            run as any
+        )
 
+        ;(service as any).registerFinishedDecision({
+            submitter: { id: reviewerId, email: '', name: '' },
+            account: { id: 'source-a-id::native-1', name: 'User', sourceName: 'Source A' },
+            newIdentity: false,
+            identityId: 'identity-1',
+            comments: '',
+            finished: true,
+        })
 
-
+        expect((service as any).finishedFusionDecisionsValue[0].submitter.name).toBe('Reviewer Display')
+    })
+})
 
 

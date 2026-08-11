@@ -3,6 +3,7 @@ import { logger } from '@sailpoint/connector-sdk'
 import { SourceType } from '../../model/config'
 import { FusionDecision } from '../../model/form'
 import { isCompositeManagedAccountKey } from '../../model/managedAccountKey'
+import { resolveIdentityDocumentDisplayName } from '../../model/fusionAccountUtils'
 import { IdentityService } from '../identityService'
 import { assert } from '../../utils/assert'
 import { readString, trimStr } from '../../utils/safeRead'
@@ -119,7 +120,7 @@ export const getReviewerInfo = (
     return {
         id: identityId,
         email: identity.attributes?.email || '',
-        name: identity.attributes?.displayName || identity.name || '',
+        name: resolveIdentityDocumentDisplayName(identity) || '',
     }
 }
 
@@ -279,9 +280,11 @@ export const createFusionDecision = async (
     // we try to fetch on-demand here (createFusionDecision is async).
     if (identities && (!reviewer.name || reviewer.name === reviewerIdentityId || !reviewer.email)) {
         try {
-            const fetched = await identities.fetchIdentityById(reviewerIdentityId)
-            const displayName =
-                fetched?.displayName || (fetched as any)?.attributes?.displayName || fetched?.name || reviewer.name
+            const fetched =
+                typeof identities.ensureIdentityById === 'function'
+                    ? await identities.ensureIdentityById(reviewerIdentityId)
+                    : await identities.fetchIdentityById(reviewerIdentityId)
+            const displayName = resolveIdentityDocumentDisplayName(fetched) || reviewer.name
             const email = (fetched as any)?.attributes?.email || reviewer.email
             if (displayName) reviewer.name = displayName
             if (email) reviewer.email = email
@@ -368,6 +371,8 @@ const extractSourceType = (formInput: any): SourceType => {
     }
     return SourceType.Authoritative
 }
+
+
 
 
 
