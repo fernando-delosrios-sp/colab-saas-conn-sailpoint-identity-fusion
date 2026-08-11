@@ -50,3 +50,7 @@
 ## 2024-05-24 - MkDocs Material Admonition Syntax
 **Learning:** MkDocs Material admonitions (e.g., `!!! warning`, `!!! tip`) require *all* of their inner body text to be separated by an empty line and indented by exactly 4 spaces relative to the admonition declaration to render correctly as a callout box. If the indentation is missing, the admonition will break.
 **Action:** Always add an empty line after the `!!!` line and indent the following text block by 4 spaces.
+
+## 2025-05-18 - JSON Code Blocks Over Inline Text
+**Learning:** Abstract inline descriptions of JSON payloads (e.g. "Pass `{ \"dryRun\": { enabled: true } }` on the input") often confuse readers about where exactly the block goes.
+**Action:** Use full JSON code blocks with language hints (`json`) for concrete API payload examples.

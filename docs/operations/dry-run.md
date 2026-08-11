@@ -137,11 +137,34 @@ npm run build
 npm run dev
 ```
 
-Pass `{ "dryRun": { enabled: true, "saveFile": true } }` on the `std:account:list` input together with your connector configuration.
+Pass the `dryRun` object on the `std:account:list` input together with your connector configuration:
+
+```json
+{
+  "dryRun": {
+    "enabled": true,
+    "saveFile": true
+  }
+}
+```
 
 ### Proxy mode
 
-When the proxy server receives `std:account:list`, include the `dryRun` object in the `input` payload. For large tenants, prefer `saveFile: true` so the HTML report is written on the server filesystem rather than relying on the full HTTP response stream.
+When the proxy server receives `std:account:list`, include the `dryRun` object in the `input` payload:
+
+```json
+{
+  "type": "std:account:list",
+  "input": {
+    "dryRun": {
+      "enabled": true,
+      "saveFile": true
+    }
+  }
+}
+```
+
+For large tenants, prefer `saveFile: true` so the HTML report is written on the server filesystem rather than relying on the full HTTP response stream.
 
 See [Proxy mode](../guides/proxy-mode.md) for architecture and setup.
 
