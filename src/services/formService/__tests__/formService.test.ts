@@ -323,6 +323,7 @@ describe('FormService managed work queue synchronization', () => {
 
         expect(accountInfo).toEqual({
             id: managedKey,
+            iscAccountId: 'acct-sync-1',
             name: 'Sync User',
             sourceName: 'Source A',
             sourceId: 'source-a-id',
@@ -433,6 +434,7 @@ describe('FormService managed work queue synchronization', () => {
 
         expect(accountInfo).toEqual({
             id: managedKey,
+            iscAccountId: 'acct-sync-1',
             name: 'Sync User',
             sourceName: 'Source A',
             sourceId: 'source-a-id',

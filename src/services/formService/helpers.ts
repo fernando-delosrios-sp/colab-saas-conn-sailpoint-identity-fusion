@@ -35,6 +35,7 @@ export function createAutomaticMergeDecision(
         submitter: { id: 'system', email: '', name: 'System (automatic merge)' },
         account: {
             id: accountKey,
+            iscAccountId: trimStr(account.id),
             name: fusionAccount.name ?? account.name ?? '',
             sourceName: fusionAccount.sourceName,
             sourceId: readString(account, 'sourceId'),
@@ -200,6 +201,7 @@ export const getFormOwner = (sources: SourceService): OwnerDto => {
     assert(owner, 'Fusion source owner not found')
     return owner
 }
+
 
 
 

@@ -1,5 +1,6 @@
 import { SourceType } from '../model/config'
 import { FusionDecision } from '../model/form'
+import { isCompositeManagedAccountKey } from '../model/managedAccountKey'
 import { readString, trimStr } from '../utils/safeRead'
 import { createUrlContext } from '../utils/url'
 import { PhaseTimer } from './logService'
@@ -7,6 +8,7 @@ import { mkdir, writeFile } from 'fs/promises'
 import * as path from 'path'
 import type { FusionService } from './fusionService'
 import { AggregationTracker as _AggregationTracker } from './fusionService/aggregationTracker'
+import { resolveReportAccountId } from './fusionService/reportAccountResolver'
 import type { AggregationStats, FusionReport, FusionReportDecision, FusionReportStats } from './fusionService/types'
 import type { FormService } from './formService'
 import type { IdentityService } from './identityService'
@@ -37,7 +39,11 @@ const toReportDecision = (
     resolveReviewerName?: (reviewerId?: string) => string | undefined,
     resolveReviewerUrl?: (reviewerId?: string) => string | undefined,
     resolveAccountName?: (managedAccountKey?: string) => string | undefined,
-    resolveAccountUrl?: (managedAccountKey?: string, identityId?: string) => string | undefined,
+    resolveAccountUrl?: (
+        managedAccountKey?: string,
+        identityId?: string,
+        iscAccountId?: string
+    ) => string | undefined,
     resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string },
     locale?: string
 ): FusionReportDecision => {
@@ -56,8 +62,12 @@ const toReportDecision = (
     const managedAccountKey = account.id
     const selectedIdentityContext = resolveIdentityContext?.(decision.identityId) ?? {}
     const submitter = decision.submitter || ({} as any)
-    const reviewerName =
-        submitter.name || resolveReviewerName?.(submitter.id) || submitter.id
+    const reviewerId = submitter.id
+    const submitterNameRaw = trimStr(submitter.name)
+    const reviewerNameFromDecision =
+        submitterNameRaw && submitterNameRaw !== reviewerId ? submitterNameRaw : undefined
+    const resolvedReviewerName = resolveReviewerName?.(reviewerId)
+    const reviewerName = reviewerNameFromDecision || resolvedReviewerName || reviewerId
     const selectedIdentityName = decision.identityName || selectedIdentityContext.selectedIdentityName
     const correlatedIdentityContext = resolveIdentityContext?.(readString(decision, 'correlatedIdentityId')) ?? {}
     const correlatedAccountName = correlatedIdentityContext.selectedIdentityName
@@ -69,7 +79,6 @@ const toReportDecision = (
         || account.name
         || managedAccountKey
 
-    const reviewerId = submitter.id
     const reviewerUrl = reviewerId && reviewerId !== 'system' ? resolveReviewerUrl?.(reviewerId) : undefined
 
     return {
@@ -79,7 +88,7 @@ const toReportDecision = (
         reviewerEmail: submitter.email || undefined,
         managedAccountKey,
         accountName,
-        accountUrl: resolveAccountUrl?.(managedAccountKey, decision.identityId),
+        accountUrl: resolveAccountUrl?.(managedAccountKey, decision.identityId, account.iscAccountId),
         accountSource: account.sourceName || '',
         sourceType,
         decision: decisionType,
@@ -132,33 +141,57 @@ class FusionReviewDecisionResolver {
         return name && name !== managedAccountKey ? name : undefined
     }
 
-    resolveAccountUrl(managedAccountKey?: string, identityId?: string): string | undefined {
-        if (!managedAccountKey) return undefined
-        const reportAccountId = this.sources?.resolveIscAccountIdForManagedKey?.(managedAccountKey)
-        if (reportAccountId) return this.urlContext.humanAccount(reportAccountId)
-        const info = this.run?.getManagedAccountInfo(managedAccountKey)
-        const directIscId = trimStr(info?.id)
-        if (directIscId && directIscId !== managedAccountKey) {
-            return this.urlContext.humanAccount(directIscId)
+    resolveAccountUrl(managedAccountKey?: string, identityId?: string, iscAccountId?: string): string | undefined {
+        const reportAccountId = this.resolveReportIscAccountId(managedAccountKey, identityId, iscAccountId)
+        return reportAccountId ? this.urlContext.humanAccount(reportAccountId) : undefined
+    }
+
+    private resolveReportIscAccountId(
+        managedAccountKey?: string,
+        identityId?: string,
+        iscAccountId?: string
+    ): string | undefined {
+        const storedId = trimStr(iscAccountId)
+        if (storedId && !isCompositeManagedAccountKey(storedId)) {
+            return storedId
         }
+
+        if (!managedAccountKey) return undefined
+
+        const fromSources = trimStr(this.sources?.resolveIscAccountIdForManagedKey?.(managedAccountKey))
+        if (fromSources && !isCompositeManagedAccountKey(fromSources)) {
+            return fromSources
+        }
+
+        const info = this.run?.getManagedAccountInfo(managedAccountKey)
+        const inventoryIscId = trimStr(info?.id)
+        if (inventoryIscId && !isCompositeManagedAccountKey(inventoryIscId)) {
+            return inventoryIscId
+        }
+
         const fusionAccountByKey = this.fusion?.getFusionAccountByManagedKey?.(managedAccountKey)
         const fusionAccountByIdentity =
             identityId && typeof this.fusion?.getFusionIdentity === 'function'
                 ? this.fusion.getFusionIdentity(identityId)
                 : undefined
-        let iscId = fusionAccountByKey?.iscAccountId ?? fusionAccountByIdentity?.iscAccountId
-        if (!iscId) {
-            for (const fa of this.run.allFusionIdentities) {
-                if (fa.managedKey === managedAccountKey && fa.iscAccountId) {
-                    iscId = fa.iscAccountId
-                    break
+
+        for (const fusionAccount of [fusionAccountByKey, fusionAccountByIdentity]) {
+            const resolved = fusionAccount ? resolveReportAccountId(fusionAccount, this.sources) : undefined
+            if (resolved && !isCompositeManagedAccountKey(resolved)) {
+                return resolved
+            }
+        }
+
+        for (const fusionAccount of this.run.allFusionIdentities) {
+            if (fusionAccount.managedKey === managedAccountKey) {
+                const resolved = resolveReportAccountId(fusionAccount, this.sources)
+                if (resolved && !isCompositeManagedAccountKey(resolved)) {
+                    return resolved
                 }
             }
         }
-        if (iscId) {
-            return this.urlContext.humanAccount(iscId)
-        }
-        return this.urlContext.humanAccount(managedAccountKey)
+
+        return undefined
     }
 
     resolveIdentityContext(
@@ -349,7 +382,8 @@ export class ReportService {
                 (reviewerId) => resolver.resolveReviewerName(reviewerId),
                 (reviewerId) => resolver.resolveReviewerUrl(reviewerId),
                 (managedAccountKey) => resolver.resolveAccountName(managedAccountKey),
-                (managedAccountKey, identityId) => resolver.resolveAccountUrl(managedAccountKey, identityId),
+                (managedAccountKey, identityId, iscAccountId) =>
+                    resolver.resolveAccountUrl(managedAccountKey, identityId, iscAccountId),
                 (identityId) => resolver.resolveIdentityContext(identityId),
                 locale
             )

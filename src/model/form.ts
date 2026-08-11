@@ -8,6 +8,8 @@ import { SourceType } from './config'
 type FusionDecisionAccount = {
     /** Managed account key: sourceId::nativeIdentity */
     id: string
+    /** ISC platform account id for report/deep links (distinct from {@link id}). */
+    iscAccountId?: string
     name: string
     sourceName: string
     sourceId?: string
@@ -62,3 +64,4 @@ export type FusionDecision = {
     /** Source type of the managed source this decision pertains to. */
     sourceType?: SourceType
 }
+
