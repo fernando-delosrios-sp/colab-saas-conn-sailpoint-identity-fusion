@@ -369,7 +369,12 @@ export class ReportService {
     }): Promise<{ reportHtmlOutputPath?: string; statsWithPhaseTiming: AggregationStats }> {
         const { report, finalDryRunStats, reportPhaseStartedAt, saveFile, sendEmail } = args
         const shouldWriteHtmlReport = saveFile ?? true
-        const recipients = Array.isArray(sendEmail) ? sendEmail : (sendEmail ? [sendEmail] : [])
+        let recipients: string[] = []
+        if (Array.isArray(sendEmail)) {
+            recipients = sendEmail
+        } else if (sendEmail) {
+            recipients = [sendEmail]
+        }
         const shouldSendReportEmail = recipients.length > 0
 
         const reportElapsedMs =
@@ -453,7 +458,12 @@ export class ReportService {
     }): Promise<{ reportHtmlOutputPath?: string; statsWithPhaseTiming: AggregationStats }> {
         const { aggregationStats, reportPhaseStartedAt, saveFile, sendEmail } = args
         const shouldWriteHtmlReport = saveFile ?? true
-        const recipients = Array.isArray(sendEmail) ? sendEmail : (sendEmail ? [sendEmail] : [])
+        let recipients: string[] = []
+        if (Array.isArray(sendEmail)) {
+            recipients = sendEmail
+        } else if (sendEmail) {
+            recipients = [sendEmail]
+        }
         const shouldSendReportEmail = recipients.length > 0
 
         const reportElapsedMs =

@@ -57,7 +57,16 @@ export function logFusionMatchDiscovery(
     options?: LogMatchDiscoveryOptions
 ): void {
     const { headline, summary } = formatFusionMatchDiscoveryLog(matches, deferred)
-    const eventType = deferred ? 'deferred' : headline.includes('EXACT') ? 'exact' : 'partial'
+
+    let eventType: string
+    if (deferred) {
+        eventType = 'deferred'
+    } else if (headline.includes('EXACT')) {
+        eventType = 'exact'
+    } else {
+        eventType = 'partial'
+    }
+
     log.recordEvent('match', { type: eventType })
     if (log.getLogLevel() === 'debug') {
         const suffix = options?.debugSuffix ?? ''

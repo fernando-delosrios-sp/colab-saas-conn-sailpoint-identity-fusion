@@ -28,7 +28,16 @@ function resolveRunMode(
     const isProxyServer = proxy.isProxyService()
     const isCustom = context[operationName] !== undefined
     const isProxyClient = !isProxyServer && proxy.isProxyMode()
-    const runMode: RunMode = isCustom ? RunMode.Custom : isProxyClient ? RunMode.Proxy : RunMode.Default
+
+    let runMode: RunMode
+    if (isCustom) {
+        runMode = RunMode.Custom
+    } else if (isProxyClient) {
+        runMode = RunMode.Proxy
+    } else {
+        runMode = RunMode.Default
+    }
+
     return { runMode, isProxyServer }
 }
 
