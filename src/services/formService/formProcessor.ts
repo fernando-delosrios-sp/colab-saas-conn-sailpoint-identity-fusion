@@ -218,7 +218,14 @@ export const extractCandidateIdsFromFormInput = (formInput: any): string[] => {
 export const createFusionDecision = async (
     formInstance: FormInstanceResponseV2025,
     identities?: IdentityService,
-    accountInfoOverride?: { id: string; name: string; sourceName: string; sourceId?: string; nativeIdentity?: string }
+    accountInfoOverride?: {
+        id: string
+        iscAccountId?: string
+        name: string
+        sourceName: string
+        sourceId?: string
+        nativeIdentity?: string
+    }
 ): Promise<FusionDecision | null> => {
     assert(formInstance, 'Form instance is required')
     assert(formInstance.id, 'Form instance ID is required')
@@ -329,6 +336,7 @@ export const createFusionDecision = async (
         sourceName: normalizeScalar((accountInfo as any)?.sourceName),
         ...(sourceIdNorm ? { sourceId: sourceIdNorm } : {}),
         ...(nativeIdNorm ? { nativeIdentity: nativeIdNorm } : {}),
+        ...(trimStr((accountInfo as any)?.iscAccountId) ? { iscAccountId: trimStr((accountInfo as any)?.iscAccountId) } : {}),
     }
     if (!isCompositeManagedAccountKey(accountInfo.id)) {
         logger.error(
@@ -360,6 +368,7 @@ const extractSourceType = (formInput: any): SourceType => {
     }
     return SourceType.Authoritative
 }
+
 
 
 

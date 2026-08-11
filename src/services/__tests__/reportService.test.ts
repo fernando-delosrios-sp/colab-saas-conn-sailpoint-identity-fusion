@@ -16,7 +16,17 @@ describe('ReportService', () => {
             getSourceByNameSafe: vi.fn((name?: string) =>
                 name ? { sourceType: SourceType.Authoritative } : undefined
             ),
-            resolveIscAccountIdForManagedKey: vi.fn((id?: string) => id),
+            resolveIscAccountIdForManagedKey: vi.fn((managedKey?: string) => {
+                const inventory =
+                    (overrides.run as any)?.managedAccountInventory ??
+                    (overrides.sources as any)?.managedAccountInventory ??
+                    new Map<string, any>()
+                const info = managedKey ? inventory.get(managedKey) : undefined
+                const iscId = info?.id
+                if (iscId && iscId !== managedKey) return iscId
+                if (managedKey && !managedKey.includes('::')) return managedKey
+                return undefined
+            }),
         }
         const identities = {
             getIdentityById: vi.fn((id?: string) => (id ? { id, displayName: `Name ${id}` } : undefined)),
@@ -84,7 +94,8 @@ describe('ReportService', () => {
                         newIdentity: false,
                         submitter: { id: 'rev-1', name: 'Reviewer Name' },
                         account: {
-                            id: 'acc-1',
+                            id: 'src-a::native-1',
+                            iscAccountId: 'acc-1',
                             name: 'Target Account',
                             sourceName: 'Source Alpha',
                         },
@@ -101,7 +112,7 @@ describe('ReportService', () => {
             reviewerName: 'Reviewer Name',
             reviewerUrl: 'https://example.identitynow.com/ui/a/admin/identities/rev-1/details/attributes',
             reviewerEmail: undefined,
-            managedAccountKey: 'acc-1',
+            managedAccountKey: 'src-a::native-1',
             accountName: 'Target Account',
             accountUrl: 'https://example.identitynow.com/ui/a/admin/accounts-management/human-accounts/acc-1',
             accountSource: 'Source Alpha',
@@ -115,6 +126,92 @@ describe('ReportService', () => {
             formUrl: undefined,
             automaticMerge: undefined,
         })
+    })
+
+
+    it('resolves reviewer display name from identity cache when submitter name equals reviewer id', () => {
+        const reviewerId = '9d86f225e3a24b1a9e3d10d92ec12005'
+        const { service } = createService({
+            identities: {
+                getIdentityById: vi.fn((id?: string) =>
+                    id === reviewerId ? { id, displayName: 'Ada Wong' } : undefined
+                ),
+            },
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        identityId: 'id-100',
+                        newIdentity: false,
+                        submitter: { id: reviewerId, name: reviewerId },
+                        account: {
+                            id: 'acc-1',
+                            name: 'Ada Wong',
+                            sourceName: 'Umbrella Corporation',
+                        },
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+
+        expect(decisions).toHaveLength(1)
+        expect(decisions[0].reviewerName).toBe('Ada Wong')
+    })
+
+    it('resolves review decision account URL from managed account inventory when caches are cleared', () => {
+        const managedAccountKey = 'src-a::native-1'
+        const managedAccountInventory = new Map<string, any>([
+            [managedAccountKey, { id: 'isc-account-1', name: 'Target Account' }],
+        ])
+
+        const { service } = createService({
+            sources: { managedAccountInventory },
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        identityId: 'id-100',
+                        newIdentity: false,
+                        submitter: { id: 'rev-1', name: 'Reviewer Name' },
+                        account: {
+                            id: managedAccountKey,
+                            name: 'Target Account',
+                            sourceName: 'Source Alpha',
+                        },
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+
+        expect(decisions[0].accountUrl).toBe(
+            'https://example.identitynow.com/ui/a/admin/accounts-management/human-accounts/isc-account-1'
+        )
+        expect(decisions[0].accountUrl).not.toContain('::')
+    })
+
+    it('does not emit account URL when only a composite managed account key is available', () => {
+        const { service } = createService({
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        identityId: 'id-500',
+                        newIdentity: false,
+                        submitter: { id: 'rev-5', name: 'Reviewer Five' },
+                        account: {
+                            id: 'src-a::native-orphan',
+                            name: 'Orphan Account',
+                            sourceName: 'Source Epsilon',
+                        },
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+
+        expect(decisions[0].accountUrl).toBeUndefined()
     })
 
     it('prefers managed account display name over raw managed account key when building review decisions', () => {
@@ -408,6 +505,7 @@ describe('ReportService', () => {
         expect(html).toContain('Estadísticas de procesamiento')
     })
 })
+
 
 
 

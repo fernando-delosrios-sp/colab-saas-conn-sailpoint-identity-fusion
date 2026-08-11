@@ -1029,7 +1029,7 @@ export class FormService {
     private extractAccountInfoOverride(
         accountId: string | undefined,
         shouldRemoveAccountFromMap: boolean
-    ): { id: string; name: string; sourceName: string; sourceId?: string; nativeIdentity?: string } | undefined {
+    ): { id: string; iscAccountId?: string; name: string; sourceName: string; sourceId?: string; nativeIdentity?: string } | undefined {
         if (!accountId) {
             return undefined
         }
@@ -1056,6 +1056,7 @@ export class FormService {
         if (queueAccount) {
             return {
                 id: normalizedAccountId,
+                iscAccountId: trimStr(queueAccount.id),
                 name: trimStr(queueAccount.name) || '',
                 sourceName: queueAccount.sourceName || '',
                 sourceId: readString(queueAccount, 'sourceId'),
@@ -1066,6 +1067,7 @@ export class FormService {
         if (info) {
             return {
                 id: normalizedAccountId,
+                iscAccountId: trimStr(info.id),
                 name: info.name,
                 sourceName: info.sourceName,
                 sourceId: info.sourceId,
@@ -1087,7 +1089,7 @@ export class FormService {
     private async createDecisionsFromInstances(
         instancesToProcess: FormInstanceResponseV2025[],
         accountInfoOverride:
-            | { id: string; name: string; sourceName: string; sourceId?: string; nativeIdentity?: string }
+            | { id: string; iscAccountId?: string; name: string; sourceName: string; sourceId?: string; nativeIdentity?: string }
             | undefined
     ): Promise<number> {
         let decisionsAdded = 0
