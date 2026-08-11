@@ -101,6 +101,8 @@ Omit the scenario argument to pick from scenarios that have a non-empty `api-log
 
 Replay serves all ISC calls from `api-log.ndjson` via `ReplayApiAdapter` — no live tenant API calls.
 
+During replay, each step sets **simulated recording time** on the operation `FusionRun` from `steps.ndjson` (per-step `timestamp`, then `scenario.json` `recordedAt`). Form stale cleanup during fetch compares definition age against that simulated time and `fusionFormExpirationDays`, not the wall clock when you run replay. Aged recordings therefore verify without false drift from expired forms.
+
 ---
 
 ## Finalize (recovery)
@@ -160,3 +162,4 @@ Written after record-mode account-list completes:
 - `failedMatches` — accounts where matching failed
 
 Record mode automatically enables managed-account report capture. Scenarios recorded before this artifact existed must be re-recorded.
+

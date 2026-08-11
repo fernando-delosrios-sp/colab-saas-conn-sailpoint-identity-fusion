@@ -3,6 +3,11 @@ CHANGELOG.md [462L]
 All notable changes to **Identity Fusion NG** — the ISC connector for Map → Define → Match identity fusion, scenario recording/replay, and supporting tooling.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
 ... [lean-ctx: omitted 1 lines]
+## 2026-08-11
+### 🐛 Fixes
+- **Scenario replay simulated recording time** — Replay now evaluates form stale cleanup at each step's recorded timestamp (`steps.ndjson` / `scenario.recordedAt`) instead of wall clock. Fixes false golden drift on aged scenario recordings (for example multi-step account-list with form-driven outcomes) without re-recording. Applies to in-process harness (`npm run test-recording`) and spawned replay CLI (`npm run replay`).
+
+---
 ## 2026-08-09
 ### ⚠️ Breaking Changes
 - **Correlated entitlement Remove rejected on account-update** — Removing the `correlated` or `correlate` action entitlement via account-update now fails with `Correlated entitlement cannot be removed: <value>`. The correlated entitlement is derived from whether all managed source accounts are linked in the Fusion identity; it cannot be revoked through entitlement removal. **Migration:** Do not provision Remove changes for correlated/correlate tokens; rely on aggregation output to reflect correlation state.

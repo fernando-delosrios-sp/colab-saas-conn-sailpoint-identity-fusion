@@ -68,6 +68,8 @@ export interface RunStateSnapshot {
         batchSize: number
     }
     trigramIndexBuilt: boolean
+    /** Optional replay-only simulated wall clock (epoch ms). Undefined in live aggregation. */
+    simulatedTimeMs?: number
 }
 
 
@@ -127,6 +129,7 @@ export class FusionRun {
     queuedFormDeleteIds: Set<string> = new Set()
     activeFormDeleteWorkers: number = 0
     pendingFormDeleteTasks: Set<Promise<void>> = new Set()
+    private simulatedTimeMsValue?: number
 
     get autoMergedCount(): number {
         return this.autoMergedIdentityIdsValue.size
@@ -755,6 +758,32 @@ export class FusionRun {
         this.resetFormDeletionQueue()
     }
 
+    /**
+     * Sets replay-only simulated wall clock from an ISO-8601 string or epoch milliseconds.
+     * Live aggregation leaves simulated time unset; `currentTimeMs()` then uses wall clock.
+     */
+    setSimulatedTime(isoOrMs: string | number): void {
+        if (typeof isoOrMs === 'number') {
+            this.simulatedTimeMsValue = isoOrMs
+            return
+        }
+        const parsed = Date.parse(isoOrMs)
+        if (Number.isNaN(parsed)) {
+            throw new Error(`Invalid simulated time: ${isoOrMs}`)
+        }
+        this.simulatedTimeMsValue = parsed
+    }
+
+    clearSimulatedTime(): void {
+        this.simulatedTimeMsValue = undefined
+    }
+
+    /** Current time for run-scoped age checks; uses simulated time during replay when set. */
+    currentTimeMs(): number {
+        return this.simulatedTimeMsValue ?? Date.now()
+    }
+
+
     snapshot(): RunStateSnapshot {
         return {
             managedAccounts: Array.from(this.managedAccountsById.values()),
@@ -792,6 +821,7 @@ export class FusionRun {
                 batchSize: this.managedAccountProcessingBatchSizeValue,
             },
             trigramIndexBuilt: this.trigramIndexBuilt,
+            simulatedTimeMs: this.simulatedTimeMsValue,
         }
     }
 
@@ -860,6 +890,7 @@ export class FusionRun {
         this.managedAccountProcessingStartedAt = snapshot.managedAccountProcessing?.startedAt ?? 0
         this.managedAccountProcessingBatchSizeValue = snapshot.managedAccountProcessing?.batchSize ?? 0
         this.trigramIndexBuilt = snapshot.trigramIndexBuilt ?? false
+        this.simulatedTimeMsValue = snapshot.simulatedTimeMs
     }
 }
 

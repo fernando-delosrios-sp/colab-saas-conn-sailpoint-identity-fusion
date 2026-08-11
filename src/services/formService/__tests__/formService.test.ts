@@ -260,6 +260,69 @@ describe('FormService stale-form cleanup queue', () => {
     })
 })
 
+
+describe('FormService stale cleanup with simulated replay time', () => {
+    const simulatedTime = '2026-07-31T08:24:12.899Z'
+    const simulatedMs = Date.parse(simulatedTime)
+
+    function buildService(forms: Array<{ id: string; name: string; created: string }>) {
+        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({
+            data: { results: forms },
+        })
+        const searchFormInstancesByTenant = vi.fn().mockResolvedValue({ data: [] })
+        const customFormsMock = {
+            searchFormInstancesByTenant,
+            searchFormDefinitionsByTenant,
+            deleteFormDefinition: vi.fn().mockResolvedValue({}),
+        }
+        const run = new FusionRun()
+        run.setSimulatedTime(simulatedTime)
+
+        const service = new FormService(
+            {
+                fusionFormNamePattern: 'Fusion',
+                fusionFormExpirationDays: 7,
+            } as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn(), setProgress: vi.fn(), track: vi.fn(() => ({ done: vi.fn() })) } as any,
+            {
+                customFormsApi: customFormsMock,
+                call: createFormClientCallMock(customFormsMock),
+                execute: async (fn: () => Promise<any>) => fn(),
+            } as any,
+            {} as any,
+            undefined,
+            undefined,
+            run
+        )
+
+        return { service, searchFormInstancesByTenant, run }
+    }
+
+    it('treats form as active when created 3 days before simulated replay time', async () => {
+        const created = new Date(simulatedMs - 3 * 24 * 60 * 60 * 1000).toISOString()
+        const { service, searchFormInstancesByTenant, run } = buildService([
+            { id: 'form-active', name: 'Fusion active', created },
+        ])
+
+        await service.fetchFormInstances({ staleFormCleanup: true })
+
+        expect(searchFormInstancesByTenant).toHaveBeenCalledTimes(1)
+        expect(run.formsFound).toBe(1)
+    })
+
+    it('treats form as stale when created 10 days before simulated replay time', async () => {
+        const created = new Date(simulatedMs - 10 * 24 * 60 * 60 * 1000).toISOString()
+        const { service, searchFormInstancesByTenant, run } = buildService([
+            { id: 'form-stale', name: 'Fusion stale', created },
+        ])
+
+        await service.fetchFormInstances({ staleFormCleanup: true })
+
+        expect(searchFormInstancesByTenant).not.toHaveBeenCalled()
+        expect(run.formsFound).toBe(0)
+    })
+})
+
 describe('FormService managed work queue synchronization', () => {
     it('removes account from managedAccountsByIdentityId when account is removed from managedAccountsById', () => {
         const managedKey = 'source-a-id::native-sync-1'

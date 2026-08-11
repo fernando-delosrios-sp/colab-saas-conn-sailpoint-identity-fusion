@@ -6,6 +6,7 @@ import { FusionConfig } from '../../../../model/config'
 import { FusionAccount } from '../../../../model/fusionAccount'
 import { buildManagedAccountKey } from '../../../../model/managedAccountKey'
 import { toManagedAccountInfo } from '../../../../model/fusionRun'
+import { applySimulatedRecordingTime } from '../../../scenarioReplay'
 import {
     processAttributeMapping as _processAttributeMapping,
     buildAttributeMappingConfig as _buildAttributeMappingConfig,
@@ -299,6 +300,14 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
             state.setServiceRegistry(registry)
         }
 
+        applySimulatedRecordingTime(
+            registry.run,
+            step.id,
+            stepTimestamp,
+            context.scenario?.recordedAt,
+            registry.log
+        )
+
         registry.res.send = vi.fn()
         context.registry = registry as unknown as MockRegistry
         return context
@@ -316,6 +325,14 @@ export function buildReplayContext(step: StepDefinition, context: ChainContext):
     })
 
     configureNonReplayMocks(registry, context, state, sweep, scenarioSources)
+
+    applySimulatedRecordingTime(
+        registry.run,
+        step.id,
+        context.options?.stepTimestamp,
+        context.scenario?.recordedAt,
+        registry.log
+    )
 
     registry.res.send = vi.fn()
 
@@ -720,5 +737,6 @@ export function collectOutputs(context: ChainContext): unknown[] {
     }
     return sent
 }
+
 
 

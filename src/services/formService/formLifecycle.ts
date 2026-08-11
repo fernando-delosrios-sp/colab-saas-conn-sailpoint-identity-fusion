@@ -328,7 +328,8 @@ export class FormLifecycle {
         const timestamp = this.readFormDefinitionTimestamp(form)
         if (!timestamp) return false
 
-        const cutoffMs = Date.now() - this.deps.fusionFormExpirationDays * 24 * 60 * 60 * 1000
+        const cutoffMs =
+            this.deps.run.currentTimeMs() - this.deps.fusionFormExpirationDays * 24 * 60 * 60 * 1000
         return timestamp.getTime() < cutoffMs
     }
 
@@ -391,4 +392,5 @@ export class FormLifecycle {
         }
     }
 }
+
 

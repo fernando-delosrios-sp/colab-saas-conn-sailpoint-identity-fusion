@@ -170,6 +170,9 @@ export class ScenarioRunner {
 
             this.state.recordStepResult(result)
             return result
+        } finally {
+            const registry = this.state.getServiceRegistry<{ run?: { clearSimulatedTime?: () => void } }>()
+            registry?.run?.clearSimulatedTime?.()
         }
     }
 
@@ -256,5 +259,6 @@ export function registerStepFn(
 function getStepFn(operation: string): ((step: StepDefinition, context: ChainContext) => Promise<unknown>) | undefined {
     return stepFns.get(operation)
 }
+
 
 

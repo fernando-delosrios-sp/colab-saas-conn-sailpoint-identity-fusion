@@ -93,6 +93,10 @@ export function createOperationHandler(
         const config: FusionConfig = await safeReadConfig()
         let interval: ReturnType<typeof setInterval> | undefined
         const serviceRegistry = new ServiceRegistry(config, context, res, operationName)
+        const replayStepTimestamp = config.recording?.replayStepTimestamp ?? process.env.REPLAY_STEP_TIMESTAMP
+        if (replayStepTimestamp) {
+            serviceRegistry.run.setSimulatedTime(replayStepTimestamp)
+        }
         try {
             const { runMode, isProxyServer } = resolveRunMode(context, serviceRegistry.proxy, operationName)
             interval = scheduleKeepAlive(options, config, runMode, isProxyServer, res)
@@ -117,10 +121,12 @@ export function createOperationHandler(
             const msg = typeof options.errorMessage === 'function' ? options.errorMessage(input) : options.errorMessage
             throw new ConnectorError(`${msg}: ${detail}`, ConnectorErrorType.Generic)
         } finally {
+            serviceRegistry.run?.clearSimulatedTime?.()
             if (interval) clearInterval(interval)
         }
     }
 }
+
 
 
 

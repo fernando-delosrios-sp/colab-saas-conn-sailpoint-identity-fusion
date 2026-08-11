@@ -103,6 +103,37 @@ describe('FusionRun', () => {
         expect(run.isAutoMerged('id-3')).toBe(false)
     })
 
+    describe('simulated recording time', () => {
+        it('setSimulatedTime, clearSimulatedTime, and currentTimeMs use ISO and epoch inputs', () => {
+            const run = new FusionRun()
+            const iso = '2026-07-31T08:24:12.899Z'
+            const expectedMs = Date.parse(iso)
+
+            run.setSimulatedTime(iso)
+            expect(run.currentTimeMs()).toBe(expectedMs)
+
+            run.setSimulatedTime(expectedMs)
+            expect(run.currentTimeMs()).toBe(expectedMs)
+
+            run.clearSimulatedTime()
+            expect(run.currentTimeMs()).toBeGreaterThanOrEqual(expectedMs)
+        })
+
+        it('snapshot and restore round-trip simulatedTimeMs', () => {
+            const run = new FusionRun()
+            run.setSimulatedTime('2026-07-31T08:24:12.899Z')
+
+            const snap = run.snapshot()
+            expect(snap.simulatedTimeMs).toBe(Date.parse('2026-07-31T08:24:12.899Z'))
+
+            run.clearSimulatedTime()
+            expect(run.currentTimeMs()).not.toBe(snap.simulatedTimeMs)
+
+            run.restore(snap)
+            expect(run.currentTimeMs()).toBe(snap.simulatedTimeMs)
+        })
+    })
+
     it('fusionAccountsIterable yields registered accounts without copying the map', () => {
         const run = new FusionRun()
         const fa1 = { name: 'fa1', managedKey: 'k1' } as FusionAccount
@@ -427,6 +458,7 @@ function makeMockRecorder(): ManagedAccountAnalysisRecording & {
     }
     return recorder
 }
+
 
 
 
