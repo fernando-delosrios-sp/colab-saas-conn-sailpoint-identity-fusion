@@ -132,11 +132,38 @@ function buildReplayConfig(scenario, scenarioRef) {
     }
 }
 
-function buildStepCommand(step, scenario, scenarioRef) {
+function loadStepTimestamps(dir) {
+    const stepsPath = path.join(dir, 'steps.ndjson')
+    if (!fs.existsSync(stepsPath)) return {}
+
+    const timestamps = {}
+    for (const line of fs.readFileSync(stepsPath, 'utf-8').trim().split('\n')) {
+        if (!line) continue
+        try {
+            const step = JSON.parse(line)
+            if (step.stepId && step.timestamp) {
+                timestamps[step.stepId] = step.timestamp
+            }
+        } catch {
+            /* skip malformed lines */
+        }
+    }
+    return timestamps
+}
+
+function buildStepCommand(step, scenario, scenarioRef, stepTimestamps = {}) {
+    const replayConfig = buildReplayConfig(scenario, scenarioRef)
+    const replayStepTimestamp = stepTimestamps[step.id] ?? scenario.recordedAt
     return {
         type: operationTypeMap(step.operation),
         input: step.input ?? {},
-        config: buildReplayConfig(scenario, scenarioRef),
+        config: {
+            ...replayConfig,
+            recording: {
+                ...replayConfig.recording,
+                ...(replayStepTimestamp ? { replayStepTimestamp } : {}),
+            },
+        },
     }
 }
 
@@ -233,6 +260,7 @@ async function runScenarioReplay({
     scriptsDir = path.join(__dirname, '..'),
 }) {
     const { dir, scenarioRef: normalizedRef, scenario } = validateScenarioDir(scenarioRef)
+    const stepTimestamps = loadStepTimestamps(dir)
     const port = flags.port ?? 3000
     const baseUrl = `http://localhost:${port}`
     const steps = flags.step ? scenario.steps.filter((s) => s.id === flags.step) : scenario.steps
@@ -265,7 +293,7 @@ async function runScenarioReplay({
             }
 
             try {
-                const command = buildStepCommand(step, scenario, normalizedRef)
+                const command = buildStepCommand(step, scenario, normalizedRef, stepTimestamps)
                 const outputs = await postStep(baseUrl, command)
                 stepResult.outputCount = outputs.length
 
@@ -333,6 +361,7 @@ module.exports = {
     parseOrchestratorArgv,
     validateScenarioDir,
     buildReplayConfig,
+    loadStepTimestamps,
     buildStepCommand,
     parseNdjsonResponse,
     compareOutputs,
@@ -340,3 +369,4 @@ module.exports = {
     writeReplayReport,
     printStepBanner,
 }
+

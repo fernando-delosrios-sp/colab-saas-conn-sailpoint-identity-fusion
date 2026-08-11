@@ -7,6 +7,7 @@ import { writePassingScenario } from './fixtures/minimalRecordingFixture'
 const require = createRequire(import.meta.url)
 const {
     buildStepCommand,
+    loadStepTimestamps,
     parseNdjsonResponse,
     runScenarioReplay,
     validateScenarioDir,
@@ -50,12 +51,18 @@ describe('scenario replay orchestrator', () => {
     })
 
     it('buildStepCommand maps operation to SDK type and replay recording config', () => {
-        const { scenario } = validateScenarioDir(scenarioRef)
-        const command = buildStepCommand(scenario.steps[0], scenario, scenarioRef)
+        const { scenario, dir } = validateScenarioDir(scenarioRef)
+        fs.writeFileSync(
+            path.join(tempDir, 'steps.ndjson'),
+            JSON.stringify({ stepId: 'step-1', timestamp: '2026-07-31T08:24:12.899Z' }) + '\n'
+        )
+        const stepTimestamps = loadStepTimestamps(dir)
+        const command = buildStepCommand(scenario.steps[0], scenario, scenarioRef, stepTimestamps)
         expect(command.type).toBe('std:entitlement:list')
         expect(command.input).toEqual({ type: 'status' })
         expect(command.config.recording?.mode).toBe('replay')
         expect(command.config.recording?.scenarioName).toBe(scenarioRef)
+        expect(command.config.recording?.replayStepTimestamp).toBe('2026-07-31T08:24:12.899Z')
     })
 
     it('parseNdjsonResponse collects connector output lines', () => {
@@ -149,3 +156,4 @@ describe('scenario replay orchestrator', () => {
         expect(saved.stepResults[0].stepId).toBe('step-1')
     })
 })
+

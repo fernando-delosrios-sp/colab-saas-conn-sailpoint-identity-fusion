@@ -500,6 +500,8 @@ export interface RecordingConfig {
     verbose?: boolean
     /** Persistence backend for record-mode artifacts. Default `'ndjson'`. */
     store?: 'ndjson' | 'sqlite'
+    /** Ephemeral per-step timestamp for replay stale-form simulation (orchestrator only). */
+    replayStepTimestamp?: string
 }
 
 // ============================================================================
@@ -523,6 +525,7 @@ export interface FusionConfig
         InternalConfig {
     recording?: RecordingConfig
 }
+
 
 
 
