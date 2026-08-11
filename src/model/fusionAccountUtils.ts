@@ -11,12 +11,20 @@ export function resolveFusionAccountNameOrDisplayName(
     return account.name || account.displayName || fallback
 }
 
-/** Identity-side display label: identity.attributes.displayName || identity.name. */
+/** Identity-side display label: identity.displayName || identity.attributes.displayName || identity.name. */
+export function resolveIdentityDocumentDisplayName(identity?: IdentityDocument | null): string | undefined {
+    if (!identity) return undefined
+    return (
+        trimStr(identity.displayName) ??
+        trimStr((identity.attributes as Record<string, unknown> | undefined)?.displayName) ??
+        trimStr(identity.name) ??
+        undefined
+    )
+}
+
+/** @deprecated internal alias */
 function identityDisplayNameFromIdentity(identity: IdentityDocument): string | undefined {
-    const fromAttrs = (identity.attributes as Record<string, unknown> | undefined)?.displayName as
-        | string
-        | undefined
-    return trimStr(fromAttrs) ?? trimStr(identity.name) ?? undefined
+    return resolveIdentityDocumentDisplayName(identity)
 }
 
 /** Account-side display label: account.identity?.name || account.name. */
@@ -80,5 +88,6 @@ export function buildIdentityInfo(
         displayName: displayName ?? name ?? '',
     }
 }
+
 
 

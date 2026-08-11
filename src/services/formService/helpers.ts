@@ -5,6 +5,7 @@ import { logger } from '@sailpoint/connector-sdk'
 import { SourceService } from '../sourceService'
 import { assert } from '../../utils/assert'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { isReportableIscAccountId } from '../fusionService/reportAccountResolver'
 import { getFusionReportAccountLabel } from '../fusionService/helpers'
 import { FusionMatch } from '../matchingService/types'
 import { Candidate } from './types'
@@ -31,11 +32,12 @@ export function createAutomaticMergeDecision(
 ): FusionDecision {
     const accountKey = getManagedAccountKeyFromAccount(account)
     assert(accountKey, 'Managed account missing composite key for automatic merge decision')
+    const iscAccountId = [trimStr(fusionAccount.iscAccountId), trimStr(account.id)].find(isReportableIscAccountId)
     return {
         submitter: { id: 'system', email: '', name: 'System (automatic merge)' },
         account: {
             id: accountKey,
-            iscAccountId: trimStr(account.id),
+            ...(iscAccountId ? { iscAccountId } : {}),
             name: fusionAccount.name ?? account.name ?? '',
             sourceName: fusionAccount.sourceName,
             sourceId: readString(account, 'sourceId'),
@@ -201,6 +203,7 @@ export const getFormOwner = (sources: SourceService): OwnerDto => {
     assert(owner, 'Fusion source owner not found')
     return owner
 }
+
 
 
 

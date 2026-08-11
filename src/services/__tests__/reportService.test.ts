@@ -31,6 +31,7 @@ describe('ReportService', () => {
         const identities = {
             getIdentityById: vi.fn((id?: string) => (id ? { id, displayName: `Name ${id}` } : undefined)),
             hydrateMissingIdentitiesById: vi.fn(async () => undefined),
+            ensureIdentityById: vi.fn(async (id?: string) => (id ? { id, displayName: `Name ${id}` } : undefined)),
         }
         const forms = {
             finishedFusionDecisions: [],
@@ -129,6 +130,38 @@ describe('ReportService', () => {
     })
 
 
+
+    it('resolves reviewer display name from identity.name when displayName is absent', () => {
+        const reviewerId = '9d86f225e3a24b1a9e3d10d92ec12005'
+        const { service } = createService({
+            identities: {
+                getIdentityById: vi.fn((id?: string) =>
+                    id === reviewerId ? { id, name: 'fernando.delosrios' } : undefined
+                ),
+            },
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        identityId: 'id-100',
+                        newIdentity: false,
+                        submitter: { id: reviewerId, name: '' },
+                        account: {
+                            id: 'src-a::native-1',
+                            iscAccountId: 'isc-1',
+                            name: 'Target Account',
+                            sourceName: 'Source Alpha',
+                        },
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+
+        expect(decisions[0].reviewerName).toBe('fernando.delosrios')
+        expect(decisions[0].reviewerName).not.toBe(reviewerId)
+    })
+
     it('resolves reviewer display name from identity cache when submitter name equals reviewer id', () => {
         const reviewerId = '9d86f225e3a24b1a9e3d10d92ec12005'
         const { service } = createService({
@@ -189,6 +222,34 @@ describe('ReportService', () => {
             'https://example.identitynow.com/ui/a/admin/accounts-management/human-accounts/isc-account-1'
         )
         expect(decisions[0].accountUrl).not.toContain('::')
+    })
+
+
+    it('uses stored iscAccountId for automatic merge review decisions after managed account caches clear', () => {
+        const { service } = createService({
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        identityId: 'id-auto',
+                        newIdentity: false,
+                        automaticMerge: true,
+                        submitter: { id: 'system', name: 'System (automatic merge)' },
+                        account: {
+                            id: 'src-a::native-auto',
+                            iscAccountId: 'isc-auto-1',
+                            name: 'Auto User',
+                            sourceName: 'Source Auto',
+                        },
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+
+        expect(decisions[0].accountUrl).toBe(
+            'https://example.identitynow.com/ui/a/admin/accounts-management/human-accounts/isc-auto-1'
+        )
     })
 
     it('does not emit account URL when only a composite managed account key is available', () => {
@@ -401,6 +462,32 @@ describe('ReportService', () => {
         expect(stats.totalFusionAccounts).toBe(42)
     })
 
+
+    it('preloads reviewer identities via ensureIdentityById before rendering decisions', async () => {
+        const reviewerId = 'rev-preload'
+        const ensureIdentityById = vi.fn(async (id: string) => ({ id, name: `Resolved ${id}` }))
+        const { service } = createService({
+            identities: {
+                getIdentityById: vi.fn(() => undefined),
+                ensureIdentityById,
+            },
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        identityId: 'id-target',
+                        submitter: { id: reviewerId, name: '' },
+                        account: { id: 'src-a::nat', name: 'A', sourceName: 'S' },
+                    },
+                ],
+            },
+        })
+
+        await service.hydrateIdentitiesForReportDecisions()
+
+        expect(ensureIdentityById).toHaveBeenCalledWith(reviewerId)
+        expect(ensureIdentityById).toHaveBeenCalledWith('id-target')
+    })
+
     it('preloads reviewer and selected identity objects before rendering decisions', async () => {
         const { service, deps } = createService({
             forms: {
@@ -417,9 +504,8 @@ describe('ReportService', () => {
 
         await service.hydrateIdentitiesForReportDecisions()
 
-        expect(deps.identities.hydrateMissingIdentitiesById).toHaveBeenCalledWith(
-            expect.arrayContaining(['id-reviewer', 'id-target'])
-        )
+        expect(deps.identities.ensureIdentityById).toHaveBeenCalledWith('id-reviewer')
+        expect(deps.identities.ensureIdentityById).toHaveBeenCalledWith('id-target')
     })
 
     it('delegates dry-run report delivery to email service directly', async () => {

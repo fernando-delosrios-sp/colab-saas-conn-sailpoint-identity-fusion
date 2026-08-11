@@ -46,6 +46,11 @@ import {
     getReviewerInfo,
 } from './formProcessor'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
+import { resolveIdentityDocumentDisplayName } from '../../model/fusionAccountUtils'
+import {
+    isReportableIscAccountId,
+    resolveManagedAccountIscIdForReport,
+} from '../fusionService/reportAccountResolver'
 import { FormLifecycle } from './formLifecycle'
 import { analyzeFormInstances } from './formInstanceAnalyzer'
 import {
@@ -811,11 +816,63 @@ export class FormService {
      * processFusionIdentityDecisions (new-identity/no-match decisions from forms).
      */
     public registerFinishedDecision(decision: FusionDecision, includeInProcessingQueue: boolean = false): void {
-        this.finishedFusionDecisionsValue.push(decision)
-        this.run.addFinishedFusionDecision(decision)
+        const enrichedDecision = this.enrichDecisionForReport(decision)
+        this.finishedFusionDecisionsValue.push(enrichedDecision)
+        this.run.addFinishedFusionDecision(enrichedDecision)
         if (!includeInProcessingQueue) return
         assert(this.run.fusionIdentityDecisions, 'Fusion identity decisions not fetched')
-        this.run.addDecision(decision)
+        this.run.addDecision(enrichedDecision)
+    }
+
+    /**
+     * Capture the ISC account id on the decision while managed-account caches are still warm.
+     * Report rendering runs after cache clear and must not fall back to composite keys.
+     */
+    private enrichDecisionAccountIscId(decision: FusionDecision): FusionDecision {
+        const account = decision.account
+        const existingId = trimStr(account.iscAccountId)
+        if (isReportableIscAccountId(existingId)) {
+            return decision
+        }
+
+        const resolvedId = resolveManagedAccountIscIdForReport(account.id, this.sources, this.run, {
+            identityId: decision.identityId,
+        })
+        if (!isReportableIscAccountId(resolvedId)) {
+            return decision
+        }
+
+        return {
+            ...decision,
+            account: {
+                ...account,
+                iscAccountId: resolvedId,
+            },
+        }
+    }
+
+
+    private enrichDecisionSubmitterName(decision: FusionDecision): FusionDecision {
+        const submitterId = trimStr(decision.submitter?.id)
+        if (!submitterId || submitterId === 'system') return decision
+
+        const currentName = trimStr(decision.submitter?.name)
+        if (currentName && currentName !== submitterId) return decision
+
+        const label = resolveIdentityDocumentDisplayName(this.identities?.getIdentityById?.(submitterId))
+        if (!label || label === submitterId) return decision
+
+        return {
+            ...decision,
+            submitter: {
+                ...decision.submitter,
+                name: label,
+            },
+        }
+    }
+
+    private enrichDecisionForReport(decision: FusionDecision): FusionDecision {
+        return this.enrichDecisionSubmitterName(this.enrichDecisionAccountIscId(decision))
     }
 
     /**
