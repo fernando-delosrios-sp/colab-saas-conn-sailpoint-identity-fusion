@@ -12,3 +12,6 @@
 
 **Learning:** When multiple functions iterate over mixed-type arrays (e.g., parsing varying SDK shapes like strings or objects) to extract normalized string values, the loop and type-checking logic is often duplicated (e.g. in `toSetFromAttribute` and `normalizeActionTokens`).
 **Action:** Encapsulate the loop and type-checking logic into a shared helper function (like `normalizeArrayItems`) to eliminate duplicate code blocks, clarify intent, and ensure consistency when handling these mixed-type arrays.
+## 2026-08-11 - Abstract Fallback Chains
+**Learning:** The codebase frequently uses chained nullish coalescing (`??`) operations to check multiple object properties (e.g., `readUnknown(attrs, 'email') ?? readUnknown(attrs, 'mail')`). This is repetitive and hard to scan.
+**Action:** Replace these chains with a variadic helper like `readFirstUnknown` to encapsulate the fallback logic, improve DRYness, and clarify intent. When replacing all usages in a file, remember to remove the original unused import to prevent lint errors.

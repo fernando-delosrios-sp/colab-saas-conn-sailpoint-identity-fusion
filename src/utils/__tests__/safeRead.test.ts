@@ -14,6 +14,7 @@ import {
     readPathUnknown,
     readString,
     readUnknown,
+    readFirstUnknown,
     trimStr,
 } from '../safeRead'
 
@@ -65,6 +66,15 @@ describe('safeRead', () => {
         expect(readUnknown(undefined, 'obj')).toBeUndefined()
         expect(readArray<string>(source, 'ids')).toEqual(['a', 'b'])
         expect(readArray<string>(source, 'none', [])).toEqual([])
+    })
+
+    it('reads first unknown safely', () => {
+        const source = { a: null, b: undefined, c: 0, d: 'test', e: '' }
+        expect(readFirstUnknown(source, 'a', 'b', 'c')).toBe(0)
+        expect(readFirstUnknown(source, 'a', 'b', 'e')).toBe('')
+        expect(readFirstUnknown(source, 'missing1', 'missing2', 'd')).toBe('test')
+        expect(readFirstUnknown(source, 'missing1', 'missing2')).toBeUndefined()
+        expect(readFirstUnknown(undefined, 'a')).toBeUndefined()
     })
 
     it('reads nested paths safely', () => {
