@@ -61,3 +61,6 @@
 ## 2026-05-24 - Avoid Array.from(set) chaining for iteration
 **Learning:** Calling `Array.from(set)` just to iterate over the items (e.g., via `for...of` or `.map()`, `.filter()`, `.some()`) is an anti-pattern that creates unnecessary intermediate arrays and heap allocations, hurting performance in hot paths (like in `fusionAccount.ts`).
 **Action:** Instead of converting the Set to an Array, iterate over it directly using a `for...of` loop or use dedicated iterators.
+## 2024-05-24 - promiseAllBatched for concurrent iteration
+**Learning:** Found multiple usages of an unbounded `Promise.all` wrapping `.map()` operations over variable-size lists (like multiple configuration sources) in `src/services/sourceService`. Unbounded parallel execution can easily trigger API rate limiting or spike memory usage as dataset sizes grow.
+**Action:** Used `promiseAllBatched` utility to cap parallel execution, which is an ideal drop-in replacement pattern across the identity-fusion repository when processing collections without throttling.
