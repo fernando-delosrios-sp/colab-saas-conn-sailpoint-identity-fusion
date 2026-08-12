@@ -6,6 +6,7 @@ import { isCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { IdentityService } from '../identityService'
 import { assert } from '../../utils/assert'
 import { readString, trimStr } from '../../utils/safeRead'
+import { resolveIdentityDisplayLabel } from '../../model/fusionAccountUtils'
 import { FusionAttribute } from '../../data/schema'
 
 // ============================================================================
@@ -273,8 +274,7 @@ export const createFusionDecision = async (
     if (identities && (!reviewer.name || reviewer.name === reviewerIdentityId || !reviewer.email)) {
         try {
             const fetched = await identities.fetchIdentityById(reviewerIdentityId)
-            const displayName =
-                fetched?.displayName || (fetched as any)?.attributes?.displayName || fetched?.name || reviewer.name
+            const displayName = resolveIdentityDisplayLabel(fetched) || reviewer.name
             const email = (fetched as any)?.attributes?.email || reviewer.email
             if (displayName) reviewer.name = displayName
             if (email) reviewer.email = email
@@ -299,7 +299,7 @@ export const createFusionDecision = async (
                 correlated = undefined
             }
         }
-        const correlatedName = correlated?.displayName || correlated?.attributes?.displayName || correlated?.name
+        const correlatedName = resolveIdentityDisplayLabel(correlated)
         if (correlatedName) {
             accountInfo = { ...accountInfo, name: correlatedName }
         }
@@ -313,12 +313,7 @@ export const createFusionDecision = async (
             selectedIdentity = undefined
         }
     }
-    const selectedIdentityName = existingIdentity
-        ? selectedIdentity?.displayName ||
-          (selectedIdentity as any)?.attributes?.displayName ||
-          selectedIdentity?.name ||
-          undefined
-        : undefined
+    const selectedIdentityName = existingIdentity ? resolveIdentityDisplayLabel(selectedIdentity) : undefined
 
     // Defensive: ensure decision.account fields are strings so templates never render "[object Object]".
     const sourceIdNorm = normalizeScalar((accountInfo as any)?.sourceId)

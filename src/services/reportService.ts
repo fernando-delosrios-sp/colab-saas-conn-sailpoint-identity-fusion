@@ -1,6 +1,7 @@
 import { SourceType } from '../model/config'
 import { FusionDecision } from '../model/form'
 import { readString, trimStr } from '../utils/safeRead'
+import { resolveIdentityDisplayLabel } from '../model/fusionAccountUtils'
 import { createUrlContext } from '../utils/url'
 import { PhaseTimer } from './logService'
 import { mkdir, writeFile } from 'fs/promises'
@@ -115,12 +116,7 @@ class FusionReviewDecisionResolver {
     resolveReviewerName(reviewerId?: string): string | undefined {
         if (!reviewerId) return undefined
         const reviewer = this.identities?.getIdentityById?.(reviewerId)
-        return (
-            (reviewer as any)?.displayName ||
-            (reviewer as any)?.attributes?.displayName ||
-            (reviewer as any)?.name ||
-            undefined
-        )
+        return resolveIdentityDisplayLabel(reviewer)
     }
 
     resolveReviewerUrl(reviewerId?: string): string | undefined {
@@ -168,11 +164,7 @@ class FusionReviewDecisionResolver {
     ): { selectedIdentityName?: string; selectedIdentityUrl?: string } {
         if (!identityId) return {}
         const identity = this.identities?.getIdentityById?.(identityId)
-        const selectedIdentityName =
-            (identity as any)?.displayName ||
-            (identity as any)?.attributes?.displayName ||
-            (identity as any)?.name ||
-            undefined
+        const selectedIdentityName = resolveIdentityDisplayLabel(identity)
         return { selectedIdentityName, selectedIdentityUrl: this.urlContext.identity(identityId) }
     }
 }

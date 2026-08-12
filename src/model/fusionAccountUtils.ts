@@ -11,6 +11,12 @@ export function resolveFusionAccountNameOrDisplayName(
     return account.name || account.displayName || fallback
 }
 
+/** Generic display label resolver for identity-like objects. */
+export function resolveIdentityDisplayLabel(identity: any): string | undefined {
+    if (!identity) return undefined
+    return identity.displayName || identity.attributes?.displayName || identity.name || undefined
+}
+
 /** Identity-side display label: identity.attributes.displayName || identity.name. */
 function identityDisplayNameFromIdentity(identity: IdentityDocument): string | undefined {
     const fromAttrs = (identity.attributes as Record<string, unknown> | undefined)?.displayName as
