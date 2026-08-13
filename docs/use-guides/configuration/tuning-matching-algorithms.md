@@ -17,7 +17,7 @@ Matching algorithms calculate **similarity scores** (0–100) between attribute 
 | Component                         | Purpose                                                        | Configuration location                                                              |
 | --------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | **Fusion attribute matches**      | Define which attributes to compare                             | Attribute Matching Settings → Matching Settings                                     |
-| **Matching algorithm**            | How to calculate similarity                                    | Per attribute (Enhanced Name Matcher, Jaro-Winkler, Dice, Double Metaphone, Custom) |
+| **Matching algorithm**            | How to calculate similarity                                    | Per attribute (Enhanced Name Matcher, Jaro-Winkler, Dice, Double Metaphone, Binary, Custom Algorithm (Velocity)) |
 | **Minimum similarity (per rule)** | Threshold for that rule; also its weight in the combined score | Per attribute (0–100)                                                               |
 | **Minimum combined match score**  | Global floor for the weighted combined score                   | Matching Settings (0–100)                                                           |
 | **Mandatory match**               | Rule must pass its minimum for a potential match               | Per attribute (Yes/No)                                                              |
@@ -38,7 +38,7 @@ Matching algorithms calculate **similarity scores** (0–100) between attribute 
 | **Double Metaphone**      | Names with spelling variations, phonetic matching | Catches "Catherine"/"Katherine", "John"/"Jon", "Smith"/"Smyth"         | May generate false positives for short names; language-dependent | Low                |
 | **LIG3**                  | Compound identifiers, names with missing parts    | Excellent with international accents and compound gap handling         | Heavily punishes transpositions (e.g. inverted dates/names)      | High               |
 | **Binary (Exact Match)**  | Stable identifiers (employee ID, email, UUID)      | Trivial threshold configuration (any value below 100 is a non-match) | Case- and whitespace-sensitive; no tolerance for variation        | Lowest             |
-| **Custom**                | Domain-specific requirements                      | Your own logic via SaaS customizer                                     | Requires development and testing                                 | Variable           |
+| **Custom Algorithm (Velocity)** | Domain-specific requirements                      | Inline Apache Velocity per rule; no separate customizer package              | Requires expression design and testing                           | Low                |
 
 ### Decision tree: Which algorithm to use?
 
@@ -64,7 +64,7 @@ What type of attribute are you comparing?
 │  └─ After normalization → Jaro-Winkler
 │
 └─ Custom business logic
-   └─ Custom (from SaaS customizer)
+   └─ Custom Algorithm (Velocity)
 ```
 
 ---
@@ -317,28 +317,42 @@ What type of attribute are you comparing?
 - You expect transpositions (e.g. swapped DOBs, or swapped first/last names). LIG3 heavily penalizes misordered data.
 - Short substrings or pure typographical error matching—Jaro-Winkler handles typos better.
 
-### Custom (from SaaS customizer)
+### Custom Algorithm (Velocity)
 
-**Purpose:** Domain-specific matching logic implemented in a [SailPoint SaaS Connectivity Customizer](https://developer.sailpoint.com/docs/connectivity/saas-connectivity/customizers).
+**Purpose:** Domain-specific matching logic implemented as an Apache Velocity expression on the Fusion attribute match rule.
+
+**How it works:**
+
+- Select **Custom Algorithm (Velocity)** as the matching algorithm.
+- Provide a **Custom match score (Velocity)** template evaluated for each account/identity pair.
+- The template must render a numeric similarity score **0–100** (values are clamped to that range).
+- Context variables: `$accountValue` (source account attribute), `$candidateValue` (candidate identity attribute), `$attribute` (rule attribute name).
 
 **When to use:**
 
-- None of the built-in algorithms fit your needs
-- You have proprietary matching logic (e.g., industry-specific identifiers)
-- You need to call external APIs for matching (e.g., third-party identity resolution service)
-- Complex business rules (e.g., "match if first 3 chars + last 2 chars identical")
+- None of the built-in algorithms fit your comparison logic
+- You need structured parsing (for example employee ID segments) before scoring
+- You want conditional scoring (exact match → 100, partial match → partial score, else 0)
 
-**Implementation:**
+**When NOT to use:**
 
-- Develop custom algorithm in a [Connectivity Customizer](https://developer.sailpoint.com/docs/connectivity/saas-connectivity/customizers)
-- Return similarity score 0–100
-- Configure as "Custom" in Fusion attribute match
+- A built-in algorithm already covers the case — prefer those for maintainability
+- You need heavy normalization — do that in **Define** first, then score with a simpler rule or **Binary**
+- You expected a separate SaaS Connectivity Customizer package — custom matching is configured inline on the rule
 
 **Examples:**
 
-- Parse and compare structured employee IDs (e.g., "EMP-2024-001234")
-- Call external identity verification service
-- Apply industry-specific matching rules (healthcare NPI, financial institution codes)
+```velocity
+## Exact match after upstream normalization
+#if($accountValue == $candidateValue)100#else 0#end
+```
+
+```velocity
+## Prefix match on employee IDs (first 3 characters)
+#if($accountValue.substring(0, 3) == $candidateValue.substring(0, 3))85#else 0#end
+```
+
+**Configuration reference:** [Attribute Matching Settings](../../configuration/matching.md) — `algorithm` = `custom`, `customVelocityExpression`.
 
 ---
 
@@ -351,7 +365,8 @@ For each **Fusion attribute match**, configure:
 | Field                          | Purpose                                   | Options / Notes                                                                                      |
 | ------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | **Attribute**                  | Identity attribute name to compare        | Must exist on identities in scope; examples: `name`, `email`, `firstname`, `lastname`, `displayName` |
-| **Matching algorithm**         | Algorithm to calculate similarity         | Enhanced Name Matcher, Jaro-Winkler, Dice, Double Metaphone, Binary (Exact Match), Custom            |
+| **Matching algorithm**         | Algorithm to calculate similarity         | Enhanced Name Matcher, Jaro-Winkler, Dice, Double Metaphone, Binary (Exact Match), Custom Algorithm (Velocity) |
+| **Custom match score (Velocity)** | Template when algorithm is Custom      | Apache Velocity; must output 0–100. Context: `$accountValue`, `$candidateValue`, `$attribute`                    |
 | **Minimum similarity [0-100]** | Threshold and blend weight for this rule  | Higher values are stricter and count more in the **combined match score**                            |
 | **Mandatory match?**           | Must pass this rule for a potential match | Passing mandatories contribute to the weighted combined score like other rules                       |
 
