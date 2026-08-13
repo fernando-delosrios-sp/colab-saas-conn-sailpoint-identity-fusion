@@ -293,7 +293,7 @@ export function normalizeActionTokens(raw: unknown): string[] {
  */
 export function getDisplayName(obj: Record<string, any> | undefined): string | undefined {
     if (!obj) return undefined
-    return (obj.displayName ?? obj.display_name ?? obj.name) as string | undefined
+    return (obj.displayName ?? obj.attributes?.displayName ?? obj.display_name ?? obj.name) as string | undefined
 }
 
 /**
