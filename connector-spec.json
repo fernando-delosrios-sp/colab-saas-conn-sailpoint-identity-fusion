@@ -63,7 +63,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Connection Settings",
-                    "sectionHelpMessage": "<strong>Configure how this connector connects to Identity Security Cloud.</strong><br><br>Use <strong>Identity Security Cloud API URL</strong> to specify the base URL of your ISC tenant (for example, <code>https://tenant.api.identitynow.com</code>).<br><br>Provide the <strong>Personal Access Token ID</strong> and <strong>Personal Access Token Secret</strong> for an account that has the required API permissions (Sources, Identities, Accounts, Workflows/Forms). These values are used to authenticate all connector operations.",
+                    "sectionHelpMessage": "<strong>Configure how this connector connects to Identity Security Cloud.</strong> See [Connection Settings](configuration/connection.md).",
                     "items": [
                         {
                             "key": "baseurl",
@@ -97,7 +97,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Scope",
-                    "sectionHelpMessage": "<strong>Define which identities are in scope.</strong><br><br>Limit processing using an <strong>Identity Scope Query</strong> (standard ISC search syntax). Toggle <strong>Include identities in the scope</strong> to establish a baseline for Match.",
+                    "sectionHelpMessage": "<strong>Define which identities are in scope.</strong> See [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md).",
                     "items": [
                         {
                             "key": "includeIdentities",
@@ -120,7 +120,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Sources",
-                    "sectionHelpMessage": "<strong>Select and configure authoritative account sources.</strong><br><br><ul><li><strong>Source type & behavior:</strong> Define role (Authoritative, Record, Orphan) and handling for non-matched non-identity accounts (disable, defer).</li><li><strong>Aggregation & correlation:</strong> Control timing (delays, retries), optimized aggregation, and correlation strategy (in-process or reverse).</li><li><strong>Filtering & limits:</strong> Process subsets via API/JMESPath filters and set batch capacities.</li></ul>",
+                    "sectionHelpMessage": "<strong>Select and configure authoritative account sources.</strong> See [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md).",
                     "items": [
                         {
                             "key": "sources",
@@ -194,7 +194,7 @@
                                             "value": "true",
                                             "parentKey": "sourceType",
                                             "parentValue": "authoritative",
-                                            "helpKey": "Deferred candidate matching: after identity scoring, also compare this account to other provisional Fusion accounts from the same source in this run. See [Deferred candidate matching](configuration/source.md#deferredmatching)."
+                                            "helpKey": "Deferred candidate matching: after identity scoring, also compare this account to other provisional Fusion accounts from. See [Deferred candidate matching](configuration/source.md#deferredmatching)."
                                         },
                                         {
                                             "key": "includeRecordAccountsForMatching",
@@ -349,7 +349,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Processing Control",
-                    "sectionHelpMessage": "<strong>Control account maintenance.</strong><br><br><ul><li><strong>History limits:</strong> Cap the number of audit history messages stored per account.</li><li><strong>Delete when empty:</strong> Remove the Fusion account if all its underlying source accounts are deleted.</li><li><strong>Skip missing targets:</strong> Ignore source accounts missing a mapped native identity attribute.</li></ul>",
+                    "sectionHelpMessage": "<strong>Control account maintenance and processing behavior.</strong> See [Source Settings](configuration/source.md).",
                     "items": [
                         {
                             "key": "maxHistoryMessages",
@@ -379,7 +379,7 @@
                             "type": "toggle",
                             "value": "false",
                             "required": false,
-                            "helpKey": "When enabled, triggers aggregation of managed sources before fetching managed accounts during single account operations (e.g., accountRead). See [Enable cascade aggregation for single account read](configuration/source.md#cascadeaggregationenabled)."
+                            "helpKey": "Aggregate managed sources before single account read. See [Cascade aggregation](configuration/source.md#cascadeaggregationenabled)."
                         }
                     ]
                 }
@@ -392,7 +392,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Attribute Mapping Definitions",
-                    "sectionHelpMessage": "<strong>Map and merge source attributes.</strong><br><br>Choose a <strong>Default attribute merge</strong> mode. Then configure per-attribute rules to target specific source fields, rename them on the Fusion account, and optionally override the merge strategy or pin specific sources.",
+                    "sectionHelpMessage": "<strong>Map and merge source attributes onto Fusion accounts.</strong> See [Mapping attributes](../use-guides/configuration/mapping-attributes.md).",
                     "items": [
                         {
                             "key": "attributeMerge",
@@ -499,7 +499,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Normal Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong> Apache Velocity; optional per-definition refresh. Post-template options: case, character normalization, spaces, trim, max length.<br><br><strong>Context:</strong><br><ul><li>Mapped attributes as <code>$name</code></li><li><code>$identity</code></li><li><code>$accounts</code> — ordered by configured sources, then insertion order within each source; non-configured sources are appended</li><li><code>$account</code> — the origin snapshot (managed match, or identity-origin row when the origin is <code>Identities</code>). <code>$account</code> may differ from <code>$accounts[0]</code> because <code>$accounts</code> follows the configured source order, not the origin</li><li><code>$previous</code></li></ul><br><strong>Snapshot shape:</strong><br><ul><li>Each <code>$accounts[]</code> entry (and the per-source list in <code>$sources</code>) includes the source account attributes plus:<ul><li><code>source.id</code> / <code>source.name</code></li><li><code>schema.id</code> (native identity) / <code>schema.name</code> (display name)</li></ul></li><li>Rows from the Identities source use <code>source.name = \"Identities\"</code> with no <code>source.id</code></li></ul><br><strong>Sources map:</strong><br><ul><li><code>$sources</code> is a Map keyed by source name — access values with dot access, e.g. <code>$sources.SourceName</code></li></ul><br><strong>Order:</strong><br><ul><li>Top to bottom; each result is available to the next</li></ul><br><strong>Helpers:</strong><br><ul><li><code>$Math</code></li><li><code>$Datefns</code> — <code>format</code>, <code>parse</code>, <code>parseISO</code>, <code>getYear</code>, <code>addDays</code>/<code>Months</code>/<code>Years</code>, <code>subDays</code>/<code>Months</code>/<code>Years</code>, <code>isBefore</code>, <code>isAfter</code>, <code>isEqual</code>, <code>differenceInDays</code>, <code>startOfDay</code>, <code>endOfDay</code>, <code>now</code>, <code>isValid</code></li><li><code>$Normalize</code> — <code>date</code>, <code>phone</code>, <code>name</code>, <code>fullName</code>, <code>ssn</code>, <code>address</code>, <code>ascii</code>; <code>$Normalize.address(address, country?)</code> accepts an optional country code (<code>\"US\"</code>, <code>\"GB\"</code>, or <code>\"UK\"</code> alias) and normalizes a full state/region name to its ISO code (e.g. <code>\"California\"</code> → <code>\"CA\"</code>, <code>\"Greater London\"</code> → <code>\"LND\"</code>); defaults to <code>\"US\"</code> and falls back to the trimmed original for unsupported country codes; <code>$Normalize.ascii(input, language?)</code> transliterates non-ASCII characters to ASCII with optional language-specific digraph rules (<code>\"de\"</code>: ä→ae, ö→oe, ü→ue, ß→ss; <code>\"no\"</code>/<code>\"da\"</code>/<code>\"sv\"</code>: ä→ae, ö→oe, å→aa, ø→oe); without a language, falls back to generic transliteration; output is lowercase</li><li><code>$AddressParse</code> — <code>getCityState</code>, <code>getCityStateCode</code>, <code>parse</code>, <code>getStateName</code>, <code>getStateCode</code>; <code>$AddressParse.getStateName(code, country)</code> returns the full state/region name (or empty string for unknown codes); <code>$AddressParse.getStateCode(name, country)</code> returns the ISO code (case-insensitive; empty string for unknown names); supported countries are <code>\"US\"</code>, <code>\"GB\"</code>, and <code>\"UK\"</code> (alias for GB); <code>getCityState</code> and <code>getCityStateCode</code> are deprecated due to ambiguous city-only lookups</li><li><code>$JSON</code> — <code>stringify</code> / <code>parse</code> ( <code>parse</code> returns <code>undefined</code> for null/non-string/empty/invalid input; <code>stringify</code> returns empty string on failure)</li><li><code>$MD5</code> — callable function returning a lowercase hex MD5 digest (e.g. <code>$MD5($email)</code>); returns empty string for null, non-string, or whitespace-only input; for deterministic identifiers, not password or secret hashing</li></ul>",
+                    "sectionHelpMessage": "<strong>Define dynamic computed attributes with Apache Velocity.</strong> See [Defining attributes](../use-guides/configuration/defining-attributes.md) and [Velocity context](../reference/velocity-context.md).",
                     "items": [
                         {
                             "key": "normalAttributeDefinitions",
@@ -513,7 +513,7 @@
                             "copyButton": true,
                             "buttonLabel": "New Normal Attribute Definition",
                             "type": "cardList",
-                            "helpKey": "Define attributes whose values are defined from templates using mapped account data",
+                            "helpKey": "Define attributes whose values are defined from templates using mapped account data. See [Normal Attribute Definitions](configuration/definition.md#normalattributedefinitions).",
                             "subMenus": [
                                 {
                                     "label": "Attribute Definition",
@@ -611,7 +611,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Unique Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define persistent unique attributes</strong> (e.g. identifiers). Values stay until account <strong>reset</strong> (e.g. disable/re-enable). Runs <strong>after</strong> normal definitions on refresh — same Velocity context plus outputs from normal definitions that run first; list order applies within unique definitions too.<br><br><strong>Unique variables:</strong> <code>$counter</code> — collision mode renders the empty string on the first try and a padded suffix on subsequent attempts (padding per <strong>Minimum counter digits</strong>), retries capped by <strong>Maximum attempts</strong>; auto-appended if missing and no <code>$UUID</code> — but the auto-append is <strong>skipped</strong> when the expression contains Velocity directives (<code>#if</code>, <code>#set</code>, <code>#else</code>, <code>#end</code>, etc.) because appending after <code>#end</code> would break parsing; in that case include <code>$counter</code> explicitly. <code>$UUID</code>: a fresh v4 is generated per attempt when the expression references it. <code>$isUnique(value)</code>: a helper injected into unique expressions that returns true when the value (after applying the same case / trim / spaces / normalize / maxLength transforms the definition would apply) is not already registered as in use — useful for choosing between candidate formats before the connector falls back to automatic <code>$counter</code> disambiguation.<br><br><strong>Use incremental counter?</strong>: when on, the counter is persistent (survives across aggregations) and always increments; the first number comes from <strong>Counter start value</strong> (default 1). When off (default), the connector uses collision-based disambiguation described above.<br><br><strong>Sub-modes of Unique:</strong> include <code>$UUID</code> in the expression for UUID generation (the expression is required); toggle <strong>Use incremental counter?</strong> for sequential IDs.<br><br><strong>Helpers:</strong> <code>$Normalize</code> (<code>date</code>, <code>phone</code>, <code>name</code>, <code>fullName</code>, <code>ssn</code>, <code>address</code>, <code>ascii</code>) — <code>$Normalize.date(date, ambiguousPriority?)</code> accepts an optional priority string like <code>\"MM-dd-yyyy,dd-MM-yyyy\"</code> for ambiguous dates; <code>$Normalize.phone(phone, defaultCountry?)</code> accepts an optional default country code (e.g. <code>\"GB\"</code>) used when the input lacks an international prefix; <code>$Normalize.ascii(input, language?)</code> transliterates non-ASCII characters to ASCII with optional language-specific digraph rules (<code>\"de\"</code>: ä→ae, ö→oe, ü→ue, ß→ss; <code>\"no\"</code>/<code>\"da\"</code>/<code>\"sv\"</code>: ä→ae, ö→oe, å→aa, ø→oe); without a language, falls back to generic transliteration; output is lowercase. <code>$AddressParse</code> (<code>getCityState</code>, <code>getCityStateCode</code>, <code>parse</code>, <code>getStateName</code>, <code>getStateCode</code>). <code>getStateName(code, country)</code> returns the full state/region name (or empty string for unknown codes); <code>getStateCode(name, country)</code> returns the ISO code (case-insensitive; empty string for unknown names). Supported countries are <code>\"US\"</code>, <code>\"GB\"</code>, and <code>\"UK\"</code> (alias for GB). <code>getCityState</code> and <code>getCityStateCode</code> are deprecated due to ambiguous city-only lookups. Bad inputs render empty. <code>$Math</code> / <code>$Datefns</code> / <code>$JSON</code> (<code>stringify</code>, <code>parse</code>) / <code>$MD5</code> — see <strong>Normal Attribute Definitions</strong>.<br><br><strong>Reuse:</strong> existing values are reused unless this run refreshes the account, the account resets, or a unique value is empty (retry).",
+                    "sectionHelpMessage": "<strong>Define persistent unique identifiers.</strong> See [Defining attributes](../use-guides/configuration/defining-attributes.md) and [Unique variables](../reference/velocity-context.md#unique-only-variables).",
                     "items": [
                         {
                             "key": "maxAttempts",
@@ -633,7 +633,7 @@
                             "copyButton": true,
                             "buttonLabel": "New Unique Attribute Definition",
                             "type": "cardList",
-                            "helpKey": "Define attributes that must have a unique value across all accounts, such as usernames or employee IDs",
+                            "helpKey": "Define attributes that must have a unique value across all accounts, such as usernames or employee IDs. See [Unique Attribute Definitions](configuration/definition.md#uniqueattributedefinitions).",
                             "subMenus": [
                                 {
                                     "label": "Attribute Definition",
@@ -745,7 +745,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Matching Settings",
-                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><ul><li><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.</li><li><strong>Thresholds & weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.</li><li><strong>Automatic merge:</strong> Optionally bypass manual review and automatically merge the managed account into the matched Fusion identity if the combined score meets or exceeds your defined automatic merge threshold.</li></ul>",
+                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong> See [Matching identities](../use-guides/configuration/matching-identities.md).",
                     "items": [
                         {
                             "key": "fusionManualReviewScore",
@@ -759,7 +759,7 @@
                             "label": "Enable automatic merge",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "When enabled, merge the managed account into the matched Fusion identity without a review form if the combined score meets or exceeds the automatic merge match score. See [Enable automatic merge](configuration/matching.md#fusionenableautomerge)."
+                            "helpKey": "When enabled, merge the managed account into the matched Fusion identity without a review form if the combined score mee. See [Enable automatic merge](configuration/matching.md#fusionenableautomerge)."
                         },
                         {
                             "key": "fusionAutoMergeScore",
@@ -854,7 +854,7 @@
                                             "label": "Similarity threshold & weight [0-100]",
                                             "type": "number",
                                             "required": true,
-                                            "helpKey": "One setting, two roles: (1) minimum similarity (0-100) the rule must meet to pass, and (2) blend weight in the combined score—higher means stricter and more influence. See [Similarity threshold & weight [0-100]](configuration/matching.md#fusionscore)."
+                                            "helpKey": "One setting, two roles: (1) minimum similarity (0-100) the rule must meet to pass, and (2) blend weight in the combined . See [Similarity threshold & weight [0-100]](configuration/matching.md#fusionscore)."
                                         },
                                         {
                                             "key": "mandatory",
@@ -875,7 +875,7 @@
                                             "label": "Skip match if threshold not met",
                                             "type": "toggle",
                                             "required": false,
-                                            "helpKey": "When enabled, this rule is excluded from the weighted combined match score if its computed similarity is below its minimum similarity (Similarity threshold & weight). See [Skip match if threshold not met](configuration/matching.md#skipmatchifthresholdnotmet)."
+                                            "helpKey": "When enabled, this rule is excluded from the weighted combined match score if its computed similarity is below its minim. See [Skip match if threshold not met](configuration/matching.md#skipmatchifthresholdnotmet)."
                                         }
                                     ]
                                 }
@@ -886,7 +886,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Review Settings",
-                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong><br><br>Define <strong>Form attributes</strong> to display to reviewers and set candidate limits. Assign global reviewers to act as fail-safes and optionally email them processing reports after each aggregation.",
+                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong> See [Review forms and reviewers](../use-guides/configuration/review-forms-and-reviewers.md).",
                     "items": [
                         {
                             "key": "fusionFormAttributes",
@@ -916,21 +916,21 @@
                             "label": "Owners are global reviewers?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Always add the source owner and any member of the source's assigned governance group as reviewers on every review form, ensuring someone is always assigned to review potential matc. See [Owners are global reviewers?](configuration/matching.md#fusionownerisglobalreviewer)."
+                            "helpKey": "Always add the source owner and any member of the source's assigned governance group as reviewers on every review form, . See [Owners are global reviewers?](configuration/matching.md#fusionownerisglobalreviewer)."
                         },
                         {
                             "key": "fusionReportOnAggregation",
                             "label": "Send report to owner on aggregation?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Send a summary report to the source owner after each run, including potential matches, processing outcomes, and source-type breakdown metrics. See [Send report to owner on aggregation?](configuration/matching.md#fusionreportonaggregation)."
+                            "helpKey": "Send a summary report to the source owner after each run, including potential matches, processing outcomes, and source-t. See [Send report to owner on aggregation?](configuration/matching.md#fusionreportonaggregation)."
                         },
                         {
                             "key": "enableLocalization",
                             "label": "Enable localized user communications?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Localize emails, aggregation reports, and Fusion review forms. Identity Language Attribute overrides Default Language for emails and reports; Fusion review forms use Default Language only. See [Enable localized user communications?](configuration/matching.md#enablelocalization)."
+                            "helpKey": "Localize emails, aggregation reports, and Fusion review forms. See [Enable localized user communications?](configuration/matching.md#enablelocalization)."
                         },
                         {
                             "key": "defaultLanguage",
@@ -939,7 +939,7 @@
                             "required": false,
                             "parentKey": "enableLocalization",
                             "parentValue": "true",
-                            "helpKey": "Leave unset for English. When set, connector-wide fallback when the reviewer's identity language is not set. Also the only locale used for Fusion review forms. See [Default Language](configuration/matching.md#defaultlanguage).",
+                            "helpKey": "Leave unset for English. See [Default Language](configuration/matching.md#defaultlanguage).",
                             "options": [
                                 {
                                     "label": "Spanish",
@@ -986,7 +986,7 @@
                             "required": false,
                             "parentKey": "enableLocalization",
                             "parentValue": "true",
-                            "helpKey": "Identity attribute containing the reviewer's preferred language. Overrides Default Language for emails and reports; does not affect Fusion review forms. See [Identity Language Attribute](configuration/matching.md#identitylanguageattribute)."
+                            "helpKey": "Identity attribute containing the reviewer's preferred language. See [Identity Language Attribute](configuration/matching.md#identitylanguageattribute)."
                         }
                     ]
                 }
@@ -999,14 +999,14 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation) and manage memory consumption during match detection by adjusting batch sizes.<br><br>The section header in ISC shows the <strong>installed connector version</strong> for reference — it updates automatically when you upgrade the connector package.",
+                    "sectionHelpMessage": "<strong>Advanced troubleshooting and performance tuning.</strong> See [Operation guides](../use-guides/operation/index.md).",
                     "items": [
                         {
                             "key": "resetAccounts",
                             "label": "Reset accounts?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "On the next aggregation only, clear all Fusion account data and emit zero accounts (rebuild from scratch on the following run). See [Reset accounts?](configuration/advanced.md#resetaccounts)."
+                            "helpKey": "On the next aggregation only, clear all Fusion account data and emit zero accounts (rebuild from scratch on the followin. See [Reset accounts?](configuration/advanced.md#resetaccounts)."
                         },
                         {
                             "key": "resetForms",
@@ -1048,14 +1048,14 @@
                 {
                     "type": "section",
                     "sectionTitle": "External Settings",
-                    "sectionHelpMessage": "<strong>Configure external infrastructure for proxy processing, logging, and recording.</strong><br><br>Enable external processing to reveal a shared target URL and password, then choose sub-options for proxy mode, chain recording, and external logging. When proxy mode is off, external logging sends HTTP POST to the target URL from ISC. When proxy mode is on, the proxy server writes logs to disk.",
+                    "sectionHelpMessage": "<strong>Configure proxy, logging, and scenario recording.</strong> See [Proxy mode](../reference/proxy-mode.md).",
                     "items": [
                         {
                             "key": "externalProcessingEnabled",
                             "label": "Enable external processing?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Gateway toggle for external infrastructure. When off, target fields and sub-options are inactive. See [Enable external processing?](configuration/advanced.md#externalprocessingenabled)."
+                            "helpKey": "Gateway toggle for external infrastructure. See [Enable external processing?](configuration/advanced.md#externalprocessingenabled)."
                         },
                         {
                             "key": "externalTargetUrl",
@@ -1064,7 +1064,7 @@
                             "required": false,
                             "parentKey": "externalProcessingEnabled",
                             "parentValue": "true",
-                            "helpKey": "Shared external target — proxy endpoint when proxy mode is on, log HTTP endpoint when proxy mode is off. See [External target URL](configuration/advanced.md#externaltargeturl)."
+                            "helpKey": "Shared external target — proxy endpoint when proxy mode is on, log HTTP endpoint when proxy mode is off. See [Server URL](configuration/advanced.md#externaltargeturl)."
                         },
                         {
                             "key": "externalTargetPassword",
@@ -1073,7 +1073,7 @@
                             "required": false,
                             "parentKey": "externalProcessingEnabled",
                             "parentValue": "true",
-                            "helpKey": "Shared secret for proxy authentication. Required when proxy mode is enabled. See [External target password](configuration/advanced.md#externaltargetpassword)."
+                            "helpKey": "Shared secret for proxy authentication. See [Password](configuration/advanced.md#externaltargetpassword)."
                         },
                         {
                             "key": "externalProxyEnabled",
@@ -1091,7 +1091,7 @@
                             "required": false,
                             "parentKey": "externalProxyEnabled",
                             "parentValue": "true",
-                            "helpKey": "Record API call chains on the proxy server for replay testing. Requires proxy mode. See [Enable chain recording?](configuration/advanced.md#externalrecordingenabled)."
+                            "helpKey": "Record API call chains on the proxy server for replay testing. See [Enable chain recording?](configuration/advanced.md#externalrecordingenabled)."
                         },
                         {
                             "key": "recordingName",
@@ -1109,7 +1109,7 @@
                             "required": false,
                             "parentKey": "externalProcessingEnabled",
                             "parentValue": "true",
-                            "helpKey": "Stream connector logs to external infrastructure. Routing depends on role: HTTP POST from ISC, disk append on proxy server, noop on proxy client. See [Enable external logging?](configuration/advanced.md#externalloggingenabled)."
+                            "helpKey": "Stream connector logs to external infrastructure. See [Enable external logging?](configuration/advanced.md#externalloggingenabled)."
                         },
                         {
                             "key": "externalLoggingLevel",
@@ -1143,7 +1143,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Advanced Connection Settings",
-                    "sectionHelpMessage": "<strong>Fine-tune API limits and execution resilience.</strong><br><br>Adjust these parameters to prevent the connector from being rate-limited by Identity Security Cloud, ensure long-running operations complete without timing out, and optimize the throughput by adjusting request concurrency and batching sizes.",
+                    "sectionHelpMessage": "<strong>Fine-tune API limits and execution resilience.</strong> See [Tune API performance](../use-guides/operation/tune-api-performance.md).",
                     "items": [
                         {
                             "key": "provisioningTimeout",
