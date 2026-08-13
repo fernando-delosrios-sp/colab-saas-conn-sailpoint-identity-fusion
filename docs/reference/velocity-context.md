@@ -154,6 +154,12 @@ Previous generated Fusion account state — useful for change detection or prese
 
 ## Available utilities
 
+### Empty output on failure
+
+Custom connector helpers (`$Normalize`, `$Datefns`, `$JSON`, `$AddressParse`, `$MD5`) return **empty output** when they cannot produce a valid result — for example when input is missing, null, or invalid. The attribute definition pipeline treats empty output as no value (undefined).
+
+Use `$!variable` (quiet reference) when you need missing context variables to render as empty rather than the literal `$variable` text. Native `$Math` and `$String` follow JavaScript semantics and are not wrapped.
+
 ### $Math
 
 JavaScript `Math` object — standard numeric operations.
@@ -247,7 +253,7 @@ $Normalize.name($Normalize.ascii("MÜLLER", "de"))  ## "Mueller"
 | Method | Behavior |
 | --- | --- |
 | `$JSON.stringify(obj)` | Serialize to JSON; empty string on failure |
-| `$JSON.parse(str)` | Parse JSON; `undefined` for null / empty / invalid input |
+| `$JSON.parse(str)` | Parse JSON; empty output for null / empty / invalid input |
 
 ### $MD5
 

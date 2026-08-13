@@ -1,9 +1,28 @@
 import { logger } from '@sailpoint/connector-sdk'
+import { withVelocityHelperFallback } from './velocityFallback'
 
 /**
  * Serialize / deserialize JSON in Velocity templates. stringify returns '' on failure;
  * parse returns undefined for invalid input, non-strings, or empty trimmed text.
  */
+function parseJson(text: unknown): unknown {
+    if (text === null || text === undefined) return undefined
+    if (typeof text !== 'string') return undefined
+    const trimmed = text.trim()
+    if (!trimmed) return undefined
+    try {
+        return globalThis.JSON.parse(trimmed)
+    } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error)
+        if (error instanceof SyntaxError) {
+            logger.debug(`JSON.parse failed for input ${globalThis.JSON.stringify(trimmed)}: ${msg}`)
+        } else {
+            logger.error(`JSON.parse threw unexpected error for input ${globalThis.JSON.stringify(trimmed)}: ${msg}`)
+        }
+        return undefined
+    }
+}
+
 export const JSONHelper = {
     stringify(value: unknown): string {
         try {
@@ -16,21 +35,5 @@ export const JSONHelper = {
             return ''
         }
     },
-    parse(text: unknown): unknown {
-        if (text === null || text === undefined) return undefined
-        if (typeof text !== 'string') return undefined
-        const trimmed = text.trim()
-        if (!trimmed) return undefined
-        try {
-            return globalThis.JSON.parse(trimmed)
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error)
-            if (error instanceof SyntaxError) {
-                logger.debug(`JSON.parse failed for input ${globalThis.JSON.stringify(trimmed)}: ${msg}`)
-            } else {
-                logger.error(`JSON.parse threw unexpected error for input ${globalThis.JSON.stringify(trimmed)}: ${msg}`)
-            }
-            return undefined
-        }
-    },
+    parse: withVelocityHelperFallback('JSON.parse', parseJson),
 }

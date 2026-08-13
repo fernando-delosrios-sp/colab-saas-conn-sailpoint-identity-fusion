@@ -5,31 +5,7 @@
  * Provides common date functions for use in Velocity templates
  */
 
-import { logger } from '@sailpoint/connector-sdk'
-
-/**
- * Wraps a Datefns helper that may return undefined.
- * Returns '' on failure so Velocity renders nothing instead of the raw expression.
- */
-function withDatefnsFallback<T extends (...args: any[]) => any>(
-    helperName: string,
-    fn: T
-): (...args: Parameters<T>) => Exclude<ReturnType<T>, undefined> | '' {
-    return (...args: Parameters<T>): Exclude<ReturnType<T>, undefined> | '' => {
-        try {
-            const result = fn(...args)
-            if (result === undefined) {
-                logger.debug(`Datefns.${helperName} returned undefined for input: ${JSON.stringify(args[0])}`)
-                return ''
-            }
-            return result
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error)
-            logger.error(`Datefns.${helperName} threw unexpected error for input ${JSON.stringify(args[0])}: ${msg}`)
-            return ''
-        }
-    }
-}
+import { withVelocityHelperFallback } from './velocityFallback'
 
 const FORMAT_TOKEN_REGEX = /yyyy|yy|MM|M|dd|d|HH|H|mm|m|ss|s|XXX|ZZZ|xxx|XX|ZZ|xx|X|Z|x/g
 
@@ -448,22 +424,22 @@ export function isValid(date: any): boolean {
  * This mimics the date-fns import pattern
  */
 export const Datefns = {
-    format: withDatefnsFallback('format', format),
-    parse: withDatefnsFallback('parse', parse),
-    parseISO: withDatefnsFallback('parseISO', parseISO),
-    getYear: withDatefnsFallback('getYear', getYear),
-    addDays: withDatefnsFallback('addDays', addDays),
-    addMonths: withDatefnsFallback('addMonths', addMonths),
-    addYears: withDatefnsFallback('addYears', addYears),
-    subDays: withDatefnsFallback('subDays', subDays),
-    subMonths: withDatefnsFallback('subMonths', subMonths),
-    subYears: withDatefnsFallback('subYears', subYears),
+    format: withVelocityHelperFallback('Datefns.format', format),
+    parse: withVelocityHelperFallback('Datefns.parse', parse),
+    parseISO: withVelocityHelperFallback('Datefns.parseISO', parseISO),
+    getYear: withVelocityHelperFallback('Datefns.getYear', getYear),
+    addDays: withVelocityHelperFallback('Datefns.addDays', addDays),
+    addMonths: withVelocityHelperFallback('Datefns.addMonths', addMonths),
+    addYears: withVelocityHelperFallback('Datefns.addYears', addYears),
+    subDays: withVelocityHelperFallback('Datefns.subDays', subDays),
+    subMonths: withVelocityHelperFallback('Datefns.subMonths', subMonths),
+    subYears: withVelocityHelperFallback('Datefns.subYears', subYears),
     isBefore,
     isAfter,
     isEqual,
-    differenceInDays: withDatefnsFallback('differenceInDays', differenceInDays),
-    startOfDay: withDatefnsFallback('startOfDay', startOfDay),
-    endOfDay: withDatefnsFallback('endOfDay', endOfDay),
+    differenceInDays: withVelocityHelperFallback('Datefns.differenceInDays', differenceInDays),
+    startOfDay: withVelocityHelperFallback('Datefns.startOfDay', startOfDay),
+    endOfDay: withVelocityHelperFallback('Datefns.endOfDay', endOfDay),
     now,
     isValid,
 }

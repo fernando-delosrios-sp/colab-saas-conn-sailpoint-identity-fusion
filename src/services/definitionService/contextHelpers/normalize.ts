@@ -1,9 +1,9 @@
-import { logger } from '@sailpoint/connector-sdk'
 import { CountryCode, parsePhoneNumberFromString } from 'libphonenumber-js'
 import { State } from './geo/geoData'
 import { capitalizeFirst } from '../../../utils'
 import { parseAddressSync } from './addressParse'
 import { transliterate } from 'transliteration'
+import { withVelocityHelperFallback } from './velocityFallback'
 
 /** Lowercase name particles treated as non-capitalised in proper-case formatting. */
 const NAME_PARTICLES = new Set(['van', 'von', 'de', 'del', 'della', 'di', 'da', 'le', 'la', 'der', 'den', 'du', 'y'])
@@ -59,30 +59,6 @@ const resolveLanguage = (language: string): Record<string, string> | undefined =
         }
     }
     return undefined
-}
-
-/**
- * Wraps a Normalize helper that may return undefined or throw.
- * Returns '' on failure so Velocity renders nothing instead of the raw expression.
- */
-function withNormalizeFallback<T extends (...args: any[]) => string | undefined>(
-    helperName: string,
-    fn: T
-): (...args: Parameters<T>) => string {
-    return (...args: Parameters<T>): string => {
-        try {
-            const result = fn(...args)
-            if (result === undefined) {
-                logger.debug(`Normalize.${helperName} returned undefined for input: ${JSON.stringify(args[0])}`)
-                return ''
-            }
-            return result
-        } catch (error) {
-            const msg = error instanceof Error ? error.message : String(error)
-            logger.error(`Normalize.${helperName} threw unexpected error for input ${JSON.stringify(args[0])}: ${msg}`)
-            return ''
-        }
-    }
 }
 
 type AmbiguousDateOrder = 'DMY' | 'MDY' | 'YMD'
@@ -447,11 +423,11 @@ const normalizeAscii = (input: string, language?: string): string | undefined =>
 }
 
 export const Normalize = {
-    date: withNormalizeFallback('date', normalizeDate),
-    phone: withNormalizeFallback('phone', normalizePhoneNumber),
-    name: withNormalizeFallback('name', properCaseName),
-    fullName: withNormalizeFallback('fullName', normalizeFullName),
-    ssn: withNormalizeFallback('ssn', normalizeSSN),
-    address: withNormalizeFallback('address', normalizeAddress),
-    ascii: withNormalizeFallback('ascii', normalizeAscii),
+    date: withVelocityHelperFallback('Normalize.date', normalizeDate),
+    phone: withVelocityHelperFallback('Normalize.phone', normalizePhoneNumber),
+    name: withVelocityHelperFallback('Normalize.name', properCaseName),
+    fullName: withVelocityHelperFallback('Normalize.fullName', normalizeFullName),
+    ssn: withVelocityHelperFallback('Normalize.ssn', normalizeSSN),
+    address: withVelocityHelperFallback('Normalize.address', normalizeAddress),
+    ascii: withVelocityHelperFallback('Normalize.ascii', normalizeAscii),
 }
