@@ -235,7 +235,17 @@ function htmlToMarkdown(html) {
         return ''
     }
 
+    const docsBase =
+        'https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/'
+
     let text = html
+        .replace(
+            new RegExp(`<a\\s+href="${docsBase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^"]+)"[^>]*>(.*?)</a>`, 'gi'),
+            (_, path, label) => {
+                const normalized = String(path).replace(/\/$/, '')
+                return `[${label}](../${normalized}.md)`
+            }
+        )
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<\/li>\s*<li>/gi, '\n- ')
         .replace(/<ul>\s*/gi, '\n')
@@ -259,7 +269,8 @@ function helpDescription(helpKey, pageSlug) {
     if (!helpKey) {
         return ''
     }
-    return rewriteConfigLinks(helpKey, pageSlug).trim()
+    const { stripMarkdownLinks } = require('./connector-spec-help-lib.cjs')
+    return stripMarkdownLinks(rewriteConfigLinks(helpKey, pageSlug)).trim()
 }
 
 function defaultForKey(initialValues, key) {
@@ -311,29 +322,29 @@ function fieldExplanation(pageSlug, item) {
 /** @type {Record<string, string>} */
 const SECTION_INTRO_OVERRIDES = {
     'Connection Settings':
-        'Configure the ISC tenant API URL and Personal Access Token credentials used to authenticate all connector operations.\n\nSee [ISC PAT scopes](../reference/pat-scopes.md) for required API permissions.',
+        '**Configure how this connector connects to Identity Security Cloud.**\n\nUse **Identity Security Cloud API URL** to specify the base URL of your ISC tenant (for example, `https://tenant.api.identitynow.com`).\n\nProvide the **Personal Access Token ID** and **Personal Access Token Secret** for an account that has the required API permissions (Sources, Identities, Accounts, Workflows/Forms). These values authenticate all connector operations.\n\nSee also: [Tune API performance](../use-guides/operation/tune-api-performance.md) · [ISC PAT scopes](../reference/pat-scopes.md).',
     Scope:
-        'Limit which identities Fusion considers during Match. Toggle **Include identities in the scope** and optionally filter with an Identity Scope Query.\n\nSee [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) for deployment patterns.',
+        '**Define which identities are in scope.**\n\nLimit processing using an **Identity Scope Query** (standard ISC search syntax). Toggle **Include identities in the scope** to establish a baseline population for Match alongside managed source accounts.\n\nSee also: [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) · [Source settings reference](source.md).',
     Sources:
-        'Select authoritative, Records, or Orphan sources; control aggregation timing, correlation mode, filters, and batch limits.\n\nSee [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) and [Source types](../use-guides/configuration/source-types.md).',
+        '**Select and configure authoritative account sources.**\n\n**Source type and behavior:** Define role (Authoritative, Records, Orphan) and handling for non-matched non-identity accounts (disable, defer).\n\n**Aggregation and correlation:** Control timing (delays, retries), optimized aggregation, and correlation strategy (in-process or reverse).\n\n**Filtering and limits:** Process subsets via API/JMESPath filters and set batch capacities.\n\nSee also: [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) · [Source types](../use-guides/configuration/source-types.md).',
     'Processing Control':
-        'Control account maintenance: history limits, delete-when-empty behavior, and whether to skip source accounts missing mapped native identity attributes.',
+        '**Control account maintenance.**\n\n**History limits:** Cap the number of audit history messages stored per account.\n\n**Delete when empty:** Remove the Fusion account if all its underlying source accounts are deleted.\n\n**Skip missing targets:** Ignore source accounts missing a mapped native identity attribute.\n\nSee also: [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md).',
     'Attribute Mapping Definitions':
-        'Map source attributes to Fusion account fields and choose default or per-attribute merge strategies.\n\nSee [Mapping attributes](../use-guides/configuration/mapping-attributes.md) for multi-source examples.',
+        '**Map and merge source attributes.**\n\nChoose a **Default attribute merge** mode. Then configure per-attribute rules to target specific source fields, rename them on the Fusion account, and optionally override the merge strategy or pin specific sources.\n\nSee also: [Mapping attributes](../use-guides/configuration/mapping-attributes.md).',
     'Normal Attribute Definitions':
-        'Define computed attributes with Apache Velocity. Values can refresh each aggregation or stay static. Post-template options include case, normalization, spaces, trim, and max length.\n\nSee [Velocity context reference](../reference/velocity-context.md) for context variables (`$accounts`, `$identity`, `$previous`) and helper functions.',
+        '**Define dynamic computed attributes.** Apache Velocity; optional per-definition refresh. Post-template options: case, character normalization, spaces, trim, max length.\n\nDefinitions run top to bottom — each result is available to the next. See [Velocity context reference](../reference/velocity-context.md) for `$accounts`, `$identity`, `$previous`, and helper functions.\n\nSee also: [Defining attributes](../use-guides/configuration/defining-attributes.md).',
     'Unique Attribute Definitions':
-        'Define persistent unique identifiers (usernames, employee IDs, UUIDs). Values persist until account reset. Runs after normal definitions; supports `$counter`, `$UUID`, and `$isUnique()`.\n\nSee [Velocity context — Unique-only variables](../reference/velocity-context.md#unique-only-variables) and [Defining attributes](../use-guides/configuration/defining-attributes.md) for recipes.',
+        '**Define persistent unique attributes** (e.g. identifiers). Values stay until account **reset** (disable/re-enable). Runs **after** normal definitions on refresh.\n\nSupports `$counter`, `$UUID`, and `$isUnique()`. Use incremental counter mode for sequential IDs; otherwise the connector uses collision-based disambiguation with padding per **Minimum counter digits**.\n\nSee also: [Defining attributes](../use-guides/configuration/defining-attributes.md) · [Velocity context reference](../reference/velocity-context.md).',
     'Matching Settings':
-        'Configure per-attribute match rules, combined score thresholds, and optional automatic merge when scores exceed your threshold.\n\nSee [Tuning matching algorithms](../use-guides/configuration/tuning-matching-algorithms.md) for algorithm selection and threshold tuning.',
+        '**Configure similarity-based match detection.**\n\nEvaluate matches using **Fusion attribute matches** to calculate a **Combined match score**.\n\n**Algorithms:** Text, phonetic, and intelligent gap comparisons.\n\n**Thresholds and weights:** Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.\n\n**Automatic merge:** Optionally bypass manual review when the combined score meets your automatic merge threshold.\n\nSee also: [Matching identities](../use-guides/configuration/matching-identities.md) · [Tuning matching algorithms](../use-guides/configuration/tuning-matching-algorithms.md).',
     'Review Settings':
-        'Configure manual review forms, candidate limits, global reviewers, and optional aggregation report emails.\n\nSee [Review forms and reviewers](../use-guides/configuration/review-forms-and-reviewers.md).',
+        '**Configure manual review for potential matches.**\n\nDefine **Form attributes** to display to reviewers and set candidate limits. Assign global reviewers to act as fail-safes and optionally email them processing reports after each aggregation.\n\nSee also: [Review forms and reviewers](../use-guides/configuration/review-forms-and-reviewers.md).',
     'Developer Settings':
-        'Advanced options for account rebuild, attribute refresh, and match batch sizing. The section header shows the installed connector version.',
+        '**Advanced options for troubleshooting and performance tuning.**\n\nUse these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation) and manage memory consumption during match detection by adjusting batch sizes.\n\nThe section header in ISC shows the **installed connector version** for reference — it updates automatically when you upgrade the connector package.\n\nSee also: [Operation guides](../use-guides/operation/index.md).',
     'External Settings':
-        'Enable external processing for proxy mode, scenario recording, and external logging. Proxy off: logging POSTs from ISC. Proxy on: logs and recordings on the proxy server.\n\nSee [Proxy mode](../reference/proxy-mode.md) and [Scenario recording](../reference/scenario-recording.md).',
+        '**Configure external infrastructure for proxy processing, logging, and recording.**\n\nEnable external processing to reveal a shared target URL and password, then choose sub-options for proxy mode, scenario recording, and external logging. When proxy mode is off, external logging sends HTTP POST to the target URL from ISC. When proxy mode is on, the proxy server writes logs to disk.\n\nSee also: [Proxy mode](../reference/proxy-mode.md) · [Scenario recording](../reference/scenario-recording.md).',
     'Advanced Connection Settings':
-        'Fine-tune ISC API rate limits, retries, timeouts, concurrency, and batch sizes.\n\nSee [Tune API performance](../use-guides/operation/tune-api-performance.md).',
+        '**Fine-tune API limits and execution resilience.**\n\nAdjust these parameters to prevent the connector from being rate-limited by Identity Security Cloud, ensure long-running operations complete without timing out, and optimize throughput by adjusting request concurrency and batching sizes.\n\nSee also: [Tune API performance](../use-guides/operation/tune-api-performance.md).',
 }
 
 function renderSelectOptions(item) {

@@ -5,10 +5,11 @@ const {
     slimSpec,
     HELP_KEY_MAX,
     SECTION_HELP_MAX,
+    DOCS_BASE_URL,
 } = require('../connector-spec-help-lib.cjs')
 
 describe('connector-spec-help-lib', () => {
-    it('passes a spec with slim helpKey and sectionHelpMessage', () => {
+    it('passes a spec with ISC-compliant section and field help', () => {
         const spec = {
             sourceConfig: [
                 {
@@ -19,13 +20,14 @@ describe('connector-spec-help-lib', () => {
                             type: 'section',
                             sectionTitle: 'Connection Settings',
                             sectionHelpMessage:
-                                '<strong>Configure ISC connection.</strong> See [Connection Settings](configuration/connection.md).',
+                                '<strong>Configure ISC connection.</strong><br><br>Provide tenant URL and PAT credentials.',
+                            docLinkLabel: 'Connection settings reference',
+                            docLink: `${DOCS_BASE_URL}configuration/connection/`,
                             items: [
                                 {
                                     key: 'baseurl',
                                     label: 'API URL',
-                                    helpKey:
-                                        'Tenant API base URL. See [API URL](configuration/connection.md#baseurl).',
+                                    helpKey: 'Tenant API base URL for Identity Security Cloud.',
                                 },
                             ],
                         },
@@ -72,9 +74,79 @@ describe('connector-spec-help-lib', () => {
         expect(
             violations.some((v) => v.kind === 'sectionHelpMessage' && v.message.includes('bullet'))
         ).toBe(true)
+        expect(violations.some((v) => v.kind === 'section' && v.message.includes('docLink'))).toBe(
+            true
+        )
     })
 
-    it('slimSpec rewrites section help to under SECTION_HELP_MAX', () => {
+    it('reports markdown links in help strings', () => {
+        const spec = {
+            sourceConfig: [
+                {
+                    type: 'menu',
+                    label: 'Connection Settings',
+                    items: [
+                        {
+                            type: 'section',
+                            sectionTitle: 'Connection Settings',
+                            sectionHelpMessage:
+                                'Overview. See [Docs](configuration/connection.md).',
+                            docLinkLabel: 'Reference',
+                            docLink: `${DOCS_BASE_URL}configuration/connection/`,
+                            items: [
+                                {
+                                    key: 'baseurl',
+                                    label: 'API URL',
+                                    helpKey: 'Tenant URL. See [API URL](configuration/connection.md#baseurl).',
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        const violations = collectViolations(spec)
+        expect(violations.some((v) => v.kind === 'sectionHelpMessage' && v.message.includes('markdown'))).toBe(
+            true
+        )
+        expect(violations.some((v) => v.kind === 'helpKey' && v.message.includes('markdown'))).toBe(true)
+    })
+
+    it('reports helpKey with too many summary sentences', () => {
+        const spec = {
+            sourceConfig: [
+                {
+                    type: 'menu',
+                    label: 'Source Settings',
+                    items: [
+                        {
+                            type: 'section',
+                            sectionTitle: 'Sources',
+                            sectionHelpMessage: '<strong>Sources.</strong>',
+                            docLinkLabel: 'Source settings reference',
+                            docLink: `${DOCS_BASE_URL}configuration/source/`,
+                            items: [
+                                {
+                                    key: 'name',
+                                    label: 'Source name',
+                                    helpKey: 'First sentence. Second sentence. Third sentence.',
+                                },
+                            ],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        expect(
+            collectViolations(spec).some(
+                (v) => v.kind === 'helpKey' && v.message.includes('3 sentence')
+            )
+        ).toBe(true)
+    })
+
+    it('slimSpec applies section overview and docLink fields', () => {
         const spec = {
             sourceConfig: [
                 {
@@ -93,8 +165,10 @@ describe('connector-spec-help-lib', () => {
         }
 
         slimSpec(spec)
-        const message = spec.sourceConfig[0].items[0].sectionHelpMessage
-        expect(plainTextLength(message)).toBeLessThanOrEqual(SECTION_HELP_MAX)
-        expect(message).toMatch(/velocity-context\.md/)
+        const section = spec.sourceConfig[0].items[0]
+        expect(plainTextLength(section.sectionHelpMessage)).toBeLessThanOrEqual(SECTION_HELP_MAX)
+        expect(section.docLink).toMatch(/^https:\/\//)
+        expect(section.docLinkLabel).toBeTruthy()
+        expect(section.sectionHelpMessage).not.toMatch(/\]\(/)
     })
 })

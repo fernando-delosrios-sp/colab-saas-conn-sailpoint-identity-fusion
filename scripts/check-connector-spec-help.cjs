@@ -32,7 +32,7 @@ function main() {
 
     if (auditMode) {
         console.error(
-            `\nLimits: helpKey ≤${HELP_KEY_MAX} chars + configuration/ link; sectionHelpMessage ≤${SECTION_HELP_MAX} chars + doc link, no <ul>`
+            `\nLimits: helpKey ≤${HELP_KEY_MAX} chars, plain text, 1 sentence; sectionHelpMessage ≤${SECTION_HELP_MAX} chars HTML overview; sections require docLink + docLinkLabel (no markdown in help strings)`
         )
         process.exit(0)
     }
