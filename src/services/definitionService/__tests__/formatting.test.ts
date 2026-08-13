@@ -550,6 +550,26 @@ describe('evaluateVelocityTemplate', () => {
             const result = evaluateVelocityTemplate('$AddressParse.getCityState($city)', context)
             expect(result).toBe('Washington')
         })
+
+        it('should yield no output when city is missing', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getCityState($city)', {})
+            expect(result).toBeUndefined()
+        })
+
+        it('should yield no output when city is null', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.getCityState($city)', { city: null })
+            expect(result).toBeUndefined()
+        })
+
+        it('should yield no output when parse receives missing address', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.parse($address)', {})
+            expect(result).toBeUndefined()
+        })
+
+        it('should yield no output when parse receives unparseable address', () => {
+            const result = evaluateVelocityTemplate('$AddressParse.parse("not an address")', {})
+            expect(result).toBeUndefined()
+        })
     })
 
     describe('AddressParse.getStateName - code to full name', () => {
@@ -797,9 +817,19 @@ describe('evaluateVelocityTemplate', () => {
             expect(result).toBeUndefined()
         })
 
-        it('should treat invalid parse input as empty when re-serialized', () => {
+        it('should treat invalid parse input as JSON empty string when re-serialized', () => {
             const context = { raw: 'not json' }
             const result = evaluateVelocityTemplate('#set($p=$JSON.parse($raw))$JSON.stringify($p)', context)
+            expect(result).toBe('""')
+        })
+
+        it('should yield no output for invalid JSON in standalone parse', () => {
+            const result = evaluateVelocityTemplate('$JSON.parse("invalid")', {})
+            expect(result).toBeUndefined()
+        })
+
+        it('should yield no output for missing variable in parse', () => {
+            const result = evaluateVelocityTemplate('$JSON.parse($missing)', {})
             expect(result).toBeUndefined()
         })
 

@@ -1,5 +1,6 @@
 import { logger } from '@sailpoint/connector-sdk'
 import { State, City } from './geo/geoData'
+import { withVelocityHelperFallback } from './velocityFallback'
 // @ts-expect-error - no types available
 import parseAddressString from 'parse-address-string'
 
@@ -119,9 +120,9 @@ const getStateCode = (name: string, country: string): string => {
 }
 
 export const AddressParse = {
-    getCityState,
-    getCityStateCode,
-    parse: parseAddressSync,
+    getCityState: withVelocityHelperFallback('AddressParse.getCityState', getCityState),
+    getCityStateCode: withVelocityHelperFallback('AddressParse.getCityStateCode', getCityStateCode),
+    parse: withVelocityHelperFallback('AddressParse.parse', parseAddressSync),
     getStateName,
     getStateCode,
 }
