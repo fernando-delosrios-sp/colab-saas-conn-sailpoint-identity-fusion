@@ -108,10 +108,9 @@ const SECTION_HELP = {
             seeAlso([
                 ['use-guides/configuration/defining-attributes/', 'Defining attributes guide'],
                 ['reference/velocity-context/', 'Velocity context reference'],
-                ['configuration/definition/', 'Attribute definition reference'],
             ]),
-        docLinkLabel: 'Attribute definition reference',
-        docLinkPath: 'configuration/definition/',
+        docLinkLabel: 'Normal attribute definitions reference',
+        docLinkPath: 'configuration/definition/#normal-attribute-definitions',
     },
     'Unique Attribute Definitions': {
         sectionHelpMessage:
@@ -119,10 +118,9 @@ const SECTION_HELP = {
             seeAlso([
                 ['use-guides/configuration/defining-attributes/', 'Defining attributes guide'],
                 ['reference/velocity-context/', 'Velocity context reference'],
-                ['configuration/definition/', 'Attribute definition reference'],
             ]),
-        docLinkLabel: 'Attribute definition reference',
-        docLinkPath: 'configuration/definition/',
+        docLinkLabel: 'Unique attribute definitions reference',
+        docLinkPath: 'configuration/definition/#unique-attribute-definitions',
     },
     'Matching Settings': {
         sectionHelpMessage:

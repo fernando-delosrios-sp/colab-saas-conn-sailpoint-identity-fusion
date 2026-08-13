@@ -509,7 +509,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Normal Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong> Apache Velocity; optional per-definition refresh. Post-template options: case, character normalization, spaces, trim, max length.<br><br>Definitions run top to bottom — each result is available to the next. See the Velocity context reference for <code>$accounts</code>, <code>$identity</code>, <code>$previous</code>, and helper functions.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/defining-attributes/\">Defining attributes guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/velocity-context/\">Velocity context reference</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/definition/\">Attribute definition reference</a>.",
+                    "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong> Apache Velocity; optional per-definition refresh. Post-template options: case, character normalization, spaces, trim, max length.<br><br>Definitions run top to bottom — each result is available to the next. See the Velocity context reference for <code>$accounts</code>, <code>$identity</code>, <code>$previous</code>, and helper functions.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/defining-attributes/\">Defining attributes guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/velocity-context/\">Velocity context reference</a>.",
                     "items": [
                         {
                             "key": "normalAttributeDefinitions",
@@ -617,13 +617,13 @@
                             ]
                         }
                     ],
-                    "docLinkLabel": "Attribute definition reference",
-                    "docLink": "https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/definition/"
+                    "docLinkLabel": "Normal attribute definitions reference",
+                    "docLink": "https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/definition/#normal-attribute-definitions"
                 },
                 {
                     "type": "section",
                     "sectionTitle": "Unique Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define persistent unique attributes</strong> (e.g. identifiers). Values stay until account <strong>reset</strong> (disable/re-enable). Runs <strong>after</strong> normal definitions on refresh.<br><br>Supports <code>$counter</code>, <code>$UUID</code>, and <code>$isUnique()</code>. Use incremental counter mode for sequential IDs; otherwise the connector uses collision-based disambiguation with padding per <strong>Minimum counter digits</strong>.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/defining-attributes/\">Defining attributes guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/velocity-context/\">Velocity context reference</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/definition/\">Attribute definition reference</a>.",
+                    "sectionHelpMessage": "<strong>Define persistent unique attributes</strong> (e.g. identifiers). Values stay until account <strong>reset</strong> (disable/re-enable). Runs <strong>after</strong> normal definitions on refresh.<br><br>Supports <code>$counter</code>, <code>$UUID</code>, and <code>$isUnique()</code>. Use incremental counter mode for sequential IDs; otherwise the connector uses collision-based disambiguation with padding per <strong>Minimum counter digits</strong>.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/defining-attributes/\">Defining attributes guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/velocity-context/\">Velocity context reference</a>.",
                     "items": [
                         {
                             "key": "maxAttempts",
@@ -747,8 +747,8 @@
                             ]
                         }
                     ],
-                    "docLinkLabel": "Attribute definition reference",
-                    "docLink": "https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/definition/"
+                    "docLinkLabel": "Unique attribute definitions reference",
+                    "docLink": "https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/definition/#unique-attribute-definitions"
                 }
             ]
         },

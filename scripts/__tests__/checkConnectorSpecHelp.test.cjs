@@ -168,7 +168,9 @@ describe('connector-spec-help-lib', () => {
         const section = spec.sourceConfig[0].items[0]
         expect(plainTextLength(section.sectionHelpMessage)).toBeLessThanOrEqual(SECTION_HELP_MAX)
         expect(section.docLink).toMatch(/^https:\/\//)
-        expect(section.docLinkLabel).toBeTruthy()
+        expect(section.docLink).toContain('#normal-attribute-definitions')
+        expect(section.docLinkLabel).toBe('Normal attribute definitions reference')
         expect(section.sectionHelpMessage).not.toMatch(/\]\(/)
+        expect(section.sectionHelpMessage).not.toContain('configuration/definition/')
     })
 })
