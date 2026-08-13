@@ -10,7 +10,10 @@
  */
 
 const DOCS_BASE_URL =
-    'https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/'
+    'https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/'
+
+/** Common typo: dot instead of hyphen in GitHub username */
+const WRONG_DOCS_HOST = 'fernando.delosrios-sp.github.io'
 
 const HELP_KEY_MAX = 300
 const SECTION_HELP_MAX = 1000
@@ -276,6 +279,13 @@ function collectViolations(spec) {
                             message: `length ${len} exceeds ${SECTION_HELP_MAX}`,
                         })
                     }
+                    if (String(item.sectionHelpMessage).includes(WRONG_DOCS_HOST)) {
+                        violations.push({
+                            kind: 'sectionHelpMessage',
+                            id: title,
+                            message: `uses wrong docs host ${WRONG_DOCS_HOST} (use fernando-delosrios-sp)`,
+                        })
+                    }
                     if (hasMarkdownLink(item.sectionHelpMessage)) {
                         violations.push({
                             kind: 'sectionHelpMessage',
@@ -310,6 +320,12 @@ function collectViolations(spec) {
                         kind: 'section',
                         id: title,
                         message: 'docLink must be an absolute https URL',
+                    })
+                } else if (String(item.docLink).includes(WRONG_DOCS_HOST)) {
+                    violations.push({
+                        kind: 'section',
+                        id: title,
+                        message: `docLink uses wrong docs host ${WRONG_DOCS_HOST} (use fernando-delosrios-sp)`,
                     })
                 } else if (!String(item.docLink).startsWith(DOCS_BASE_URL)) {
                     violations.push({

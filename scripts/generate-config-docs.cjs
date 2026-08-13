@@ -236,7 +236,7 @@ function htmlToMarkdown(html) {
     }
 
     const docsBase =
-        'https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/'
+        'https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/'
 
     let text = html
         .replace(
