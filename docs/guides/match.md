@@ -44,11 +44,9 @@ Use Identity Fusion for Match when you face these challenges:
 | **Fusion report access profile**  | Access profile with "Fusion report" entitlement               | Allow specific users to view potential match reports                                            |
 | **Automatic merge**          | **Attribute Matching Settings → Enable automatic merge** | Assign without manual review when the combined score meets the automatic merge match score |
 
-**Screenshot placeholder:** High-level Match flow diagram.
 
 ![Match flow - Overview](../assets/images/match-flow.png)
 
-<!-- PLACEHOLDER: Diagram or screenshot of Match flow. Save as docs/assets/images/match-flow.png -->
 
 ---
 
@@ -75,11 +73,9 @@ Configure **Source Settings → Scope** to define the baseline of identities to 
 
 **Without a baseline:** If **Include identities in the scope?** is No or Identity Scope Query returns zero identities, there is **no baseline** to compare accounts against. Match cannot detect existing identities—only merge new accounts from configured sources.
 
-**Screenshot placeholder:** Source Settings showing identity scope for baseline.
 
 ![Match source settings - Baseline](../assets/images/match-source-settings.png)
 
-<!-- PLACEHOLDER: Screenshot of Source Settings with sources and identity scope for Match. Save as docs/assets/images/match-source-settings.png -->
 
 ### Sources configuration
 
@@ -136,11 +132,9 @@ Configure **Attribute Matching Settings → Matching Settings** to define match 
 | **Enable automatic merge**       | Skip review when the combined score meets the automatic merge match score | No initially; enable after tuning                  |
 | **Fusion attribute matches**          | List of identity attributes to compare                                         | At least 2 attributes (e.g. name + email)          |
 
-**Screenshot placeholder:** Attribute Matching Settings - Matching section.
 
 ![Fusion matching settings - Configuration](../assets/images/match-fusion-matching.png)
 
-<!-- PLACEHOLDER: Screenshot of Attribute Matching Settings > Matching. Save as docs/assets/images/match-fusion-matching.png -->
 
 ### Per-attribute match configuration
 
@@ -306,17 +300,13 @@ Include attributes that help reviewers decide if identities are matches:
 | **phone**      | Contact verification     | Same phone → likely match                                 |
 | **employeeId** | Business key             | Same ID → definitely match; different → investigate       |
 
-**Screenshot placeholder:** Manual review form example.
 
 ![Match review form - Example](../assets/images/match-review-form.png)
 
-<!-- PLACEHOLDER: Screenshot of manual review form for potential matches. Save as docs/assets/images/match-review-form.png -->
 
-**Screenshot placeholder:** Email notification to reviewer.
 
 ![Email to reviewer - Notification](../assets/images/match-email-reviewer.png)
 
-<!-- PLACEHOLDER: Screenshot of email sent to reviewer. Save as docs/assets/images/match-email-reviewer.png -->
 
 ---
 
@@ -389,9 +379,7 @@ An **enforced correlation role** is an automatically mergeed ISC role that opera
 | 7    | **Connector** | On next aggregation, applies reviewer decision                      | Account correlated or new identity created |
 | 8    | **Connector** | Updates account history                                             | Audit trail maintained                     |
 
-**Video placeholder:** End-to-end matching walkthrough.
 
-<!-- PLACEHOLDER: Video walking through matching: aggregation, match, form, resolution. Save as docs/assets/videos/match-flow.mp4 -->
 
 ### Detailed step-by-step
 
