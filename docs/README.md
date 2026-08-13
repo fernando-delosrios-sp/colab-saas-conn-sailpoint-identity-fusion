@@ -40,5 +40,5 @@ npm run docs:serve
 
 Generated Configuration reference pages live under `docs/configuration/` and are recreated on each `docs:prepare` run. The Home page is authored in `docs/index.md`.
 
-`connector-spec.json` inline help (`helpKey`, `sectionHelpMessage`) must stay concise with links to Configuration reference or Use guides. `npm run lint` runs `scripts/check-connector-spec-help.cjs` to enforce length limits. Use `node scripts/slim-connector-spec-help.cjs` when bulk-shortening help text.
+`connector-spec.json` inline help follows the [ISC connector spec](https://developer.sailpoint.com/docs/connectivity/saas-connectivity/connector-spec): **sections** use HTML `sectionHelpMessage` for a short overview plus separate `docLink` / `docLinkLabel` fields for clickable documentation links; **fields** use plain-text `helpKey` only (markdown links are not rendered in ISC). Detailed reference lives on the MkDocs site. `npm run lint` runs `scripts/check-connector-spec-help.cjs` to enforce these rules. Use `node scripts/slim-connector-spec-help.cjs` when bulk-refreshing help text.
 

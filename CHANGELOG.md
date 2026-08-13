@@ -10,7 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### 📚 Documentation
 
-- **Slimmer ISC configuration inline help** — `connector-spec.json` `helpKey` and `sectionHelpMessage` strings are shortened to scannable blurbs with links to the Configuration reference, Use guides, and Technical reference. Detailed Velocity and match-tuning prose remains in the MkDocs site. `npm run lint` enforces help length and link rules via `scripts/check-connector-spec-help.cjs`.
+- **Slimmer ISC configuration inline help** — `connector-spec.json` section help uses HTML overviews plus separate `docLink`/`docLinkLabel` fields (per ISC connector spec); field `helpKey` strings are plain text only. Detailed reference remains on the MkDocs site. `npm run lint` enforces format via `scripts/check-connector-spec-help.cjs`.
 
 ---
 

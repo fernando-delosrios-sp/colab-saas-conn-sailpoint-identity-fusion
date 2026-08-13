@@ -63,30 +63,32 @@
                 {
                     "type": "section",
                     "sectionTitle": "Connection Settings",
-                    "sectionHelpMessage": "<strong>Configure how this connector connects to Identity Security Cloud.</strong> See [Connection Settings](configuration/connection.md).",
+                    "sectionHelpMessage": "<strong>Configure how this connector connects to Identity Security Cloud.</strong><br><br>Use <strong>Identity Security Cloud API URL</strong> to specify the base URL of your ISC tenant (for example, <code>https://tenant.api.identitynow.com</code>).<br><br>Provide the <strong>Personal Access Token ID</strong> and <strong>Personal Access Token Secret</strong> for an account that has the required API permissions (Sources, Identities, Accounts, Workflows/Forms). These values authenticate all connector operations.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/operation/tune-api-performance/\">Tune API performance guide</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/pat-scopes/\">ISC PAT scopes reference</a>.",
                     "items": [
                         {
                             "key": "baseurl",
                             "label": "Identity Security Cloud API URL",
                             "type": "url",
                             "required": true,
-                            "helpKey": "Base URL of your Identity Security Cloud tenant (format: https:// .api.identitynow.com). See [Identity Security Cloud API URL](configuration/connection.md#baseurl)."
+                            "helpKey": "Tenant API base URL for Identity Security Cloud."
                         },
                         {
                             "key": "clientId",
                             "label": "Personal Access Token ID",
                             "type": "text",
                             "required": true,
-                            "helpKey": "Enter the Client ID from your Personal Access Token. See [Personal Access Token ID](configuration/connection.md#clientid)."
+                            "helpKey": "Enter the Client ID from your Personal Access Token."
                         },
                         {
                             "key": "clientSecret",
                             "label": "Personal Access Token secret",
                             "type": "secret",
                             "required": true,
-                            "helpKey": "Enter the Client Secret from your Personal Access Token. See [Personal Access Token secret](configuration/connection.md#clientsecret)."
+                            "helpKey": "Enter the Client Secret from your Personal Access Token."
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Connection settings reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/connection/"
                 }
             ]
         },
@@ -97,14 +99,14 @@
                 {
                     "type": "section",
                     "sectionTitle": "Scope",
-                    "sectionHelpMessage": "<strong>Define which identities are in scope.</strong> See [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md).",
+                    "sectionHelpMessage": "<strong>Define which identities are in scope.</strong><br><br>Limit processing using an <strong>Identity Scope Query</strong> (standard ISC search syntax). Toggle <strong>Include identities in the scope</strong> to establish a baseline population for Match alongside managed source accounts.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/configuring-sources-and-scope/\">Configuring sources and scope</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/source/\">Source settings reference</a>.",
                     "items": [
                         {
                             "key": "includeIdentities",
                             "label": "Include identities in the scope?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "When enabled, existing identities are included alongside accounts from your configured sources. See [Include identities in the scope?](configuration/source.md#includeidentities)."
+                            "helpKey": "When enabled, existing identities are included alongside accounts from your configured sources."
                         },
                         {
                             "key": "identityScopeQuery",
@@ -113,14 +115,16 @@
                             "required": true,
                             "parentKey": "includeIdentities",
                             "parentValue": "true",
-                            "helpKey": "Filter which identities are included using a search query. See [Identity Scope Query](configuration/source.md#identityscopequery)."
+                            "helpKey": "Filter which identities are included using a search query."
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Source settings reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/source/"
                 },
                 {
                     "type": "section",
                     "sectionTitle": "Sources",
-                    "sectionHelpMessage": "<strong>Select and configure authoritative account sources.</strong> See [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md).",
+                    "sectionHelpMessage": "<strong>Select and configure authoritative account sources.</strong><br><br><strong>Source type and behavior:</strong> Define role (Authoritative, Records, Orphan) and handling for non-matched non-identity accounts (disable, defer).<br><br><strong>Aggregation and correlation:</strong> Control timing (delays, retries), optimized aggregation, and correlation strategy (in-process or reverse).<br><br><strong>Filtering and limits:</strong> Process subsets via API/JMESPath filters and set batch capacities.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/configuring-sources-and-scope/\">Configuring sources and scope</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/source-types/\">Source types guide</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/source/\">Source settings reference</a>.",
                     "items": [
                         {
                             "key": "sources",
@@ -144,7 +148,7 @@
                                             "label": "Source name",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Enter the exact name of the source as it appears in Identity Security Cloud (case-sensitive). See [Source name](configuration/source.md#name)."
+                                            "helpKey": "Enter the exact name of the source as it appears in Identity Security Cloud (case-sensitive)."
                                         },
                                         {
                                             "key": "enabled",
@@ -152,7 +156,7 @@
                                             "type": "toggle",
                                             "value": "true",
                                             "required": false,
-                                            "helpKey": "Turn off to temporarily exclude this source from processing without removing it. See [Enabled](configuration/source.md#enabled)."
+                                            "helpKey": "Turn off to temporarily exclude this source from processing without removing it."
                                         },
                                         {
                                             "key": "sourceType",
@@ -160,7 +164,7 @@
                                             "type": "radio",
                                             "required": true,
                                             "value": "authoritative",
-                                            "helpKey": "Choose how accounts from this source are handled. See [Source type](configuration/source.md#sourcetype).",
+                                            "helpKey": "Choose how accounts from this source are handled.",
                                             "options": [
                                                 {
                                                     "label": "Authoritative accounts",
@@ -184,7 +188,7 @@
                                             "value": "false",
                                             "parentKey": "sourceType",
                                             "parentValue": "orphan",
-                                            "helpKey": "Automatically disable orphan accounts that no longer match any identity after aggregation. See [Disable non-matching accounts](configuration/source.md#disablenonmatchingaccounts)."
+                                            "helpKey": "Automatically disable orphan accounts that no longer match any identity after aggregation."
                                         },
                                         {
                                             "key": "deferredMatching",
@@ -194,7 +198,7 @@
                                             "value": "true",
                                             "parentKey": "sourceType",
                                             "parentValue": "authoritative",
-                                            "helpKey": "Deferred candidate matching: after identity scoring, also compare this account to other provisional Fusion accounts from. See [Deferred candidate matching](configuration/source.md#deferredmatching)."
+                                            "helpKey": "Deferred candidate matching: after identity scoring, also compare this account to other provisional Fusion accounts from."
                                         },
                                         {
                                             "key": "includeRecordAccountsForMatching",
@@ -204,28 +208,28 @@
                                             "value": "true",
                                             "parentKey": "sourceType",
                                             "parentValue": "record",
-                                            "helpKey": "Enable when record accounts should be matched against Fusion identities. See [Include record accounts in Match](configuration/source.md#includerecordaccountsformatching)."
+                                            "helpKey": "Enable when record accounts should be matched against Fusion identities."
                                         },
                                         {
                                             "key": "accountFilter",
                                             "label": "Accounts API filter",
                                             "type": "text",
                                             "required": false,
-                                            "helpKey": "Server-side ISC account filter sent to the Accounts API (filters parameter). See [Accounts API filter](configuration/source.md#accountfilter)."
+                                            "helpKey": "Server-side ISC account filter sent to the Accounts API (filters parameter)."
                                         },
                                         {
                                             "key": "accountJmespathFilter",
                                             "label": "Accounts JMESPath filter",
                                             "type": "text",
                                             "required": false,
-                                            "helpKey": "Client-side JMESPath expression applied after accounts are fetched (page-wise as { accounts: [...] }). See [Accounts JMESPath filter](configuration/source.md#accountjmespathfilter)."
+                                            "helpKey": "Client-side JMESPath filter applied to fetched account pages."
                                         },
                                         {
                                             "key": "accountLimit",
                                             "label": "Aggregation batch size",
                                             "type": "number",
                                             "required": false,
-                                            "helpKey": "Limit the number of accounts processed per run. See [Aggregation batch size](configuration/source.md#accountlimit)."
+                                            "helpKey": "Limit the number of accounts processed per run."
                                         }
                                     ]
                                 },
@@ -238,7 +242,7 @@
                                             "type": "radio",
                                             "value": "none",
                                             "required": true,
-                                            "helpKey": "Choose when to pull the latest accounts from this source. See [Account aggregation mode](configuration/source.md#aggregationmode).",
+                                            "helpKey": "Choose when to pull the latest accounts from this source.",
                                             "options": [
                                                 {
                                                     "label": "Do not aggregate",
@@ -263,7 +267,7 @@
                                             "value": "10",
                                             "parentKey": "aggregationMode",
                                             "parentValue": "before",
-                                            "helpKey": "Maximum time to wait for this source's aggregation to finish when using Aggregate before processing. See [Aggregation wait timeout (minutes)](configuration/source.md#aggregationtimeout)."
+                                            "helpKey": "Maximum time to wait for this source's aggregation to finish when using Aggregate before processing."
                                         },
                                         {
                                             "key": "aggregationDelay",
@@ -274,7 +278,7 @@
                                             "value": "5",
                                             "parentKey": "aggregationMode",
                                             "parentValue": "delayed",
-                                            "helpKey": "How many minutes to wait after processing completes before refreshing accounts from this source. See [Aggregation delay (minutes)](configuration/source.md#aggregationdelay)."
+                                            "helpKey": "How many minutes to wait after processing completes before refreshing accounts from this source."
                                         },
                                         {
                                             "key": "optimizedAggregation",
@@ -284,7 +288,7 @@
                                             "required": false,
                                             "parentKey": "aggregationMode",
                                             "parentValue": "before",
-                                            "helpKey": "Only process accounts that have changed since the last run, improving performance. See [Optimized aggregation](configuration/source.md#optimizedaggregation)."
+                                            "helpKey": "Only process accounts that have changed since the last run, improving performance."
                                         },
                                         {
                                             "key": "optimizedAggregation",
@@ -294,7 +298,7 @@
                                             "required": false,
                                             "parentKey": "aggregationMode",
                                             "parentValue": "delayed",
-                                            "helpKey": "Only process accounts that have changed since the last run, improving performance. See [Optimized aggregation](configuration/source.md#optimizedaggregation)."
+                                            "helpKey": "Only process accounts that have changed since the last run, improving performance."
                                         }
                                     ]
                                 },
@@ -306,7 +310,7 @@
                                             "label": "Correlation mode",
                                             "type": "radio",
                                             "required": false,
-                                            "helpKey": "Choose how uncorrelated source accounts are linked to identities. See [Correlation mode](configuration/source.md#correlationmode).",
+                                            "helpKey": "Choose how uncorrelated source accounts are linked to identities.",
                                             "options": [
                                                 {
                                                     "label": "Do not correlate",
@@ -329,7 +333,7 @@
                                             "required": true,
                                             "parentKey": "correlationMode",
                                             "parentValue": "reverse",
-                                            "helpKey": "Friendly display label for the reverse-correlation attribute shown in Identity Security Cloud. See [Correlation attribute display name](configuration/source.md#correlationdisplayname)."
+                                            "helpKey": "Friendly display label for the reverse-correlation attribute shown in Identity Security Cloud."
                                         },
                                         {
                                             "key": "correlationAttribute",
@@ -338,18 +342,20 @@
                                             "required": true,
                                             "parentKey": "correlationMode",
                                             "parentValue": "reverse",
-                                            "helpKey": "Internal name for the attribute used to link accounts via reverse correlation. See [Correlation attribute name](configuration/source.md#correlationattribute)."
+                                            "helpKey": "Internal name for the attribute used to link accounts via reverse correlation."
                                         }
                                     ]
                                 }
                             ]
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Source settings reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/source/"
                 },
                 {
                     "type": "section",
                     "sectionTitle": "Processing Control",
-                    "sectionHelpMessage": "<strong>Control account maintenance and processing behavior.</strong> See [Source Settings](configuration/source.md).",
+                    "sectionHelpMessage": "<strong>Control account maintenance.</strong><br><br><strong>History limits:</strong> Cap the number of audit history messages stored per account.<br><br><strong>Delete when empty:</strong> Remove the Fusion account if all its underlying source accounts are deleted.<br><br><strong>Skip missing targets:</strong> Ignore source accounts missing a mapped native identity attribute.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/source/\">Source settings reference</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/configuring-sources-and-scope/\">Configuring sources and scope</a>.",
                     "items": [
                         {
                             "key": "maxHistoryMessages",
@@ -357,21 +363,21 @@
                             "type": "number",
                             "required": false,
                             "min": "1",
-                            "helpKey": "Number of processing history entries to keep per account. See [Maximum history messages](configuration/source.md#maxhistorymessages)."
+                            "helpKey": "Number of processing history entries to keep per account."
                         },
                         {
                             "key": "deleteEmpty",
                             "label": "Delete accounts with no managed accounts left?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Automatically remove a Fusion account when all of its linked source accounts have been deleted. See [Delete accounts with no managed accounts left?](configuration/source.md#deleteempty)."
+                            "helpKey": "Automatically remove a Fusion account when all of its linked source accounts have been deleted."
                         },
                         {
                             "key": "skipAccountsWithMissingId",
                             "label": "Skip accounts with missing ID?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Skip accounts that are missing a unique identity value. See [Skip accounts with missing ID?](configuration/source.md#skipaccountswithmissingid)."
+                            "helpKey": "Skip accounts that are missing a unique identity value."
                         },
                         {
                             "key": "cascadeAggregationEnabled",
@@ -379,9 +385,11 @@
                             "type": "toggle",
                             "value": "false",
                             "required": false,
-                            "helpKey": "Aggregate managed sources before single account read. See [Cascade aggregation](configuration/source.md#cascadeaggregationenabled)."
+                            "helpKey": "Aggregate managed sources before single account read."
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Source settings reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/source/"
                 }
             ]
         },
@@ -392,14 +400,14 @@
                 {
                     "type": "section",
                     "sectionTitle": "Attribute Mapping Definitions",
-                    "sectionHelpMessage": "<strong>Map and merge source attributes onto Fusion accounts.</strong> See [Mapping attributes](../use-guides/configuration/mapping-attributes.md).",
+                    "sectionHelpMessage": "<strong>Map and merge source attributes.</strong><br><br>Choose a <strong>Default attribute merge</strong> mode. Then configure per-attribute rules to target specific source fields, rename them on the Fusion account, and optionally override the merge strategy or pin specific sources.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/mapping-attributes/\">Mapping attributes guide</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/mapping/\">Mapping settings reference</a>.",
                     "items": [
                         {
                             "key": "attributeMerge",
                             "label": "Default attribute merge from multiple sources",
                             "type": "radio",
                             "required": true,
-                            "helpKey": "When multiple sources provide the same attribute, choose how to combine them. See [Default attribute merge from multiple sources](configuration/mapping.md#attributemerge).",
+                            "helpKey": "When multiple sources provide the same attribute, choose how to combine them.",
                             "options": [
                                 {
                                     "label": "First found",
@@ -436,14 +444,14 @@
                                             "label": "New attribute",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Name for this attribute on the Fusion account. See [New attribute](configuration/mapping.md#newattribute)."
+                                            "helpKey": "Name for this attribute on the Fusion account."
                                         },
                                         {
                                             "key": "existingAttributes",
                                             "label": "Existing attributes",
                                             "type": "list",
                                             "required": true,
-                                            "helpKey": "Source attribute names to pull values from. See [Existing attributes](configuration/mapping.md#existingattributes)."
+                                            "helpKey": "Source attribute names to pull values from."
                                         }
                                     ]
                                 },
@@ -455,7 +463,7 @@
                                             "label": "Default attribute merge from multiple sources",
                                             "type": "radio",
                                             "required": true,
-                                            "helpKey": "Override the default merge strategy for this specific attribute. See [Default attribute merge from multiple sources](configuration/mapping.md#attributemerge).",
+                                            "helpKey": "Override the default merge strategy for this specific attribute.",
                                             "options": [
                                                 {
                                                     "label": "First found",
@@ -482,13 +490,15 @@
                                             "parentKey": "attributeMerge",
                                             "parentValue": "source",
                                             "required": true,
-                                            "helpKey": "Name of the source whose value should be used for this attribute when available. See [Source name](configuration/mapping.md#source)."
+                                            "helpKey": "Name of the source whose value should be used for this attribute when available."
                                         }
                                     ]
                                 }
                             ]
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Mapping settings reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/mapping/"
                 }
             ]
         },
@@ -499,7 +509,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Normal Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define dynamic computed attributes with Apache Velocity.</strong> See [Defining attributes](../use-guides/configuration/defining-attributes.md) and [Velocity context](../reference/velocity-context.md).",
+                    "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong> Apache Velocity; optional per-definition refresh. Post-template options: case, character normalization, spaces, trim, max length.<br><br>Definitions run top to bottom — each result is available to the next. See the Velocity context reference for <code>$accounts</code>, <code>$identity</code>, <code>$previous</code>, and helper functions.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/defining-attributes/\">Defining attributes guide</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/velocity-context/\">Velocity context reference</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/definition/\">Attribute definition reference</a>.",
                     "items": [
                         {
                             "key": "normalAttributeDefinitions",
@@ -513,7 +523,7 @@
                             "copyButton": true,
                             "buttonLabel": "New Normal Attribute Definition",
                             "type": "cardList",
-                            "helpKey": "Define attributes whose values are defined from templates using mapped account data. See [Normal Attribute Definitions](configuration/definition.md#normalattributedefinitions).",
+                            "helpKey": "Define attributes whose values are defined from templates using mapped account data.",
                             "subMenus": [
                                 {
                                     "label": "Attribute Definition",
@@ -523,20 +533,20 @@
                                             "label": "Attribute Name",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Name for this defined attribute on the Fusion account. See [Attribute Name](configuration/definition.md#name)."
+                                            "helpKey": "Name for this defined attribute on the Fusion account."
                                         },
                                         {
                                             "key": "expression",
                                             "label": "Apache Velocity expression",
                                             "type": "textarea",
                                             "required": true,
-                                            "helpKey": "Velocity template that defines the attribute value. See [Apache Velocity expression](configuration/definition.md#expression)."
+                                            "helpKey": "Velocity template that defines the attribute value."
                                         },
                                         {
                                             "key": "static",
                                             "label": "Static",
                                             "type": "toggle",
-                                            "helpKey": "When enabled, the attribute is evaluated only when it has no value. See [Static](configuration/definition.md#static)."
+                                            "helpKey": "When enabled, the attribute is evaluated only when it has no value."
                                         },
                                         {
                                             "key": "refresh",
@@ -544,7 +554,7 @@
                                             "parentKey": "static",
                                             "parentValue": "false",
                                             "type": "toggle",
-                                            "helpKey": "When enabled, the value is recalculated on every aggregation. See [Refresh on each aggregation?](configuration/definition.md#refresh)."
+                                            "helpKey": "When enabled, the value is recalculated on every aggregation."
                                         }
                                     ]
                                 },
@@ -556,7 +566,7 @@
                                             "label": "Case selection",
                                             "type": "select",
                                             "required": true,
-                                            "helpKey": "Convert the defined value to a specific letter case. See [Case selection](configuration/definition.md#case).",
+                                            "helpKey": "Convert the defined value to a specific letter case.",
                                             "options": [
                                                 {
                                                     "label": "Do not change",
@@ -580,19 +590,19 @@
                                             "key": "normalize",
                                             "label": "Normalize special characters?",
                                             "type": "toggle",
-                                            "helpKey": "Replace accented and special characters with their plain equivalents (e.g. See [Normalize special characters?](configuration/definition.md#normalize)."
+                                            "helpKey": "Replace accented characters with plain ASCII equivalents."
                                         },
                                         {
                                             "key": "spaces",
                                             "label": "Remove spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove all spaces from the defined value. See [Remove spaces?](configuration/definition.md#spaces)."
+                                            "helpKey": "Remove all spaces from the defined value."
                                         },
                                         {
                                             "key": "trim",
                                             "label": "Trim leading and trailing spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value. See [Trim leading and trailing spaces?](configuration/definition.md#trim)."
+                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value."
                                         },
                                         {
                                             "key": "maxLength",
@@ -600,18 +610,20 @@
                                             "type": "number",
                                             "required": false,
                                             "min": "1",
-                                            "helpKey": "Limit the defined value to this many characters. See [Maximum length](configuration/definition.md#maxlength)."
+                                            "helpKey": "Limit the defined value to this many characters."
                                         }
                                     ]
                                 }
                             ]
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Attribute definition reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/definition/"
                 },
                 {
                     "type": "section",
                     "sectionTitle": "Unique Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define persistent unique identifiers.</strong> See [Defining attributes](../use-guides/configuration/defining-attributes.md) and [Unique variables](../reference/velocity-context.md#unique-only-variables).",
+                    "sectionHelpMessage": "<strong>Define persistent unique attributes</strong> (e.g. identifiers). Values stay until account <strong>reset</strong> (disable/re-enable). Runs <strong>after</strong> normal definitions on refresh.<br><br>Supports <code>$counter</code>, <code>$UUID</code>, and <code>$isUnique()</code>. Use incremental counter mode for sequential IDs; otherwise the connector uses collision-based disambiguation with padding per <strong>Minimum counter digits</strong>.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/defining-attributes/\">Defining attributes guide</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/velocity-context/\">Velocity context reference</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/definition/\">Attribute definition reference</a>.",
                     "items": [
                         {
                             "key": "maxAttempts",
@@ -619,7 +631,7 @@
                             "type": "number",
                             "required": false,
                             "min": "1",
-                            "helpKey": "Maximum number of tries to find a value that is not already taken. See [Maximum attempts for unique definition](configuration/definition.md#maxattempts)."
+                            "helpKey": "Maximum number of tries to find a value that is not already taken."
                         },
                         {
                             "key": "uniqueAttributeDefinitions",
@@ -633,7 +645,7 @@
                             "copyButton": true,
                             "buttonLabel": "New Unique Attribute Definition",
                             "type": "cardList",
-                            "helpKey": "Define attributes that must have a unique value across all accounts, such as usernames or employee IDs. See [Unique Attribute Definitions](configuration/definition.md#uniqueattributedefinitions).",
+                            "helpKey": "Define attributes that must have a unique value across all accounts, such as usernames or employee IDs.",
                             "subMenus": [
                                 {
                                     "label": "Attribute Definition",
@@ -643,27 +655,27 @@
                                             "label": "Attribute Name",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Name for this unique attribute on the Fusion account. See [Attribute Name](configuration/definition.md#name)."
+                                            "helpKey": "Name for this unique attribute on the Fusion account."
                                         },
                                         {
                                             "key": "expression",
                                             "label": "Apache Velocity expression",
                                             "type": "textarea",
                                             "required": true,
-                                            "helpKey": "Velocity template that defines the unique value (required). See [Apache Velocity expression](configuration/definition.md#expression)."
+                                            "helpKey": "Velocity template that defines the unique value (required)."
                                         },
                                         {
                                             "key": "digits",
                                             "label": "Minimum counter digits ($counter)",
                                             "type": "number",
                                             "required": true,
-                                            "helpKey": "Minimum number of digits for the counter, padded with leading zeros. See [Minimum counter digits ($counter)](configuration/definition.md#digits)."
+                                            "helpKey": "Minimum number of digits for the counter, padded with leading zeros."
                                         },
                                         {
                                             "key": "useIncrementalCounter",
                                             "label": "Use incremental counter?",
                                             "type": "toggle",
-                                            "helpKey": "Always assign the next number in sequence instead of only adding a number when there is a conflict. See [Use incremental counter?](configuration/definition.md#useincrementalcounter)."
+                                            "helpKey": "Always assign the next number in sequence instead of only adding a number when there is a conflict."
                                         },
                                         {
                                             "key": "counterStart",
@@ -672,7 +684,7 @@
                                             "parentKey": "useIncrementalCounter",
                                             "parentValue": "true",
                                             "required": true,
-                                            "helpKey": "The first number the counter will use. See [Counter start value](configuration/definition.md#counterstart)."
+                                            "helpKey": "The first number the counter will use."
                                         }
                                     ]
                                 },
@@ -684,7 +696,7 @@
                                             "label": "Case selection",
                                             "type": "select",
                                             "required": true,
-                                            "helpKey": "Convert the defined value to a specific letter case. See [Case selection](configuration/definition.md#case).",
+                                            "helpKey": "Convert the defined value to a specific letter case.",
                                             "options": [
                                                 {
                                                     "label": "Do not change",
@@ -708,19 +720,19 @@
                                             "key": "normalize",
                                             "label": "Normalize special characters?",
                                             "type": "toggle",
-                                            "helpKey": "Replace accented and special characters with their plain equivalents (e.g. See [Normalize special characters?](configuration/definition.md#normalize)."
+                                            "helpKey": "Replace accented characters with plain ASCII equivalents."
                                         },
                                         {
                                             "key": "spaces",
                                             "label": "Remove spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove all spaces from the defined value. See [Remove spaces?](configuration/definition.md#spaces)."
+                                            "helpKey": "Remove all spaces from the defined value."
                                         },
                                         {
                                             "key": "trim",
                                             "label": "Trim leading and trailing spaces?",
                                             "type": "toggle",
-                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value. See [Trim leading and trailing spaces?](configuration/definition.md#trim)."
+                                            "helpKey": "Remove extra spaces at the beginning and end of the defined value."
                                         },
                                         {
                                             "key": "maxLength",
@@ -728,13 +740,15 @@
                                             "type": "number",
                                             "required": false,
                                             "min": "1",
-                                            "helpKey": "Limit the defined value to this many characters. See [Maximum length](configuration/definition.md#maxlength)."
+                                            "helpKey": "Limit the defined value to this many characters."
                                         }
                                     ]
                                 }
                             ]
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Attribute definition reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/definition/"
                 }
             ]
         },
@@ -745,21 +759,21 @@
                 {
                     "type": "section",
                     "sectionTitle": "Matching Settings",
-                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong> See [Matching identities](../use-guides/configuration/matching-identities.md).",
+                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><br><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.<br><br><strong>Thresholds and weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.<br><br><strong>Automatic merge:</strong> Optionally bypass manual review when the combined score meets your automatic merge threshold.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/matching-identities/\">Matching identities guide</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/tuning-matching-algorithms/\">Tuning matching algorithms</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/matching/\">Matching settings reference</a>.",
                     "items": [
                         {
                             "key": "fusionManualReviewScore",
                             "label": "Manual review match score [0-100]",
                             "type": "number",
                             "required": true,
-                            "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match. See [Manual review match score [0-100]](configuration/matching.md#fusionmanualreviewscore)."
+                            "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match."
                         },
                         {
                             "key": "fusionEnableAutoMerge",
                             "label": "Enable automatic merge",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "When enabled, merge the managed account into the matched Fusion identity without a review form if the combined score mee. See [Enable automatic merge](configuration/matching.md#fusionenableautomerge)."
+                            "helpKey": "When enabled, merge the managed account into the matched Fusion identity without a review form if the combined score mee."
                         },
                         {
                             "key": "fusionAutoMergeScore",
@@ -768,7 +782,7 @@
                             "required": true,
                             "parentKey": "fusionEnableAutoMerge",
                             "parentValue": "true",
-                            "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically merged. See [Automatic merge match score [0-100]](configuration/matching.md#fusionautomergescore)."
+                            "helpKey": "Matches with a combined score equal to or higher than this threshold will be automatically merged."
                         },
                         {
                             "key": "matchingConfigs",
@@ -791,14 +805,14 @@
                                             "label": "Attribute",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "The identity attribute to compare when looking for matches (e.g. See [Attribute](configuration/matching.md#attribute)."
+                                            "helpKey": "Identity attribute to compare when looking for matches."
                                         },
                                         {
                                             "key": "algorithm",
                                             "label": "Matching algorithm",
                                             "type": "select",
                                             "required": true,
-                                            "helpKey": "Algorithm used to compare values. See [Matching algorithm](configuration/matching.md#algorithm).",
+                                            "helpKey": "Algorithm used to compare values.",
                                             "options": [
                                                 {
                                                     "label": "Enhanced Name Matcher",
@@ -847,53 +861,55 @@
                                             "required": true,
                                             "parentKey": "algorithm",
                                             "parentValue": "custom",
-                                            "helpKey": "Apache Velocity template evaluated for each account/identity pair. See [Custom match score (Velocity)](configuration/matching.md#customvelocityexpression)."
+                                            "helpKey": "Apache Velocity template evaluated for each account/identity pair."
                                         },
                                         {
                                             "key": "fusionScore",
                                             "label": "Similarity threshold & weight [0-100]",
                                             "type": "number",
                                             "required": true,
-                                            "helpKey": "One setting, two roles: (1) minimum similarity (0-100) the rule must meet to pass, and (2) blend weight in the combined . See [Similarity threshold & weight [0-100]](configuration/matching.md#fusionscore)."
+                                            "helpKey": "Minimum similarity and blend weight for this rule (0-100)."
                                         },
                                         {
                                             "key": "mandatory",
                                             "label": "Mandatory match",
                                             "type": "toggle",
                                             "required": false,
-                                            "helpKey": "When enabled, this rule must meet its minimum similarity for a potential match. See [Mandatory match](configuration/matching.md#mandatory)."
+                                            "helpKey": "When enabled, this rule must meet its minimum similarity for a potential match."
                                         },
                                         {
                                             "key": "skipMatchIfMissing",
                                             "label": "Skip match if missing",
                                             "type": "toggle",
                                             "required": false,
-                                            "helpKey": "When enabled (default), this rule is skipped if either value is missing (null, undefined, or empty after trimming). See [Skip match if missing](configuration/matching.md#skipmatchifmissing)."
+                                            "helpKey": "When enabled (default), this rule is skipped if either value is missing (null, undefined, or empty after trimming)."
                                         },
                                         {
                                             "key": "skipMatchIfThresholdNotMet",
                                             "label": "Skip match if threshold not met",
                                             "type": "toggle",
                                             "required": false,
-                                            "helpKey": "When enabled, this rule is excluded from the weighted combined match score if its computed similarity is below its minim. See [Skip match if threshold not met](configuration/matching.md#skipmatchifthresholdnotmet)."
+                                            "helpKey": "When enabled, this rule is excluded from the weighted combined match score if its computed similarity is below its minim."
                                         }
                                     ]
                                 }
                             ]
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Matching settings reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/matching/"
                 },
                 {
                     "type": "section",
                     "sectionTitle": "Review Settings",
-                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong> See [Review forms and reviewers](../use-guides/configuration/review-forms-and-reviewers.md).",
+                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong><br><br>Define <strong>Form attributes</strong> to display to reviewers and set candidate limits. Assign global reviewers to act as fail-safes and optionally email them processing reports after each aggregation.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/review-forms-and-reviewers/\">Review forms and reviewers</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/matching/\">Matching settings reference</a>.",
                     "items": [
                         {
                             "key": "fusionFormAttributes",
                             "label": "List of Fusion account attributes to include in form",
                             "type": "list",
                             "required": false,
-                            "helpKey": "Account attributes displayed on the review form to help reviewers compare potential matches. See [List of Fusion account attributes to include in form](configuration/matching.md#fusionformattributes)."
+                            "helpKey": "Account attributes displayed on the review form to help reviewers compare potential matches."
                         },
                         {
                             "key": "fusionMaxCandidatesForForm",
@@ -902,35 +918,35 @@
                             "required": false,
                             "min": "1",
                             "max": "15",
-                            "helpKey": "Maximum number of potential identity matches shown on each manual review form. See [Maximum candidates per review form](configuration/matching.md#fusionmaxcandidatesforform)."
+                            "helpKey": "Maximum number of potential identity matches shown on each manual review form."
                         },
                         {
                             "key": "fusionFormExpirationDays",
                             "label": "Manual review expiration days",
                             "type": "number",
                             "required": true,
-                            "helpKey": "Number of days a reviewer has to respond before the review form expires. See [Manual review expiration days](configuration/matching.md#fusionformexpirationdays)."
+                            "helpKey": "Number of days a reviewer has to respond before the review form expires."
                         },
                         {
                             "key": "fusionOwnerIsGlobalReviewer",
                             "label": "Owners are global reviewers?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Always add the source owner and any member of the source's assigned governance group as reviewers on every review form, . See [Owners are global reviewers?](configuration/matching.md#fusionownerisglobalreviewer)."
+                            "helpKey": "Always add the source owner and any member of the source's assigned governance group as reviewers on every review form,."
                         },
                         {
                             "key": "fusionReportOnAggregation",
                             "label": "Send report to owner on aggregation?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Send a summary report to the source owner after each run, including potential matches, processing outcomes, and source-t. See [Send report to owner on aggregation?](configuration/matching.md#fusionreportonaggregation)."
+                            "helpKey": "Send a summary report to the source owner after each run, including potential matches, processing outcomes, and source-t."
                         },
                         {
                             "key": "enableLocalization",
                             "label": "Enable localized user communications?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Localize emails, aggregation reports, and Fusion review forms. See [Enable localized user communications?](configuration/matching.md#enablelocalization)."
+                            "helpKey": "Localize emails, aggregation reports, and Fusion review forms."
                         },
                         {
                             "key": "defaultLanguage",
@@ -939,7 +955,7 @@
                             "required": false,
                             "parentKey": "enableLocalization",
                             "parentValue": "true",
-                            "helpKey": "Leave unset for English. See [Default Language](configuration/matching.md#defaultlanguage).",
+                            "helpKey": "Leave unset for English.",
                             "options": [
                                 {
                                     "label": "Spanish",
@@ -986,9 +1002,11 @@
                             "required": false,
                             "parentKey": "enableLocalization",
                             "parentValue": "true",
-                            "helpKey": "Identity attribute containing the reviewer's preferred language. See [Identity Language Attribute](configuration/matching.md#identitylanguageattribute)."
+                            "helpKey": "Identity attribute containing the reviewer's preferred language."
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Matching settings reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/matching/"
                 }
             ]
         },
@@ -999,63 +1017,65 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced troubleshooting and performance tuning.</strong> See [Operation guides](../use-guides/operation/index.md).",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation) and manage memory consumption during match detection by adjusting batch sizes.<br><br>The section header in ISC shows the <strong>installed connector version</strong> for reference — it updates automatically when you upgrade the connector package.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/operation/\">Operation guides</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/advanced/\">Advanced settings reference</a>.",
                     "items": [
                         {
                             "key": "resetAccounts",
                             "label": "Reset accounts?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "On the next aggregation only, clear all Fusion account data and emit zero accounts (rebuild from scratch on the followin. See [Reset accounts?](configuration/advanced.md#resetaccounts)."
+                            "helpKey": "On the next aggregation only, clear all Fusion account data and emit zero accounts (rebuild from scratch on the followin."
                         },
                         {
                             "key": "resetForms",
                             "label": "Reset forms?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "On the next aggregation only, delete all Fusion review form definitions. See [Reset forms?](configuration/advanced.md#resetforms)."
+                            "helpKey": "On the next aggregation only, delete all Fusion review form definitions."
                         },
                         {
                             "key": "forceAttributeRefresh",
                             "label": "Force attribute refresh on next aggregation?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "On the next aggregation only, recalculate all computed Normal-type attributes even if no changes were detected. See [Force attribute refresh on next aggregation?](configuration/advanced.md#forceattributerefresh)."
+                            "helpKey": "On the next aggregation only, recalculate all computed Normal-type attributes even if no changes were detected."
                         },
                         {
                             "key": "concurrencyCheckEnabled",
                             "label": "Enable concurrency check?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Safeguard against data conflicts if multiple aggregations overlap. See [Enable concurrency check?](configuration/advanced.md#concurrencycheckenabled)."
+                            "helpKey": "Safeguard against data conflicts if multiple aggregations overlap."
                         },
                         {
                             "key": "managedAccountsBatchSize",
                             "label": "Managed accounts batch size",
                             "type": "number",
                             "required": false,
-                            "helpKey": "Number of uncorrelated managed accounts processed in each match detection batch. See [Managed accounts batch size](configuration/advanced.md#managedaccountsbatchsize)."
+                            "helpKey": "Number of uncorrelated managed accounts processed in each match detection batch."
                         },
                         {
                             "key": "scoringMaxConcurrency",
                             "label": "Scoring concurrency limit",
                             "type": "number",
                             "required": false,
-                            "helpKey": "Maximum concurrent identity-comparison scoring operations during managed-account analysis. See [Scoring concurrency limit](configuration/advanced.md#scoringmaxconcurrency)."
+                            "helpKey": "Maximum concurrent identity-comparison scoring operations during managed-account analysis."
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Advanced settings reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/advanced/"
                 },
                 {
                     "type": "section",
                     "sectionTitle": "External Settings",
-                    "sectionHelpMessage": "<strong>Configure proxy, logging, and scenario recording.</strong> See [Proxy mode](../reference/proxy-mode.md).",
+                    "sectionHelpMessage": "<strong>Configure external infrastructure for proxy processing, logging, and recording.</strong><br><br>Enable external processing to reveal a shared target URL and password, then choose sub-options for proxy mode, scenario recording, and external logging. When proxy mode is off, external logging sends HTTP POST to the target URL from ISC. When proxy mode is on, the proxy server writes logs to disk.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/proxy-mode/\">Proxy mode reference</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/scenario-recording/\">Scenario recording reference</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/advanced/\">Advanced settings reference</a>.",
                     "items": [
                         {
                             "key": "externalProcessingEnabled",
                             "label": "Enable external processing?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Gateway toggle for external infrastructure. See [Enable external processing?](configuration/advanced.md#externalprocessingenabled)."
+                            "helpKey": "Gateway toggle for external infrastructure."
                         },
                         {
                             "key": "externalTargetUrl",
@@ -1064,7 +1084,7 @@
                             "required": false,
                             "parentKey": "externalProcessingEnabled",
                             "parentValue": "true",
-                            "helpKey": "Shared external target — proxy endpoint when proxy mode is on, log HTTP endpoint when proxy mode is off. See [Server URL](configuration/advanced.md#externaltargeturl)."
+                            "helpKey": "Shared external target — proxy endpoint when proxy mode is on, log HTTP endpoint when proxy mode is off."
                         },
                         {
                             "key": "externalTargetPassword",
@@ -1073,7 +1093,7 @@
                             "required": false,
                             "parentKey": "externalProcessingEnabled",
                             "parentValue": "true",
-                            "helpKey": "Shared secret for proxy authentication. See [Password](configuration/advanced.md#externaltargetpassword)."
+                            "helpKey": "Shared secret for proxy authentication."
                         },
                         {
                             "key": "externalProxyEnabled",
@@ -1082,7 +1102,7 @@
                             "required": false,
                             "parentKey": "externalProcessingEnabled",
                             "parentValue": "true",
-                            "helpKey": "Delegate operation processing to the external target. See [Enable proxy mode?](configuration/advanced.md#externalproxyenabled)."
+                            "helpKey": "Delegate operation processing to the external target."
                         },
                         {
                             "key": "externalRecordingEnabled",
@@ -1091,7 +1111,7 @@
                             "required": false,
                             "parentKey": "externalProxyEnabled",
                             "parentValue": "true",
-                            "helpKey": "Record API call chains on the proxy server for replay testing. See [Enable chain recording?](configuration/advanced.md#externalrecordingenabled)."
+                            "helpKey": "Record API call chains on the proxy server for replay testing."
                         },
                         {
                             "key": "recordingName",
@@ -1100,7 +1120,7 @@
                             "required": false,
                             "parentKey": "externalRecordingEnabled",
                             "parentValue": "true",
-                            "helpKey": "Name for the recording chain directory. See [Recording chain name](configuration/advanced.md#recordingname)."
+                            "helpKey": "Name for the recording chain directory."
                         },
                         {
                             "key": "externalLoggingEnabled",
@@ -1109,7 +1129,7 @@
                             "required": false,
                             "parentKey": "externalProcessingEnabled",
                             "parentValue": "true",
-                            "helpKey": "Stream connector logs to external infrastructure. See [Enable external logging?](configuration/advanced.md#externalloggingenabled)."
+                            "helpKey": "Stream connector logs to external infrastructure."
                         },
                         {
                             "key": "externalLoggingLevel",
@@ -1118,7 +1138,7 @@
                             "required": false,
                             "parentKey": "externalLoggingEnabled",
                             "parentValue": "true",
-                            "helpKey": "Minimum log level for external logging delivery. See [External logging level](configuration/advanced.md#externallogginglevel).",
+                            "helpKey": "Minimum log level for external logging delivery.",
                             "options": [
                                 {
                                     "label": "Error",
@@ -1138,19 +1158,21 @@
                                 }
                             ]
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Advanced settings reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/advanced/"
                 },
                 {
                     "type": "section",
                     "sectionTitle": "Advanced Connection Settings",
-                    "sectionHelpMessage": "<strong>Fine-tune API limits and execution resilience.</strong> See [Tune API performance](../use-guides/operation/tune-api-performance.md).",
+                    "sectionHelpMessage": "<strong>Fine-tune API limits and execution resilience.</strong><br><br>Adjust these parameters to prevent the connector from being rate-limited by Identity Security Cloud, ensure long-running operations complete without timing out, and optimize throughput by adjusting request concurrency and batching sizes.<br><br>See also: <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/operation/tune-api-performance/\">Tune API performance guide</a> · <a href=\"https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/advanced/\">Advanced settings reference</a>.",
                     "items": [
                         {
                             "key": "provisioningTimeout",
                             "label": "Provisioning timeout (seconds)",
                             "type": "number",
                             "required": true,
-                            "helpKey": "Maximum time (in seconds) to wait for a provisioning operation to complete. See [Provisioning timeout (seconds)](configuration/advanced.md#provisioningtimeout)."
+                            "helpKey": "Maximum time (in seconds) to wait for a provisioning operation to complete."
                         },
                         {
                             "key": "maxConcurrentRequests",
@@ -1159,7 +1181,7 @@
                             "required": false,
                             "min": "1",
                             "max": "30",
-                            "helpKey": "How many HTTP requests can run at the same time. See [Maximum concurrent requests](configuration/advanced.md#maxconcurrentrequests)."
+                            "helpKey": "How many HTTP requests can run at the same time."
                         },
                         {
                             "key": "parallelBatchSize",
@@ -1168,7 +1190,7 @@
                             "required": false,
                             "min": "1",
                             "max": "16",
-                            "helpKey": "Max in-flight parallel pages per pagination stream. See [Parallel pagination batch size](configuration/advanced.md#parallelbatchsize)."
+                            "helpKey": "Max in-flight parallel pages per pagination stream."
                         },
                         {
                             "key": "requestsPerSecond",
@@ -1177,7 +1199,7 @@
                             "required": false,
                             "min": "1",
                             "max": "12",
-                            "helpKey": "Legacy rate hint: derives the sliding-window cap as requests per second × 10 seconds (max 100). See [Requests per second](configuration/advanced.md#requestspersecond)."
+                            "helpKey": "Legacy rate hint: derives the sliding-window cap as requests per second × 10 seconds (max 100)."
                         },
                         {
                             "key": "maxRetries",
@@ -1186,7 +1208,7 @@
                             "required": false,
                             "min": "0",
                             "max": "20",
-                            "helpKey": "How many times to retry a failed request before giving up. See [API request retries](configuration/advanced.md#maxretries)."
+                            "helpKey": "How many times to retry a failed request before giving up."
                         },
                         {
                             "key": "processingWait",
@@ -1194,7 +1216,7 @@
                             "type": "number",
                             "required": false,
                             "min": "10",
-                            "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts. See [Processing wait time (seconds)](configuration/advanced.md#processingwait)."
+                            "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts."
                         },
                         {
                             "key": "heartbeatInterval",
@@ -1202,16 +1224,18 @@
                             "type": "number",
                             "required": false,
                             "min": "5",
-                            "helpKey": "How often (in seconds) the connector emits STATUS and EVENT_SUMMARY lines during long operations. See [Heartbeat interval (seconds)](configuration/advanced.md#heartbeatinterval)."
+                            "helpKey": "How often (in seconds) the connector emits STATUS and EVENT_SUMMARY lines during long operations."
                         },
                         {
                             "key": "enablePriority",
                             "label": "Enable priority processing?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Process critical operations (like saving data) before less urgent ones (like logging). See [Enable priority processing?](configuration/advanced.md#enablepriority)."
+                            "helpKey": "Process critical operations (like saving data) before less urgent ones (like logging)."
                         }
-                    ]
+                    ],
+                    "docLinkLabel": "Advanced settings reference",
+                    "docLink": "https://fernando.delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/advanced/"
                 }
             ]
         }
