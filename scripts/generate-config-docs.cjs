@@ -447,8 +447,6 @@ function renderMenuPage(menu, initialValues) {
         '',
         `# ${menu.label}`,
         '',
-        `Field-level reference generated from \`connector-spec.json\`.`,
-        '',
         ...renderPageGuideBlock(menu.label),
     ]
 
@@ -496,7 +494,7 @@ function renderIndex(menus) {
         '',
         '# Configuration reference',
         '',
-        'Field-level reference for Identity Fusion NG source configuration in ISC. Pages are generated from `connector-spec.json` when you run `npm run docs:prepare`.',
+        'Field-level reference for Identity Fusion NG source configuration in Identity Security Cloud.',
         '',
         '**How to use these pages**',
         '',
