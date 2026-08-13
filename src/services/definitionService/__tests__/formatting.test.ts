@@ -709,6 +709,24 @@ describe('evaluateVelocityTemplate', () => {
             const result = evaluateVelocityTemplate('$Datefns.getYear($Datefns.parseISO($birthDate))', context)
             expect(result).toBe('1985')
         })
+
+        it('should yield no output when format receives invalid or missing input', () => {
+            const expression = '$Datefns.format($Datefns.parse($INACTIVE_DATE, "yyyy-MM-dd"))'
+            expect(evaluateVelocityTemplate(expression, {})).toBeUndefined()
+            expect(evaluateVelocityTemplate(expression, { INACTIVE_DATE: null })).toBeUndefined()
+            expect(evaluateVelocityTemplate(expression, { INACTIVE_DATE: undefined })).toBeUndefined()
+            expect(evaluateVelocityTemplate(expression, { INACTIVE_DATE: '' })).toBeUndefined()
+        })
+
+        it('should yield no output for invalid date in format', () => {
+            const result = evaluateVelocityTemplate('$Datefns.format("invalid", "yyyy-MM-dd")', {})
+            expect(result).toBeUndefined()
+        })
+
+        it('should yield no output for invalid parse input', () => {
+            const result = evaluateVelocityTemplate('$Datefns.parse("invalid", "yyyy-MM-dd")', {})
+            expect(result).toBeUndefined()
+        })
     })
 
     // ========================================================================
