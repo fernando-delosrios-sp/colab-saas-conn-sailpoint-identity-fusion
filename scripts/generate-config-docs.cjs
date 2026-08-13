@@ -469,7 +469,8 @@ function renderMenuPage(menu, initialValues) {
             continue
         }
         const sectionTitle = item.sectionTitle || menu.label
-        lines.push(`## ${sectionTitle}`)
+        const sectionAnchor = anchorForKey(sectionTitle)
+        lines.push(`## ${sectionTitle} {#${sectionAnchor}}`)
         lines.push('')
         const sectionGuide = USE_GUIDE_BY_SECTION[sectionTitle]
         if (sectionGuide) {
