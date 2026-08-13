@@ -310,10 +310,30 @@ function fieldExplanation(pageSlug, item) {
 
 /** @type {Record<string, string>} */
 const SECTION_INTRO_OVERRIDES = {
+    'Connection Settings':
+        'Configure the ISC tenant API URL and Personal Access Token credentials used to authenticate all connector operations.\n\nSee [ISC PAT scopes](../reference/pat-scopes.md) for required API permissions.',
+    Scope:
+        'Limit which identities Fusion considers during Match. Toggle **Include identities in the scope** and optionally filter with an Identity Scope Query.\n\nSee [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) for deployment patterns.',
+    Sources:
+        'Select authoritative, Records, or Orphan sources; control aggregation timing, correlation mode, filters, and batch limits.\n\nSee [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) and [Source types](../use-guides/configuration/source-types.md).',
+    'Processing Control':
+        'Control account maintenance: history limits, delete-when-empty behavior, and whether to skip source accounts missing mapped native identity attributes.',
+    'Attribute Mapping Definitions':
+        'Map source attributes to Fusion account fields and choose default or per-attribute merge strategies.\n\nSee [Mapping attributes](../use-guides/configuration/mapping-attributes.md) for multi-source examples.',
     'Normal Attribute Definitions':
         'Define computed attributes with Apache Velocity. Values can refresh each aggregation or stay static. Post-template options include case, normalization, spaces, trim, and max length.\n\nSee [Velocity context reference](../reference/velocity-context.md) for context variables (`$accounts`, `$identity`, `$previous`) and helper functions.',
     'Unique Attribute Definitions':
         'Define persistent unique identifiers (usernames, employee IDs, UUIDs). Values persist until account reset. Runs after normal definitions; supports `$counter`, `$UUID`, and `$isUnique()`.\n\nSee [Velocity context — Unique-only variables](../reference/velocity-context.md#unique-only-variables) and [Defining attributes](../use-guides/configuration/defining-attributes.md) for recipes.',
+    'Matching Settings':
+        'Configure per-attribute match rules, combined score thresholds, and optional automatic merge when scores exceed your threshold.\n\nSee [Tuning matching algorithms](../use-guides/configuration/tuning-matching-algorithms.md) for algorithm selection and threshold tuning.',
+    'Review Settings':
+        'Configure manual review forms, candidate limits, global reviewers, and optional aggregation report emails.\n\nSee [Review forms and reviewers](../use-guides/configuration/review-forms-and-reviewers.md).',
+    'Developer Settings':
+        'Advanced options for account rebuild, attribute refresh, and match batch sizing. The section header shows the installed connector version.',
+    'External Settings':
+        'Enable external processing for proxy mode, scenario recording, and external logging. Proxy off: logging POSTs from ISC. Proxy on: logs and recordings on the proxy server.\n\nSee [Proxy mode](../reference/proxy-mode.md) and [Scenario recording](../reference/scenario-recording.md).',
+    'Advanced Connection Settings':
+        'Fine-tune ISC API rate limits, retries, timeouts, concurrency, and batch sizes.\n\nSee [Tune API performance](../use-guides/operation/tune-api-performance.md).',
 }
 
 function renderSelectOptions(item) {

@@ -25,7 +25,7 @@
         "replay": "node scripts/replay-scenario.js",
         "test-recording": "node scripts/test-recording.js",
         "refresh-recording-reports": "node scripts/refresh-scenario-reports.js",
-        "lint": "npx eslint . && npx knip",
+        "lint": "npx eslint . && node scripts/check-connector-spec-help.cjs && npx knip",
         "lint:docs-code": "npx eslint \"src/**/*.{ts,js,mjs,cjs}\"",
         "lint:markdown": "npx markdownlint \"README.md\" \"docs/**/*.md\"",
         "lint:docs-guides": "node scripts/check-use-guide-structure.cjs",

@@ -66,7 +66,7 @@ Full detail: [superpowers-bridge README §Entry & exit gates](https://github.com
 | `npm test` | Run Vitest suite (all `__tests__/**/*.test.ts`) |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run test:coverage` | Vitest with v8 coverage |
-| `npm run lint` | ESLint + knip (dead code check) |
+| `npm run lint` | ESLint + connector-spec help check + knip (dead code check) |
 | `npm run lint:markdown` | markdownlint on README + docs |
 | `npm run lint:docs-guides` | Use-guide IA check (duplicate headings, owned sections) |
 | `npm run dev` | Run connector locally with spcx + source maps |

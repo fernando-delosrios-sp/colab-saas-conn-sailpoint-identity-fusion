@@ -40,3 +40,5 @@ npm run docs:serve
 
 Generated Configuration reference pages live under `docs/configuration/` and are recreated on each `docs:prepare` run. The Home page is authored in `docs/index.md`.
 
+`connector-spec.json` inline help (`helpKey`, `sectionHelpMessage`) must stay concise with links to Configuration reference or Use guides. `npm run lint` runs `scripts/check-connector-spec-help.cjs` to enforce length limits. Use `node scripts/slim-connector-spec-help.cjs` when bulk-shortening help text.
+
