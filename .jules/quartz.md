@@ -1,0 +1,3 @@
+## 2024-08-14 - Readability Pattern (Quartz): Extract redundant, complex property resolution chains
+**Learning:** The codebase frequently uses chained `??` operations on `readUnknown` to resolve a property from multiple possible keys (e.g., `readUnknown(form, 'modified') ?? readUnknown(form, 'modifiedAt') ?? ...`). This pattern is verbose, repetitive, and decreases readability, especially in complex components.
+**Action:** Replace these chained nullish coalescing operations with a dedicated variadic helper function, `readFirstUnknown(source, ...keys)`. This encapsulates the fallback logic, adheres to DRY principles, and makes the intent much clearer while preserving the exact behavior of skipping nullish values.

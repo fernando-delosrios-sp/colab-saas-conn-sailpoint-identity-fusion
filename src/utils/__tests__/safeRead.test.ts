@@ -14,10 +14,19 @@ import {
     readPathUnknown,
     readString,
     readUnknown,
+    readFirstUnknown,
     trimStr,
 } from '../safeRead'
 
 describe('safeRead', () => {
+    it('returns the first non-nullish value with readFirstUnknown', () => {
+        const source = { a: null, b: undefined, c: false, d: 0, e: "" }
+        expect(readFirstUnknown(source, 'a')).toBeNull()
+        expect(readFirstUnknown(source, 'x', 'a', 'b')).toBeUndefined()
+        expect(readFirstUnknown(source, 'a', 'b', 'c')).toBe(false)
+        expect(readFirstUnknown(source, 'x', 'a', 'b', 'd')).toBe(0)
+    })
+
     it('classifies nullish and attribute presence', () => {
         expect(isNullish(null)).toBe(true)
         expect(isNullish(undefined)).toBe(true)
