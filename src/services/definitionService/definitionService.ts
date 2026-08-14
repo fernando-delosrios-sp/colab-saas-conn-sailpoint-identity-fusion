@@ -668,15 +668,13 @@ export class DefinitionService {
             this.log.error(
                 `Error evaluating normal attribute ${definition.name}: ${result.error}`
             )
-            const safeDefault = this.fusionAttributeSafeDefault(
+            this.applyNormalDefinitionClearOrSafeDefault(
                 definition.name,
                 fusionAccount,
+                context,
                 fusionIdentityAttribute,
                 fusionDisplayAttribute
             )
-            if (safeDefault !== undefined) {
-                fusionAccount.attributes[definition.name] = safeDefault
-            }
             return
         }
 
@@ -687,17 +685,36 @@ export class DefinitionService {
                 `[${fusionAccount.name}] ${definition.name} = ${typeof result.value === 'object' ? JSON.stringify(result.value) : result.value}`
             )
         } else {
-            const safeDefault = this.fusionAttributeSafeDefault(
+            this.applyNormalDefinitionClearOrSafeDefault(
                 definition.name,
                 fusionAccount,
+                context,
                 fusionIdentityAttribute,
                 fusionDisplayAttribute
             )
-            if (safeDefault !== undefined) {
-                fusionAccount.attributes[definition.name] = safeDefault
-                context[definition.name] = safeDefault
-            }
         }
+    }
+
+    private applyNormalDefinitionClearOrSafeDefault(
+        attributeName: string,
+        fusionAccount: FusionAccount,
+        context: Record<string, any>,
+        fusionIdentityAttribute: string,
+        fusionDisplayAttribute: string
+    ): void {
+        const safeDefault = this.fusionAttributeSafeDefault(
+            attributeName,
+            fusionAccount,
+            fusionIdentityAttribute,
+            fusionDisplayAttribute
+        )
+        if (safeDefault !== undefined) {
+            fusionAccount.attributes[attributeName] = safeDefault
+            context[attributeName] = safeDefault
+            return
+        }
+        delete fusionAccount.attributes[attributeName]
+        delete context[attributeName]
     }
 
     // ========================================================================

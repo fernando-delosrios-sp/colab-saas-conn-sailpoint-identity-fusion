@@ -346,3 +346,146 @@ describe('DefinitionService.refreshUniqueAttributes preservation', () => {
         expect(account.attributes.UID).not.toBe('old-value')
     })
 })
+
+describe('DefinitionService.refreshNormalAttributes clearing', () => {
+    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
+    const mockLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
+    const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
+
+    beforeAll(() => {
+        const minimalConfig = {
+            sources: [{ name: 'HR', id: 'src-hr', type: 'authoritative' }],
+            fusionAccountRefreshThresholdInSeconds: 3600,
+            maxHistoryMessages: 50,
+            resetAccounts: false,
+            resetForms: false,
+        } as unknown as FusionConfig
+        FusionAccount.configure(minimalConfig)
+    })
+
+    const createService = (normalAttributeDefinitions: any[]) =>
+        new DefinitionService(
+            {
+                normalAttributeDefinitions,
+                uniqueAttributeDefinitions: [],
+                attributeMaps: [],
+                skipAccountsWithMissingId: false,
+                forceAttributeRefresh: false,
+            } as any,
+            mockSchemas,
+            mockLog,
+            mockLocks
+        )
+
+    const createRefreshableAccount = (attrs: Record<string, any> = {}) => {
+        const acc = FusionAccount.fromManagedAccount({
+            id: 'src-hr::acc-1',
+            name: 'neo-1',
+            sourceId: 'src-hr',
+            nativeIdentity: 'acc-1',
+            uncorrelated: true,
+            attributes: { ...attrs },
+        } as any)
+        acc.setNeedsRefresh(true)
+        return acc
+    }
+
+    it('clears existing normal attribute when template evaluates to empty output', async () => {
+        const service = createService([
+            {
+                name: 'formattedDate',
+                expression: '$Datefns.format($Datefns.parse($INACTIVE_DATE, "yyyy-MM-dd"))',
+            },
+        ])
+        const acc = createRefreshableAccount({ formattedDate: '2024-01-15' })
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current.formattedDate).toBeUndefined()
+    })
+
+    it('removes cleared attribute from velocity context for downstream definitions', async () => {
+        const service = createService([
+            {
+                name: 'formattedDate',
+                expression: '$Datefns.format($Datefns.parse($INACTIVE_DATE, "yyyy-MM-dd"))',
+            },
+            {
+                name: 'derived',
+                expression: 'prefix-$!{formattedDate}-suffix',
+            },
+        ])
+        const acc = createRefreshableAccount({
+            formattedDate: '2024-01-15',
+            derived: '2024-01-15',
+        })
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current.formattedDate).toBeUndefined()
+        expect(acc.attributeBag.current.derived).toBe('prefix--suffix')
+    })
+
+    it('clears existing normal attribute when template evaluation returns error', async () => {
+        const service = createService([{ name: 'department', expression: '' }])
+        const acc = createRefreshableAccount({ department: 'Engineering' })
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current.department).toBeUndefined()
+        expect(mockLog.error).toHaveBeenCalled()
+    })
+
+    it('applies safe default for display attribute on falsy output instead of clearing', async () => {
+        const service = createService([
+            { name: 'name', expression: '$Datefns.format($Datefns.parse($missingDate, "yyyy-MM-dd"))' },
+        ])
+        const acc = createRefreshableAccount()
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current.name).toBe('neo-1')
+    })
+
+    it('applies safe default for identity attribute on falsy output instead of clearing', async () => {
+        const service = createService([
+            { name: 'id', expression: '$Datefns.format($Datefns.parse($missingDate, "yyyy-MM-dd"))' },
+        ])
+        const acc = createRefreshableAccount()
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current.id).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+        )
+    })
+
+    it('static definition with existing value skips evaluation on existing fusion rows', async () => {
+        const service = createService([
+            { name: 'department', expression: 'New Value', static: true },
+        ])
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-native-1',
+            name: 'Persisted Name',
+            sourceName: 'Identity Fusion NG',
+            attributes: {
+                department: 'Engineering',
+                employeeId: 'E1',
+            },
+        } as any)
+        acc.setNeedsRefresh(true)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current.department).toBe('Engineering')
+    })
+
+    it('non-nullish rendered value overwrites existing value', async () => {
+        const service = createService([{ name: 'fullName', expression: 'Jane Smith' }])
+        const acc = createRefreshableAccount({ fullName: 'Jane Doe' })
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current.fullName).toBe('Jane Smith')
+    })
+})

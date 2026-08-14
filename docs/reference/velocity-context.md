@@ -158,6 +158,8 @@ Previous generated Fusion account state — useful for change detection or prese
 
 Custom connector helpers (`$Normalize`, `$Datefns`, `$JSON`, `$AddressParse`, `$MD5`) return **empty output** when they cannot produce a valid result — for example when input is missing, null, or invalid. The attribute definition pipeline treats empty output as no value (undefined).
 
+When a **Normal** attribute definition runs and evaluation fails or produces empty/falsy output, the connector **clears** the stored attribute value (removes the key from the account). Core schema attributes (`id`, `name`) receive safe defaults instead of being cleared. To retain a prior value when new input is missing, reference `$previous` in the expression or mark the attribute **Static**.
+
 Use `$!variable` (quiet reference) when you need missing context variables to render as empty rather than the literal `$variable` text. Native `$Math` and `$String` follow JavaScript semantics and are not wrapped.
 
 ### $Math
