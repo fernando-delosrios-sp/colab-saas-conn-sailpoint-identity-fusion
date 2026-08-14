@@ -6,6 +6,7 @@ import { LogService } from '../logService'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { StatusEntitlement } from '../../model/statusEntitlement'
 import { trimStr } from '../../utils/safeRead'
+import { getDisplayName } from '../../utils/attributes'
 import { compact, batchProcess } from './collections'
 import { skipBlendHistoryKeysForDecisionAccountId } from './helpers'
 import { FusionRun } from '../../model/fusionRun'
@@ -243,8 +244,7 @@ export class DecisionProcessor {
 
         try {
             const identity = await this.resolveIdentityBestEffort(submitterId)
-            const label =
-                identity?.displayName || (identity as any)?.attributes?.displayName || identity?.name
+            const label = getDisplayName(identity)
             if (label && label !== submitterId) {
                 decision.submitter.name = label
             }
@@ -267,8 +267,7 @@ export class DecisionProcessor {
 
         try {
             const identity = await this.resolveIdentityBestEffort(identityId)
-            const label =
-                identity?.displayName || (identity as any)?.attributes?.displayName || identity?.name
+            const label = getDisplayName(identity)
             if (label && label !== identityId) {
                 decision.identityName = label
             }
