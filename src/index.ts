@@ -1,7 +1,8 @@
 // Load repo-root `.env` before config/auth (proxy-server, spcx dev). Does not override existing env vars.
 import path from 'path'
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-require(path.join(__dirname, '..', 'scripts', 'loadDotEnv.cjs')).loadDotEnv(path.join(__dirname, '..'))
+import { loadDotEnv } from './utils/loadDotEnv'
+
+loadDotEnv(path.join(__dirname, '..'))
 
 // Raise EventEmitter listener limit before any FormData usage. The sailpoint-api-client uses
 // form-data for OAuth and multipart requests; with axios-retry, retries add error listeners
