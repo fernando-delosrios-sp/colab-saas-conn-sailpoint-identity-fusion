@@ -33,6 +33,16 @@ export const isRecord = (value: unknown): value is SafeRecord =>
 
 export const asRecord = (value: unknown): SafeRecord | undefined => (isRecord(value) ? value : undefined)
 
+export const readFirstUnknown = (source: unknown, ...keys: string[]): unknown => {
+    if (keys.length === 0) return undefined
+    let val
+    for (const key of keys) {
+        val = readUnknown(source, key)
+        if (val != null) return val
+    }
+    return val
+}
+
 export const readUnknown = (source: unknown, key: string): unknown => {
     const record = asRecord(source)
     return record ? record[key] : undefined
