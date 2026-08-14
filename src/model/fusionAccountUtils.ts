@@ -29,12 +29,12 @@ export function resolveFusionAccountNameOrDisplayName(
     return account.name || account.displayName || fallback
 }
 
-/** Identity-side display label: identity.displayName || identity.attributes.displayName || identity.name. */
+/** Identity display name: attributes.displayName || displayName || name. */
 export function resolveIdentityDocumentDisplayName(identity?: IdentityDocument | null): string | undefined {
     if (!identity) return undefined
     return (
-        trimStr(identity.displayName) ??
         trimStr((identity.attributes as Record<string, unknown> | undefined)?.displayName) ??
+        trimStr(identity.displayName) ??
         trimStr(identity.name) ??
         undefined
     )
@@ -56,9 +56,9 @@ function identityDisplayNameFromAccount(account: Account): string | undefined {
  *
  * Rules:
  * - `id` is mandatory and non-empty. Without it, no IdentityInfo is returned.
- * - `name` is the alias/login chain: identity.name || account.identity?.name || decision.identityName.
- * - `displayName` is the human-readable chain:
- *   identity.attributes.displayName || identity.name || account.identity?.name || account.name.
+ * - `name` is the identity alias chain: identity.name || account.identity?.name || decision.identityName.
+ * - `displayName` is the identity display name chain:
+ *   identity.attributes.displayName || identity.displayName || identity.name || account.identity?.name || account.name.
  */
 export function buildIdentityInfo(
     source: IdentityDocument | Account | FusionDecision | { id?: string | null; name?: string | null; displayName?: string | null }

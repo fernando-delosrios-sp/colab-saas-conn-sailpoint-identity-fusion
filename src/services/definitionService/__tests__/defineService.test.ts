@@ -49,21 +49,21 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
         return acc
     }
 
-    it('writes the identity alias (displayName) to the display attribute when an identity is linked', () => {
+    it('writes IdentityDocument.name (identity alias) to the display attribute when an identity is linked', () => {
         const service = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
         const acc = buildAccountWithIdentity('Alice Anderson', 'aanderson')
         acc.attributeBag.current['name'] = 'persisted-old-value'
         service.applyDisplayAttributeOverride(acc)
-        expect(acc.attributeBag.current['name']).toBe('Alice Anderson')
+        expect(acc.attributeBag.current['name']).toBe('aanderson')
     })
 
-    it('uses the alias even when it differs from the login', () => {
+    it('uses the login even when displayName differs', () => {
         const service = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
         const acc = buildAccountWithIdentity('Display Name', 'login')
         acc.attributeBag.current['name'] = undefined
         service.applyDisplayAttributeOverride(acc)
-        expect(acc.attributeBag.current['name']).toBe('Display Name')
-        expect(acc.attributeBag.current['name']).not.toBe('login')
+        expect(acc.attributeBag.current['name']).toBe('login')
+        expect(acc.attributeBag.current['name']).not.toBe('Display Name')
     })
 
     it('skips the override when isIdentity is false', () => {
@@ -119,7 +119,7 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
         } as any)
         expect(acc.isIdentity).toBe(true)
         service.applyDisplayAttributeOverride(acc)
-        expect(acc.attributeBag.current['name']).toBe('Alice Anderson')
+        expect(acc.attributeBag.current['name']).toBe('login')
     })
 
     it('evaluates the display attribute definition for uncorrelated managed accounts even when source attributes seed previous', async () => {

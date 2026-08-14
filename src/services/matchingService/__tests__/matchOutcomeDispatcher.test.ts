@@ -597,7 +597,8 @@ describe('MatchOutcomeDispatcher', () => {
 
             expect(result.nonMatch).toBe(1)
             expect(scoreSpy).not.toHaveBeenCalled()
-            expect(result.resolved[0].fusionAccount.identityAlias).toBe('Alice Anderson')
+            expect(result.resolved[0].fusionAccount.identityAlias).toBe('aanderson')
+            expect(result.resolved[0].fusionAccount.identityDisplayName).toBe('Alice Anderson')
             expect(result.resolved[0].fusionAccount.isIdentity).toBe(true)
         })
 
@@ -669,8 +670,10 @@ describe('MatchOutcomeDispatcher', () => {
             const result = await dispatcher.runMatchSweep([account1, account2], 2)
 
             expect(result.nonMatch).toBe(2)
-            expect(result.resolved[0].fusionAccount.identityAlias).toBe('Shared Display Name')
-            expect(result.resolved[1].fusionAccount.identityAlias).toBe('Shared Display Name')
+            expect(result.resolved[0].fusionAccount.identityAlias).toBe('shared-login')
+            expect(result.resolved[1].fusionAccount.identityAlias).toBe('shared-login')
+            expect(result.resolved[0].fusionAccount.identityDisplayName).toBe('Shared Display Name')
+            expect(result.resolved[1].fusionAccount.identityDisplayName).toBe('Shared Display Name')
             expect(result.resolved[0].fusionAccount.isIdentity).toBe(true)
             expect(result.resolved[1].fusionAccount.isIdentity).toBe(true)
         })
@@ -703,6 +706,7 @@ describe('MatchOutcomeDispatcher', () => {
 
             expect(result.nonMatch).toBe(1)
             expect(result.resolved[0].fusionAccount.identityAlias).not.toBe('Alice Anderson')
+            expect(result.resolved[0].fusionAccount.identityDisplayName).not.toBe('Alice Anderson')
         })
 
 

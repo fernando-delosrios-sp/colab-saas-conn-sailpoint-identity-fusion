@@ -374,7 +374,7 @@ Implementers SHALL treat SourceService `_allSources` as the ordered full discove
 
 The connector SHALL hydrate identities correlated to **orphan correlated managed accounts** — managed source accounts that are correlated on the source (`uncorrelated === false`) and remain on the work queue after the refresh phase because they are not linked to any account key on a loaded Fusion row — before the correlated account sweep creates Fusion accounts from them. Hydration SHALL occur only for identities not already present in the run-scoped identity cache after the configured `identityScopeQuery` fetch. The connector SHALL NOT perform this hydration pass for managed accounts already linked to an existing Fusion row or for uncorrelated managed accounts.
 
-For each orphan correlated managed account whose identity is hydrated, the connector SHALL apply the identity layer to the **new** Fusion account created from that managed account during the correlated account sweep, before `getISCAccount` serializes it, so the Fusion display-attribute override can consume the identity alias.
+For each orphan correlated managed account whose identity is hydrated, the connector SHALL apply the identity layer to the **new** Fusion account created from that managed account during the correlated account sweep, before `getISCAccount` serializes it, so the Fusion display-attribute override can consume the identity alias via `FusionAccount.identityAlias`.
 
 #### Scenario: Orphan correlated managed account with identity outside configured scope
 

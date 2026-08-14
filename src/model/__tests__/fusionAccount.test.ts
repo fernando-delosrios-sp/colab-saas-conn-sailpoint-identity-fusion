@@ -870,9 +870,14 @@ describe('FusionAccount', () => {
     })
 
     describe('identityAlias accessor', () => {
-        it('returns identityInfo.displayName when set', () => {
-            const acc = FusionAccount.fromIdentity({ id: 'id-1', name: 'login', attributes: { displayName: 'Display Name' } } as any)
-            expect(acc.identityAlias).toBe('Display Name')
+        it('returns identityInfo.name (login) when set', () => {
+            const acc = FusionAccount.fromIdentity({
+                id: 'id-1',
+                name: 'login',
+                displayName: 'Display Name',
+                attributes: { displayName: 'Attr Display Name' },
+            } as any)
+            expect(acc.identityAlias).toBe('login')
         })
 
         it('returns undefined when identityInfo is not set', () => {
@@ -882,6 +887,35 @@ describe('FusionAccount', () => {
                 submitter: { name: 'test' },
             } as any)
             expect(acc.identityAlias).toBeUndefined()
+        })
+    })
+
+    describe('identityDisplayName accessor', () => {
+        it('prefers attributes.displayName over top-level displayName and name', () => {
+            const acc = FusionAccount.fromIdentity({
+                id: 'id-1',
+                name: 'login',
+                displayName: 'Top Display Name',
+                attributes: { displayName: 'Attr Display Name' },
+            } as any)
+            expect(acc.identityDisplayName).toBe('Attr Display Name')
+        })
+
+        it('falls back to top-level displayName then name', () => {
+            const acc = FusionAccount.fromIdentity({
+                id: 'id-1',
+                name: 'login',
+                displayName: 'Top Display Name',
+                attributes: {},
+            } as any)
+            expect(acc.identityDisplayName).toBe('Top Display Name')
+
+            const nameOnly = FusionAccount.fromIdentity({
+                id: 'id-2',
+                name: 'login-only',
+                attributes: {},
+            } as any)
+            expect(nameOnly.identityDisplayName).toBe('login-only')
         })
     })
 })

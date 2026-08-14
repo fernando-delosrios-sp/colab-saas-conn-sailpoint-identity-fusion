@@ -465,17 +465,17 @@ export class DefinitionService {
     private buildVelocityContext(fusionAccount: FusionAccount): Record<string, any> {
         const context: Record<string, any> = { ...fusionAccount.attributeBag.current }
 
-        if (fusionAccount.identityName && context.name === undefined) {
-            context.name = fusionAccount.identityName
+        if (fusionAccount.identityAlias && context.name === undefined) {
+            context.name = fusionAccount.identityAlias
         }
 
         const orderedAccounts = this.getOrderedAccountsForContext(fusionAccount)
 
         context.identity = fusionAccount.attributeBag.identity
-        if (fusionAccount.identityName) {
+        if (fusionAccount.identityAlias) {
             context.identity = {
                 ...fusionAccount.attributeBag.identity,
-                name: fusionAccount.identityName,
+                name: fusionAccount.identityAlias,
             }
         }
 
@@ -522,10 +522,10 @@ export class DefinitionService {
             fusionAccount,
             fusionIdentityAttribute
         )
-        const identityName = fusionAccount.identityName
+        const identityAlias = fusionAccount.identityAlias
         const identityId = fusionAccount.identityId ?? trimStr(identityBag.id)
 
-        const schemaName = configuredSchemaName ?? identityName ?? originId
+        const schemaName = configuredSchemaName ?? identityAlias ?? originId
         const schemaId = configuredSchemaId ?? identityId ?? originId
 
         const identityIdTrimmed = trimStr(identityId)
@@ -741,7 +741,7 @@ export class DefinitionService {
             if (this.shouldApplyDisplayAttributeOverride(fusionAccount) && isFusionDisplayAttribute) {
                 const label = fusionAccount.identityAlias
                 if (label) {
-                    this.log.info(`Setting identity name for attribute: ${name} for account: ${fusionAccount.name}`)
+                    this.log.info(`Setting identity alias for attribute: ${name} for account: ${fusionAccount.name}`)
                     fusionAccount.attributes[name] = label
                 }
                 return

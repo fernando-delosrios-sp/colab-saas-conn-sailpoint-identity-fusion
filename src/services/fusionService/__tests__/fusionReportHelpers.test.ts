@@ -169,14 +169,14 @@ describe('fusionReportHelpers', () => {
     })
 
     describe('getFusionReportAccountLabel', () => {
-        it('should return identityAlias if present', () => {
-            const acc = { name: '  My Name  ', identityAlias: 'IDN Name' } as any
-            expect(getFusionReportAccountLabel(acc)).toBe('IDN Name')
+        it('should return identityDisplayName if present', () => {
+            const acc = { name: '  My Name  ', identityDisplayName: 'Friendly Name' } as any
+            expect(getFusionReportAccountLabel(acc)).toBe('Friendly Name')
         })
 
-        it('should fallback to identityName', () => {
-            const acc = { identityName: '  Alias  ', displayName: 'Disp Name' } as any
-            expect(getFusionReportAccountLabel(acc)).toBe('Alias')
+        it('should fallback to identityAlias', () => {
+            const acc = { identityAlias: '  login  ', displayName: 'Disp Name' } as any
+            expect(getFusionReportAccountLabel(acc)).toBe('login')
         })
 
         it('should fallback to name', () => {

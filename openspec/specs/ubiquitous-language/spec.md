@@ -36,7 +36,7 @@ All new domain terms, states, or classifications SHALL be defined in this spec b
 
 ### Requirement: Code uses canonical terms
 
-Source code SHALL use the canonical terms from this spec for variable names, function names, type names, class names, file names, and comments. The retired term **AttributeService** SHALL be replaced with **MappingService** or **DefinitionService** as appropriate. The retired term **ScoringService** SHALL be replaced with **MatchingService**. The retired term **identity display name** (and the `identityDisplayName` property) SHALL be replaced with **identity name**.
+Source code SHALL use the canonical terms from this spec for variable names, function names, type names, class names, file names, and comments. The retired term **AttributeService** SHALL be replaced with **MappingService** or **DefinitionService** as appropriate. The retired term **ScoringService** SHALL be replaced with **MatchingService**. The ambiguous term **identity name** (when used for the human-friendly identity label) SHALL be replaced with **identity display name** and the `FusionAccount.identityDisplayName` accessor.
 
 #### Scenario: Variable naming follows ubiquitous language (updated)
 
@@ -140,13 +140,19 @@ Code, configuration, and documentation SHALL use the account taxonomy defined in
 
 ### Requirement: Identity reference terms are defined precisely
 
-The connector SHALL distinguish between the authoritative identity alias, the human-friendly identity name, and the internal Fusion account name. The glossary definition of **Fusion account name** MUST refer to the `name` property of `FusionAccount` and MUST NOT refer to `state.name` or `FusionAccountState`.
+The connector SHALL distinguish between the identity alias, the identity display name, and the internal Fusion account name. The glossary definition of **Fusion account name** MUST refer to the `name` property of `FusionAccount` and MUST NOT refer to `state.name` or `FusionAccountState`.
 
-#### Scenario: Identifying the authoritative identity alias
+#### Scenario: Identifying the identity alias
 
 - **WHEN** code needs the value used for the Fusion display attribute override or for identity lookup
-- **THEN** it SHALL use the **identity alias**, defined as the top-level `displayName` field of the `IdentityDocument` as reported by the SailPoint SDK
-  - **AND** it SHALL NOT use `IdentityDocument.name` for that purpose
+- **THEN** it SHALL use the **identity alias**, defined as the `name` field of the `IdentityDocument` as reported by the SailPoint SDK (accessed via `FusionAccount.identityAlias`)
+  - **AND** it SHALL NOT use `displayName` or `attributes.displayName` for that purpose
+
+#### Scenario: Identifying the identity display name
+
+- **WHEN** code needs a human-friendly reference label for a correlated identity in reports, review forms, emails, or logs
+- **THEN** it SHALL use the **identity display name**, computed as `IdentityDocument.attributes.displayName`, falling back to top-level `IdentityDocument.displayName`, then to `IdentityDocument.name` (accessed via `FusionAccount.identityDisplayName`)
+  - **AND** it SHALL NOT use the identity alias alone when a display name is available
 
 #### Scenario: Fusion account name definition omits deleted State
 
@@ -315,8 +321,8 @@ The connector refers to an ISC identity and to the Fusion account itself through
 
 | Term | Definition |
 |------|------------|
-| **Identity alias** | The authoritative account name of the correlated ISC identity, taken from the top-level `displayName` field of the `IdentityDocument` as reported by the SailPoint SDK. This is the only value used for the Fusion account display attribute override (`fusionDisplayAttribute`). |
-| **Identity name** | A human-friendly reference label for the correlated identity. Computed as `IdentityDocument.attributes.displayName`, falling back to `IdentityDocument.name`, then to `FusionAccount.name`. Used in reports, review form candidates, emails, logs, and other user-facing references where a readable label is required. Replaces the former **identity display name** concept. |
+| **Identity alias** | The authoritative login/account name of the correlated ISC identity, taken from the `name` field of the `IdentityDocument` as reported by the SailPoint SDK (accessed via `FusionAccount.identityAlias`). This is the only value used for the Fusion account display attribute override (`fusionDisplayAttribute`). |
+| **Identity display name** | A human-friendly reference label for the correlated identity. Computed as `IdentityDocument.attributes.displayName`, falling back to top-level `IdentityDocument.displayName`, then to `IdentityDocument.name`, then to `FusionAccount.name`. Used in reports, review form candidates, emails, logs, and other user-facing references where a readable label is required (via `FusionAccount.identityDisplayName`). |
 | **Fusion account name** | The `name` property of a `FusionAccount` (`FusionAccount.name`). It mirrors the ISC `Account.name` / `Identity.name` field of the persisted account and is used for internal logging, history entries, and conflict tracking. It is not the output display attribute unless the display attribute override is configured to consume it. |
 
 ### Fusion account collaborators
@@ -584,7 +590,7 @@ The following terms are retired and SHALL NOT be used in new code, configuration
 | `processing run` | operation run, or the specific operation name when referring to the command definition |
 | `AttributeService` | `MappingService` (for attribute mapping/merging) + `DefinitionService` (for attribute computation and unique value generation) |
 | `ScoringService` | `MatchingService` (scoring remains as the computation technique within matching) |
-| `identity display name` / `identityDisplayName` | identity name (for the human-friendly reference label) |
+| `identity name` (ambiguous friendly-label usage) | identity display name (via `FusionAccount.identityDisplayName`) |
 | `attribute-service` (spec) | `mapping-service` + `definition-service` |
 | `scoring-service` (spec) | `matching-service` |
 | `custom:dryrun` | dry-run mode of the accountList operation |

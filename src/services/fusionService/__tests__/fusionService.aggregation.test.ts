@@ -380,7 +380,7 @@ describe('FusionService — aggregation', () => {
             // name is the source title (account.name) and is empty here; alias chain picks up the identity ref name
             expect(fusionAccount.name).toBeUndefined()
             expect(fusionAccount.displayName).toBeUndefined()
-            expect(fusionAccount.identityName).toBe('Jane Identity (from ref)')
+            expect(fusionAccount.identityAlias).toBe('Jane Identity (from ref)')
             expect(fusionAccount.identityDisplayName).toBe('Jane Identity (from ref)')
             expect((fusionAccount.attributeBag.identity as any)?.name).toBeUndefined()
         })
@@ -435,7 +435,7 @@ describe('FusionService — aggregation', () => {
 
             // name is the source title (still empty); displayName comes from identity.attributes.displayName
             expect(fusionAccount.name).toBeUndefined()
-            expect(fusionAccount.identityName).toBe('Authoritative Identity Name')
+            expect(fusionAccount.identityAlias).toBe('Authoritative Identity Name')
             expect(fusionAccount.identityDisplayName).toBe('Authoritative Display Name')
         })
     })
@@ -511,7 +511,7 @@ describe('FusionService — aggregation', () => {
             ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             ctx.mockDefinitionService.applyDisplayAttributeOverride.mockImplementation((account) => {
-                account.attributes.displayName = account.identityName ?? null
+                account.attributes.displayName = account.identityAlias ?? null
             })
 
             const result = await ctx.fusionService.processIdentity(mockIdentity)
