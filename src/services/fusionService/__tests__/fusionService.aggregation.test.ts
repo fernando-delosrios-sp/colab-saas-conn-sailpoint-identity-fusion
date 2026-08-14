@@ -680,6 +680,34 @@ describe('FusionService — aggregation', () => {
             expect(processed.collections.statuses.isOrphan()).toBe(false)
         })
 
+        it('clears orphan from in-scope identity-origin account when originSource attribute is missing but baseline is present', async () => {
+            const identityId = 'baseline-only-origin'
+            ctx.mockIdentities.hasIdentityInScope = vi.fn((id?: string) => id === identityId)
+            ctx.mockIdentities.getIdentityById = vi.fn((id?: string) =>
+                id === identityId ? ({ id: identityId, name: 'Baseline Only' } as IdentityDocument) : undefined
+            )
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+
+            const persisted = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'NG000026',
+                name: 'Baseline Only',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                identityId,
+                attributes: {
+                    originAccount: identityId,
+                    statuses: ['baseline', 'orphan'],
+                    accounts: [],
+                },
+            } as unknown as Account)
+
+            const processed = await ctx.fusionService.processFusionAccount(persisted)
+            expect(processed.fromIdentity).toBe(true)
+            expect(processed.collections.statuses.isOrphan()).toBe(false)
+        })
+
         it('warns when global reviewer is enabled but no owner identity IDs resolve', async () => {
             ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = true
             ctx.mockSources.fetchGlobalOwnerIdentityIds = vi.fn().mockResolvedValue([])

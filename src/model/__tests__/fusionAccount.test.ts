@@ -626,6 +626,64 @@ describe('FusionAccount', () => {
             expect(acc.collections.statuses.isOrphan()).toBe(true)
             expect(acc.statuses).toContain('orphan')
         })
+
+        it('does not mark identity-origin account orphan when origin identity is in scope and there are no managed accounts', () => {
+            const identity: IdentityDocument = { id: 'id-1', name: 'test-identity', attributes: {} } as any
+            const acc = FusionAccount.fromIdentity(identity)
+            acc.setOriginIdentityInScope(true)
+
+            const run = new FusionRun()
+            acc.addManagedAccountLayer(run, { pruneDeleted: true })
+
+            expect(acc.collections.statuses.isOrphan()).toBe(false)
+            expect(acc.statuses).not.toContain('orphan')
+        })
+
+        it('clears stale orphan status when identity-origin account is in scope with no managed accounts', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Identity',
+                sourceName: 'Identity Fusion NG',
+                identityId: 'id-1',
+                attributes: {
+                    originSource: IDENTITIES_SOURCE_NAME,
+                    originAccount: 'id-1',
+                    accounts: [],
+                    statuses: ['baseline', 'orphan'],
+                },
+            } as unknown as Account)
+            acc.setOriginIdentityInScope(true)
+
+            const run = new FusionRun()
+            acc.addManagedAccountLayer(run, { pruneDeleted: true })
+
+            expect(acc.collections.statuses.isOrphan()).toBe(false)
+            expect(acc.statuses).not.toContain('orphan')
+        })
+
+        it('treats baseline-only persisted rows as identity-origin for orphan detection', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Identity',
+                sourceName: 'Identity Fusion NG',
+                identityId: 'id-1',
+                attributes: {
+                    originAccount: 'id-1',
+                    accounts: [],
+                    statuses: ['baseline'],
+                },
+            } as unknown as Account)
+
+            expect(acc.fromIdentity).toBe(true)
+            acc.setOriginIdentityInScope(true)
+
+            const run = new FusionRun()
+            acc.addManagedAccountLayer(run, { pruneDeleted: true })
+
+            expect(acc.collections.statuses.isOrphan()).toBe(false)
+        })
     })
 
     describe('pruneDeletedManagedAccounts', () => {

@@ -7,7 +7,6 @@ import { FusionDecision } from './form'
 import { SourceType } from './config'
 import { FusionAction } from './fusionAction'
 import { StatusEntitlement } from './statusEntitlement'
-import { IDENTITIES_SOURCE_NAME } from './fusionAccount'
 import type { FusionManagedAccountInfo } from './fusionAccountTypes'
 
 /**
@@ -313,15 +312,15 @@ export class FusionCollections {
             }
             return result
         },
-        removeSourceAccount: (id: string, originSource?: string, originIdentityInScope?: boolean): void => {
+        removeSourceAccount: (id: string, fromIdentity?: boolean, originIdentityInScope?: boolean): void => {
             this.removeFromSet(this.accountIdsValue, id, '')
 
-            const fromIdentity = originSource === IDENTITIES_SOURCE_NAME
-
             if (this.accountIdsValue.size === 0) {
-                if (!fromIdentity || (fromIdentity && !originIdentityInScope)) {
+                if (!fromIdentity || !originIdentityInScope) {
                     this.statusesValue.add(StatusEntitlement.Orphan)
                     this.addHistory(`Account became orphan after removing source account: ${id}`)
+                } else {
+                    this.statusesValue.delete(StatusEntitlement.Orphan)
                 }
             }
 
