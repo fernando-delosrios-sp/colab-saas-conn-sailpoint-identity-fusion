@@ -1,5 +1,6 @@
 import { createOperationTestRegistry } from '../../__tests__/harness/operationTestRegistry'
-import { runAccountListPhases } from '../accountListOrchestration'
+import { AggregationTracker } from '../../../services/fusionService'
+import { buildReportContext, runAccountListPhases } from '../accountListOrchestration'
 
 describe('accountListOrchestration — runAccountListPhases', () => {
     afterEach(() => {
@@ -37,5 +38,21 @@ describe('accountListOrchestration — runAccountListPhases', () => {
         expect(breakdown.some((entry) => entry.phase === 'Setup')).toBe(true)
         expect(breakdown.some((entry) => entry.phase === 'Process')).toBe(true)
         expect(breakdown.some((entry) => entry.phase === 'Output')).toBe(false)
+    })
+})
+
+describe('accountListOrchestration — buildReportContext', () => {
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('sets AggregationTracker on FusionRun for report generation', async () => {
+        const registry = createOperationTestRegistry()
+        const fusion = registry.fusion as any
+
+        await buildReportContext(registry)
+
+        expect(fusion.setTracker).toHaveBeenCalledTimes(1)
+        expect(fusion.setTracker.mock.calls[0][0]).toBeInstanceOf(AggregationTracker)
     })
 })

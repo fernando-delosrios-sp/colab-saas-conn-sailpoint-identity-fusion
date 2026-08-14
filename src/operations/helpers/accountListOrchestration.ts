@@ -1,5 +1,6 @@
 import { LogService, PhaseTimer } from '../../services/logService'
 import { OperationPhase } from '../../services/logService/operationRunContext'
+import { AggregationTracker } from '../../services/fusionService'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import {
     fetchPhase,
@@ -106,7 +107,7 @@ export async function buildReportContext(serviceRegistry: ServiceRegistry): Prom
     const timer = log.timer()
     const phaseResult = await runAccountListPhases(
         serviceRegistry,
-        { isPersistent: false, schema: undefined, throughPhase: 4 },
+        { isPersistent: false, schema: undefined, throughPhase: 4, tracker: new AggregationTracker() },
         { log, timer, logPhases: false }
     )
     if (!phaseResult.continued) {
