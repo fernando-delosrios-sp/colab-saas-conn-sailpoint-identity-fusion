@@ -5,7 +5,7 @@ import { SourceType } from './config'
 import { isNewerThan } from '../utils/date'
 import { readString, trimStr } from '../utils/safeRead'
 import { StatusEntitlement } from './statusEntitlement'
-import { buildIdentityInfo } from './fusionAccountUtils'
+import { buildIdentityInfo, isIdentityOriginFusionAccount } from './fusionAccountUtils'
 import {
     buildManagedAccountKey,
     getManagedAccountKeyFromAccount,
@@ -221,18 +221,19 @@ export class FusionLayers {
         this.preserveMissingAccountContext(workQueue.managedAccountInventory)
 
         if (this.collections.accountIds.size === 0) {
-            const originFromAttributes = attributeBag.current?.originSource
-            const legacyOriginFromAttributes = attributeBag.current?.sourceOrigin
-            const fromIdentity =
-                this.originSourceValue === IDENTITIES_SOURCE_NAME ||
-                originFromAttributes === IDENTITIES_SOURCE_NAME ||
-                legacyOriginFromAttributes === IDENTITIES_SOURCE_NAME
+            const fromIdentity = isIdentityOriginFusionAccount(
+                this.originSourceValue,
+                attributeBag.current,
+                this.collections.statusesSet.has(StatusEntitlement.Baseline)
+            )
 
             if (fromIdentity) {
                 const originIdentityId = this.originAccountValue ?? identityInfo?.id
                 if (originIdentityId && !this.originIdentityInScopeValue) {
                     this.collections.statuses.add(StatusEntitlement.Orphan)
                     this.needsRefreshValue = false
+                } else if (this.originIdentityInScopeValue) {
+                    this.collections.statuses.remove(StatusEntitlement.Orphan)
                 }
             } else {
                 this.collections.statuses.add(StatusEntitlement.Orphan)

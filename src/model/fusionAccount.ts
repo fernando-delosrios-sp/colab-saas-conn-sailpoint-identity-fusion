@@ -5,8 +5,9 @@ import { FusionDecision } from './form'
 import { FusionConfig } from './config'
 import { FusionMatch } from '../services/matchingService'
 import { FusionAccountKind } from './fusionAccountTypes'
+import { StatusEntitlement } from './statusEntitlement'
 import type { FusionAttributeBag, IdentityInfo } from './fusionAccountTypes'
-import { buildIdentityInfo } from './fusionAccountUtils'
+import { buildIdentityInfo, isIdentityOriginFusionAccount } from './fusionAccountUtils'
 import type { FusionRun } from './fusionRun'
 import { FusionCollections } from './fusionCollections'
 import { FusionCorrelation } from './fusionCorrelation'
@@ -271,12 +272,10 @@ export class FusionAccount {
     }
 
     get fromIdentity(): boolean {
-        const originFromAttributes = this.attributeBagValue.current?.originSource
-        const legacyOriginFromAttributes = this.attributeBagValue.current?.sourceOrigin
-        return (
-            this.layers.originSource === IDENTITIES_SOURCE_NAME ||
-            originFromAttributes === IDENTITIES_SOURCE_NAME ||
-            legacyOriginFromAttributes === IDENTITIES_SOURCE_NAME
+        return isIdentityOriginFusionAccount(
+            this.layers.originSource,
+            this.attributeBagValue.current,
+            this.collections.statusesSet.has(StatusEntitlement.Baseline)
         )
     }
 
@@ -458,7 +457,7 @@ export class FusionAccount {
     removeSourceAccount(id: string): void {
         this.collections.accounts.removeSourceAccount(
             id,
-            this.layers.originSource,
+            this.fromIdentity,
             this.layers.originIdentityInScope
         )
     }

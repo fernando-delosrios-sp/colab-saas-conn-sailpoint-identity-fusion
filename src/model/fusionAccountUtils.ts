@@ -3,6 +3,24 @@ import { FusionDecision } from './form'
 import type { IdentityInfo } from './fusionAccountTypes'
 import { trimStr } from '../utils/safeRead'
 
+const IDENTITIES_SOURCE_NAME = 'Identities'
+
+/** Whether a Fusion account was seeded from an ISC identity rather than a managed source account. */
+export function isIdentityOriginFusionAccount(
+    originSource: string | undefined,
+    attributes: { originSource?: string; sourceOrigin?: string } | undefined,
+    hasBaselineStatus: boolean
+): boolean {
+    const originFromAttributes = attributes?.originSource
+    const legacyOriginFromAttributes = attributes?.sourceOrigin
+    return (
+        originSource === IDENTITIES_SOURCE_NAME ||
+        originFromAttributes === IDENTITIES_SOURCE_NAME ||
+        legacyOriginFromAttributes === IDENTITIES_SOURCE_NAME ||
+        hasBaselineStatus
+    )
+}
+
 /** Primary display label from fusion account name fields, with fallback. */
 export function resolveFusionAccountNameOrDisplayName(
     account: { name?: string; displayName?: string },
