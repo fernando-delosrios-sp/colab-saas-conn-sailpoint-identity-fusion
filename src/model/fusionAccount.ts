@@ -219,16 +219,21 @@ export class FusionAccount {
         return this.identityInfoValue
     }
 
-    get identityName(): string | undefined {
-        return this.identityInfoValue?.name
-    }
-
+    /** Identity alias (`IdentityDocument.name`) — authoritative login used for display-attribute override. */
     get identityAlias(): string | undefined {
-        return this.identityInfoValue?.displayName
+        return trimStr(this.identityInfoValue?.name)
     }
 
+    /** Identity display name chain — friendly label for reports, forms, and emails. */
     get identityDisplayName(): string | undefined {
-        return this.identityInfoValue?.displayName
+        return trimStr(this.identityInfoValue?.displayName)
+    }
+
+    /**
+     * @deprecated Use {@link identityDisplayName} for friendly labels or {@link identityAlias} for login/override.
+     */
+    get identityName(): string | undefined {
+        return this.identityDisplayName
     }
 
     get disabled(): boolean {

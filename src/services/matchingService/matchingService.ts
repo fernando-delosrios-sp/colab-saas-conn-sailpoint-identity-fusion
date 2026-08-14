@@ -818,7 +818,7 @@ export class MatchingService {
      * Prefer displayName/name, then fall back to uid-like identifiers.
      */
     private getIdentityDisplayLabel(fusionIdentity: FusionAccount): string {
-        const identityDisplayName = trimStr(fusionIdentity.identityAlias) ?? ''
+        const identityDisplayName = trimStr(fusionIdentity.identityDisplayName) ?? ''
         if (identityDisplayName) return identityDisplayName
 
         const identityId = trimStr(fusionIdentity.identityId) ?? ''

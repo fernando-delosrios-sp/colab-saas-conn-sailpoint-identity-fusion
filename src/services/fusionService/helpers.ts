@@ -146,10 +146,10 @@ export function buildDeferredMatchReportRows(
 }
 
 export function getFusionReportAccountLabel(fusionAccount: FusionAccount): string {
-    const displayLabel = trimStr(fusionAccount.identityAlias) ?? ''
+    const displayLabel = trimStr(fusionAccount.identityDisplayName) ?? ''
     if (displayLabel) return displayLabel
 
-    const aliasLabel = trimStr(fusionAccount.identityName) ?? ''
+    const aliasLabel = trimStr(fusionAccount.identityAlias) ?? ''
     if (aliasLabel) return aliasLabel
 
     const sourceTitle = trimStr(fusionAccount.name) ?? ''

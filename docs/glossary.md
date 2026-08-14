@@ -20,8 +20,8 @@ This page defines the canonical terms used throughout the connector, its configu
 
 | Term | Definition |
 |------|------------|
-| **Identity alias** | The authoritative account name of the correlated ISC identity, taken from the top-level `displayName` field of the `IdentityDocument` as reported by the SailPoint SDK. This is the only value used for the Fusion account display attribute override (`fusionDisplayAttribute`). |
-| **Identity name** | A human-friendly reference label for the correlated identity. Computed as `IdentityDocument.attributes.displayName`, falling back to `IdentityDocument.name`, then to `FusionAccount.name`. Used in reports, review form candidates, emails, logs, and other user-facing references where a readable label is required. Replaces the former **identity display name** concept. |
+| **Identity alias** | The authoritative login/account name of the correlated ISC identity, taken from the `name` field of the `IdentityDocument` as reported by the SailPoint SDK (accessed via `FusionAccount.identityAlias`). This is the only value used for the Fusion account display attribute override (`fusionDisplayAttribute`). |
+| **Identity display name** | A human-friendly reference label for the correlated identity. Computed as `IdentityDocument.attributes.displayName`, falling back to top-level `IdentityDocument.displayName`, then to `IdentityDocument.name`, then to `FusionAccount.name`. Used in reports, review form candidates, emails, logs, and other user-facing references where a readable label is required (via `FusionAccount.identityDisplayName`). |
 | **Fusion account name** | The `name` property of a `FusionAccount` (`FusionAccount.name`). It mirrors the ISC `Account.name` / `Identity.name` field of the persisted account and is used for internal logging, history entries, and conflict tracking. It is not the output display attribute unless the display attribute override is configured to consume it. |
 
 ## Fusion account collaborators
