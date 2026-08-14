@@ -99,6 +99,74 @@ describe('safeReadConfig recording env bridge', () => {
         expect(config.recording?.chainName).toBe('prod-baseline')
     })
 
+    it('does not bridge recording when forwarded proxy password auth fails', async () => {
+        process.env.PROXY_PASSWORD = 'correct-secret'
+        vi.mocked(readConfig).mockResolvedValue({
+            ...minimalPlatformConfig,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalRecordingEnabled: true,
+            recordingName: 'cullen',
+            externalTargetUrl: 'https://proxy.example.com',
+            externalTargetPassword: 'wrong-secret',
+            isProxy: true,
+            recording: { mode: 'off', store: 'ndjson' },
+        } as never)
+
+        await expect(safeReadConfig()).rejects.toThrow('Proxy password mismatch')
+    })
+
+    it('rejects forwarded proxy payload when PROXY_PASSWORD env is missing', async () => {
+        delete process.env.PROXY_PASSWORD
+        vi.mocked(readConfig).mockResolvedValue({
+            ...minimalPlatformConfig,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalRecordingEnabled: true,
+            recordingName: 'prod-baseline',
+            externalTargetUrl: 'https://proxy.example.com',
+            externalTargetPassword: 'secret',
+            isProxy: true,
+        } as never)
+
+        await expect(safeReadConfig()).rejects.toThrow('PROXY_PASSWORD environment variable is not set')
+    })
+
+    it('rejects proxy payload on server host when password is wrong even without isProxy flag', async () => {
+        process.env.PROXY_PASSWORD = 'server-secret'
+        vi.mocked(readConfig).mockResolvedValue({
+            ...minimalPlatformConfig,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetUrl: 'https://proxy.example.com',
+            externalTargetPassword: 'wrong-secret',
+        } as never)
+
+        await expect(safeReadConfig()).rejects.toThrow('Proxy password mismatch')
+    })
+
+    it('bridges external recording for authorized forwarded proxy payload', async () => {
+        delete process.env.RECORD_MODE
+        delete process.env.RECORD_CHAIN_NAME
+        process.env.PROXY_PASSWORD = 'secret'
+        vi.mocked(readConfig).mockResolvedValue({
+            ...minimalPlatformConfig,
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalRecordingEnabled: true,
+            recordingName: 'prod-baseline',
+            externalTargetUrl: 'https://proxy.example.com',
+            externalTargetPassword: 'secret',
+            isProxy: true,
+            recording: { mode: 'off', store: 'ndjson' },
+        } as never)
+
+        const config = await safeReadConfig()
+
+        expect(config.recording?.mode).toBe('record')
+        expect(config.recording?.scenarioName).toBe('prod-baseline')
+    })
+
     it('does not bridge External Settings recording on ISC proxy client', async () => {
         delete process.env.RECORD_MODE
         delete process.env.RECORD_CHAIN_NAME

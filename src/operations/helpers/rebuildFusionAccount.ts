@@ -5,7 +5,8 @@ import { AttributeOperations } from '../../services/definitionService/types'
 import { buildManagedAccountKey, parseManagedAccountKey } from '../../model/managedAccountKey'
 import { FusionAttribute } from '../../data/schema'
 import { getAccountStringAttribute, toSetFromAttribute as attributeToSet } from '../../utils/attributes'
-import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
+import { isIdentityOriginFusionAccount } from '../../model/fusionAccountUtils'
+import { StatusEntitlement } from '../../model/statusEntitlement'
 import { readString } from '../../utils/safeRead'
 import { IdentityDocument } from 'sailpoint-api-client'
 import type { FusionService } from '../../services/fusionService'
@@ -20,9 +21,19 @@ interface ParsedAccountKey {
 }
 
 function isIdentityOriginAccount(account: Account): boolean {
-    const originSource = getAccountStringAttribute(account, FusionAttribute.OriginSource)
-    const legacyOriginSource = (account.attributes as Record<string, unknown> | undefined)?.sourceOrigin
-    return originSource === IDENTITIES_SOURCE_NAME || legacyOriginSource === IDENTITIES_SOURCE_NAME
+    const statuses = attributeToSet(account.attributes, FusionAttribute.Statuses)
+    return isIdentityOriginFusionAccount(
+        getAccountStringAttribute(account, FusionAttribute.OriginSource),
+        account.attributes as Record<string, unknown> | undefined,
+        statuses.has(StatusEntitlement.Baseline)
+    )
+}
+
+function resolveOriginIdentityId(account: Account): string | undefined {
+    const originAccount = getAccountStringAttribute(account, FusionAttribute.OriginAccount)
+    if (originAccount?.trim()) return originAccount.trim()
+    const identityId = account.identityId?.trim()
+    return identityId || undefined
 }
 
 /**
@@ -129,8 +140,8 @@ export const rebuildFusionAccount = async (
     }
     assert(account.identityId, 'Identity ID not found')
 
-    await identities.fetchIdentityById(account.identityId)
-    const identity = identities.getIdentityById(account.identityId)
+    const fetchedIdentity = await identities.fetchIdentityById(account.identityId)
+    const identity = fetchedIdentity ?? identities.getIdentityById(account.identityId)
 
     const accountIds = collectManagedAccountKeys(
         account as unknown as Account,
@@ -153,8 +164,9 @@ export const rebuildFusionAccount = async (
     })
 
     let originIdentityInScope: boolean | undefined
-    if (isIdentityOriginAccount(account as Account)) {
-        originIdentityInScope = await identities.isIdentityInScope(account.identityId)
+    const originIdentityId = resolveOriginIdentityId(account as Account)
+    if (isIdentityOriginAccount(account as Account) && originIdentityId) {
+        originIdentityInScope = await identities.resolveOriginIdentityInScope(originIdentityId, identity)
     }
 
     return await fusion.processFusionAccount(account, attributeOperations, originIdentityInScope)

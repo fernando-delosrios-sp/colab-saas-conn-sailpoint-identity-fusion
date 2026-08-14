@@ -2,8 +2,7 @@ import { ConnectorError, Response } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
 import { LogService } from './logService'
 import { assert } from '../utils/assert'
-import { isProxyClientConfig, isProxyServerHost } from '../utils/proxyRole'
-import crypto from 'crypto'
+import { isProxyClientConfig, isProxyServerHost, assertProxyServerPassword } from '../utils/proxyRole'
 
 const KEEPALIVE = 2.5 * 60 * 1000
 const DEFAULT_PROXY_REQUEST_TIMEOUT_MS = 5 * 60 * 1000
@@ -56,30 +55,22 @@ export class ProxyService {
     isProxyService(): boolean {
         const gatewayEnabled = this.config.externalProcessingEnabled === true
         const proxyEnabled = this.config.externalProxyEnabled === true
+        const isForwardedProxyOp = this.config.isProxy === true
 
-        if (gatewayEnabled && proxyEnabled && isProxyServerHost()) {
-            this.log.info('Running as proxy server')
-
-            // 🛡️ Sentinel: Enforce strict proxy password validation. If the server requires
-            // a password, the client must provide one and it must match exactly.
-            const serverPassword = process.env.PROXY_PASSWORD || ''
-            const clientPassword = this.config.externalTargetPassword || ''
-
-            const expectedHash = crypto
-                .createHash('sha256')
-                .update(serverPassword)
-                .digest()
-            const actualHash = crypto
-                .createHash('sha256')
-                .update(clientPassword)
-                .digest()
-            const isMatch = crypto.timingSafeEqual(expectedHash, actualHash)
-            assert(isMatch, 'Proxy password mismatch')
-
-            return true
-        } else {
+        if (!gatewayEnabled || !proxyEnabled) {
             return false
         }
+
+        if (!isProxyServerHost() && !isForwardedProxyOp) {
+            return false
+        }
+
+        this.log.info('Running as proxy server')
+        if (isForwardedProxyOp) {
+            return true
+        }
+        assertProxyServerPassword(this.config.externalTargetPassword)
+        return true
     }
 
     /**
@@ -97,6 +88,10 @@ export class ProxyService {
 
             if (!response.ok) {
                 const errorText = await response.text()
+                const proxyUrl = this.config.externalTargetUrl ?? 'unknown'
+                this.log.error(
+                    `Proxy server rejected request (${response.status}) from ${proxyUrl}: ${errorText || response.statusText}`
+                )
                 throw new ConnectorError(
                     `Proxy server returned error status ${response.status}: ${errorText || response.statusText}`
                 )

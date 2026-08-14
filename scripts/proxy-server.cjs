@@ -15,8 +15,9 @@ const childProcess = require('child_process')
 const { _withConfig, ConnectorError, ConnectorErrorType } = require('@sailpoint/connector-sdk/dist/lib')
 const { loadDotEnv } = require('./loadDotEnv.cjs')
 const { FUSION_BASEURL_HEADER, resolveLogFilePath, isDeprecatedIngestLogPath } = require('./logPath.cjs')
+const { assertProxyCommandAuthorized, describeProxyAuthContext } = require('./proxyPassword.cjs')
 
-loadDotEnv()
+loadDotEnv(path.join(__dirname, '..'))
 
 if (process.env.LOG_FILE && isDeprecatedIngestLogPath(process.env.LOG_FILE)) {
     console.warn(
@@ -164,6 +165,7 @@ app.post('/', (req, res, next) => {
 })
 
 app.post('/', async (req, res) => {
+    let cmd
     try {
         if (typeof req.body === 'string') {
             // On a proxy server, external logs are appended in-process during forwarded JSON ops.
@@ -180,7 +182,7 @@ app.post('/', async (req, res) => {
             return
         }
 
-        const cmd = req.body
+        cmd = req.body
         if (!cmd || typeof cmd !== 'object' || cmd.config == null) {
             res.status(400).json({
                 error: 'Expected JSON body with type, input, and config fields for connector commands',
@@ -188,9 +190,28 @@ app.post('/', async (req, res) => {
             return
         }
 
+        const authContext = describeProxyAuthContext(cmd.config)
+        console.log(
+            `[proxy-server] Incoming operation: ${cmd.type ?? 'unknown'} auth=${JSON.stringify(authContext)}`
+        )
+
+        assertProxyCommandAuthorized(cmd.config)
+        console.log(`[proxy-server] Accepted forwarded operation: ${cmd.type ?? 'unknown'}`)
+
         await runConnectorCommand(cmd, res)
     } catch (e) {
-        console.error(typeof e === 'string' ? e : e?.message)
+        const message = typeof e === 'string' ? e : e?.message
+        const operationLabel = cmd?.type ? ` (${cmd.type})` : ''
+        console.error(`[proxy-server] Rejected forwarded operation${operationLabel}: ${message}`)
+        console.log(`[proxy-server] Rejected forwarded operation${operationLabel}: ${message}`)
+        if (e instanceof Error && e.message === 'Proxy password mismatch') {
+            res.status(401).json({ error: e.message })
+            return
+        }
+        if (e instanceof Error && e.message.includes('PROXY_PASSWORD environment variable is not set')) {
+            res.status(500).json({ error: e.message })
+            return
+        }
         let errorType = ConnectorErrorType.Generic
         if (e instanceof ConnectorError) {
             errorType = e.type
@@ -208,9 +229,11 @@ app.listen(port, () => {
         `External log path: ${process.env.LOG_FILE ? path.resolve(process.env.LOG_FILE) : path.resolve('logs/<tenant>/fusion-YYYYMMDD.log')}`
     )
     if (process.env.PROXY_PASSWORD !== undefined) {
-        console.log('Proxy server mode: PROXY_PASSWORD is set (disk external logging during forwarded ops)')
+        console.log('[proxy-server] PROXY_PASSWORD loaded from environment')
     } else {
-        console.warn('Warning: PROXY_PASSWORD is not set — external logging may HTTP POST instead of writing under logs/<tenant>/')
+        console.warn(
+            '[proxy-server] PROXY_PASSWORD is NOT SET — add it to the repo-root .env file (or export it) and restart'
+        )
     }
 })
 

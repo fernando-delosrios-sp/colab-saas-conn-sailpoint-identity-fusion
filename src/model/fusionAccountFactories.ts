@@ -11,7 +11,7 @@ import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { FusionDecision } from './form'
 import { FusionAction } from './fusionAction'
 import { FusionAccountKind } from './fusionAccountTypes'
-import { buildIdentityInfo } from './fusionAccountUtils'
+import { buildIdentityInfo, isIdentityOriginFusionAccount } from './fusionAccountUtils'
 import {
     buildManagedAccountKey,
     getManagedAccountKeyFromAccount,
@@ -65,10 +65,11 @@ function applyOriginMetadata(
     const originAccount = getAccountStringAttribute(account, FusionAttribute.OriginAccount)
     if (originAccount) {
         const trimmedOriginAccount = originAccount.trim()
-        const fromIdentityOrigin =
-            fa.layers.originSource === IDENTITIES_SOURCE_NAME ||
-            fa.attributeBag.current?.originSource === IDENTITIES_SOURCE_NAME ||
-            fa.attributeBag.current?.sourceOrigin === IDENTITIES_SOURCE_NAME
+        const fromIdentityOrigin = isIdentityOriginFusionAccount(
+            fa.layers.originSource,
+            fa.attributeBag.current,
+            fa.collections.statusesSet.has(StatusEntitlement.Baseline)
+        )
         if (fromIdentityOrigin) {
             fa.layers.originAccount = trimmedOriginAccount || undefined
         } else {
@@ -76,10 +77,11 @@ function applyOriginMetadata(
         }
     }
 
-    const fromIdentity =
-        fa.layers.originSource === IDENTITIES_SOURCE_NAME ||
-        fa.attributeBag.current?.originSource === IDENTITIES_SOURCE_NAME ||
-        fa.attributeBag.current?.sourceOrigin === IDENTITIES_SOURCE_NAME
+    const fromIdentity = isIdentityOriginFusionAccount(
+        fa.layers.originSource,
+        fa.attributeBag.current,
+        fa.collections.statusesSet.has(StatusEntitlement.Baseline)
+    )
     if (fromIdentity && !fa.collections.statusesSet.has(StatusEntitlement.Baseline)) {
         fa.collections.hydratePersisted({
             statuses: [StatusEntitlement.Baseline],

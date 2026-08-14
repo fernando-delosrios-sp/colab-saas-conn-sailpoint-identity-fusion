@@ -320,7 +320,8 @@ describe('rebuildFusionAccount', () => {
 
     it('passes origin identity scope to processFusionAccount for identity-origin accounts', async () => {
         const processFusionAccount = vi.fn().mockResolvedValue({ nativeIdentity: 'fusion-origin' })
-        const isIdentityInScope = vi.fn().mockResolvedValue(true)
+        const resolveOriginIdentityInScope = vi.fn().mockResolvedValue(true)
+        const hydratedIdentity = { id: 'identity-origin', accounts: [] }
 
         const registry = {
             sources: {
@@ -344,9 +345,9 @@ describe('rebuildFusionAccount', () => {
                 config: { cascadeAggregationEnabled: false },
             },
             identities: {
-                fetchIdentityById: vi.fn().mockResolvedValue(undefined),
-                getIdentityById: vi.fn().mockReturnValue({ id: 'identity-origin', accounts: [] }),
-                isIdentityInScope,
+                fetchIdentityById: vi.fn().mockResolvedValue(hydratedIdentity),
+                getIdentityById: vi.fn().mockReturnValue(hydratedIdentity),
+                resolveOriginIdentityInScope,
             },
             fusion: {
                 processFusionAccount,
@@ -361,7 +362,7 @@ describe('rebuildFusionAccount', () => {
             log: registry.log,
         })
 
-        expect(isIdentityInScope).toHaveBeenCalledWith('identity-origin')
+        expect(resolveOriginIdentityInScope).toHaveBeenCalledWith('identity-origin', hydratedIdentity)
         expect(processFusionAccount).toHaveBeenCalledWith(
             registry.sources.fusionAccountsByNativeIdentity.get('fusion-origin'),
             {},
@@ -369,9 +370,9 @@ describe('rebuildFusionAccount', () => {
         )
     })
 
-    it('does not call isIdentityInScope for managed-origin accounts', async () => {
+    it('does not call resolveOriginIdentityInScope for managed-origin accounts', async () => {
         const processFusionAccount = vi.fn().mockResolvedValue({ nativeIdentity: 'fusion-managed' })
-        const isIdentityInScope = vi.fn()
+        const resolveOriginIdentityInScope = vi.fn()
 
         const account = {
             nativeIdentity: 'fusion-managed',
@@ -394,7 +395,7 @@ describe('rebuildFusionAccount', () => {
             identities: {
                 fetchIdentityById: vi.fn().mockResolvedValue(undefined),
                 getIdentityById: vi.fn().mockReturnValue({ id: 'identity-managed', accounts: [] }),
-                isIdentityInScope,
+                resolveOriginIdentityInScope,
             },
             fusion: {
                 processFusionAccount,
@@ -409,8 +410,63 @@ describe('rebuildFusionAccount', () => {
             log: registry.log,
         })
 
-        expect(isIdentityInScope).not.toHaveBeenCalled()
+        expect(resolveOriginIdentityInScope).not.toHaveBeenCalled()
         expect(processFusionAccount).toHaveBeenCalledWith(account, {}, undefined)
+    })
+
+    it('checks scope for baseline-only identity-origin accounts during rebuild', async () => {
+        const processFusionAccount = vi.fn().mockResolvedValue({ nativeIdentity: 'fusion-baseline' })
+        const resolveOriginIdentityInScope = vi.fn().mockResolvedValue(true)
+
+        const registry = {
+            sources: {
+                fetchFusionAccount: vi.fn().mockResolvedValue(undefined),
+                fusionAccountsByNativeIdentity: new Map([
+                    [
+                        'fusion-baseline',
+                        {
+                            nativeIdentity: 'fusion-baseline',
+                            identityId: 'identity-baseline',
+                            attributes: {
+                                originAccount: 'identity-baseline',
+                                statuses: ['baseline'],
+                            },
+                        },
+                    ],
+                ]),
+                fetchManagedAccount: vi.fn().mockResolvedValue(undefined),
+                getSourceByName: vi.fn().mockReturnValue(undefined),
+                getSourceById: vi.fn().mockReturnValue(undefined),
+                aggregateManagedSource: vi.fn().mockResolvedValue(undefined),
+                config: { cascadeAggregationEnabled: false },
+            },
+            identities: {
+                fetchIdentityById: vi.fn().mockResolvedValue({ id: 'identity-baseline', accounts: [] }),
+                getIdentityById: vi.fn().mockReturnValue({ id: 'identity-baseline', accounts: [] }),
+                resolveOriginIdentityInScope,
+            },
+            fusion: {
+                processFusionAccount,
+            },
+            log: { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() },
+        } as any
+
+        await rebuildFusionAccount('fusion-baseline', {} as any, {
+            fusion: registry.fusion,
+            identities: registry.identities,
+            sources: registry.sources,
+            log: registry.log,
+        })
+
+        expect(resolveOriginIdentityInScope).toHaveBeenCalledWith(
+            'identity-baseline',
+            { id: 'identity-baseline', accounts: [] }
+        )
+        expect(processFusionAccount).toHaveBeenCalledWith(
+            registry.sources.fusionAccountsByNativeIdentity.get('fusion-baseline'),
+            {},
+            true
+        )
     })
 
     it('returns undefined when the fusion account is not found', async () => {

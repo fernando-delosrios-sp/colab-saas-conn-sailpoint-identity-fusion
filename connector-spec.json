@@ -1087,15 +1087,6 @@
                             "helpKey": "Shared external target — proxy endpoint when proxy mode is on, log HTTP endpoint when proxy mode is off."
                         },
                         {
-                            "key": "externalTargetPassword",
-                            "label": "Password",
-                            "type": "secret",
-                            "required": false,
-                            "parentKey": "externalProcessingEnabled",
-                            "parentValue": "true",
-                            "helpKey": "Shared secret for proxy authentication."
-                        },
-                        {
                             "key": "externalProxyEnabled",
                             "label": "Enable proxy mode?",
                             "type": "toggle",
@@ -1103,6 +1094,15 @@
                             "parentKey": "externalProcessingEnabled",
                             "parentValue": "true",
                             "helpKey": "Delegate operation processing to the external target."
+                        },
+                        {
+                            "key": "externalTargetPassword",
+                            "label": "Password",
+                            "type": "secret",
+                            "required": true,
+                            "parentKey": "externalProxyEnabled",
+                            "parentValue": "true",
+                            "helpKey": "Required when proxy mode is on. Must match PROXY_PASSWORD on the proxy server host."
                         },
                         {
                             "key": "externalRecordingEnabled",

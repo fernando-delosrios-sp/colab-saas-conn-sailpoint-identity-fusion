@@ -13,6 +13,9 @@ import { FusionRun } from '../model/fusionRun'
 // Constants
 // ============================================================================
 
+/** Pass-through for searchPost so ClientService searchAfter pagination receives `{ data }`. */
+const searchPostPaginated = (api: any, params: any) => api.search.searchPost(params)
+
 const IDENTITY_SEARCH_INCLUDES = [
     'id',
     'name',
@@ -31,6 +34,27 @@ function buildIdentityQuery(queryString: string): Search {
         queryResultFilter: { includes: IDENTITY_SEARCH_INCLUDES },
         includeNested: true,
     }
+}
+
+function normalizeIdentityScopeQuery(query?: string): string | undefined {
+    const trimmed = query?.trim()
+    return trimmed || undefined
+}
+
+/** True when the configured scope query matches all identities (connector default is `*`). */
+function isUniversalIdentityScopeQuery(query?: string): boolean {
+    const trimmed = normalizeIdentityScopeQuery(query)
+    return trimmed === '*' || trimmed === '*:*'
+}
+
+/** Builds a single-identity scope lookup query; universal scope uses id-only search. */
+function buildIdentityScopeLookupQuery(id: string, scopeQuery?: string): string | undefined {
+    const trimmed = normalizeIdentityScopeQuery(scopeQuery)
+    if (!trimmed) return undefined
+    if (isUniversalIdentityScopeQuery(trimmed)) {
+        return `id:"${id}"`
+    }
+    return `id:"${id}" AND (${trimmed})`
 }
 
 // ============================================================================
@@ -125,7 +149,7 @@ export class IdentityService {
 
             await wrapConnectorError(async () => {
                 const identities = await this.client.call<IdentityDocument>(
-                    (api: any, params: any) => api.search.searchPost(params).then((r: any) => r.data as IdentityDocument[]),
+                    searchPostPaginated,
                     {
                         paginate: { mode: 'searchAfter', search: query as any },
                         priority: QueuePriority.HIGH,
@@ -211,7 +235,7 @@ export class IdentityService {
 
         return wrapConnectorError(async () => {
             const identities = await this.client.call<IdentityDocument>(
-                (api: any, params: any) => api.search.searchPost(params).then((r: any) => r.data as IdentityDocument[]),
+                searchPostPaginated,
                 { paginate: { mode: 'searchAfter', search: query as any }, priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentityById searchPost' }
             )
             identities.forEach((identity) => this.run.addIdentity(identity.id, identity))
@@ -232,7 +256,7 @@ export class IdentityService {
 
         return wrapConnectorError(async () => {
             const identities = await this.client.call<IdentityDocument>(
-                (api: any, params: any) => api.search.searchPost(params).then((r: any) => r.data as IdentityDocument[]),
+                searchPostPaginated,
                 { paginate: { mode: 'searchAfter', search: query as any }, priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentityByName searchPost' }
             )
             identities.forEach((identity) => this.run.addIdentity(identity.id, identity))
@@ -310,7 +334,7 @@ export class IdentityService {
             const query = buildIdentityQuery(queryStr)
             try {
                 const identities = await this.client.call<IdentityDocument>(
-                    (api: any, params: any) => api.search.searchPost(params).then((r: any) => r.data as IdentityDocument[]),
+                    searchPostPaginated,
                     { paginate: { mode: 'searchAfter', search: query as any }, priority: QueuePriority.HIGH, context: 'IdentityService>hydrateMissingIdentitiesById searchPost' }
                 )
                 identities.forEach((identity) => {
@@ -500,22 +524,73 @@ export class IdentityService {
     }
 
     /**
+     * Resolves whether an identity-origin fusion account's origin identity should stay
+     * active for orphan detection during single-account rebuilds.
+     *
+     * When bulk identity scope is disabled, a successfully hydrated origin identity
+     * document is sufficient — no second scoped search is required.
+     */
+    public async resolveOriginIdentityInScope(
+        id: string,
+        hydratedIdentity?: IdentityDocument
+    ): Promise<boolean> {
+        if (!id) return false
+
+        const cached = hydratedIdentity?.id === id ? hydratedIdentity : this.getIdentityById(id)
+        if (cached && !cached.protected && !this.includeIdentities) {
+            return true
+        }
+
+        return this.isIdentityInScope(id)
+    }
+
+    /**
      * Checks whether an identity is in the configured scope, using the cached scope
      * set when available or a targeted search when single-account rebuilds have not
      * run a full `fetchIdentities()` pass.
+     *
+     * When {@link includeIdentities} is disabled, bulk identity scope is not loaded
+     * during aggregation; identity-origin orphan checks instead verify that the origin
+     * identity still exists on the platform (cache hit or id-only search).
      */
     public async isIdentityInScope(id: string): Promise<boolean> {
         if (!id) return false
         if (this.hasIdentityInScope(id)) return true
-        if (!this.includeIdentities) return false
-        if (!this.identityScopeQuery) return false
+
+        const cached = this.getIdentityById(id)
+        if (cached && !cached.protected && !this.includeIdentities) {
+            return true
+        }
+
+        if (!this.includeIdentities) {
+            return this.searchIdentityExists(id)
+        }
+
+        const scopeQuery = normalizeIdentityScopeQuery(this.identityScopeQuery)
+        if (!scopeQuery) return false
+
+        if (isUniversalIdentityScopeQuery(scopeQuery)) {
+            if (cached && !cached.protected) return true
+        }
+
         if (this.identityScopeFetchCompleted) return false
 
-        const query = buildIdentityQuery(`id:"${id}" AND (${this.identityScopeQuery})`)
+        const queryString = buildIdentityScopeLookupQuery(id, scopeQuery)
+        if (!queryString) return false
+
+        return this.searchIdentityInScope(id, queryString)
+    }
+
+    private async searchIdentityExists(id: string): Promise<boolean> {
+        return this.searchIdentityInScope(id, `id:"${id}"`)
+    }
+
+    private async searchIdentityInScope(id: string, queryString: string): Promise<boolean> {
+        const query = buildIdentityQuery(queryString)
 
         return wrapConnectorError(async () => {
             const identities = await this.client.call<IdentityDocument>(
-                (api: any, params: any) => api.search.searchPost(params).then((r: any) => r.data as IdentityDocument[]),
+                searchPostPaginated,
                 {
                     paginate: { mode: 'searchAfter', search: query as any },
                     priority: QueuePriority.HIGH,

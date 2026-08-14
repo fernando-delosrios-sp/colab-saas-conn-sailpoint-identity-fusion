@@ -162,13 +162,30 @@ describe('IdentityService.isIdentityInScope', () => {
         await expect(service.isIdentityInScope('id-2')).resolves.toBe(false)
     })
 
-    it('returns false when identity fetching is disabled', async () => {
+    it('returns true when identity fetching is disabled but the identity is hydrated in cache', async () => {
         const { service, client } = makeService({
             config: { includeIdentities: false, identityScopeQuery: 'source.name:Employees' },
+            searchResultsByQuery: {
+                'id:"id-1"': [makeIdentity('id-1')],
+            },
         })
 
-        await expect(service.isIdentityInScope('id-1')).resolves.toBe(false)
-        expect(client.call).not.toHaveBeenCalled()
+        await service.fetchIdentityById('id-1')
+
+        await expect(service.isIdentityInScope('id-1')).resolves.toBe(true)
+        expect(client.call).toHaveBeenCalledTimes(1)
+    })
+
+    it('uses id-only existence search when identity fetching is disabled and identity is not cached', async () => {
+        const { service } = makeService({
+            config: { includeIdentities: false, identityScopeQuery: 'source.name:Employees' },
+            searchResultsByQuery: {
+                'id:"id-1"': [makeIdentity('id-1')],
+            },
+        })
+
+        await expect(service.isIdentityInScope('id-1')).resolves.toBe(true)
+        await expect(service.isIdentityInScope('id-missing')).resolves.toBe(false)
     })
 
     it('returns false when no identity scope query is configured', async () => {
@@ -178,6 +195,56 @@ describe('IdentityService.isIdentityInScope', () => {
 
         await expect(service.isIdentityInScope('id-1')).resolves.toBe(false)
         expect(client.call).not.toHaveBeenCalled()
+    })
+
+    it('returns true for universal scope when the identity is already hydrated in cache', async () => {
+        const { service, client } = makeService({
+            config: { identityScopeQuery: '*' },
+            searchResultsByQuery: {
+                'id:"id-1"': [makeIdentity('id-1')],
+            },
+        })
+
+        await service.fetchIdentityById('id-1')
+
+        await expect(service.isIdentityInScope('id-1')).resolves.toBe(true)
+        expect(client.call).toHaveBeenCalledTimes(1)
+    })
+
+    it('uses id-only lookup for universal scope instead of id AND (*)', async () => {
+        const { service } = makeService({
+            config: { identityScopeQuery: '*' },
+            searchResultsByQuery: {
+                'id:"id-1"': [makeIdentity('id-1')],
+            },
+        })
+
+        await expect(service.isIdentityInScope('id-1')).resolves.toBe(true)
+        await expect(service.isIdentityInScope('id-2')).resolves.toBe(false)
+    })
+})
+
+describe('IdentityService.resolveOriginIdentityInScope', () => {
+    it('returns true without search when includeIdentities is false and identity was just hydrated', async () => {
+        const { service, client } = makeService({
+            config: { includeIdentities: false, identityScopeQuery: 'source.name:Employees' },
+        })
+        const hydrated = makeIdentity('id-1')
+
+        await expect(service.resolveOriginIdentityInScope('id-1', hydrated)).resolves.toBe(true)
+        expect(client.call).not.toHaveBeenCalled()
+    })
+
+    it('falls back to scoped search when includeIdentities is enabled', async () => {
+        const scopedQuery = 'id:"id-1" AND (source.name:Employees)'
+        const { service } = makeService({
+            config: { includeIdentities: true, identityScopeQuery: 'source.name:Employees' },
+            searchResultsByQuery: {
+                [scopedQuery]: [makeIdentity('id-1')],
+            },
+        })
+
+        await expect(service.resolveOriginIdentityInScope('id-1')).resolves.toBe(true)
     })
 })
 

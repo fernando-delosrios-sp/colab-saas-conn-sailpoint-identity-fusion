@@ -10,6 +10,7 @@ import {
     extractString,
     extractStringOrDefault,
     extractBoolean,
+    rawLooksEnabled,
     extractNumber,
     extractArray,
     extractObjectIdentifierValue,
@@ -189,8 +190,31 @@ describe('attributes', () => {
             expect(extractBoolean({ flag: 'false' }, 'flag')).toBe(false)
         })
 
+        it('should handle common ISC toggle string variants', () => {
+            expect(extractBoolean({ flag: 'True' }, 'flag')).toBe(true)
+            expect(extractBoolean({ flag: 'on' }, 'flag')).toBe(true)
+            expect(extractBoolean({ flag: 'ON' }, 'flag')).toBe(true)
+            expect(extractBoolean({ flag: 'off' }, 'flag')).toBe(false)
+        })
+
         it('should return undefined for invalid', () => {
-            expect(extractBoolean({ flag: 'yes' }, 'flag')).toBeUndefined()
+            expect(extractBoolean({ flag: 'maybe' }, 'flag')).toBeUndefined()
+        })
+    })
+
+    describe('rawLooksEnabled', () => {
+        it('detects truthy raw toggle shapes', () => {
+            expect(rawLooksEnabled(true)).toBe(true)
+            expect(rawLooksEnabled(1)).toBe(true)
+            expect(rawLooksEnabled('on')).toBe(true)
+            expect(rawLooksEnabled('yes')).toBe(true)
+        })
+
+        it('returns false for absent or disabled values', () => {
+            expect(rawLooksEnabled(false)).toBe(false)
+            expect(rawLooksEnabled(0)).toBe(false)
+            expect(rawLooksEnabled(undefined)).toBe(false)
+            expect(rawLooksEnabled('off')).toBe(false)
         })
     })
 
