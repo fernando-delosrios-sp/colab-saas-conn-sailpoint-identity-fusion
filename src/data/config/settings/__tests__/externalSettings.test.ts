@@ -111,5 +111,16 @@ describe('externalSettings.readSettings', () => {
         expect(result.externalProcessingEnabled).toBe(true)
         expect(result.externalProxyEnabled).toBe(true)
     })
+
+    it('throws when a stored toggle looks enabled but cannot be parsed', () => {
+        expect(() =>
+            readSettings({
+                externalProcessingEnabled: 'enabled',
+                externalProxyEnabled: true,
+                externalTargetUrl: 'https://proxy.example.com',
+                externalTargetPassword: 'secret',
+            })
+        ).toThrow(/externalProcessingEnabled/)
+    })
 })
 

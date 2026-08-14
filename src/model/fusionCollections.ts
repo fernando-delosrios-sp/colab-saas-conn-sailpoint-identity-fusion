@@ -316,10 +316,10 @@ export class FusionCollections {
             this.removeFromSet(this.accountIdsValue, id, '')
 
             if (this.accountIdsValue.size === 0) {
-                if (!fromIdentity || !originIdentityInScope) {
+                if (!fromIdentity || originIdentityInScope === false) {
                     this.statusesValue.add(StatusEntitlement.Orphan)
                     this.addHistory(`Account became orphan after removing source account: ${id}`)
-                } else {
+                } else if (fromIdentity && originIdentityInScope === true) {
                     this.statusesValue.delete(StatusEntitlement.Orphan)
                 }
             }

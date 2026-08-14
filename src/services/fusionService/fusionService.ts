@@ -485,7 +485,7 @@ export class FusionService {
         this.applyReviewerLayersToFusionAccount(fusionAccount)
         const mergeDecision = this.applyIdentityLayerForFusionAccount(fusionAccount)
         const skipBlendHistoryForManagedKeys = skipBlendHistoryKeysForDecisionAccountId(mergeDecision?.account.id)
-        this.setOriginIdentityInScopeIfNeeded(fusionAccount, originIdentityInScope)
+        await this.setOriginIdentityInScopeIfNeeded(fusionAccount, originIdentityInScope)
 
         // Pass direct reference to work queue - deletions will remove processed accounts.
         await this.accountAssembly.addManagedAccountLayer(fusionAccount, {
@@ -543,19 +543,22 @@ export class FusionService {
         return mergeDecision
     }
 
-    private setOriginIdentityInScopeIfNeeded(
+    private async setOriginIdentityInScopeIfNeeded(
         fusionAccount: FusionAccount,
         originIdentityInScope?: boolean
-    ): void {
+    ): Promise<void> {
         if (!fusionAccount.fromIdentity || fusionAccount.originIdentityInScope !== undefined) return
 
         const originIdentityId = fusionAccount.originAccountId ?? fusionAccount.identityId
-        let inScope = false
-        if (originIdentityId && originIdentityInScope !== undefined) {
-            inScope = originIdentityInScope
-        } else if (originIdentityId) {
-            inScope = this.identities.hasIdentityInScope(originIdentityId)
-        }
+        if (!originIdentityId) return
+
+        const inScope =
+            originIdentityInScope !== undefined
+                ? originIdentityInScope
+                : await this.identities.resolveOriginIdentityInScope(
+                      originIdentityId,
+                      this.identities.getIdentityById(originIdentityId)
+                  )
         fusionAccount.setOriginIdentityInScope(inScope)
     }
 

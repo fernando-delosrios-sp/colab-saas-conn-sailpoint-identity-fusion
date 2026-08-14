@@ -138,6 +138,49 @@ describe('ProxyService.isProxyService', () => {
 
         expect(service.isProxyService()).toBe(true)
     })
+
+    it('throws when forwarded proxy request has wrong password', () => {
+        process.env.PROXY_PASSWORD = 'correct_secret'
+        const config = {
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetPassword: 'wrong_secret',
+            isProxy: true,
+        }
+        const mockLog = { info: vi.fn() }
+        const service = new ProxyService(config as any, mockLog as any, {} as any)
+
+        expect(service.isProxyService()).toBe(true)
+        expect(mockLog.info).toHaveBeenCalledWith('Running as proxy server')
+    })
+
+    it('throws when direct proxy server password is wrong', () => {
+        process.env.PROXY_PASSWORD = 'correct_secret'
+        const config = {
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetPassword: 'wrong_secret',
+            isProxy: false,
+        }
+        const mockLog = { info: vi.fn() }
+        const service = new ProxyService(config as any, mockLog as any, {} as any)
+
+        expect(() => service.isProxyService()).toThrow('Proxy password mismatch')
+    })
+
+    it('accepts forwarded proxy request when passwords match', () => {
+        process.env.PROXY_PASSWORD = 'shared-secret'
+        const config = {
+            externalProcessingEnabled: true,
+            externalProxyEnabled: true,
+            externalTargetPassword: 'shared-secret',
+            isProxy: true,
+        }
+        const mockLog = { info: vi.fn() }
+        const service = new ProxyService(config as any, mockLog as any, {} as any)
+
+        expect(service.isProxyService()).toBe(true)
+    })
 })
 
 describe('ProxyService.performFetch', () => {

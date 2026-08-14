@@ -653,7 +653,8 @@ describe('FusionService — aggregation', () => {
                 name: 'fernando.delosrios',
             } as IdentityDocument)
             ctx.mockIdentities.markIdentityInScope = vi.fn()
-            ctx.mockIdentities.hasIdentityInScope = vi.fn((id?: string) => id === globalOwnerId)
+            ctx.mockIdentities.isIdentityInScope = vi.fn(async (id?: string) => id === globalOwnerId)
+            ctx.mockIdentities.hasIdentityInScope = vi.fn(() => false)
             ctx.mockIdentities.getIdentityById = vi.fn((id?: string) =>
                 id === globalOwnerId
                     ? ({ id: globalOwnerId, name: 'fernando.delosrios' } as IdentityDocument)
@@ -682,7 +683,8 @@ describe('FusionService — aggregation', () => {
 
         it('clears orphan from in-scope identity-origin account when originSource attribute is missing but baseline is present', async () => {
             const identityId = 'baseline-only-origin'
-            ctx.mockIdentities.hasIdentityInScope = vi.fn((id?: string) => id === identityId)
+            ctx.mockIdentities.isIdentityInScope = vi.fn(async (id?: string) => id === identityId)
+            ctx.mockIdentities.hasIdentityInScope = vi.fn(() => false)
             ctx.mockIdentities.getIdentityById = vi.fn((id?: string) =>
                 id === identityId ? ({ id: identityId, name: 'Baseline Only' } as IdentityDocument) : undefined
             )
@@ -705,6 +707,34 @@ describe('FusionService — aggregation', () => {
 
             const processed = await ctx.fusionService.processFusionAccount(persisted)
             expect(processed.fromIdentity).toBe(true)
+            expect(ctx.mockIdentities.isIdentityInScope).toHaveBeenCalledWith(identityId)
+            expect(processed.collections.statuses.isOrphan()).toBe(false)
+        })
+
+        it('clears orphan when scope resolves via baseline-only originAccount without top-level identityId', async () => {
+            const originIdentityId = 'baseline-origin-only-id'
+            ctx.mockIdentities.isIdentityInScope = vi.fn(async (id?: string) => id === originIdentityId)
+            ctx.mockIdentities.hasIdentityInScope = vi.fn(() => false)
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+
+            const persisted = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'NG000027',
+                name: 'Baseline Origin Only',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {
+                    originAccount: originIdentityId,
+                    statuses: ['baseline', 'orphan'],
+                    accounts: [],
+                },
+            } as unknown as Account)
+
+            expect(persisted.originAccountId).toBe(originIdentityId)
+
+            const processed = await ctx.fusionService.processFusionAccount(persisted)
+            expect(ctx.mockIdentities.isIdentityInScope).toHaveBeenCalledWith(originIdentityId)
             expect(processed.collections.statuses.isOrphan()).toBe(false)
         })
 

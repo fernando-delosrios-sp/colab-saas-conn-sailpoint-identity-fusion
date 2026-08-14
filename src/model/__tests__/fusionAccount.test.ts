@@ -639,6 +639,27 @@ describe('FusionAccount', () => {
             expect(acc.statuses).not.toContain('orphan')
         })
 
+        it('does not mark identity-origin account orphan when scope has not been evaluated yet', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Identity',
+                sourceName: 'Identity Fusion NG',
+                identityId: 'id-1',
+                attributes: {
+                    originSource: IDENTITIES_SOURCE_NAME,
+                    originAccount: 'id-1',
+                    accounts: [],
+                    statuses: ['baseline'],
+                },
+            } as unknown as Account)
+
+            const run = new FusionRun()
+            acc.addManagedAccountLayer(run, { pruneDeleted: true })
+
+            expect(acc.collections.statuses.isOrphan()).toBe(false)
+        })
+
         it('clears stale orphan status when identity-origin account is in scope with no managed accounts', () => {
             const acc = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-1',
@@ -816,6 +837,21 @@ describe('FusionAccount', () => {
                 },
             } as unknown as Account)
             expect(acc.originAccountId).toBe('identity-uuid-123')
+        })
+
+        it('retains originAccount from baseline-only persisted rows without originSource', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Identity',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    originAccount: 'identity-baseline-only',
+                    statuses: ['baseline'],
+                },
+            } as unknown as Account)
+            expect(acc.fromIdentity).toBe(true)
+            expect(acc.originAccountId).toBe('identity-baseline-only')
         })
 
         it('rejects raw originAccount for managed-source origin', () => {

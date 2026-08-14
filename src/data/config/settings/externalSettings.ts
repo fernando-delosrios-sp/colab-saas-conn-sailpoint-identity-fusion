@@ -2,9 +2,24 @@
  * connector-spec.json -> Advanced Settings -> External Settings
  */
 import { bootstrapLog } from '../../../services/logService'
-import { extractBoolean } from '../../../utils/attributes'
+import { extractBoolean, rawLooksEnabled } from '../../../utils/attributes'
 import type { ExternalSettingsSection } from '../../../model/config'
 import { assert } from './assertLite'
+import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
+
+function assertRawToggleMatchesParsed(raw: Record<string, unknown>, key: string, parsed: boolean): void {
+    if (!(key in raw)) {
+        return
+    }
+    const rawValue = raw[key]
+    if (rawLooksEnabled(rawValue) && !parsed) {
+        throw new ConnectorError(
+            `Configuration toggle "${key}" is stored as ${JSON.stringify(rawValue)} but was read as disabled. ` +
+                'Re-save the source after enabling External Settings, or upgrade/re-upload the connector package.',
+            ConnectorErrorType.Generic
+        )
+    }
+}
 
 export const connectorSpecInitialValues = {
     externalProcessingEnabled: false,
@@ -38,8 +53,10 @@ function assertHttpOrHttpsUrl(url: string, label: string): void {
 export function readSettings(raw: Record<string, unknown>): ExternalSettingsSection {
     const externalProcessingEnabled =
         extractBoolean(raw, 'externalProcessingEnabled') ?? runtimeDefaults.externalProcessingEnabled
+    assertRawToggleMatchesParsed(raw, 'externalProcessingEnabled', externalProcessingEnabled)
     const externalProxyEnabled =
         extractBoolean(raw, 'externalProxyEnabled') ?? runtimeDefaults.externalProxyEnabled
+    assertRawToggleMatchesParsed(raw, 'externalProxyEnabled', externalProxyEnabled)
     const externalRecordingEnabled =
         extractBoolean(raw, 'externalRecordingEnabled') ?? runtimeDefaults.externalRecordingEnabled
     const externalLoggingEnabled =

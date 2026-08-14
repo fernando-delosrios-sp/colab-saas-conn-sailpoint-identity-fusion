@@ -189,7 +189,22 @@ export function extractBoolean(attributes: Record<string, any>, key: string): bo
     if (value === 'false' || value === 'False') return false
     if (value === 1 || value === '1') return true
     if (value === 0 || value === '0') return false
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase()
+        if (normalized === 'on' || normalized === 'yes') return true
+        if (normalized === 'off' || normalized === 'no') return false
+    }
     return undefined
+}
+
+/** True when a raw platform value clearly means "enabled" even if {@link extractBoolean} cannot parse it. */
+export function rawLooksEnabled(value: unknown): boolean {
+    if (value === true || value === 1 || value === '1') return true
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase()
+        return normalized === 'true' || normalized === 'on' || normalized === 'yes' || normalized === 'enabled'
+    }
+    return false
 }
 
 /**

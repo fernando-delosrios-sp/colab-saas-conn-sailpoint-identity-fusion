@@ -7,7 +7,7 @@ function loadDotEnv(cwd = process.cwd()) {
     if (!fs.existsSync(envPath)) {
         return
     }
-    for (const line of fs.readFileSync(envPath, 'utf8').split('\n')) {
+    for (const line of fs.readFileSync(envPath, 'utf8').replace(/^\uFEFF/, '').split('\n')) {
         const trimmed = line.trim()
         if (!trimmed || trimmed.startsWith('#')) {
             continue

@@ -228,11 +228,10 @@ export class FusionLayers {
             )
 
             if (fromIdentity) {
-                const originIdentityId = this.originAccountValue ?? identityInfo?.id
-                if (originIdentityId && !this.originIdentityInScopeValue) {
+                if (this.originIdentityInScopeValue === false) {
                     this.collections.statuses.add(StatusEntitlement.Orphan)
                     this.needsRefreshValue = false
-                } else if (this.originIdentityInScopeValue) {
+                } else if (this.originIdentityInScopeValue === true) {
                     this.collections.statuses.remove(StatusEntitlement.Orphan)
                 }
             } else {

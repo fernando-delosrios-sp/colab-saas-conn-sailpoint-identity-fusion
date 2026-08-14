@@ -3,6 +3,7 @@ import { safeReadConfig } from '../data/config'
 import { FusionConfig } from '../model/config'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { ProxyService } from '../services/proxyService'
+import { assertProxyRouting } from './proxyRole'
 
 /** Operation execution route selected at runtime. */
 enum RunMode {
@@ -98,6 +99,7 @@ export function createOperationHandler(
             serviceRegistry.run.setSimulatedTime(replayStepTimestamp)
         }
         try {
+            assertProxyRouting(config)
             const { runMode, isProxyServer } = resolveRunMode(context, serviceRegistry.proxy, operationName)
             interval = scheduleKeepAlive(options, config, runMode, isProxyServer, res)
 
