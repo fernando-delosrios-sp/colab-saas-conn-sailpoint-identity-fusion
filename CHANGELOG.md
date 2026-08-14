@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-08-14
+
+### ⚠️ Breaking Changes
+
+- **Normal attribute definitions clear on falsy or failed evaluation** — When a Normal attribute definition runs during aggregation and the Velocity template fails or produces empty/falsy output, the connector now **removes** the attribute from the Fusion account instead of preserving the previously stored value. Core schema attributes (`id`, `name`) still receive safe defaults. **Migration:** Use `$previous` in Velocity expressions to retain the last value when source input is missing, or mark attributes **Static** for write-once behavior.
+
+---
+
 ## 2026-08-13
 
 ### 📚 Documentation

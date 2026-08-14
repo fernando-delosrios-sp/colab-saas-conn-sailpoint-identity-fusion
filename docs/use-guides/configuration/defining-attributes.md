@@ -65,9 +65,12 @@ Add each attribute under **Normal Attribute Definitions** or **Unique Attribute 
 
 | Static | Refresh setting | Behavior                                                                   | Use case                                                            |
 | ------ | --------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| No     | Yes             | Recalculated every aggregation                                             | Dynamic values that should update (full name, age, formatted dates) |
-| No     | No              | Recalculated only when underlying source data changes                      | Standard values that update only when source data updates           |
+| No     | Yes             | Recalculated every aggregation; falsy or failed output **clears** the stored value | Dynamic values that should update (full name, age, formatted dates) |
+| No     | No              | Recalculated only when underlying source data changes; falsy or failed output **clears** the stored value | Standard values that update only when source data updates           |
 | Yes    | (Ignored)       | Calculated only when it has no value; existing values are never recalculated | Immutable values (initial assignment, one-time calculations)        |
+
+!!! warning "Breaking behavior"
+    When a Normal definition runs and the Velocity expression fails or renders empty output, the connector removes the attribute from the Fusion account. Use `$previous` in the expression to retain the last value when source input is temporarily missing, or enable **Static** for write-once attributes.
 
 **Examples:**
 
