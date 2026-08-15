@@ -19,7 +19,7 @@ import {
 import { SourceService } from '../sourceService'
 import { FusionRun } from '../../model/fusionRun'
 import { assert, softAssert } from '../../utils/assert'
-import { readString, readUnknown, trimStr } from '../../utils/safeRead'
+import { readString, readUnknown, readFirstUnknown, trimStr } from '../../utils/safeRead'
 import { FusionDecision } from '../../model/form'
 import { FusionAccount } from '../../model/account'
 import { AccountV2025 as Account } from 'sailpoint-api-client'
@@ -488,7 +488,7 @@ export class FormService {
             if (doc) {
                 const attrs = readUnknown(doc, 'attributes')
                 const hydrated = normalizeEmail(
-                    readUnknown(attrs, 'email') ?? readUnknown(attrs, 'mail') ?? readUnknown(attrs, 'emailAddress')
+                    readFirstUnknown(attrs, 'email', 'mail', 'emailAddress')
                 )
                 if (hydrated) {
                     ;(c.attributes as Record<string, unknown>).email = hydrated
