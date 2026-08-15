@@ -78,13 +78,10 @@ The client sends a JSON body to the proxy server:
 
 ```json
 {
-    "type": "<commandType>",
-    "input": {
-        // Command-specific input
-    },
+    "type": "std:test-connection",
+    "input": {},
     "config": {
-        // Full connector configuration
-        // with proxyEnabled: false to prevent loop
+        "proxyEnabled": false
     }
 }
 ```
