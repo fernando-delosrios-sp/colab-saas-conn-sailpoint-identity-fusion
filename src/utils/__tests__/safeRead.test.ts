@@ -14,6 +14,7 @@ import {
     readPathUnknown,
     readString,
     readUnknown,
+    getFirstUnknown,
     trimStr,
 } from '../safeRead'
 
@@ -60,8 +61,12 @@ describe('safeRead', () => {
     })
 
     it('reads arrays and unknown values safely', () => {
-        const source = { ids: ['a', 'b'], obj: { x: 1 } }
+        const source = { ids: ['a', 'b'], obj: { x: 1 }, nil: null }
         expect(readUnknown(source, 'obj')).toEqual({ x: 1 })
+
+        expect(getFirstUnknown(source, 'missing', 'obj')).toEqual({ x: 1 })
+        expect(getFirstUnknown(source, 'missing1', 'missing2')).toBeUndefined()
+        expect(getFirstUnknown(source, 'missing1', 'nil')).toBeNull()
         expect(readUnknown(undefined, 'obj')).toBeUndefined()
         expect(readArray<string>(source, 'ids')).toEqual(['a', 'b'])
         expect(readArray<string>(source, 'none', [])).toEqual([])
