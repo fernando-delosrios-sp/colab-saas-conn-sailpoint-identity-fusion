@@ -72,7 +72,7 @@ describe('ProxyService.isProxyService', () => {
         const mockLog = { info: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
 
-        expect(() => service.isProxyService()).toThrow('Proxy password mismatch')
+        expect(() => service.isProxyService()).toThrow('Client proxy password is required')
     })
 
     it('returns true when passwords match', () => {
@@ -110,7 +110,7 @@ describe('ProxyService.isProxyService', () => {
         const mockLog = { info: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
 
-        expect(() => service.isProxyService()).toThrow('Proxy password mismatch')
+        expect(() => service.isProxyService()).toThrow('Client proxy password is required')
     })
 
     it('does not enter server mode when gateway is off even if PROXY_PASSWORD is set', () => {
@@ -126,7 +126,7 @@ describe('ProxyService.isProxyService', () => {
         expect(service.isProxyService()).toBe(false)
     })
 
-    it('accepts empty password when server PROXY_PASSWORD is empty string', () => {
+    it('throws error when server PROXY_PASSWORD is empty string', () => {
         process.env.PROXY_PASSWORD = ''
         const config = {
             externalProcessingEnabled: true,
@@ -136,7 +136,7 @@ describe('ProxyService.isProxyService', () => {
         const mockLog = { info: vi.fn() }
         const service = new ProxyService(config as any, mockLog as any, {} as any)
 
-        expect(service.isProxyService()).toBe(true)
+        expect(() => service.isProxyService()).toThrow('Server proxy password is not securely configured')
     })
 })
 

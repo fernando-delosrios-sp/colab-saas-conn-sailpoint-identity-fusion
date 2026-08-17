@@ -1,0 +1,4 @@
+## 2024-05-15 - Empty Credential Fallback Bypass
+**Vulnerability:** The proxy authentication logic in `proxyService.ts` used `|| ''` as a fallback for missing passwords, allowing a client providing an empty password to successfully authenticate if the server's `PROXY_PASSWORD` environment variable was set to an empty string.
+**Learning:** Using truthiness fallbacks like `|| ''` for credentials creates a weak default state. If an environment variable is unintentionally misconfigured (e.g., set to an empty string instead of undefined), attackers can bypass authentication by simply providing empty credentials.
+**Prevention:** Always explicitly validate that security-critical configuration values (like passwords or secrets) are defined and non-empty. Use strict assertions to fail securely rather than silently falling back to guessable defaults.

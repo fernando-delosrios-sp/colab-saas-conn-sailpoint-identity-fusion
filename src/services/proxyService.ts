@@ -62,8 +62,11 @@ export class ProxyService {
 
             // 🛡️ Sentinel: Enforce strict proxy password validation. If the server requires
             // a password, the client must provide one and it must match exactly.
-            const serverPassword = process.env.PROXY_PASSWORD || ''
-            const clientPassword = this.config.externalTargetPassword || ''
+            const serverPassword = process.env.PROXY_PASSWORD
+            const clientPassword = this.config.externalTargetPassword
+
+            assert(serverPassword !== undefined && serverPassword !== '', 'Server proxy password is not securely configured')
+            assert(clientPassword !== undefined && clientPassword !== '', 'Client proxy password is required')
 
             const expectedHash = crypto
                 .createHash('sha256')
