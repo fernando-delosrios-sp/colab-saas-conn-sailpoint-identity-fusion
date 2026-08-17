@@ -782,6 +782,8 @@
                             "label": "Enable automatic merge",
                             "type": "toggle",
                             "required": false,
+                            "parentKey": "fusionEnableManualReview",
+                            "parentValue": "true",
                             "helpKey": "When enabled, merge the managed account into the matched Fusion identity without a review form if the combined score mee."
                         },
                         {
@@ -798,6 +800,8 @@
                             "label": "Fusion attribute matches",
                             "titleKey": "attribute",
                             "subtitleKey": "algorithm",
+                            "parentKey": "fusionEnableManualReview",
+                            "parentValue": "true",
                             "dragNDropEnabled": true,
                             "deleteButton": true,
                             "editButton": true,
