@@ -25,10 +25,12 @@ Pass a `dryRun` object on the `std:account:list` input:
 
 ```json
 {
-  "dryRun": {
-    "enabled": true,
-    "saveFile": true,
-    "sendEmail": ["reviewer@example.com"]
+  "input": {
+    "dryRun": {
+      "enabled": true,
+      "saveFile": true,
+      "sendEmail": ["reviewer@example.com"]
+    }
   }
 }
 ```
