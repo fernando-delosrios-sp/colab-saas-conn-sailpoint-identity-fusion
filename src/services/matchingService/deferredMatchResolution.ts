@@ -1,5 +1,7 @@
 import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { FusionAccount } from '../../model/account'
+import { FusionRun } from '../../model/fusionRun'
+import { SourceInfo } from '../sourceService'
 import { FusionMatch, ManagedAccountAnalysisContext } from './types'
 import type {
     DeferredMatchDrainContext,
@@ -7,6 +9,7 @@ import type {
     MatchSweepResult,
     ResolvedMatch,
 } from './matchOutcomeDispatcher'
+import { sourceManualReviewPathAvailable } from './reviewerAvailability'
 
 export interface AutoMergeCallbacks {
     handleExactMatch(
@@ -30,6 +33,17 @@ export interface DeferredMatchResolutionCallbacks extends AutoMergeCallbacks {
         materializedEarly?: Set<string>,
         sweepResult?: MatchSweepResult
     ): Promise<number>
+    handleAuthoritativeNonMatch(
+        fusionAccount: FusionAccount,
+        account: Account,
+        sourceInfo: SourceInfo | undefined
+    ): Promise<ResolvedMatch>
+}
+
+export interface DeferredMatchOutcomeContext {
+    sourceInfo?: SourceInfo
+    run: FusionRun
+    fusionEnableManualReview: boolean
 }
 
 export async function tryAutoMergeFromMatches(
@@ -51,7 +65,8 @@ export async function resolveLiveDeferredMatchOutcome(
     fusionAccount: FusionAccount,
     account: Account,
     callbacks: DeferredMatchResolutionCallbacks,
-    drainContext?: DeferredMatchDrainContext
+    drainContext?: DeferredMatchDrainContext,
+    outcomeContext?: DeferredMatchOutcomeContext
 ): Promise<{ resolved: ResolvedMatch; promotedNonMatches: number }> {
     const assigned = await callbacks.tryAutoMergeIntoDeferredAnchor(fusionAccount, account)
     if (assigned) {
@@ -61,6 +76,24 @@ export async function resolveLiveDeferredMatchOutcome(
                 fusionAccount: assigned,
                 resolution: 'exact-match',
             },
+            promotedNonMatches: 0,
+        }
+    }
+
+    if (
+        outcomeContext &&
+        !sourceManualReviewPathAvailable(
+            { fusionEnableManualReview: outcomeContext.fusionEnableManualReview },
+            outcomeContext.sourceInfo,
+            outcomeContext.run
+        )
+    ) {
+        return {
+            resolved: await callbacks.handleAuthoritativeNonMatch(
+                fusionAccount,
+                account,
+                outcomeContext.sourceInfo
+            ),
             promotedNonMatches: 0,
         }
     }

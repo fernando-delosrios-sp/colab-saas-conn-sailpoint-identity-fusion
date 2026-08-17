@@ -749,6 +749,47 @@ describe('FusionService — aggregation', () => {
             ;(ctx.fusionService as any).validateManagedSourceReviewers()
             expect(ctx.run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(true)
         })
+
+        it('does not mark source non-scorable when automatic merge enabled and no reviewers', async () => {
+            ;(ctx.mockConfig as any).fusionEnableAutoMerge = true
+            ;(ctx.mockConfig as any).fusionEnableManualReview = false
+            ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = false
+            const warnSpy = vi.spyOn(ctx.mockLog, 'warn')
+
+            await ctx.fusionService.initializeSourceReviewers()
+
+            ;(ctx.fusionService as any).validateManagedSourceReviewers()
+            expect(ctx.run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(false)
+            expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Manual review is unavailable'))
+            ;(ctx.mockConfig as any).fusionEnableAutoMerge = undefined
+            ;(ctx.mockConfig as any).fusionEnableManualReview = undefined
+        })
+
+        it('marks source non-scorable when manual review enabled without reviewers and automatic merge disabled', async () => {
+            ;(ctx.mockConfig as any).fusionEnableAutoMerge = false
+            ;(ctx.mockConfig as any).fusionEnableManualReview = true
+            ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = false
+            const errorSpy = vi.spyOn(ctx.mockLog, 'error')
+
+            await ctx.fusionService.initializeSourceReviewers()
+
+            ;(ctx.fusionService as any).validateManagedSourceReviewers()
+            expect(ctx.run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(true)
+            expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Match scoring is not configured'))
+        })
+
+        it('marks source non-scorable when both automatic merge and manual review are disabled', async () => {
+            ;(ctx.mockConfig as any).fusionEnableAutoMerge = false
+            ;(ctx.mockConfig as any).fusionEnableManualReview = false
+            ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = false
+            const errorSpy = vi.spyOn(ctx.mockLog, 'error')
+
+            await ctx.fusionService.initializeSourceReviewers()
+
+            ;(ctx.fusionService as any).validateManagedSourceReviewers()
+            expect(ctx.run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(true)
+            expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Match scoring is not configured'))
+        })
     })
 
     describe('processManagedAccounts', () => {

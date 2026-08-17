@@ -57,6 +57,8 @@ export function createFusionServiceTestContext(): FusionServiceTestContext {
         resetAccounts: false,
         resetForms: false,
         fusionOwnerIsGlobalReviewer: false,
+        fusionEnableManualReview: true,
+        fusionEnableAutoMerge: false,
         fusionReportOnAggregation: false,
         fusionFormAttributes: ['email', 'firstName', 'lastName'],
         baseurl: 'https://example.identitynow.com',

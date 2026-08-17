@@ -62,8 +62,8 @@ The default type for managed sources that contribute to identity lifecycle decis
 | --- | --- |
 | **Deferred candidate matching** | When enabled, compares non-matched accounts to other deferred candidates from the **same source in the same run**. Defers identity creation when the best match is another deferred candidate. Never cross-source. Disable when one person may appear as multiple accounts in a single aggregation and each should be evaluated independently. |
 
-!!! warning "Reviewers required for Match"
-    Sources without a valid reviewer setup skip scoring and are added as non-matched. Configure **global reviewers** (source owner and/or governance group with **Owners are global reviewers?**) or **per-source reviewer entitlements** before enabling Match on a source. See [Managing reviewers](managing-reviewers.md).
+!!! warning "Reviewers required for manual review"
+    Match scoring runs when **Enable automatic merge** is on, or when **Enable manual review** is on with valid reviewers. When manual review is off or reviewers are missing, borderline scores register as non-matched. Configure **global reviewers** or **per-source reviewer entitlements** when you need manual review for partial matches. See [Managing reviewers](managing-reviewers.md).
 
 ## Records
 

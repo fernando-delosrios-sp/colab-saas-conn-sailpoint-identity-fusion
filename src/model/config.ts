@@ -296,6 +296,8 @@ export interface MatchingSettingsSection {
     matchingConfigs?: MatchingConfig[]
     /** Minimum weighted combined match score (0-100). Required for matching. */
     fusionManualReviewScore?: number
+    /** When true, potential matches below the automatic merge threshold may enter manual review when reviewers are configured. */
+    fusionEnableManualReview: boolean
     /** When true, exact attribute matches skip manual review (automatic merge to the matched identity). */
     fusionEnableAutoMerge: boolean
     /** Automatic assignment match score threshold. Matches equal to or above this score are automatically assigned. */

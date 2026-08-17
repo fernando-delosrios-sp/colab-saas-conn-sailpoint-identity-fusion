@@ -1,6 +1,14 @@
 import { readSettings } from '../matchingSettings'
 
 describe('matchingSettings readSettings', () => {
+    it('defaults fusionEnableManualReview to true when omitted', () => {
+        const raw = { matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }] }
+
+        const result = readSettings(raw)
+
+        expect(result.fusionEnableManualReview).toBe(true)
+    })
+
     it('defaults fusionEnableAutoMerge to false when omitted', () => {
         const raw = { matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }] }
 

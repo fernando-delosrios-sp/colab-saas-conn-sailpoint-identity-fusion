@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-08-17
+
+### ⚠️ Breaking Changes
+
+- **Automatic merge without reviewers now scores and merges** — When **Enable automatic merge** is on and a managed source has no reviewers configured, Match scoring now runs for that source. Accounts at or above the automatic merge threshold merge without review; all other scored outcomes register as **non-matched** instead of partial matches or review forms. Previously, no-reviewer sources skipped scoring entirely. **Migration:** If you enable automatic merge without reviewers intentionally, no config change is required — expect merges for high-confidence scores after upgrade. If you relied on the old skip-scoring behavior, leave automatic merge disabled until reviewers are configured.
+
+### ✨ New Features
+
+- **Enable manual review toggle** — Restores an explicit **`fusionEnableManualReview`** setting (default **on**). Match scoring runs when automatic merge is enabled **or** when manual review is enabled with valid reviewers. After scoring, outcomes are evaluated in order: automatic merge threshold, then manual review (when enabled and reviewers exist), otherwise non-match.
+
+---
+
 ## 2026-08-14
 
 ### ⚠️ Breaking Changes

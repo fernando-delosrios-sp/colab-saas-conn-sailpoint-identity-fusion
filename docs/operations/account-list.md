@@ -91,7 +91,7 @@ Sub-steps map to `STEP` log markers inside `PHASE 4 Process`:
 
 - Processes remaining managed accounts in the work queue (not matched to an existing fusion account or identity).
 - **Source Type Check**: Record registers unique attributes and drops from output; Orphan drops entirely; Identity proceeds to matching.
-- **Reviewer validation**: Sources without a valid reviewer bypass scoring and are added as non-matched.
+- **Reviewer validation**: Match scoring runs when **Enable automatic merge** is on, or when **Enable manual review** is on with valid reviewers. Sources that meet neither condition skip scoring and register as non-matched.
 
 <details>
 <summary><b>View Graphic: Managed Account Processing (uncorrelated-sweep)</b></summary>
@@ -102,13 +102,16 @@ flowchart TD
     B -- Record --> C[Register Unique Attributes & Drop]
     B -- Orphan --> D[Drop Account]
     D -.-> E([Optional: Disable Action])
-    B -- Identity --> F{Valid Reviewer Setup?}
+    B -- Identity --> F{Match scoring configured?}
     F -- No --> G[Skip Scoring: Add as Non-matched]
     F -- Yes --> H[Run Matching/Scoring Engine]
-    H --> I{Score Thresholds}
-    I -- Perfect Match --> J[Assign automatically]
-    I -- Partial Match --> K[Generate Review Form]
-    I -- No Match --> G
+    H --> I{Automatic merge enabled and score meets threshold?}
+    I -- Yes --> J[Assign automatically]
+    I -- No --> K{Manual review enabled with reviewers?}
+    K -- Yes --> L{Score meets manual review threshold?}
+    L -- Yes --> M[Generate Review Form or Defer]
+    L -- No --> G
+    K -- No --> G
 ```
 
 </details>
@@ -202,7 +205,7 @@ When a source is configured with `correlationMode: correlate`, correlations are 
 
 ### Reviewer validation for managed account scoring
 
-Before the managed account scoring loop begins, each managed source is validated for reviewer availability. Sources that lack a valid reviewer cannot create review forms for partial matches, making the scoring step unnecessary. Accounts from these sources skip scoring entirely and are added as non-matched. A single error is logged per source, avoiding the per-account warning that would otherwise repeat for every managed account without a reviewer.
+Before the managed account scoring loop begins, each managed source is validated for Match scoring eligibility. Scoring runs when **Enable automatic merge** is on, or when **Enable manual review** is on and the source has at least one reviewer. When neither applies, accounts skip scoring and are added as non-matched (one **error** per source). When automatic merge is on but reviewers are absent, scoring still runs; borderline outcomes register as non-matched because the manual review path is unavailable (one **warn** per source).
 
 ### Machine account exclusion
 

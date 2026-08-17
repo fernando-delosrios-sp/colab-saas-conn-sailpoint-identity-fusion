@@ -44,6 +44,7 @@ import { IdentityProcessor } from './identityProcessor'
 import { CorrelationManager } from '../correlationManager'
 import { DecisionProcessor } from './decisionProcessor'
 import { MatchOutcomeDispatcher, MatchSweepMode } from '../matchingService/matchOutcomeDispatcher'
+import { sourceHasReviewers, sourceShouldEnterMatchScoring } from '../matchingService/reviewerAvailability'
 import { AccountAssembly } from '../accountAssembly'
 import { FusionRun } from '../../model/fusionRun'
 
@@ -691,12 +692,18 @@ export class FusionService {
     private validateManagedSourceReviewers(): void {
         this.run.sourcesWithoutReviewers.clear()
         for (const source of this.sources.managedSources) {
-            const reviewers = this.run.reviewersBySourceId.get(source.id)
-            if (!reviewers || reviewers.size === 0) {
+            const sourceInfo = { id: source.id, name: source.name } as import('../sourceService').SourceInfo
+            if (!sourceShouldEnterMatchScoring(this.config, sourceInfo, this.run)) {
                 this.run.sourcesWithoutReviewers.add(source.name)
                 this.log.error(
-                    `No valid reviewer configured for source "${source.name}". ` +
+                    `Match scoring is not configured for source "${source.name}" ` +
+                        `(enable automatic merge and/or manual review with valid reviewers). ` +
                         `Managed accounts from this source will be treated as NonMatched.`
+                )
+            } else if (this.config.fusionEnableAutoMerge && !sourceHasReviewers(sourceInfo, this.run)) {
+                this.log.warn(
+                    `No reviewers configured for source "${source.name}" with automatic merge enabled. ` +
+                        `Manual review is unavailable; borderline matches will register as non-match.`
                 )
             }
         }

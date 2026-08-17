@@ -15,6 +15,7 @@ export const connectorSpecInitialValues = {
 
 export const runtimeDefaults = {
     fusionEnableAutoMerge: false,
+    fusionEnableManualReview: true,
     fusionManualReviewScore: connectorSpecInitialValues.fusionManualReviewScore,
 } as const
 
@@ -26,6 +27,8 @@ export function readSettings(raw: Record<string, unknown>): MatchingSettingsSect
 
     const matchingConfigs = (raw.matchingConfigs as MatchingConfig[]) ?? []
     const fusionEnableAutoMerge = extractBoolean(raw, 'fusionEnableAutoMerge') ?? runtimeDefaults.fusionEnableAutoMerge
+    const fusionEnableManualReview =
+        extractBoolean(raw, 'fusionEnableManualReview') ?? runtimeDefaults.fusionEnableManualReview
     const fusionManualReviewScore = (raw.fusionManualReviewScore as number | undefined) ?? runtimeDefaults.fusionManualReviewScore
     const fusionAutoMergeScore = raw.fusionAutoMergeScore as number | undefined
 
@@ -78,6 +81,7 @@ export function readSettings(raw: Record<string, unknown>): MatchingSettingsSect
     return {
         matchingConfigs,
         fusionEnableAutoMerge,
+        fusionEnableManualReview,
         fusionManualReviewScore,
         fusionAutoMergeScore,
         fusionScoreMap,

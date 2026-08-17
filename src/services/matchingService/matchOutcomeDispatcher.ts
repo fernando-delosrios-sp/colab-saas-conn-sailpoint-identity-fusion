@@ -402,6 +402,8 @@ export class MatchOutcomeDispatcher {
                 this.scorePersistedAnchorsForAutoMerge(fusionAccount, account),
             handlePartialMatch: (fusionAccount, sourceInfo, account) =>
                 this.handlePartialMatch(fusionAccount, sourceInfo, account),
+            handleAuthoritativeNonMatch: (fusionAccount, account, sourceInfo) =>
+                this.handleAuthoritativeNonMatch(fusionAccount, account, sourceInfo),
         }
     }
 
@@ -418,6 +420,22 @@ export class MatchOutcomeDispatcher {
                     materializedEarly,
                     sweepResult
                 ),
+            handleAuthoritativeNonMatch: (fusionAccount, account, sourceInfo) =>
+                this.handleAuthoritativeNonMatch(fusionAccount, account, sourceInfo),
+        }
+    }
+
+    private async handleAuthoritativeNonMatch(
+        fusionAccount: FusionAccount,
+        account: Account,
+        sourceInfo: SourceInfo | undefined
+    ): Promise<ResolvedMatch> {
+        const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
+        const nonMatchAccount = await this.handleNonMatch(fusionAccount, account, sourceType, sourceInfo)
+        return {
+            account,
+            fusionAccount: nonMatchAccount ?? fusionAccount,
+            resolution: 'non-match',
         }
     }
 
@@ -466,7 +484,8 @@ export class MatchOutcomeDispatcher {
                     analysis.fusionAccount,
                     analysis.account,
                     this.deferredResolutionCallbacks(),
-                    { remainingInQueue, materializedEarly, sweepResult: options?.sweepResult }
+                    { remainingInQueue, materializedEarly, sweepResult: options?.sweepResult },
+                    { sourceInfo: analysis.sourceInfo, run: this.deps.run, fusionEnableManualReview: this.deps.config.fusionEnableManualReview !== false }
                 )
                 promotedNonMatches = outcome.promotedNonMatches
                 resolved.push(outcome.resolved)
@@ -712,7 +731,9 @@ export class MatchOutcomeDispatcher {
             const outcome = await resolveLiveDeferredMatchOutcome(
                 fusionAccount,
                 account,
-                this.deferredResolutionCallbacks()
+                this.deferredResolutionCallbacks(),
+                undefined,
+                { sourceInfo, run: this.deps.run, fusionEnableManualReview: this.deps.config.fusionEnableManualReview !== false }
             )
             if (outcome.resolved.resolution === 'exact-match') {
                 return {

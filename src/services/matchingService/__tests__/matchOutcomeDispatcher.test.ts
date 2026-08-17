@@ -34,6 +34,8 @@ describe('MatchOutcomeDispatcher', () => {
         const config = {
             sources: [],
             fusionFormAttributes: ['email', 'firstName', 'lastName'],
+            fusionEnableManualReview: true,
+            fusionEnableAutoMerge: false,
             baseurl: 'https://example.identitynow.com',
             managedAccountsBatchSize: 10,
             ...options.configOverrides,
@@ -152,6 +154,13 @@ describe('MatchOutcomeDispatcher', () => {
             return 0
         })
         return () => maxInFlight
+    }
+
+    function seedReviewers(run: FusionRun) {
+        run.reviewersBySourceId.set(
+            SOURCE_ID,
+            new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+        )
     }
 
     describe('runMatchSweep', () => {
@@ -359,6 +368,7 @@ describe('MatchOutcomeDispatcher', () => {
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } }))
+            seedReviewers(run)
             const previousNonMatch = FusionAccount.fromManagedAccount({
                 id: 'acct-prev',
                 nativeIdentity: 'native-prev',
@@ -394,6 +404,7 @@ describe('MatchOutcomeDispatcher', () => {
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } }))
+            seedReviewers(run)
 
             vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, candidates, candidateType) => {
                 if (candidateType === 'identity') return 0
@@ -430,6 +441,7 @@ describe('MatchOutcomeDispatcher', () => {
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } }))
+            seedReviewers(run)
 
             const firstAccount = managedAccount({ id: 'acct-a', nativeIdentity: 'nat-a', name: 'Peer A' })
             const secondAccount = managedAccount({ id: 'acct-b', nativeIdentity: 'nat-b', name: 'Peer B' })
@@ -464,6 +476,7 @@ describe('MatchOutcomeDispatcher', () => {
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } }))
+            seedReviewers(run)
 
             const firstAccount = managedAccount({ id: 'acct-first', nativeIdentity: 'native-first', name: 'Taylor Jordan' })
             const secondAccount = managedAccount({ id: 'acct-second', nativeIdentity: 'native-second', name: 'Taylor Jordan' })
@@ -514,9 +527,10 @@ describe('MatchOutcomeDispatcher', () => {
             expect(run.getFusionAccountByManagedKey('source-a-id::native-1')).toBeDefined()
         })
 
-        it('treats accounts from sources without reviewers as non-matches', async () => {
+        it('treats accounts from sources without reviewers as non-matches when automatic merge is disabled', async () => {
             const { dispatcher, matchingService, forms, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
+                configOverrides: { fusionEnableAutoMerge: false },
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
             run.sourcesWithoutReviewers.add(SOURCE_NAME)
@@ -528,6 +542,218 @@ describe('MatchOutcomeDispatcher', () => {
             expect(result.nonMatch).toBe(1)
             expect(scoreSpy).not.toHaveBeenCalled()
             expect(forms.createFusionForm).not.toHaveBeenCalled()
+        })
+
+        it('scores accounts from no-reviewer sources when automatic merge is enabled', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { fusionEnableAutoMerge: true },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+
+            const scoreSpy = vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)
+
+            await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(scoreSpy).toHaveBeenCalled()
+        })
+
+        it('registers non-match when partial score and manual review path is unavailable', async () => {
+            const { dispatcher, matchingService, forms, log, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: {
+                    fusionEnableAutoMerge: true,
+                    fusionEnableManualReview: false,
+                    fusionAutoMergeScore: 100,
+                    fusionManualReviewScore: 80,
+                },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    fusionAccount.layers.addFusionMatch({
+                        identityId: 'identity-1',
+                        identityName: 'Identity One',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
+                    })
+                }
+                return 1
+            })
+
+            const result = await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(result.nonMatch).toBe(1)
+            expect(result.partial).toBe(0)
+            expect(forms.createFusionForm).not.toHaveBeenCalled()
+            expect(log.recordEvent).toHaveBeenCalledWith('nonMatch')
+        })
+
+        it('registers non-match when partial score and no reviewers with automatic merge enabled', async () => {
+            const { dispatcher, matchingService, forms, log, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: {
+                    fusionEnableAutoMerge: true,
+                    fusionEnableManualReview: true,
+                    fusionAutoMergeScore: 100,
+                    fusionManualReviewScore: 80,
+                },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    fusionAccount.layers.addFusionMatch({
+                        identityId: 'identity-1',
+                        identityName: 'Identity One',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
+                    })
+                }
+                return 1
+            })
+
+            const result = await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(result.nonMatch).toBe(1)
+            expect(result.partial).toBe(0)
+            expect(forms.createFusionForm).not.toHaveBeenCalled()
+            expect(log.recordEvent).toHaveBeenCalledWith('nonMatch')
+        })
+
+        it('dispatches partial match when manual review is enabled and reviewers exist', async () => {
+            const { dispatcher, matchingService, forms, log, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: {
+                    fusionEnableAutoMerge: true,
+                    fusionEnableManualReview: true,
+                    fusionAutoMergeScore: 100,
+                    fusionManualReviewScore: 80,
+                },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.reviewersBySourceId.set(
+                SOURCE_ID,
+                new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+            )
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    fusionAccount.layers.addFusionMatch({
+                        identityId: 'identity-1',
+                        identityName: 'Identity One',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
+                    })
+                }
+                return 1
+            })
+
+            const result = await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(result.partial).toBe(1)
+            expect(result.nonMatch).toBe(0)
+            expect(forms.createFusionForm).toHaveBeenCalled()
+            expect(log.recordEvent).toHaveBeenCalledWith('formsQueued')
+        })
+
+        it('registers non-match when partial score and manual review path is unavailable with reviewers present', async () => {
+            const { dispatcher, matchingService, forms, log, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: {
+                    fusionEnableAutoMerge: true,
+                    fusionEnableManualReview: false,
+                    fusionAutoMergeScore: 100,
+                    fusionManualReviewScore: 80,
+                },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.reviewersBySourceId.set(
+                SOURCE_ID,
+                new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+            )
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    fusionAccount.layers.addFusionMatch({
+                        identityId: 'identity-1',
+                        identityName: 'Identity One',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
+                    })
+                }
+                return 1
+            })
+
+            const result = await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(result.nonMatch).toBe(1)
+            expect(result.partial).toBe(0)
+            expect(forms.createFusionForm).not.toHaveBeenCalled()
+            expect(log.recordEvent).toHaveBeenCalledWith('nonMatch')
+        })
+
+        it('auto-merges when threshold met without reviewers configured', async () => {
+            const { dispatcher, matchingService, forms, decisionProcessor, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { fusionEnableAutoMerge: true, fusionAutoMergeScore: 100 },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            const identity = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Identity One', attributes: {} } as any)
+            run.registerFusionAccount(identity)
+
+            const assigned = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Identity One', attributes: {} } as any)
+            decisionProcessor.processFusionIdentityDecision.mockResolvedValue(assigned)
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    fusionAccount.layers.addFusionMatch(identityMatch())
+                }
+                return 1
+            })
+
+            const result = await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(result.exact).toBe(1)
+            expect(result.partial).toBe(0)
+            expect(result.nonMatch).toBe(0)
+            expect(forms.createFusionForm).not.toHaveBeenCalled()
+            expect(run.autoMergedIdentityIds.has('identity-1')).toBe(true)
+        })
+
+        it('finalizes non-match for deferred partial outcome without reviewers', async () => {
+            const { dispatcher, matchingService, forms, log, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { fusionEnableAutoMerge: true, fusionAutoMergeScore: 100 },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: true } }))
+            const previousNonMatch = FusionAccount.fromManagedAccount({
+                id: 'acct-prev',
+                nativeIdentity: 'native-prev',
+                name: 'Previous Non Match',
+                sourceId: SOURCE_ID,
+                sourceName: SOURCE_NAME,
+                attributes: {},
+            } as any)
+            previousNonMatch.collections.statuses.setNonMatched(previousNonMatch.name, previousNonMatch.sourceName)
+            run.registerFusionAccount(previousNonMatch)
+            run.registerFinalizedDeferredCandidate(previousNonMatch)
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') return 0
+                if (candidateType === 'deferred') {
+                    fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: previousNonMatch }))
+                }
+                return 1
+            })
+
+            const result = await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(result.nonMatch).toBe(1)
+            expect(result.deferred).toBe(0)
+            expect(forms.createFusionForm).not.toHaveBeenCalled()
+            expect(log.recordEvent).toHaveBeenCalledWith('nonMatch')
         })
 
         it('handles record sources by registering unique attributes without creating a fusion account', async () => {
