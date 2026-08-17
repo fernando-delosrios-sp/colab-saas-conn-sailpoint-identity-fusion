@@ -44,6 +44,7 @@ Configure **Attribute Matching Settings → Matching Settings**:
 
 | Field | Purpose | Recommended value |
 | --- | --- | --- |
+| **Enable manual review** | Route borderline matches to review forms when reviewers are configured | Yes (default) |
 | **Manual review match score [0-100]** | Global floor for weighted combined score | 80 (start); tune with false positive/negative rate |
 | **Enable automatic merge** | Skip review when combined score meets automatic merge threshold | No initially; enable after tuning |
 | **Fusion attribute matches** | Identity attributes to compare | At least 2 (e.g. name + email) |
@@ -95,14 +96,22 @@ Test threshold changes with [Analyze changes with dry-run](../operation/analyze-
 
 ---
 
-## Automatic merge
+## Automatic merge and manual review
 
-| **Enable automatic merge** | Effect |
-| --- | --- |
-| No | All potential matches go to manual review |
-| Yes | Scores ≥ automatic merge threshold merge without review; borderline cases still reviewed |
+Match evaluates outcomes in order after scoring:
 
-Enable after tuning when false-positive rate is acceptable. Keep disabled during initial setup or high-risk merges.
+1. **Automatic merge** — when **Enable automatic merge** is on and combined score ≥ automatic merge threshold → merge without review.
+2. **Manual review** — when **Enable manual review** is on, reviewers are configured, and combined score ≥ manual review threshold (but below automatic merge) → review form or deferred pending.
+3. **Non-match** — all other scored outcomes.
+
+| **Enable manual review** | **Enable automatic merge** | Scoring runs when… | Borderline outcomes |
+| --- | --- | --- | --- |
+| Yes | No | Reviewers configured | Review forms |
+| Yes | Yes | Auto merge on **or** reviewers configured | Review when reviewers exist; otherwise non-match |
+| No | Yes | Always (for managed Identity sources) | Non-match unless auto-merge threshold met |
+| No | No | Never | Non-match (skip scoring) |
+
+Enable automatic merge after tuning when false-positive rate is acceptable. Disable manual review only when you want a pure auto-merge path and accept non-match for borderline scores.
 
 ---
 

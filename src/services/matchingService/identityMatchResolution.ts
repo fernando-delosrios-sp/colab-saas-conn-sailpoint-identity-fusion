@@ -3,6 +3,7 @@ import { FusionAccount } from '../../model/account'
 import { SourceInfo } from '../sourceService'
 import type { MatchOutcomeDispatcherDeps, ResolvedMatch } from './matchOutcomeDispatcher'
 import { tryAutoMergeFromMatches, type AutoMergeCallbacks } from './deferredMatchResolution'
+import { sourceManualReviewPathAvailable } from './reviewerAvailability'
 
 export interface IdentityMatchResolutionCallbacks extends AutoMergeCallbacks {
     scorePersistedAnchorsForAutoMerge(fusionAccount: FusionAccount, account: Account): Promise<void>
@@ -11,6 +12,11 @@ export interface IdentityMatchResolutionCallbacks extends AutoMergeCallbacks {
         sourceInfo: SourceInfo | undefined,
         account: Account
     ): Promise<void>
+    handleAuthoritativeNonMatch(
+        fusionAccount: FusionAccount,
+        account: Account,
+        sourceInfo: SourceInfo | undefined
+    ): Promise<ResolvedMatch>
 }
 
 export async function resolveIdentityMatchOutcome(
@@ -48,12 +54,12 @@ export async function resolveIdentityMatchOutcome(
             identityId: autoMerge.mergeTargetId,
         }
     }
-    if (
-        hadMergeTarget
-    ) {
-        return undefined
+    if (sourceManualReviewPathAvailable(deps.config, sourceInfo, deps.run)) {
+        if (hadMergeTarget) {
+            return undefined
+        }
+        await callbacks.handlePartialMatch(fusionAccount, sourceInfo, account)
+        return { account, fusionAccount, resolution: 'partial-match' }
     }
-    await callbacks.handlePartialMatch(fusionAccount, sourceInfo, account)
-    return { account, fusionAccount, resolution: 'partial-match' }
+    return callbacks.handleAuthoritativeNonMatch(fusionAccount, account, sourceInfo)
 }
-

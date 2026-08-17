@@ -762,10 +762,19 @@
                     "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><br><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.<br><br><strong>Thresholds and weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.<br><br><strong>Automatic merge:</strong> Optionally bypass manual review when the combined score meets your automatic merge threshold.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/matching-identities/\">Matching identities guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/tuning-matching-algorithms/\">Tuning matching algorithms</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/matching/\">Matching settings reference</a>.",
                     "items": [
                         {
+                            "key": "fusionEnableManualReview",
+                            "label": "Enable manual review",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "When enabled, potential matches below the automatic merge threshold may enter manual review when reviewers are configured."
+                        },
+                        {
                             "key": "fusionManualReviewScore",
                             "label": "Manual review match score [0-100]",
                             "type": "number",
                             "required": true,
+                            "parentKey": "fusionEnableManualReview",
+                            "parentValue": "true",
                             "helpKey": "Minimum weighted combined similarity (0-100) required for a potential match."
                         },
                         {
