@@ -7,6 +7,7 @@ import {
     CompiledAccountJmespathFilter,
     compileAccountPageJmespathFilter,
 } from './accountFilters'
+import { promiseAllBatched } from '../fusionService/collections'
 import { SourceInfo } from './types'
 
 export interface ManagedAccountFetcherDeps {
@@ -194,8 +195,10 @@ export async function fetchManagedAccounts(
             log.setProgress(sumLoaded, allTotalsKnown ? sumTotal : sumLoaded, 'fetched')
         }
 
-        await Promise.all(
-            sourcesWithLimits.map(async ({ source, effectiveLimit }) => {
+        // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
+        await promiseAllBatched(
+            sourcesWithLimits,
+            async ({ source, effectiveLimit }) => {
                 log.info(`Fetching accounts from source: ${source.name}`)
                 let collectedCount = 0
                 let discardedMachineCount = 0
@@ -235,7 +238,8 @@ export async function fetchManagedAccounts(
                     batchCumulativeCount[source.name] = collectedCount
                     log.debug(`Source ${source.name}: updated cumulative count to ${collectedCount}`)
                 }
-            })
+            },
+            5
         )
         log.debug(`Total managed accounts loaded: ${run.managedAccountsById.size}`)
     }, 'Failed to fetch managed accounts')
