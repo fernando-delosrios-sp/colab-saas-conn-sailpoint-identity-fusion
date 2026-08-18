@@ -56,6 +56,8 @@ export class CorrelationManager {
         const missingIds = fusionAccount.missingAccountIds
         const canDirectCorrelate = Boolean(fusionAccount.identityId)
 
+        const directCorrelateIds: string[] = []
+
         for (const accountId of missingIds) {
             if (!canDirectCorrelate) {
                 this.log.recordCorrelationSkipped('noIdentity')
@@ -64,27 +66,18 @@ export class CorrelationManager {
             const info = fusionAccount.collections.managedAccountInfo.get(accountId)
             if (!info) {
                 this.log.recordCorrelationSkipped('noSourceContext')
+                this.log.debug(
+                    `Skipping per-source correlation for missing managed key "${accountId}" on ${fusionAccount.name}: source context not available`
+                )
                 continue
             }
             const sourceConfig = this.sources.getSourceConfig(info.source.name)
-            if ((sourceConfig?.correlationMode ?? 'none') !== 'correlate') {
+            if ((sourceConfig?.correlationMode ?? 'none') === 'correlate') {
+                directCorrelateIds.push(accountId)
+            } else {
                 this.log.recordCorrelationSkipped('wrongMode')
             }
         }
-
-        const directCorrelateIds = canDirectCorrelate
-            ? missingIds.filter((accountId) => {
-                  const info = fusionAccount.collections.managedAccountInfo.get(accountId)
-                  if (!info) {
-                      this.log.debug(
-                          `Skipping per-source correlation for missing managed key "${accountId}" on ${fusionAccount.name}: source context not available`
-                      )
-                      return false
-                  }
-                  const sourceConfig = this.sources.getSourceConfig(info.source.name)
-                  return (sourceConfig?.correlationMode ?? 'none') === 'correlate'
-              })
-            : []
 
         // Link-to-existing form outcomes: PATCH correlate-mode sources for the assigned
         // managed account even when assembleAccount already blended it off missing-accounts.
