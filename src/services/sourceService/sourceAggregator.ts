@@ -4,6 +4,7 @@ import { getDateFromISOString } from '../../utils/date'
 import { coerceBoolean } from '../../utils/safeRead'
 import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
+import { promiseAllBatched } from '../fusionService/collections'
 import { SourceInfo } from './types'
 
 export interface SourceAggregationTaskDeps {
@@ -66,8 +67,11 @@ export async function aggregateManagedSources(deps: SourceAggregatorDeps): Promi
 
     const fusionLatestAggregationDate = await getLatestAggregationDate(deps, deps.fusionSourceId)
 
-    const aggregationChecks = await Promise.all(
-        managedSources.map(async (source) => {
+    // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
+    // to prevent API rate limiting issues and memory spikes when iterating over a large number of sources
+    const aggregationChecks = await promiseAllBatched(
+        managedSources,
+        async (source) => {
             const mode = source.config?.aggregationMode ?? 'none'
 
             if (mode !== 'before') {
@@ -80,18 +84,23 @@ export async function aggregateManagedSources(deps: SourceAggregatorDeps): Promi
             const shouldAggregate = fusionLatestAggregationDate > latestSourceDate
 
             return { source, shouldAggregate }
-        })
+        }
     )
 
     const disableOptimization = (source: SourceInfo) => coerceBoolean(source.config?.optimizedAggregation) === false
 
-    await Promise.all(
-        aggregationChecks
-            .filter(({ shouldAggregate }) => shouldAggregate)
-            .map(({ source }) => {
-                log.info(`Aggregating source before processing: ${source.name}`)
-                return aggregateManagedSource(deps, source.id, disableOptimization(source))
-            })
+    const sourcesToAggregate = aggregationChecks
+        .filter(({ shouldAggregate }) => shouldAggregate)
+        .map(({ source }) => source)
+
+    // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
+    // to prevent API rate limiting issues and memory spikes when triggering aggregation for many sources
+    await promiseAllBatched(
+        sourcesToAggregate,
+        (source) => {
+            log.info(`Aggregating source before processing: ${source.name}`)
+            return aggregateManagedSource(deps, source.id, disableOptimization(source))
+        }
     )
     log.debug('Pre-processing source aggregation completed')
 }
@@ -118,8 +127,11 @@ export async function aggregateDelayedSources(
 
     log.info(`Scheduling delayed aggregation for ${delayedSources.length} source(s)`)
 
-    await Promise.all(
-        delayedSources.map(async (source) => {
+    // ⚡ Bolt: Replace unbounded Promise.all mapping with bounded promiseAllBatched
+    // to prevent API rate limiting issues and memory spikes when scheduling delayed aggregations
+    await promiseAllBatched(
+        delayedSources,
+        async (source) => {
             const delayMinutes = source.config?.aggregationDelay ?? 5
             const disableOpt = coerceBoolean(source.config?.optimizedAggregation) === false
 
@@ -139,7 +151,7 @@ export async function aggregateDelayedSources(
                     }`
                 )
             }
-        })
+        }
     )
 }
 
