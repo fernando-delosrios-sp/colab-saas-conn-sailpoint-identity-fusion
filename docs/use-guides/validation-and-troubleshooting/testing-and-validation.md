@@ -27,12 +27,36 @@ These validate the replay adapter, step orchestration, and golden comparison log
 
 Written after record-mode account-list completes:
 
-- `version`, `recordedAt`, `operation` — artifact metadata
-- `sweepSummary` — `{ processed, exact, partial, deferred, nonMatch }` counts
-- `identityMatches` — identity-origin matches with candidate scores
-- `deferredMatches` — deferred candidate rows with per-attribute scores
-- `nonMatches` — analyzed non-match accounts
-- `failedMatches` — accounts where matching failed
+```json
+{
+  "version": "1",
+  "recordedAt": "2024-02-24T10:00:00.000Z",
+  "operation": "std:account:list",
+  "sweepSummary": {
+    "processed": 150,
+    "exact": 1,
+    "partial": 2,
+    "deferred": 0,
+    "nonMatch": 147
+  },
+  "identityMatches": [
+    {
+      "candidate": "2c918086...",
+      "score": 90,
+      "scores": {
+        "email": 100,
+        "name": 80
+      }
+    }
+  ],
+  "deferredMatches": [],
+  "nonMatches": [
+    "EMP-001",
+    "EMP-002"
+  ],
+  "failedMatches": []
+}
+```
 
 Record mode automatically enables managed-account report capture. Scenarios recorded before this artifact existed must be re-recorded.
 
