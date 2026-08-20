@@ -405,8 +405,10 @@ export class IdentityService {
             )
         }
 
-        await Promise.all(
-            targetIds.map((accountId) => this.correlateSingleAccount(fusionAccount, accountId, identityId, kind))
+        // ⚡ Bolt: Replace unbounded Promise.all with promiseAllBatched
+        await promiseAllBatched(
+            targetIds,
+            (accountId) => this.correlateSingleAccount(fusionAccount, accountId, identityId, kind)
         )
 
         return true
