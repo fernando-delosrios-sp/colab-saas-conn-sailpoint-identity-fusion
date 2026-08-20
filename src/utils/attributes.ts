@@ -322,20 +322,13 @@ export function buildAccountIdentifier(
     fallback: string = 'unknown'
 ): string {
     return (
-        trimOrUndefined(managedAccountId) ??
-        trimOrUndefined(nativeIdentity) ??
-        trimOrUndefined(attributes?.id) ??
-        trimOrUndefined(attributes?.uuid) ??
-        trimOrUndefined(identityId) ??
+        trimStr(managedAccountId) ??
+        trimStr(nativeIdentity) ??
+        trimStr(attributes?.id) ??
+        trimStr(attributes?.uuid) ??
+        trimStr(identityId) ??
         fallback
     )
-}
-
-/**
- * Trims a string and returns undefined if empty.
- */
-function trimOrUndefined(value: string | null | undefined): string | undefined {
-    return trimStr(value)
 }
 
 // SDK Account attribute helpers
