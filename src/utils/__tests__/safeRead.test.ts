@@ -14,6 +14,7 @@ import {
     readPathUnknown,
     readString,
     readUnknown,
+    readFirstUnknown,
     trimStr,
 } from '../safeRead'
 
@@ -65,6 +66,33 @@ describe('safeRead', () => {
         expect(readUnknown(undefined, 'obj')).toBeUndefined()
         expect(readArray<string>(source, 'ids')).toEqual(['a', 'b'])
         expect(readArray<string>(source, 'none', [])).toEqual([])
+    })
+
+    describe('readFirstUnknown', () => {
+        it('should return undefined if source is not a record', () => {
+            expect(readFirstUnknown(undefined, ['a'])).toBeUndefined()
+            expect(readFirstUnknown(null, ['a'])).toBeUndefined()
+            expect(readFirstUnknown('string', ['a'])).toBeUndefined()
+        })
+
+        it('should return undefined if keys array is empty', () => {
+            expect(readFirstUnknown({ a: 1 }, [])).toBeUndefined()
+        })
+
+        it('should return the first non-nullish value', () => {
+            const source = { a: null, b: undefined, c: 1, d: 2 }
+            expect(readFirstUnknown(source, ['a', 'b', 'c', 'd'])).toBe(1)
+        })
+
+        it('should fall back correctly if all values are missing/undefined', () => {
+            const source = { a: undefined }
+            expect(readFirstUnknown(source, ['a', 'b', 'c'])).toBeUndefined()
+        })
+
+        it('should preserve ?? behavior: return last evaluated if all are nullish (e.g. explicitly null)', () => {
+            const source = { a: undefined, b: null }
+            expect(readFirstUnknown(source, ['a', 'b'])).toBeNull()
+        })
     })
 
     it('reads nested paths safely', () => {

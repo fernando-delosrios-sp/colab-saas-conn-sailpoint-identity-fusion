@@ -1,5 +1,5 @@
 import { AccountV2025 as Account } from 'sailpoint-api-client'
-import { hasValue, isDefined, missing, readUnknown, trimStr } from './safeRead'
+import { hasValue, isDefined, missing, readFirstUnknown, trimStr } from './safeRead'
 
 /**
  * Attribute utility functions for picking, filtering, and transforming attributes.
@@ -229,7 +229,7 @@ export function extractArray<T = any>(attributes: Record<string, any>, key: stri
  * // Returns: Set()
  */
 export function extractObjectIdentifierValue(item: object): string | undefined {
-    const pick = readUnknown(item, 'id') ?? readUnknown(item, 'value') ?? readUnknown(item, 'name')
+    const pick = readFirstUnknown(item, ['id', 'value', 'name'])
     return hasValue(pick) ? String(pick) : undefined
 }
 
