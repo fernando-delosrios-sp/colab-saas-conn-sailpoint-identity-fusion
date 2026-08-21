@@ -1,0 +1,3 @@
+## 2024-05-24 - [Avoid Unbounded Promise.all over Sources]
+**Learning:** Using unbounded `Promise.all(managedSources.map(...))` or `Promise.all(delayedSources.map(...))` creates simultaneous promises for all elements. When processing many sources concurrently, this can lead to memory spikes and API rate limit exhaustion (since each source aggregation makes API calls to ISC).
+**Action:** Always replace unbounded `Promise.all` mapping over potentially large sets of sources with the `promiseAllBatched` utility from `fusionService/collections` to bound peak memory usage and concurrent API requests.
