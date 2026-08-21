@@ -465,19 +465,19 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 | ------------------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | **High false positives** | Many forms for obvious non-duplicates | Raise thresholds; add mandatory matches for critical attributes                                |
 | **High false negatives** | Missing obvious matches               | Lower thresholds; add more attributes; try different algorithms                                |
-| **Borderline cases**     | Many ambiguous matches                | Toggle **Enable automatic assignment** for obvious ones; manual review for borderline |
+| **Borderline cases**     | Many ambiguous matches                | Toggle **Enable automatic merge** for obvious ones; manual review for borderline |
 
 ![Similarity scores on review form - Detail view](../../assets/images/matching-algorithms-scores-form.png)
 
 ---
 
-## Automatic assignment
+## Automatic merge outcomes
 
 ### When to use
 
-**Enable automatic assignment** = Yes
+**Enable automatic merge** = Yes
 
-**Effect:** Candidates whose combined score meets or exceeds the **Automatic assignment match score** threshold are assigned to that identity without manual review.
+**Effect:** Candidates whose combined score meets or exceeds the **Automatic merge match score** threshold are assigned to that identity without manual review.
 
 | Enable when...                         | Keep disabled when...                   |
 | -------------------------------------- | --------------------------------------- |
@@ -486,7 +486,7 @@ With **minimum combined match score** 80 → potential match if all mandatory ru
 | Review burden is high (>50 forms/week) | You want manual approval for all merges |
 | Obvious matches are common             | Data quality is poor                    |
 
-**When it runs:** When **Enable automatic assignment** is enabled, the connector skips the review form when the candidate's combined score meets or exceeds the **Automatic assignment match score**.
+**When it runs:** When **Enable automatic merge** is enabled, the connector skips the review form when the candidate's combined score meets or exceeds the **Automatic merge match score**.
 
 ---
 
@@ -587,7 +587,7 @@ The rows below are **fictional** composites. **Source A** and **Source B** stand
 
 **Why it is ambiguous:** **Enhanced Name Matcher** is intended to relate common nickname ↔ legal pairs when comparing person-name attributes.
 
-**What to do:** Prefer **Enhanced Name Matcher** on `name` or `firstname`; add a second signal (DOB, email, employee ID) if automatic assignment must stay conservative.
+**What to do:** Prefer **Enhanced Name Matcher** on `name` or `firstname`; add a second signal (DOB, email, employee ID) if automatic merge must stay conservative.
 
 ### Multipart or cultural last-name variation
 
@@ -623,7 +623,7 @@ The rows below are **fictional** composites. **Source A** and **Source B** stand
 
 **Why it is ambiguous:** With **Skip match if missing** = Yes (default), rules on email/phone are **skipped** when Source A is empty, so the **combined score** rests on fewer signals—higher false positive or false negative risk depending on thresholds.
 
-**What to do:** Keep strong non-skipped rules (name + DOB) where populated; document reviewer expectations; consider **Skip match if missing** = No only for attributes you intentionally want to penalize when absent, understanding side effects on combined score and automatic assignment.
+**What to do:** Keep strong non-skipped rules (name + DOB) where populated; document reviewer expectations; consider **Skip match if missing** = No only for attributes you intentionally want to penalize when absent, understanding side effects on combined score and automatic merge.
 
 ### Weak signal on a non-critical attribute
 
@@ -715,7 +715,7 @@ Dates are notoriously poor candidates for pure string-matching algorithms due to
 3. **Test with samples** — Don't run on full dataset until thresholds are tuned
 4. **Monitor and adjust** — Track false positive/negative rates; iterate
 5. **Balance precision and recall** — Lower thresholds catch more matches but increase false positives
-6. **Consider automatic assignment** — Enable after tuning to reduce manual review burden
+6. **Consider automatic merge** — Enable after tuning to reduce manual review burden
 
 **Next steps:**
 
