@@ -1,0 +1,3 @@
+## 2024-05-18 - Simplifying Chained nullish Coalescing Operators
+**Learning:** Replaced chained `readUnknown(obj, 'a') ?? readUnknown(obj, 'b')` with `readFirstUnknown(obj, ['a', 'b'])`. When implementing `readFirstUnknown`, it's critical to ensure the loop returns the last evaluated value if all values are nullish. This preserves the exact behavior of `??`, which evaluates to the right-most value even if it is `null` or `undefined`.
+**Action:** When simplifying chained property access or coalescing operations, always implement a utility that accurately matches the fallback and evaluation behavior of the original operators.
