@@ -51,7 +51,8 @@ Recommended starting point for Match tuning (100–500 managed accounts is a pra
 {
   "dryRun": {
     "enabled": true,
-    "saveFile": true
+    "saveFile": true,
+    "sendEmail": ["reviewer@example.com"]
   }
 }
 ```
