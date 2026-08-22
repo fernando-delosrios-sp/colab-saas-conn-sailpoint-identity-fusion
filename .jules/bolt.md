@@ -1,0 +1,3 @@
+## 2024-05-17 - Bounding memory consumption when fetching managed accounts
+**Learning:** Found an unbounded `Promise.all` in `src/services/sourceService/managedAccountFetcher.ts` processing accounts for all managed sources simultaneously, which could cause memory spikes or API rate limit issues when fetching accounts from a large number of sources.
+**Action:** Replaced the unbounded `Promise.all` over `sourcesWithLimits.map` with `promiseAllBatched` (from `src/services/fusionService/collections.ts`), using a default batch size of 10 to limit concurrent source fetching and stabilize resource usage.
