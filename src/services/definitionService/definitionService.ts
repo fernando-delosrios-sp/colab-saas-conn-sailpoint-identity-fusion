@@ -805,42 +805,39 @@ export class DefinitionService {
     // Private — Unique Value Generation
     // ========================================================================
 
+    private async tryRegisterUniqueValue(definitionName: string, strValue: string): Promise<boolean> {
+        return this.locks.withLock(`unique:${definitionName}`, async () => {
+            const registeredValues = this.getUniqueValues(definitionName)
+            if (registeredValues.has(strValue)) return false
+            registeredValues.add(strValue)
+            return true
+        })
+    }
+
+    private debugUniqueGeneration(message: string): void {
+        if (this.log.getLogLevel?.() === 'debug') {
+            this.log.debug(message)
+        }
+    }
+
     private async generateUniqueAttributeValue(
         definition: UniqueAttributeDefinition,
         fusionAccount: FusionAccount,
         context: Record<string, any>
     ): Promise<any> {
-        const lockKey = `unique:${definition.name}`
+        const maxAttempts = this.maxAttempts ?? runtimeDefaults.maxAttempts
 
-        return await this.locks.withLock(lockKey, async () => {
-            const registeredValues = this.getUniqueValues(definition.name)
-            const maxAttempts = this.maxAttempts ?? runtimeDefaults.maxAttempts
+        if (definition.useIncrementalCounter) {
+            return await this.generateWithIncrementalCounter(definition, fusionAccount, context, maxAttempts)
+        }
 
-            if (definition.useIncrementalCounter) {
-                return await this.generateWithIncrementalCounter(
-                    definition,
-                    fusionAccount,
-                    context,
-                    registeredValues,
-                    maxAttempts
-                )
-            }
-
-            return await this.generateWithCollisionDisambiguation(
-                definition,
-                fusionAccount,
-                context,
-                registeredValues,
-                maxAttempts
-            )
-        })
+        return await this.generateWithCollisionDisambiguation(definition, fusionAccount, context, maxAttempts)
     }
 
     private async generateWithIncrementalCounter(
         definition: UniqueAttributeDefinition,
         fusionAccount: FusionAccount,
         context: Record<string, any>,
-        registeredValues: Set<string>,
         maxAttempts: number
     ): Promise<any> {
         const stateWrapper = this.getStateWrapper()
@@ -860,21 +857,19 @@ export class DefinitionService {
             }
             const value = result.value
             if (value === undefined || value === null) return undefined
-            this.log.debug(
+            this.debugUniqueGeneration(
                 `[${fusionAccount.name}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`
             )
 
-            const strValue =
-                typeof value === 'object' ? JSON.stringify(value) : String(value)
-            if (!registeredValues.has(strValue)) {
-                registeredValues.add(strValue)
-                this.log.debug(
+            const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
+            if (await this.tryRegisterUniqueValue(definition.name, strValue)) {
+                this.debugUniqueGeneration(
                     `Generated unique value (incremental) for attribute ${definition.name}: ${strValue}`
                 )
                 return value
             }
 
-            this.log.debug(
+            this.debugUniqueGeneration(
                 `Collision on incremental counter for ${definition.name}, retrying (attempt ${attempt + 1})`
             )
         }
@@ -891,7 +886,6 @@ export class DefinitionService {
         definition: UniqueAttributeDefinition,
         fusionAccount: FusionAccount,
         context: Record<string, any>,
-        registeredValues: Set<string>,
         maxAttempts: number
     ): Promise<any> {
         const counter = StateWrapper.getCounter()
@@ -911,25 +905,23 @@ export class DefinitionService {
             }
             const value = result.value
             if (value === undefined || value === null) return undefined
-            this.log.debug(
+            this.debugUniqueGeneration(
                 `[${fusionAccount.name}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`
             )
 
-            const strValue =
-                typeof value === 'object' ? JSON.stringify(value) : String(value)
-            if (!registeredValues.has(strValue)) {
-                registeredValues.add(strValue)
-                this.log.debug(
+            const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
+            if (await this.tryRegisterUniqueValue(definition.name, strValue)) {
+                this.debugUniqueGeneration(
                     `Generated unique value for attribute ${definition.name}: ${strValue}`
                 )
                 return value
             }
 
-            this.log.debug(
+            this.debugUniqueGeneration(
                 `Value ${strValue} already exists for unique attribute: ${definition.name}`
             )
             context.counter = padNumber(counter(), digits)
-            this.log.debug(
+            this.debugUniqueGeneration(
                 `Regenerating unique attribute: ${definition.name} (attempt ${attempt + 1})`
             )
         }
