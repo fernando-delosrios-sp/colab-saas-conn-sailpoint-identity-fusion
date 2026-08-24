@@ -2,7 +2,7 @@
  * connector-spec.json -> Attribute Matching Settings -> Matching Settings
  */
 import { bootstrapLog } from '../../../services/logService'
-import { assert, softAssert } from './assertLite'
+import { assert } from './assertLite'
 import { extractBoolean } from '../../../utils/attributes'
 import { migrateConfigKey } from '../migration'
 import type { MatchingSettingsSection, MatchingConfig } from '../../../model/config'
@@ -54,12 +54,6 @@ export function readSettings(raw: Record<string, unknown>): MatchingSettingsSect
             'Automatic merge match score (fusionAutoMergeScore) must be strictly greater than the minimum score for manual review (fusionManualReviewScore)'
         )
     }
-
-    softAssert(
-        matchingConfigs.length > 0,
-        'No matching configurations defined - fusion matching may not work correctly',
-        'warn'
-    )
 
     const fusionScoreMap = new Map<string, number>()
     for (const matchingConfig of matchingConfigs) {
