@@ -6,7 +6,7 @@ export const internalConfigClientService = {
     requestsPerSecondConstant: 100,
     pageSize: 250,
     tokenUrlPath: '/oauth/token',
-    processingWaitConstant: 60 * 1000,
+    processingWaitConstant: 250 * 1000,
     retriesConstant: 20,
     maxRetryDelayMs: 60000,
     retryJitterFactor: 0.3,

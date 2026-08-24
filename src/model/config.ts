@@ -413,8 +413,8 @@ export interface AdvancedConnectionSettingsSection {
     /**
      * Interval (in milliseconds) between keep-alive signals sent to the platform
      * during long-running account list and account update operations. Configured in
-     * seconds in the connector UI; converted to milliseconds internally. Lower values
-     * reduce timeout risk; higher values reduce keep-alive traffic.
+     * seconds in the connector UI; converted to milliseconds internally. Default 250
+     * seconds. Lower values reduce timeout risk; higher values reduce keep-alive traffic.
      */
     processingWait?: number
 
