@@ -14,6 +14,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 - **Uncorrelated match sweep stays responsive** — The managed-account sweep now yields the event loop at a bounded cadence during pre-scoring, outcome dispatch, and the deferred drain. Previously these loops awaited work that resolved without I/O, which only queues microtasks — Node drains those before running any timer, so a large sweep silenced STATUS, the platform keep-alive, and buffered log output for its full duration and the platform reset the aggregation. Most visible on first runs, where an empty identity pool sends every account through the deferred drain.
 - **Large Fetch cache registration stays responsive** — Identity and Fusion-account bulk ingest now yields between bounded chunks so operation heartbeat and platform keep-alive timers continue running. STATUS distinguishes cache registration from HTTP retrieval with `progress=… ingested`; this does not extend the platform command timeout.
 
+### 🔧 Improvements
+
+- **Uncorrelated sweep finishes review forms and non-matches faster** — After identity scoring, those outcomes can overlap up to the existing Fusion parallel batch cap (12 by default, or the managed-account batch size when it is lower). Automatic merges still apply one at a time. No new setting and no migration.
+
 ### ✨ New Features
 
 - **Event-loop watchdog** — Operations that run a keep-alive now sample the event loop and emit `WARN EVENT_LOOP blocked <duration>` when timers are starved, naming the phase, step, and progress counter on both sides of the gap, plus a worst-block summary when the operation ends. Warnings are also written unbuffered to stdout, since a blocked loop stops the logger draining its own buffer. See the observability reference.

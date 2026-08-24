@@ -31,6 +31,7 @@ import { resolveFusionMaxCandidatesForForm } from '../../data/config'
 import {
     promiseAllBatched,
     getScoringMaxConcurrency,
+    getFusionParallelBatchSize,
     getManagedAccountEventLoopYieldEvery,
 } from '../fusionService/collections'
 import { resolveAccountBeforeScoring } from './preScoreGate'
@@ -412,18 +413,24 @@ export class MatchOutcomeDispatcher {
         }
     }
 
-    private autoMergeCallbacks(): AutoMergeCallbacks {
+    private autoMergeCallbacks(
+        serializeExactMatch?: (work: () => Promise<FusionAccount | undefined>) => Promise<FusionAccount | undefined>
+    ): AutoMergeCallbacks {
         return {
-            handleExactMatch: (fusionAccount, account, identityId) =>
-                this.handleExactMatch(fusionAccount, account, identityId),
+            handleExactMatch: (fusionAccount, account, identityId) => {
+                const work = () => this.handleExactMatch(fusionAccount, account, identityId)
+                return serializeExactMatch ? serializeExactMatch(work) : work()
+            },
             getBestAutoAssignMatch: (matches) => this.getBestAutoAssignMatch(matches),
             resolveAutoMergeTargetId: (bestMatch) => this.resolveAutoMergeTargetId(bestMatch),
         }
     }
 
-    private identityResolutionCallbacks(): IdentityMatchResolutionCallbacks {
+    private identityResolutionCallbacks(
+        serializeExactMatch?: (work: () => Promise<FusionAccount | undefined>) => Promise<FusionAccount | undefined>
+    ): IdentityMatchResolutionCallbacks {
         return {
-            ...this.autoMergeCallbacks(),
+            ...this.autoMergeCallbacks(serializeExactMatch),
             scorePersistedAnchorsForAutoMerge: (fusionAccount, account) =>
                 this.scorePersistedAnchorsForAutoMerge(fusionAccount, account),
             handlePartialMatch: (fusionAccount, sourceInfo, account) =>
@@ -662,18 +669,30 @@ export class MatchOutcomeDispatcher {
                 this.scoringDeps()
             )
 
-            const yieldDispatch = createLoopYielder(getManagedAccountEventLoopYieldEvery(this.deps.config))
-            for (const scored of identityResults) {
-                run.recordAnalysis(scored.analysis)
-                const resolved = await this.dispatchOutcome(scored)
-                await yieldDispatch()
-                processedCount++
-                updateProgress()
-                if (resolved) {
-                    result.resolved.push(resolved)
-                    applyResolutionToSweepResult(this.deps.log, result, resolved.resolution)
-                }
+            let exactMatchTail = Promise.resolve()
+            const serializeExactMatch = (work: () => Promise<FusionAccount | undefined>) => {
+                const next = exactMatchTail.then(work, work)
+                exactMatchTail = next.then(
+                    () => undefined,
+                    () => undefined
+                )
+                return next
             }
+
+            await promiseAllBatched(
+                identityResults,
+                async (scored) => {
+                    run.recordAnalysis(scored.analysis)
+                    const resolved = await this.dispatchOutcome(scored, serializeExactMatch)
+                    processedCount++
+                    updateProgress()
+                    if (resolved) {
+                        result.resolved.push(resolved)
+                        applyResolutionToSweepResult(this.deps.log, result, resolved.resolution)
+                    }
+                },
+                getFusionParallelBatchSize(this.deps.config)
+            )
 
             const { resolved: drainResolved } = await this.runDeferredDrain(pendingDeferred, {
                 sweepResult: result,
@@ -745,7 +764,10 @@ export class MatchOutcomeDispatcher {
         return this.finalizeAuthoritativeNonMatch(fusionAccount)
     }
 
-    private async dispatchOutcome(scored: ManagedAccountMatchingResult): Promise<ResolvedMatch | undefined> {
+    private async dispatchOutcome(
+        scored: ManagedAccountMatchingResult,
+        serializeExactMatch?: (work: () => Promise<FusionAccount | undefined>) => Promise<FusionAccount | undefined>
+    ): Promise<ResolvedMatch | undefined> {
         const { analysis } = scored
         const { fusionAccount, account, sourceInfo, sourceType } = analysis
 
@@ -755,7 +777,7 @@ export class MatchOutcomeDispatcher {
                 account,
                 sourceInfo,
                 this.deps,
-                this.identityResolutionCallbacks()
+                this.identityResolutionCallbacks(serializeExactMatch)
             )
         }
 
