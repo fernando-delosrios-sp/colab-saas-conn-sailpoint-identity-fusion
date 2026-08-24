@@ -253,4 +253,221 @@ describe('MappingService selective targets', () => {
 
         expect(fusionAccount.attributes.jobTitle).toBe('Manager')
     })
+
+    it('Unmapped same-named key uses stored First found default', () => {
+        const firstConfig = { ...config, attributeMaps: [], attributeMerge: AttributeMergeMode.First } as any
+        const service = new MappingService(firstConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-1',
+                department: 'First found',
+            },
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-2',
+                department: 'Second',
+            },
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.department).toBe('First found')
+    })
+
+    it('Unmapped key uses Main account default', () => {
+        const mainConfig = { ...config, attributeMaps: [], attributeMerge: AttributeMergeMode.MainAccount } as any
+        const service = new MappingService(mainConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current[FusionAttribute.MainAccount] = 'src-1::native-2'
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-1',
+                department: 'Origin',
+            },
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-2',
+                department: 'Main',
+            },
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.department).toBe('Main')
+    })
+
+    it('Unmapped Main account miss does not take a sibling snapshot', () => {
+        const mainConfig = { ...config, attributeMaps: [], attributeMerge: AttributeMergeMode.MainAccount } as any
+        const service = new MappingService(mainConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current[FusionAttribute.MainAccount] = 'src-1::native-2'
+        fusionAccount.attributeBag.current.department = 'Stale'
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-1',
+                department: 'Other',
+            },
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-2',
+            },
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.department).not.toBe('Other')
+        expect(fusionAccount.attributeBag.current.department).toBeUndefined()
+    })
+
+    it('Overlay and control keys are not implicit targets', () => {
+        const service = new MappingService({ ...config, attributeMaps: [] } as any, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                schema: { name: 'account', id: 'native-1' },
+                nativeIdentity: 'native-1',
+                IIQDisabled: true,
+                department: 'HR',
+            },
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.source).toBeUndefined()
+        expect(fusionAccount.attributeBag.current.schema).toBeUndefined()
+        expect(fusionAccount.attributeBag.current.IIQDisabled).toBeUndefined()
+    })
+
+    it('Schema-only names are not mapping targets', () => {
+        const service = new MappingService({ ...config, attributeMaps: [] } as any, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.cloudLifecycleState = 'active'
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-1',
+                department: 'HR',
+            },
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.cloudLifecycleState).toBe('active')
+    })
+
+    it('Origin resolves through the index for identity-origin', () => {
+        const originConfig = {
+            ...config,
+            attributeMaps: [],
+            attributeMerge: AttributeMergeMode.OriginAccount,
+            sources: [{ name: 'Record Source' }],
+        } as any
+        const service = new MappingService(originConfig, mockLog)
+        const fusionAccount = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-1',
+            name: 'Fusion One',
+            sourceName: 'Identity Fusion',
+            identityId: 'identity-1',
+            attributes: {
+                originSource: 'Identities',
+                originAccount: 'identity-1',
+                statuses: ['baseline'],
+            },
+        } as any)
+        fusionAccount.addIdentityLayer({
+            id: 'identity-1',
+            name: 'identity-one',
+            attributes: { department: 'HR' },
+        } as any)
+        fusionAccount.attributeBag.sources.set('Record Source', [{ department: 'IT' }])
+        fusionAccount.setNeedsRefresh(true)
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.department).toBe('HR')
+    })
+
+    it('Main account can resolve to the Identities snapshot', () => {
+        const mainConfig = {
+            ...config,
+            attributeMaps: [],
+            attributeMerge: AttributeMergeMode.MainAccount,
+            sources: [{ name: 'Record Source' }],
+        } as any
+        const service = new MappingService(mainConfig, mockLog)
+        const fusionAccount = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-1',
+            name: 'Fusion One',
+            sourceName: 'Identity Fusion',
+            identityId: 'identity-1',
+            attributes: {
+                originSource: 'Identities',
+                originAccount: 'identity-1',
+                mainAccount: 'identity-1',
+                statuses: ['baseline'],
+            },
+        } as any)
+        fusionAccount.addIdentityLayer({
+            id: 'identity-1',
+            name: 'identity-one',
+            attributes: { department: 'HR' },
+        } as any)
+        fusionAccount.attributeBag.sources.set('Record Source', [{ department: 'IT' }])
+        fusionAccount.setNeedsRefresh(true)
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.department).toBe('HR')
+    })
+
+    it('Managed-origin row indexes Identities when the bag is present', () => {
+        const mainConfig = { ...config, attributeMaps: [], attributeMerge: AttributeMergeMode.MainAccount } as any
+        const service = new MappingService(mainConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.addIdentityLayer({
+            id: 'identity-1',
+            name: 'identity-one',
+            attributes: { department: 'HR' },
+        } as any)
+        fusionAccount.attributeBag.current[FusionAttribute.MainAccount] = 'identity-1'
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-1',
+                department: 'IT',
+            },
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.department).toBe('HR')
+    })
+
+    it('Selective map does not implicit-merge extra keys', () => {
+        const selectiveConfig = {
+            ...config,
+            attributeMaps: [{ newAttribute: 'employeeId', existingAttributes: ['emp_id'] }],
+        } as any
+        const service = new MappingService(selectiveConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.title = 'Kept'
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-1',
+                emp_id: 'E123',
+                title: 'Should not write',
+            },
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun(), { onlyTargets: new Set(['employeeId']) })
+
+        expect(fusionAccount.attributes.employeeId).toBe('E123')
+        expect(fusionAccount.attributeBag.current.title).toBe('Kept')
+    })
 })

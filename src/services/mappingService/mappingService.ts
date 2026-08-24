@@ -15,6 +15,15 @@ export interface MapAttributesOptions {
     onlyTargets?: ReadonlySet<string>
 }
 
+const IMPLICIT_KEY_DENYLIST = new Set<string>([
+    ...Object.values(FusionAttribute),
+    'id',
+    'name',
+    'source',
+    'schema',
+    'IIQDisabled',
+])
+
 function buildSnapshotIndex(sourceAttributeMap: Map<string, Attributes[]>): Map<string, Attributes> {
     const index = new Map<string, Attributes>()
     for (const accounts of sourceAttributeMap.values()) {
@@ -28,6 +37,24 @@ function buildSnapshotIndex(sourceAttributeMap: Map<string, Attributes[]>): Map<
     return index
 }
 
+function collectUnmappedSnapshotKeys(
+    sourceAttributeMap: Map<string, Attributes[]>,
+    explicitTargets: ReadonlySet<string>
+): string[] {
+    const names = new Set<string>()
+    for (const accounts of sourceAttributeMap.values()) {
+        for (const account of accounts) {
+            if (!account || typeof account !== 'object') continue
+            for (const key of Object.keys(account)) {
+                if (!IMPLICIT_KEY_DENYLIST.has(key) && !explicitTargets.has(key)) {
+                    names.add(key)
+                }
+            }
+        }
+    }
+    return [...names]
+}
+
 export class MappingService {
     private cachedAttributeMappingConfig?: Map<string, AttributeMappingConfig>
     private readonly attributeMaps?: AttributeMap[]
@@ -38,7 +65,7 @@ export class MappingService {
 
     constructor(
         config: FusionConfig,
-        private log: LogService
+        _log: LogService
     ) {
         this.attributeMaps = config.attributeMaps
         this.attributeMerge = config.attributeMerge
@@ -69,18 +96,53 @@ export class MappingService {
         }
 
         const attributes = { ...attributeBag.current }
-        const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some((accounts) => accounts.length > 0)
-        const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
         let sourceOrder = this.sourceOrder
-        if (fusionAccount.originSource === IDENTITIES_SOURCE_NAME) {
-            sourceOrder = [...this.sourceOrder, IDENTITIES_SOURCE_NAME]
-            sourceAttributeMap.set(IDENTITIES_SOURCE_NAME, [attributeBag.identity])
+        const identityBag = attributeBag.identity
+        const identityPresent = Object.keys(identityBag).length > 0
+        if (identityPresent) {
+            sourceAttributeMap.set(IDENTITIES_SOURCE_NAME, [identityBag])
+            if (!sourceOrder.includes(IDENTITIES_SOURCE_NAME)) {
+                sourceOrder = [...sourceOrder, IDENTITIES_SOURCE_NAME]
+            }
         }
 
+        const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some((accounts) => accounts.length > 0)
+        const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
         const snapshotIndex = buildSnapshotIndex(sourceAttributeMap)
+        if (identityPresent) {
+            const identityId = trimStr(fusionAccount.identityId) ?? trimStr(identityBag.id)
+            if (identityId) {
+                snapshotIndex.set(identityId, identityBag)
+            }
+        }
         const originSnapshot = this.getOriginAccountContextAccount(fusionAccount, snapshotIndex)
         let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, snapshotIndex)
         const mappingTargets = this.mappingTargetNames
+        const explicitTargetSet = new Set(mappingTargets)
+
+        const applyMappedValue = (attribute: string, processedValue: unknown): void => {
+            if (processedValue === undefined) {
+                if (fusionAccount.isIdentity && fusionAccount.attributeBag.identity[attribute] !== undefined) {
+                    attributes[attribute] = fusionAccount.attributeBag.identity[attribute]
+                } else if (!shouldPreserveCurrentWithoutContext) {
+                    delete attributes[attribute]
+                }
+                if (attribute === FusionAttribute.MainAccount) {
+                    delete attributes[attribute]
+                    prioritizedAccount = undefined
+                }
+                return
+            }
+
+            attributes[attribute] = processedValue
+            if (attribute === FusionAttribute.MainAccount) {
+                const mainAccountId = trimStr(processedValue)
+                prioritizedAccount = mainAccountId ? snapshotIndex.get(mainAccountId) : undefined
+            }
+            if (attribute === FusionAttribute.History) {
+                this.applyHistoryMapping(processedValue, fusionAccount)
+            }
+        }
 
         for (const attribute of mappingTargets) {
             if (options?.onlyTargets && !options.onlyTargets.has(attribute)) {
@@ -92,34 +154,31 @@ export class MappingService {
             }
 
             const processingConfig = this.attributeMappingConfig.get(attribute)!
-            const processedValue = processAttributeMapping(
-                processingConfig,
-                sourceAttributeMap,
-                sourceOrder,
-                prioritizedAccount,
-                originSnapshot
+            applyMappedValue(
+                attribute,
+                processAttributeMapping(
+                    processingConfig,
+                    sourceAttributeMap,
+                    sourceOrder,
+                    prioritizedAccount,
+                    originSnapshot
+                )
             )
+        }
 
-            if (processedValue === undefined) {
-                if (fusionAccount.isIdentity && fusionAccount.attributeBag.identity[attribute] !== undefined) {
-                    attributes[attribute] = fusionAccount.attributeBag.identity[attribute]
-                } else if (!shouldPreserveCurrentWithoutContext) {
-                    delete attributes[attribute]
-                }
-                if (attribute === FusionAttribute.MainAccount) {
-                    delete attributes[attribute]
-                    prioritizedAccount = undefined
-                }
-                continue
-            }
-
-            attributes[attribute] = processedValue
-            if (attribute === FusionAttribute.MainAccount) {
-                const mainAccountId = trimStr(processedValue)
-                prioritizedAccount = mainAccountId ? snapshotIndex.get(mainAccountId) : undefined
-            }
-            if (attribute === FusionAttribute.History) {
-                this.applyHistoryMapping(processedValue, fusionAccount)
+        if (!options?.onlyTargets) {
+            for (const attribute of collectUnmappedSnapshotKeys(sourceAttributeMap, explicitTargetSet)) {
+                const processingConfig = buildAttributeMappingConfig(attribute, this.attributeMaps, this.attributeMerge)
+                applyMappedValue(
+                    attribute,
+                    processAttributeMapping(
+                        processingConfig,
+                        sourceAttributeMap,
+                        sourceOrder,
+                        prioritizedAccount,
+                        originSnapshot
+                    )
+                )
             }
         }
 
@@ -171,15 +230,6 @@ export class MappingService {
     ): Attributes | undefined {
         const originAccountId = trimStr(fusionAccount.originAccountId)
         if (!originAccountId) return undefined
-
-        if (fusionAccount.originSource === IDENTITIES_SOURCE_NAME) {
-            const identity = fusionAccount.attributeBag.identity
-            const identityId = trimStr(fusionAccount.identityId) ?? trimStr(identity.id)
-            if (identityId !== originAccountId || Object.keys(identity).length === 0) {
-                return undefined
-            }
-            return identity
-        }
 
         return snapshotIndex.get(originAccountId)
     }
