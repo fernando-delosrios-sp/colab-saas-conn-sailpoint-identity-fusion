@@ -30,9 +30,11 @@ export async function resolveAccountBeforeScoring(
     const managedAccountKey = getManagedAccountKeyFromAccount(account)
 
     if (callbacks.isCorrelatedManagedAccountLinkedInFusion(account)) {
-        log.info(
-            `Dropping managed account already linked in Fusion from work queue: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
-        )
+        if (log.getLogLevel() === 'debug') {
+            log.debug(
+                `Dropping managed account already linked in Fusion from work queue: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
+            )
+        }
         run.claimAccount(managedAccountKey!, account.identityId)
         return { action: 'skip-linked' }
     }
@@ -59,9 +61,11 @@ export async function resolveAccountBeforeScoring(
     }
 
     if (account.uncorrelated === false) {
-        log.info(
-            `Correlated managed account not linked to Fusion; treating as non-match: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
-        )
+        if (log.getLogLevel() === 'debug') {
+            log.debug(
+                `Correlated managed account not linked to Fusion; treating as non-match: ${account.name} [${account.sourceName}] (${managedAccountKey ?? 'no-key'}) identityId=${account.identityId}`
+            )
+        }
         const fusionAccount = await accountAssembly.assembleManagedAccount(account)
         const orphanIdentityId = account.identityId
         if (orphanIdentityId) {

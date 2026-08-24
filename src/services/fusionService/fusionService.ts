@@ -740,17 +740,24 @@ export class FusionService {
             action: 'correlated account sweep',
             count: correlatedAccounts.length,
         })
+        let droppedLinked = 0
         await batchProcess(
             correlatedAccounts,
             'Correlated managed accounts',
-            (account) => this.processManagedAccount(account),
+            async (account) => {
+                if (isManagedAccountLinkedInFusion(account, this.run)) {
+                    droppedLinked++
+                }
+                return this.processManagedAccount(account)
+            },
             this.config,
             this.log,
             this.run.managedAccountProcessingBatchSize
         )
         this.log.detail({
             action: 'correlated account sweep complete',
-            queued: map.size,
+            droppedLinked,
+            remaining: map.size,
         })
     }
 
