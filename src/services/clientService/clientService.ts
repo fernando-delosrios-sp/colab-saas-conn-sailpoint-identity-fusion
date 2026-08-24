@@ -25,10 +25,14 @@ class OffsetPageScheduler<T> {
     private yieldIndex = 0
     private readonly completed = new Map<number, T[]>()
     private readonly inFlight = new Map<number, Promise<void>>()
+    /** First page error, recorded so no task rejection is left unobserved. */
+    private failure?: unknown
+    /** Never below 1: a zero window would leave the scheduler unable to schedule any page. */
+    private readonly window: number
 
     constructor(
         private readonly offsets: number[],
-        private readonly windowSize: number,
+        windowSize: number,
         initialLoaded: number,
         private readonly progressTotal: number | undefined,
         private readonly fetchPage: (offset: number) => Promise<T[] | undefined>,
@@ -37,10 +41,11 @@ class OffsetPageScheduler<T> {
         private readonly abortSignal?: AbortSignal
     ) {
         this.loaded = initialLoaded
+        this.window = Math.max(1, windowSize)
     }
 
     private pump(): void {
-        while (this.inFlight.size < this.windowSize && this.scheduleIndex < this.offsets.length) {
+        while (this.inFlight.size < this.window && this.scheduleIndex < this.offsets.length) {
             const offset = this.offsets[this.scheduleIndex++]
             const task = (async () => {
                 if (this.abortSignal?.aborted) {
@@ -53,9 +58,15 @@ class OffsetPageScheduler<T> {
                 this.completed.set(offset, page)
                 this.loaded += page.length
                 this.onPageComplete(this.loaded, this.progressTotal)
-            })().finally(() => {
-                this.inFlight.delete(offset)
-            })
+            })()
+                // Promise.race only settles on the first promise, so a sibling's rejection
+                // would otherwise go unobserved and terminate the process.
+                .catch((error: unknown) => {
+                    this.failure ??= error
+                })
+                .finally(() => {
+                    this.inFlight.delete(offset)
+                })
             this.inFlight.set(offset, task)
         }
     }
@@ -66,6 +77,9 @@ class OffsetPageScheduler<T> {
         while (this.yieldIndex < this.offsets.length || this.inFlight.size > 0) {
             if (this.abortSignal?.aborted) {
                 return
+            }
+            if (this.failure !== undefined) {
+                throw this.failure
             }
 
             while (this.yieldIndex < this.offsets.length) {
@@ -85,10 +99,19 @@ class OffsetPageScheduler<T> {
                 break
             }
 
-            if (this.inFlight.size > 0) {
-                await Promise.race(Array.from(this.inFlight.values()))
-                this.pump()
+            if (this.inFlight.size === 0) {
+                // Every offset has been scheduled and settled, yet the next page in
+                // sequence never landed. Continuing here would spin without awaiting
+                // and starve the event loop for the remainder of the operation.
+                throw this.fail(this.offsets[this.yieldIndex], this.loaded)
             }
+
+            await Promise.race(Array.from(this.inFlight.values()))
+            this.pump()
+        }
+
+        if (this.failure !== undefined) {
+            throw this.failure
         }
     }
 }
