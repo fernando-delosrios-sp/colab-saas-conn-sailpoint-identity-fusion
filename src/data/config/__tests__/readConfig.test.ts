@@ -225,6 +225,12 @@ describe('safeReadConfig heartbeat interval', () => {
         vi.mocked(readConfig).mockResolvedValue(minimalPlatformConfig as never)
     })
 
+    it('defaults processingWait to 250 seconds when omitted', async () => {
+        const config = await safeReadConfig()
+
+        expect(config.processingWait).toBe(250_000)
+    })
+
     it('defaults statsLoggingIntervalMs to 10 seconds when heartbeatInterval omitted', async () => {
         const config = await safeReadConfig()
 

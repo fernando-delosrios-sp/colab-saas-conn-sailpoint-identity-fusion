@@ -12,7 +12,7 @@ export const connectorSpecInitialValues = {
     requestsPerSecond: 10,
     maxConcurrentRequests: 20,
     parallelBatchSize: 16,
-    processingWait: 60,
+    processingWait: 250,
     heartbeatInterval: 10,
 } as const
 

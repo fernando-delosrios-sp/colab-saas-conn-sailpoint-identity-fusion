@@ -42,7 +42,7 @@ Some settings also appear in **Connection Settings** — they control the same v
 | Field | Default | Range | Purpose |
 | --- | --- | --- | --- |
 | **Provisioning timeout (seconds)** | 300 | 60–3600 | Max in-flight HTTP time per queue execution attempt |
-| **Processing wait time (seconds)** | 60 | 0–600 | Keep-alive interval during long account list/update |
+| **Processing wait time (seconds)** | 250 | 0–600 | Keep-alive interval during long account list/update |
 | **Heartbeat interval (seconds)** | 10 | 5+ | How often `STATUS` and `EVENT_SUMMARY` lines emit |
 
 **Provisioning timeout by volume:**

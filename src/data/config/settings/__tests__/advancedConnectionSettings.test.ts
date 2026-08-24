@@ -33,6 +33,13 @@ describe('advancedConnectionSettings readSettings', () => {
         expect(result.enablePriority).toBe(false)
     })
 
+    it('defaults processingWait to 250 seconds when omitted', () => {
+        const result = readSettings({})
+
+        expect(result.processingWait).toBe(250_000)
+        expect(result.processingWait).toBe(runtimeDefaults.processingWait)
+    })
+
     it('defaults statsLoggingIntervalMs to 10 seconds when heartbeatInterval omitted', () => {
         const result = readSettings({})
 
@@ -48,5 +55,9 @@ describe('advancedConnectionSettings readSettings', () => {
 
     it('connectorSpecInitialValues heartbeatInterval matches runtime default', () => {
         expect(connectorSpecInitialValues.heartbeatInterval * 1000).toBe(runtimeDefaults.statsLoggingIntervalMs)
+    })
+
+    it('connectorSpecInitialValues processingWait matches runtime default', () => {
+        expect(connectorSpecInitialValues.processingWait * 1000).toBe(runtimeDefaults.processingWait)
     })
 })
