@@ -66,7 +66,13 @@ function runVerification(scenarioRefInput) {
 
     const result = spawnSync(
         'npx',
-        ['vitest', 'run', 'src/operations/__tests__/scenario/verifyRecording.cli.test.ts'],
+        [
+            'vitest',
+            'run',
+            '--config',
+            'vitest.scenario.config.ts',
+            'src/operations/__tests__/scenario/verifyRecording.cli.test.ts',
+        ],
         {
             env: verifyEnv,
             stdio: 'inherit',

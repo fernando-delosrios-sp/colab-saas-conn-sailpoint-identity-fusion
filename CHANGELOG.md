@@ -18,6 +18,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 - **Event-loop watchdog** — Operations that run a keep-alive now sample the event loop and emit `WARN EVENT_LOOP blocked <duration>` when timers are starved, naming the phase, step, and progress counter on both sides of the gap, plus a worst-block summary when the operation ends. Warnings are also written unbuffered to stdout, since a blocked loop stops the logger draining its own buffer. See the observability reference.
 
+### 📚 Documentation
+
+- **Scenario recording Vitest is opt-in** — `npm test` no longer discovers files under `src/operations/__tests__/scenario/`. Use `npm run test:scenario` for that suite. Named golden replay of one recording is unchanged: `npm run test-recording -- tenant/scenario`.
+
 ---
 
 ## 2026-08-17

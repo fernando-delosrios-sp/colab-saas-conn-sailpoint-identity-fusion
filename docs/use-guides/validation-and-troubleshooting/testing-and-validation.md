@@ -17,11 +17,10 @@ Artifact schemas and External Settings field reference: [Scenario recording](../
 ### Harness unit tests (no recordings required)
 
 ```bash
-npm test -- src/operations/__tests__/scenario/chain.replay.test.ts
-npm test -- src/operations/__tests__/scenario/orchestrator.integration.test.ts
+npm run test:scenario
 ```
 
-These validate the replay adapter, step orchestration, and golden comparison logic using in-repo fixtures.
+This runs every Vitest file under `src/operations/__tests__/scenario/` (fixture harness tests plus env-gated recording replays). Do not pass those paths to `npm test`; the global suite excludes that folder. Named golden replay of one on-disk recording remains `npm run test-recording -- tenant/scenario`.
 
 ### `reports/matching-results.json` schema
 

@@ -70,9 +70,10 @@ When all 5 hold → proactively suggest "ready to `/opsx:propose`?" — wait for
 | Command | Purpose |
 |---------|---------|
 | `npm run build` | Clean + sync spec + bundle with ncc to `dist/` |
-| `npm test` | Run Vitest suite (all `__tests__/**/*.test.ts`) |
-| `npm run test:watch` | Vitest in watch mode |
-| `npm run test:coverage` | Vitest with v8 coverage |
+| `npm test` | Run the global Vitest suite (excludes `src/operations/__tests__/scenario/`) |
+| `npm run test:scenario` | Run the scenario recording Vitest suite (`src/operations/__tests__/scenario/**/*.test.ts`) |
+| `npm run test:watch` | Vitest in watch mode (global suite) |
+| `npm run test:coverage` | Vitest with v8 coverage (global suite) |
 | `npm run lint` | ESLint + connector-spec help check + knip (dead code check) |
 | `npm run lint:markdown` | markdownlint on README + docs |
 | `npm run lint:docs-guides` | Use-guide IA check (duplicate headings, owned sections) |

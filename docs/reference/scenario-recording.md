@@ -142,10 +142,10 @@ npm run refresh-recording-reports -- "company12926-poc/fernando"
 
 ## Harness unit tests
 
-No local recordings required:
+No local recordings required. Use the scenario recording suite, not `npm test`:
 
 ```bash
-npm test -- src/operations/__tests__/scenario/chain.replay.test.ts
+npm run test:scenario
 ```
 
 ---
