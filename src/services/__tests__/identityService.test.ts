@@ -29,7 +29,15 @@ function makeClient(searchResultsByQuery: Record<string, IdentityDocument[]> = {
             }
             return _fn({ search: { searchPost: vi.fn() } })
         }),
-        paginateSearchApiGenerator: vi.fn(),
+        paginateSearchApiGenerator: vi.fn(async function* (search: any, _priority, _context, _abortSignal, onPageProgress) {
+            const items = searchResultsByQuery[search?.query?.query ?? ''] ?? []
+            const pageSize = 250
+            for (let start = 0; start < items.length; start += pageSize) {
+                const page = items.slice(start, start + pageSize)
+                onPageProgress?.(start + page.length, items.length)
+                yield page
+            }
+        }),
     } as unknown as ClientServiceStub
 }
 
@@ -39,6 +47,8 @@ function makeLog(): LogService {
         debug: vi.fn(),
         warn: vi.fn(),
         error: vi.fn(),
+        detail: vi.fn(),
+        setProgress: vi.fn(),
         assert: vi.fn(),
         getLogLevel: vi.fn().mockReturnValue('info'),
         recordCorrelationActivity: vi.fn(),
@@ -65,13 +75,13 @@ function makeConfig(overrides: Partial<FusionConfig> = {}): FusionConfig {
 function makeService(overrides: {
     config?: Partial<FusionConfig>
     searchResultsByQuery?: Record<string, IdentityDocument[]>
-} = {}): { service: IdentityService; client: ClientServiceStub } {
+} = {}): { service: IdentityService; client: ClientServiceStub; log: LogService } {
     const log = makeLog()
     const client = makeClient(overrides.searchResultsByQuery)
     const sources = makeSources()
     const config = makeConfig(overrides.config)
     const service = new IdentityService(config, log, client as unknown as ClientService, sources as unknown as SourceService, new FusionRun())
-    return { service, client }
+    return { service, client, log }
 }
 
 describe('IdentityService.hasIdentityInScope', () => {
@@ -88,6 +98,41 @@ describe('IdentityService.hasIdentityInScope', () => {
 })
 
 describe('IdentityService.fetchIdentities with identityScopeQuery', () => {
+    it('yields during large identity bulk ingest and reports ingested progress', async () => {
+        const identities = Array.from({ length: 501 }, (_, index) => makeIdentity(`id-${index}`))
+        const { service, log, client } = makeService({
+            config: { identityScopeQuery: '*' },
+            searchResultsByQuery: { '*': identities },
+        })
+        ;(client.paginateSearchApiGenerator as Mock).mockImplementation(
+            async function* (_search: any, _priority: any, _context: any, _abortSignal: any, onPageProgress: any) {
+                onPageProgress?.(identities.length, identities.length)
+                yield identities
+            }
+        )
+        const setImmediateSpy = vi.spyOn(global, 'setImmediate')
+
+        await service.fetchIdentities()
+
+        expect(setImmediateSpy).toHaveBeenCalledTimes(3)
+        expect(log.detail).toHaveBeenCalledWith({ action: 'ingesting identities', count: 501 })
+        expect(log.setProgress).toHaveBeenLastCalledWith(501, 501, 'ingested')
+        expect(service.hasIdentityInScope('id-500')).toBe(true)
+        setImmediateSpy.mockRestore()
+    })
+
+    it('skips ingested progress for an empty identity result', async () => {
+        const { service, log } = makeService({
+            config: { identityScopeQuery: '*' },
+            searchResultsByQuery: { '*': [] },
+        })
+
+        await service.fetchIdentities()
+
+        expect(log.setProgress).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), 'ingested')
+        expect(log.detail).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'ingesting identities' }))
+    })
+
     it('marks identities returned by the scope query as in-scope', async () => {
         const { service } = makeService({
             config: { identityScopeQuery: 'source.name:Employees' },
@@ -132,7 +177,8 @@ describe('IdentityService.isIdentityInScope', () => {
         await service.fetchIdentities()
 
         await expect(service.isIdentityInScope('id-1')).resolves.toBe(true)
-        expect(client.call).toHaveBeenCalledTimes(1)
+        expect(client.paginateSearchApiGenerator).toHaveBeenCalledTimes(1)
+        expect(client.call).not.toHaveBeenCalled()
     })
 
     it('returns false without search when fetchIdentities already resolved scope', async () => {
@@ -146,7 +192,8 @@ describe('IdentityService.isIdentityInScope', () => {
         await service.fetchIdentities()
 
         await expect(service.isIdentityInScope('id-out')).resolves.toBe(false)
-        expect(client.call).toHaveBeenCalledTimes(1)
+        expect(client.paginateSearchApiGenerator).toHaveBeenCalledTimes(1)
+        expect(client.call).not.toHaveBeenCalled()
     })
 
     it('uses a targeted scoped search when the scope set has not been loaded', async () => {

@@ -8,6 +8,7 @@ import { wrapConnectorError } from '../utils/error'
 import { FusionAccount } from '../model/account'
 import { SourceService } from './sourceService'
 import { FusionRun } from '../model/fusionRun'
+import { forEachChunked } from '../utils/yieldToEventLoop'
 
 // ============================================================================
 // Constants
@@ -136,6 +137,9 @@ export class IdentityService {
     /**
      * Fetch identities and cache them
      */
+    /**
+     * Fetches scoped identities and bulk-ingests search pages without blocking operation timers.
+     */
     public async fetchIdentities(additionalIdentityIds?: string[]): Promise<void> {
         if (!this.includeIdentities && !additionalIdentityIds?.length) {
             this.log.info('Skipping identity fetch.')
@@ -148,25 +152,47 @@ export class IdentityService {
             const query = buildIdentityQuery(this.identityScopeQuery)
 
             await wrapConnectorError(async () => {
-                const identities = await this.client.call<IdentityDocument>(
-                    searchPostPaginated,
-                    {
-                        paginate: { mode: 'searchAfter', search: query as any },
-                        priority: QueuePriority.HIGH,
-                        context: 'IdentityService>fetchIdentities searchPost',
-                        onPageProgress: (loaded, total) =>
-                            this.log.setProgress(loaded, total ?? loaded, 'fetched'),
-                    }
-                )
                 this.run.clearIdentities()
-                for (const identity of identities) {
-                    if (!identity.protected) {
-                        this.run.addIdentity(identity.id, identity)
+                this.identityIdsInScope = new Set()
+
+                let ingested = 0
+                let knownTotal: number | undefined
+                let ingestDetailLogged = false
+                const pages = this.client.paginateSearchApiGenerator<IdentityDocument>(
+                    query,
+                    QueuePriority.HIGH,
+                    'IdentityService>fetchIdentities searchPost',
+                    undefined,
+                    (loaded, total) => {
+                        knownTotal = total
+                        this.log.setProgress(loaded, total ?? loaded, 'fetched')
                     }
-                }
-                this.identityIdsInScope = new Set(
-                    identities.filter((identity) => !identity.protected).map((identity) => identity.id)
                 )
+
+                for await (const page of pages) {
+                    if (!ingestDetailLogged && knownTotal && knownTotal > 0) {
+                        this.log.detail({ action: 'ingesting identities', count: knownTotal })
+                        ingestDetailLogged = true
+                    }
+
+                    const pageStart = ingested
+                    await forEachChunked(
+                        page,
+                        (identity) => {
+                            if (!identity.protected) {
+                                this.run.addIdentity(identity.id, identity)
+                                this.identityIdsInScope.add(identity.id)
+                            }
+                        },
+                        {
+                            onProgress: (pageDone) => {
+                                const done = pageStart + pageDone
+                                this.log.setProgress(done, knownTotal ?? done, 'ingested')
+                            },
+                        }
+                    )
+                    ingested += page.length
+                }
                 this.identityScopeFetchCompleted = true
             }, `Failed to fetch identities using scope query "${this.identityScopeQuery}"`)
         } else if (this.includeIdentities) {

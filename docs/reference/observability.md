@@ -59,6 +59,16 @@ During long `accountList` aggregations, the connector emits standardized text pr
 | `EPILOGUE` | Info | Report epilogue (`START` / `END elapsed=…`; not a numbered phase) |
 | `METRIC` | Info | Phase/step timing metrics |
 
+### STATUS progress units
+
+The `progress=done/total unit` segment distinguishes the kind of pipeline work:
+
+- `fetched` — HTTP pages retrieved from ISC.
+- `ingested` — already-fetched identity documents or Fusion accounts registered into operation-run caches.
+- Other phase-specific units such as `processed`, `analyzed`, or `sent` describe later pipeline work.
+
+Bulk ingest remains in the Fetch phase but uses `ingested` so operators can distinguish API retrieval from CPU-bound cache registration. The first STATUS tick after a unit change omits the delta; later ticks show the interval delta normally. Ingest start may also emit `DETAIL action=ingesting identities count=N` or `DETAIL action=ingesting fusion-accounts count=N`. There is no separate `INGEST` line kind.
+
 ## Correlation activity format
 
 Used in `EVENT_SUMMARY`, `PHASE END`, and Output/Epilogue `STATUS` lines:

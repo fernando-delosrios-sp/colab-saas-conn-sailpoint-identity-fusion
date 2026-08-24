@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-08-24
+
+### 🐛 Fixes
+
+- **Large Fetch cache registration stays responsive** — Identity and Fusion-account bulk ingest now yields between bounded chunks so operation heartbeat and platform keep-alive timers continue running. STATUS distinguishes cache registration from HTTP retrieval with `progress=… ingested`; this does not extend the platform command timeout.
+
+---
+
 ## 2026-08-17
 
 ### ⚠️ Breaking Changes

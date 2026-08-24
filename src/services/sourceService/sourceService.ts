@@ -11,6 +11,7 @@ import { SourceInfo } from './types'
 import { buildIscAccountsQueryFilter } from './accountFilters'
 import { FusionRun } from '../../model/fusionRun'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { forEachChunked } from '../../utils/yieldToEventLoop'
 import {
     fetchAllSources as fetchAllSourcesImpl,
     validateAccountJmespathFilters as validateAccountJmespathFiltersImpl,
@@ -405,19 +406,46 @@ export class SourceService {
         )
     }
 
+    /**
+     * Fetches Fusion accounts and bulk-ingests each page without blocking operation timers.
+     */
     public async fetchFusionAccounts(): Promise<void> {
         this.log.debug('Fetching fusion accounts')
         await wrapConnectorError(async () => {
-            const accounts: Account[] = []
+            this.fusionAccountsByNativeIdentity = new Map()
+            let ingested = 0
+            let knownTotal: number | undefined
+            let ingestDetailLogged = false
+
             for await (const batch of this.fetchAccountsBySourceIdGenerator(
                 this.fusionSourceId,
                 undefined,
                 undefined,
-                (loaded, total) => this.log.setProgress(loaded, total ?? loaded, 'fetched')
+                (loaded, total) => {
+                    knownTotal = total
+                    this.log.setProgress(loaded, total ?? loaded, 'fetched')
+                }
             )) {
-                accounts.push(...batch)
+                if (!ingestDetailLogged && knownTotal && knownTotal > 0) {
+                    this.log.detail({ action: 'ingesting fusion-accounts', count: knownTotal })
+                    ingestDetailLogged = true
+                }
+
+                const pageStart = ingested
+                await forEachChunked(
+                    batch,
+                    (account) => {
+                        this.fusionAccountsByNativeIdentity!.set(account.nativeIdentity!, account)
+                    },
+                    {
+                        onProgress: (pageDone) => {
+                            const done = pageStart + pageDone
+                            this.log.setProgress(done, knownTotal ?? done, 'ingested')
+                        },
+                    }
+                )
+                ingested += batch.length
             }
-            this.fusionAccountsByNativeIdentity = new Map(accounts.map((account) => [account.nativeIdentity!, account]))
             this.log.debug(`Fetched ${this.fusionAccountsByNativeIdentity.size} fusion account(s)`)
         }, 'Failed to fetch fusion accounts from the fusion source')
     }

@@ -25,6 +25,7 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         info: vi.fn(),
         warn: vi.fn(),
         error: vi.fn(),
+        detail: vi.fn(),
         setProgress: vi.fn(),
     }
     const client: any = {
@@ -126,6 +127,7 @@ describe('SourceService Accounts JMESPath filter', () => {
         expect(log.setProgress).toHaveBeenCalledWith(100, 300, 'fetched')
         expect(log.setProgress).toHaveBeenCalledWith(200, 300, 'fetched')
         expect(log.setProgress).toHaveBeenCalledWith(300, 300, 'fetched')
+        expect(log.setProgress).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), 'ingested')
     })
 
     it('aggregates fetch progress across concurrent managed sources on each page callback', async () => {
@@ -216,6 +218,58 @@ describe('SourceService Accounts JMESPath filter', () => {
 
         expect(() => service.validateAccountJmespathFilters()).toThrow(
             'Invalid Accounts JMESPath filter for source "HR Source"'
+        )
+    })
+})
+
+describe('SourceService.fetchFusionAccounts bulk ingest', () => {
+    it('registers each page before requesting the next and reports ingested progress', async () => {
+        const { service, log } = createService()
+        ;(service as any).fusionSourceIdValue = 'fusion-source-id'
+        const setImmediateSpy = vi.spyOn(global, 'setImmediate')
+
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(
+            async function* (_sourceId, _abort, _limit, onPageProgress) {
+                onPageProgress?.(2, 3)
+                yield [
+                    { id: 'f1', nativeIdentity: 'native-1' } as any,
+                    { id: 'f2', nativeIdentity: 'native-2' } as any,
+                ]
+                expect(service.fusionAccountsByNativeIdentity?.has('native-1')).toBe(true)
+                onPageProgress?.(3, 3)
+                yield [{ id: 'f3', nativeIdentity: 'native-3' } as any]
+            }
+        )
+
+        await service.fetchFusionAccounts()
+
+        expect(Array.from(service.fusionAccountsByNativeIdentity?.keys() ?? [])).toEqual([
+            'native-1',
+            'native-2',
+            'native-3',
+        ])
+        expect(setImmediateSpy).toHaveBeenCalledTimes(2)
+        expect(log.detail).toHaveBeenCalledWith({ action: 'ingesting fusion-accounts', count: 3 })
+        expect(log.setProgress).toHaveBeenLastCalledWith(3, 3, 'ingested')
+        setImmediateSpy.mockRestore()
+    })
+
+    it('replaces the previous map and skips ingested progress when empty', async () => {
+        const { service, log } = createService()
+        ;(service as any).fusionSourceIdValue = 'fusion-source-id'
+        service.fusionAccountsByNativeIdentity = new Map([
+            ['stale', { id: 'stale', nativeIdentity: 'stale' } as any],
+        ])
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* () {
+            yield* []
+        })
+
+        await service.fetchFusionAccounts()
+
+        expect(service.fusionAccountsByNativeIdentity.size).toBe(0)
+        expect(log.setProgress).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), 'ingested')
+        expect(log.detail).not.toHaveBeenCalledWith(
+            expect.objectContaining({ action: 'ingesting fusion-accounts' })
         )
     })
 })

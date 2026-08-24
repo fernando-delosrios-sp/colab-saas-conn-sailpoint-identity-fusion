@@ -3,6 +3,7 @@ import { QueuePriority, QueueStats, QueuedItemInfo, CallPolicy, PaginatePolicy, 
 import { LogService } from '../logService'
 import { FusionConfig } from '../../model/config'
 import { readNumber } from '../../utils/safeRead'
+import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { mergeAbortSignals, invokeAbortable, runWithRequestAbortSignal } from './helpers'
 import { IscApiAdapter } from './iscApiAdapter'
 import { IscApiSurface } from './iscApiSurface'
@@ -280,6 +281,7 @@ export class ClientService {
         const effectiveLimit = ol ?? (hasExplicitBaseLimit ? bl! : undefined)
         const reportProgress = () => onProgress?.(all.length, effectiveLimit)
         reportProgress()
+        if (firstPage.length > 0) await yieldToEventLoop()
         if (firstPage.length < initialLimit || (effectiveLimit != null && all.length >= effectiveLimit)) {
             return effectiveLimit != null && all.length > effectiveLimit ? all.slice(0, effectiveLimit) : all
         }
@@ -302,6 +304,7 @@ export class ClientService {
             if (!pageData.length) break
             all.push(...pageData)
             reportProgress()
+            await yieldToEventLoop()
             if (pageData.length < requestLimit) break
             offset += requestLimit
         }
@@ -393,15 +396,16 @@ export class ClientService {
         }
 
         const initialItems = initialResponse.data || []
-        yield initialItems
         if (limit != null && initialItems.length >= limit) {
             policy.onPageProgress?.(Math.min(initialItems.length, limit), limit)
+            yield initialItems
             return
         }
 
         const totalCount = parseInt(initialResponse.headers?.['x-total-count'] || '0', 10)
         const fetchCeiling = limit != null ? Math.min(totalCount, limit) : totalCount
         policy.onPageProgress?.(initialItems.length, totalCount > 0 ? fetchCeiling : undefined)
+        yield initialItems
 
         yield* this.yieldParallelOffsetPages(
             initialItems,
@@ -476,6 +480,7 @@ export class ClientService {
             const items = (r.data ?? []) as T[]
             if (items.length) all.push(...items)
             policy.onPageProgress?.(all.length, undefined)
+            if (items.length) await yieldToEventLoop()
             if (items.length < ps) { more = false } else { const li = (items[items.length - 1] as { id?: string }).id; if (!li) { more = false } else { sa = [li] } }
             first = false; pn++
         }
@@ -661,13 +666,15 @@ export class ClientService {
      * @param priority - Optional priority for the page requests
      * @param context - Optional hint for error logs
      * @param abortSignal - Signal to abort the operation
+     * @param onPageProgress - Optional callback with loaded and known total counts
      * @yields Arrays of items (pages) as they are fetched
      */
     public async *paginateSearchApiGenerator<T>(
         search: Search,
         priority: QueuePriority = QueuePriority.MEDIUM,
         context?: string,
-        abortSignal?: AbortSignal
+        abortSignal?: AbortSignal,
+        onPageProgress?: (loaded: number, total?: number) => void
     ): AsyncGenerator<T[], void, unknown> {
         const pageSize = this.pageSize
         const baseSearch: Search = {
@@ -679,12 +686,14 @@ export class ClientService {
         let isFirstPage = true
         let hasMore = true
         let pageNum = 1
+        let loaded = 0
+        let total: number | undefined
 
         while (hasMore) {
             if (abortSignal?.aborted) return
 
             const pageContext = context ? `${context} [page ${pageNum}]` : `search [page ${pageNum}]`
-            const response = await this.execute<{ data: unknown[] }>(
+            const response = await this.execute<{ data: unknown[]; headers?: any }>(
                 () =>
                     this.adapter.searchApi.searchPost({
                         search: searchAfter ? { ...baseSearch, searchAfter } : baseSearch,
@@ -695,6 +704,12 @@ export class ClientService {
             )
 
             const items = (response?.data ?? []) as T[]
+            loaded += items.length
+            if (isFirstPage) {
+                const parsedTotal = Number.parseInt(String(response?.headers?.['x-total-count'] ?? ''), 10)
+                total = Number.isFinite(parsedTotal) ? parsedTotal : undefined
+            }
+            onPageProgress?.(loaded, total)
             if (items.length > 0) {
                 yield items
             }
