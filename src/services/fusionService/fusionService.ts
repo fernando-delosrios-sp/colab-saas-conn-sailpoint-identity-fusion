@@ -695,11 +695,15 @@ export class FusionService {
             const sourceInfo = { id: source.id, name: source.name } as import('../sourceService').SourceInfo
             if (!sourceShouldEnterMatchScoring(this.config, sourceInfo, this.run)) {
                 this.run.sourcesWithoutReviewers.add(source.name)
-                this.log.error(
+                const message =
                     `Match scoring is not configured for source "${source.name}" ` +
-                        `(enable automatic merge and/or manual review with valid reviewers). ` +
-                        `Managed accounts from this source will be treated as NonMatched.`
-                )
+                    `(enable automatic merge and/or manual review with valid reviewers). ` +
+                    `Managed accounts from this source will be treated as NonMatched.`
+                if (this.config.fusionEnableManualReview !== false) {
+                    this.log.error(message)
+                } else {
+                    this.log.info(message)
+                }
             } else if (this.config.fusionEnableAutoMerge && !sourceHasReviewers(sourceInfo, this.run)) {
                 this.log.warn(
                     `No reviewers configured for source "${source.name}" with automatic merge enabled. ` +

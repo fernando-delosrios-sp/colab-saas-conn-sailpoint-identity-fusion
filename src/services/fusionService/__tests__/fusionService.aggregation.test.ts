@@ -785,13 +785,15 @@ describe('FusionService — aggregation', () => {
             ;(ctx.mockConfig as any).fusionEnableAutoMerge = false
             ;(ctx.mockConfig as any).fusionEnableManualReview = false
             ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = false
+            const infoSpy = vi.spyOn(ctx.mockLog, 'info')
             const errorSpy = vi.spyOn(ctx.mockLog, 'error')
 
             await ctx.fusionService.initializeSourceReviewers()
 
             ;(ctx.fusionService as any).validateManagedSourceReviewers()
             expect(ctx.run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(true)
-            expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Match scoring is not configured'))
+            expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('Match scoring is not configured'))
+            expect(errorSpy).not.toHaveBeenCalledWith(expect.stringContaining('Match scoring is not configured'))
         })
     })
 
