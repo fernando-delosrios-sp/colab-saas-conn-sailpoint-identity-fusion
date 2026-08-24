@@ -470,6 +470,94 @@ describe('ClientService', () => {
         }).rejects.toThrow(PaginationError)
     })
 
+    it('rejects instead of spinning when a mid-window page fails after a sibling resolves', async () => {
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, parallelBatchSize: 3 }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '5' } })
+                }
+                // Fails only after its siblings have settled, so Promise.race resolves on a
+                // sibling and the scheduler must still surface this rejection.
+                if (offset === 1) {
+                    return new Promise((_resolve, reject) => {
+                        setTimeout(() => reject(new Error('page-failed')), 30)
+                    })
+                }
+                return Promise.resolve({ data: [{ id: `a${offset}` }] })
+            }),
+        } as any
+
+        const gen = client.call(
+            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+            { context: 'test-dropped-rejection', paginate: { mode: 'parallel', baseParams: {} } }
+        )
+
+        await expect(async () => {
+            for await (const _page of gen) {
+                // the dropped offset must surface as an error rather than hanging
+            }
+        }).rejects.toThrow(PaginationError)
+    }, 5000)
+
+    it('rejects when a page resolves without data instead of leaving a gap in the sequence', async () => {
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, parallelBatchSize: 2 }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '3' } })
+                }
+                return offset === 1 ? Promise.resolve({}) : Promise.resolve({ data: [{ id: `a${offset}` }] })
+            }),
+        } as any
+
+        const gen = client.call(
+            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+            { context: 'test-missing-data', paginate: { mode: 'parallel', baseParams: {} } }
+        )
+
+        await expect(async () => {
+            for await (const _page of gen) {
+                // consume until the gap is detected
+            }
+        }).rejects.toThrow(PaginationError)
+    }, 5000)
+
+    it('still paginates when parallelBatchSize is configured as zero', async () => {
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, parallelBatchSize: 0 }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                return offset === 0
+                    ? Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '3' } })
+                    : Promise.resolve({ data: [{ id: `a${offset}` }] })
+            }),
+        } as any
+
+        const gen = client.call(
+            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+            { paginate: { mode: 'parallel', baseParams: {} } }
+        )
+
+        const collected: any[][] = []
+        for await (const page of gen) {
+            collected.push(page)
+        }
+
+        expect(collected.flat().map((item) => item.id)).toEqual(['a0', 'a1', 'a2'])
+    }, 5000)
+
     it('schedules next offset when a fast page frees a sliding-window slot before a slow page completes', async () => {
         const sc = {
             ...mockConfig,
