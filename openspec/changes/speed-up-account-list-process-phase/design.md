@@ -1,9 +1,9 @@
 ## Context
 
-Planned at git `f45c75e` (2026-08-24). Drift check (run first):
+Planned at git `eeb22de` (2026-08-24). Drift check (run first):
 
 ```bash
-git diff --stat f45c75e..HEAD -- \
+git diff --stat eeb22de..HEAD -- \
   src/services/definitionService/definitionService.ts \
   src/services/matchingService/preScoreGate.ts \
   src/services/matchingService/matchOutcomeDispatcher.ts \
@@ -14,42 +14,20 @@ git diff --stat f45c75e..HEAD -- \
 
 If any of those files disagree with the excerpts below, STOP.
 
-Working tree at plan time also had unrelated dirty files (`src/services/logService/operationHeartbeat.ts`, `connector-spec.json`, docs/tune-api-performance, etc.). Do not stage or “fix” them as part of this change.
+Working tree at this revision is clean. Do not invent a “dirty heartbeat / API-tuning files” exclusion.
 
-### Why Process phase still dominates after recent perf work
+### Already landed (do not redo)
 
-Already landed (do not redo):
-
-- Map/Define hot path (`speed-up-map-define-hot-path`, archived 2026-08-24)
-- Uncorrelated identity-phase outcome `promiseAllBatched` with exact-match single-flight (`parallelize-uncorrelated-outcome-dispatch`)
+- Map/Define hot path (`speed-up-map-define-hot-path`)
+- Uncorrelated identity-phase outcome `promiseAllBatched` with exact-match single-flight
 - Event-loop yield during bulk promise resolution / managed-account sweep
-
-Still serial or host-log bound on Process:
+- Output `processOutputBatch` already `Promise.all`s `refreshUniqueAttributes` then `getISCAccount`
 
 ### Record unique registration today
 
-`src/services/definitionService/definitionService.ts`:
-
 ```283:318:src/services/definitionService/definitionService.ts
-    public async registerUniqueValuesFromRecordManagedAccount(
-        account: Account,
-        mappingService: MappingService,
-        run: FusionRun
-    ): Promise<void> {
-        const fusionAccount = FusionAccount.fromManagedAccount(account)
-        mappingService.mapAttributes(fusionAccount, run, {
-            onlyTargets: this.registrationPlan.mapTargets,
-        })
-        await this.registerUniqueAttributes(fusionAccount)
-    }
-
-    public async registerUniqueValuesFromRecordManagedAccounts(
-        accounts: Account[],
-        mappingService: MappingService,
-        run: FusionRun,
-        options?: RecordUniqueRegistrationProgress
-    ): Promise<number> {
-        // ...
+    public async registerUniqueValuesFromRecordManagedAccount(...)
+    public async registerUniqueValuesFromRecordManagedAccounts(...) {
         let done = 0
         for (const account of accounts) {
             await this.registerUniqueValuesFromRecordManagedAccount(account, mappingService, run)
@@ -63,118 +41,100 @@ Still serial or host-log bound on Process:
     }
 ```
 
-Caller: `FusionService.processRecordUniqueRegistration` (`fusionService.ts` ~1287–1330) then `run.claimAccount` for each eligible. Keep claim-after-register on the FusionService side (queue ownership). Do not parallelize `claimAccount` in a way that races with other Process steps — registration completes before claims if you keep the current “register all, then claim all” structure. If the current code claims inside the same method after the loop, preserve that order: **all registrations finish, then all claims** (today claims are a second loop after register). Read the live method and match it.
+Caller: `FusionService.processRecordUniqueRegistration` then `run.claimAccount` for each eligible. Keep **all registrations finish, then all claims** if that is still the live structure. Read the live method and match it.
 
-`registerUniqueAttributes` already uses `locks.withLock(\`unique:${definition.name}\`)` per value. Concurrent registration is safe if that lock remains.
+`registerUniqueAttributes` already uses `locks.withLock(\`unique:${definition.name}\`)`. Concurrent registration is safe if that lock remains.
 
-Batch helper already exists:
-
-```39:53:src/services/fusionService/collections.ts
-export async function promiseAllBatched<T, R>(
-    items: T[],
-    fn: (item: T) => Promise<R>,
-    batchSize: number = 50,
-    onBatchComplete?: (processed: number, total: number) => void
-): Promise<R[]> {
-    // Promise.all per slice, then yieldToEventLoop()
-}
-```
-
-```115:118:src/services/fusionService/collections.ts
-export function getFusionParallelBatchSize(config: FusionConfig): number {
-    return Math.max(1, Math.min(getManagedAccountsBatchSize(config), 12))
-}
-```
-
-Honor `definition-service`: registration plan (mapTargets vs passthrough); no Normal/Unique Velocity on this path; skip missing values.
-
-Prefer importing `promiseAllBatched` + `getFusionParallelBatchSize` from `../fusionService/collections` (same as `matchOutcomeDispatcher`). If apply-time lint/knip forbids definitionService → fusionService, copy a **local** batch loop into `definitionService.ts` (do not relocate `collections.ts`).
-
-Progress: `onProgress` may fire per account (keep) or per batch (acceptable if tests only assert final registered count). Heartbeat `setProgress(done, total, 'registered')` is wired from FusionService `onProgress` — keep monotonic `done`.
+Batch helper: `promiseAllBatched` + `getFusionParallelBatchSize` in `src/services/fusionService/collections.ts` (cap 12). Prefer importing those from definitionService (same as matchOutcomeDispatcher). If lint/knip forbids definitionService → fusionService, copy a **local** batch loop; do not relocate `collections.ts`.
 
 ### Correlated sweep + pre-score today
 
-```729:750:src/services/fusionService/fusionService.ts
-    private async runCorrelatedAccountSweep(map: Map<string, Account>): Promise<void> {
-        const correlatedAccounts = [...map.values()].filter((a) => a.uncorrelated === false)
-        // ...
-        await batchProcess(
-            correlatedAccounts,
-            'Correlated managed accounts',
-            (account) => this.processManagedAccount(account),
-            ...
-            this.run.managedAccountProcessingBatchSize
-        )
-    }
-```
+`runCorrelatedAccountSweep` filters `uncorrelated === false` and `batchProcess` → `processManagedAccount` → `dispatcher.runMatchSweep([account], 1)`. **Do not** change that 1-account sweep contract.
 
-```807:809:src/services/fusionService/fusionService.ts
-    public async processManagedAccount(account: Account): Promise<FusionAccount | undefined> {
-        const result = await this.dispatcher.runMatchSweep([account], 1)
-        return result.resolved[0]?.fusionAccount
-    }
-```
+`src/services/matchingService/preScoreGate.ts` (~32–38 skip-linked, ~61–64 correlated-orphan) emits `log.info` with the account name. Remove those INFO calls. Keep claim / assemble / handleNonMatch control flow.
 
-Do **not** change that 1-account sweep contract.
+After the sweep, `log.detail({ action: 'correlated account sweep complete', droppedLinked, remaining: map.size })` (or STEP END fields). `droppedLinked` = skip-linked outcomes only, not correlated-orphan non-matches.
 
-`src/services/matchingService/preScoreGate.ts`:
+### Unique generation today (Output JIT)
 
-```32:38:src/services/matchingService/preScoreGate.ts
-    if (callbacks.isCorrelatedManagedAccountLinkedInFusion(account)) {
-        log.info(
-            `Dropping managed account already linked in Fusion from work queue: ${account.name} ...`
-        )
-        run.claimAccount(managedAccountKey!, account.identityId)
-        return { action: 'skip-linked' }
-    }
-```
+`forEachISCAccount` / `processOutputBatch` (`fusionService.ts` ~884–908):
 
-```61:64:src/services/matchingService/preScoreGate.ts
-    if (account.uncorrelated === false) {
-        log.info(
-            `Correlated managed account not linked to Fusion; treating as non-match: ${account.name} ...`
+```884:896:src/services/fusionService/fusionService.ts
+        const outputBatch = await Promise.all(
+            batch.map(async (account) => {
+                if (refreshUniqueAttributes && account.needsRefresh) {
+                    await this.definitionService.refreshUniqueAttributes(account)
+                }
+                return this.getISCAccount(account, false)
+            })
         )
 ```
 
-Replace those INFO calls. Keep claim/assemble/handleNonMatch control flow.
+Keep Unique generation **here**, immediately before serialize. Do not move it into Process.
 
-After `runCorrelatedAccountSweep`, add `log.detail({ action: 'correlated account sweep complete', droppedLinked: <count>, remaining: map.size })` or equivalent fields on the existing STEP END if `accountListPhases` already logs `remaining`. Count dropped-linked as `correlatedAccounts.length - processedNonSkip` **or** `initialCorrelatedCount - remainingCorrelatedOnQueue` — pick one definition, test it, document in the DETAIL keys. Prefer: `droppedLinked` = number of skip-linked outcomes in this sweep (not including correlated-orphan non-matches).
+`generateUniqueAttributeValue` (`definitionService.ts` ~808–837) holds `unique:${definition.name}` for the whole `generateWithIncrementalCounter` / `generateWithCollisionDisambiguation` body, including `evaluateAttributeTemplate` and debug string builds.
 
-Honor `account-list-operation`: no per-account INFO for match/correlation-class messages; warn/error for failures stay.
+```808:837:src/services/definitionService/definitionService.ts
+        const lockKey = `unique:${definition.name}`
+        return await this.locks.withLock(lockKey, async () => {
+            const registeredValues = this.getUniqueValues(definition.name)
+            // Velocity + collision loop entirely inside the lock
+        })
+```
+
+Target shape (executor may name helpers):
+
+1. Preserve / identity / display short-circuits in `processUniqueDefinition` stay as they are (no generation).
+2. For generation: loop up to `maxAttempts`:
+   - Set `context.counter` / `context.UUID` as today (`$counter` empty string on first collision-strategy attempt).
+   - `evaluateAttributeTemplate` **outside** `unique:${name}`.
+   - `withLock('unique:${name}')` only: if `!registeredValues.has(strValue)` then `add` and return value; else indicate collision.
+   - On collision, bump counter or new UUID (same as today’s loop) and retry.
+3. Incremental `counterFn()` remains the existing counter lock (`stateWrapper.getCounter`). Do not hold `unique:${name}` while awaiting `counterFn()` if that nests two long critical sections. Snapshot the counter value, evaluate outside unique lock, then unique-lock insert.
+4. Exhausting `maxAttempts` still logs error and returns undefined (same as today).
+5. Gate `log.debug` interpolations that stringify values on Unique generate/collision the same way Map/Define gated debug (only when log level is debug). Do not wrap `log.error`.
+6. Do not change lock **keys**. Do not drop uniqueness. Two concurrent Output-batch accounts generating the same attribute must still not both keep the same value.
+
+Honor `definition-service` collision / UUID / incremental scenarios and `fusion-service` JIT-on-output / dry-run in-memory counters.
+
+Existing tests to keep green: `defineService.test.ts` unique generation, preservation, collision; `recordUniqueRegistration.test.ts`.
 
 ### Repo conventions
 
-- Tests: Vitest, `*.test.ts` beside code; `vi.fn` mocks as in `recordUniqueRegistration.test.ts`
-- Logging: `log.detail({ key: value })` for aggregates (renders `DETAIL` INFO line); `log.debug` for per-account traces
-- Do not use `_` prefix except unused vars
+- Tests: Vitest, `*.test.ts` beside code
+- Logging: `log.detail({ key: value })` for aggregates; `log.debug` for per-account traces
 - Prettier: 4-space, single quotes, no semicolons
-- Skills for executor: **tdd**; **changelog-generator** at the end. Do **not** invoke apply-code-changes from inside apply.
+- Skills: **tdd**; **changelog-generator** at the end. Do **not** invoke apply-code-changes from inside apply.
 
 ## Goals / Non-Goals
 
 **Goals**
 
-- Record unique registration wall-clock overlaps Map work up to fusion parallel cap
+- Record unique registration overlaps Map work up to fusion parallel cap
 - Correlated skip-linked / correlated-orphan do not emit INFO per account
 - One aggregate DETAIL (or STEP END) for correlated sweep drop counts
-- Registered unique sets and work-queue claims match serial behavior
+- Unique Velocity does not run under the unique registry lock
+- Concurrent Output-batch Unique generation still yields unique registered values
+- JIT Unique generation remains immediately before Output serialize
 
 **Non-Goals**
 
-- Faster Unique generation on Output
+- Generating Unique during Process
 - Changing correlated sweep to a single batched `runMatchSweep`
-- Raising scoring concurrency defaults
-- Fetch pagination, API queue, heartbeat interval (dirty tree)
+- Raising scoring or Output batch defaults / new connector-spec keys
+- Fetch pagination, API queue, heartbeat interval
+- Relocating `collections.ts`
 
 ## Decisions
 
-See `discovery.md`. Batch size = `getFusionParallelBatchSize`. Skip-linked: no per-account INFO/DETAIL.
+See `discovery.md`. Unique registry lock = membership only. Output batch size unchanged.
 
 ## Risks / Trade-offs
 
-- Parallel record registration can convoy on a single hot unique attribute lock — still better than serial Map; do not add a second lock scheme.
-- `onProgress` ordering may not be strictly +1 if you count in `onBatchComplete` only — heartbeat may jump by batch size. Acceptable. Do not lose `registered` unit.
-- Removing INFO may surprise operators grepping “Dropping managed account” — changelog + operations doc if that string is documented.
+- Parallel record registration can convoy on one hot unique-attribute lock — still better than serial Map.
+- Eval-outside-lock then insert is a check-then-act that **must** re-check under the lock (do not add to the set outside the lock).
+- Incremental counters: two accounts may increment then both collide on insert; retry must still be unique. Do not skip `has` after increment.
+- Removing skip-linked INFO may surprise greps of “Dropping managed account” — changelog; operations doc only if that string is documented.
 
 ## Migration Plan
 
@@ -189,8 +149,8 @@ None.
 Stop and report if:
 
 - Live code at the cited methods no longer matches these excerpts (drift).
-- Unique registration is already batched (package is obsolete).
-- Parallelizing registration requires changing `registerUniqueAttributes` lock semantics or dropping locks.
+- Unique registration is already batched **and** Unique generation already evaluates outside the registry lock (package obsolete).
+- Parallelizing registration or shrinking the Unique lock requires dropping uniqueness or changing lock **keys**.
 - Correlated path no longer calls `runMatchSweep([account], 1)` (do not “fix” by batching correlated into one sweep).
-- Tests for record unique registration or pre-score cannot be made green without touching out-of-scope Unique generation.
+- Making Unique faster appears to require generating Unique before Output or calling `listISCAccounts` on the account-list path.
 - Layering/knip requires moving `collections.ts` — do not move it; use a local batch loop instead.

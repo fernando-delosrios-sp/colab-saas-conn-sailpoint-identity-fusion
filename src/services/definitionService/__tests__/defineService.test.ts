@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeAll } from 'vitest'
 import { DefinitionService } from '../definitionService'
 import { FusionAccount } from '../../../model/account'
 import { FusionConfig } from '../../../model/config'
+import { InMemoryLockService } from '../../lockService'
+import * as templateEvaluator from '../templateEvaluator'
 
 describe('DefinitionService', () => {
     const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogLevel: vi.fn(() => 'info') } as any
@@ -513,5 +515,145 @@ describe('DefinitionService.refreshNormalAttributes clearing', () => {
         await service.refreshNormalAttributes(acc)
 
         expect(acc.attributeBag.current.identityName).toBe('Jane')
+    })
+})
+
+describe('DefinitionService.refreshUniqueAttributes unique-registry lock', () => {
+    const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
+
+    const createFusionAccount = (attrs: Record<string, any> = {}) => {
+        const attributeBag = {
+            current: { ...attrs },
+            previous: {},
+            identity: {},
+            accounts: [],
+            sources: new Map<string, Record<string, any>[]>(),
+        }
+        const fusionAccount: any = {
+            type: 'managed',
+            needsRefresh: true,
+            needsReset: false,
+            name: 'neo-1',
+            sourceName: 'HR',
+            fromIdentity: false,
+            isIdentity: false,
+            isMatch: false,
+            sources: ['HR'],
+            history: [],
+            importHistory: vi.fn(),
+            attributeBag,
+        }
+        Object.defineProperty(fusionAccount, 'attributes', {
+            get: () => attributeBag.current,
+            set: (value) => {
+                attributeBag.current = value
+            },
+        })
+        return fusionAccount
+    }
+
+    it('does not hold unique:${name} during evaluateAttributeTemplate', async () => {
+        let uniqueLockHeld = false
+        let evaluatedOutsideUniqueLock = false
+        const originalEvaluate = templateEvaluator.evaluateAttributeTemplate
+        const evaluateSpy = vi.spyOn(templateEvaluator, 'evaluateAttributeTemplate').mockImplementation((...args) => {
+            if (!uniqueLockHeld) evaluatedOutsideUniqueLock = true
+            return originalEvaluate(...args)
+        })
+
+        const mockLog = {
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+            getLogLevel: vi.fn(() => 'info'),
+        } as any
+        const mockLocks = {
+            withLock: vi.fn(async (key: string, fn: () => Promise<any>) => {
+                if (String(key).startsWith('unique:')) {
+                    uniqueLockHeld = true
+                    try {
+                        return await fn()
+                    } finally {
+                        uniqueLockHeld = false
+                    }
+                }
+                return fn()
+            }),
+        } as any
+
+        const service = new DefinitionService(
+            {
+                normalAttributeDefinitions: [],
+                uniqueAttributeDefinitions: [
+                    {
+                        name: 'UID',
+                        expression: 'STATIC-UID',
+                        useIncrementalCounter: false,
+                        digits: 1,
+                    },
+                ],
+                attributeMaps: [],
+                skipAccountsWithMissingId: false,
+                forceAttributeRefresh: false,
+                maxAttempts: 20,
+            } as any,
+            mockSchemas,
+            mockLog,
+            mockLocks
+        )
+        service.setStateWrapper({})
+
+        await service.refreshUniqueAttributes(createFusionAccount())
+
+        expect(evaluateSpy).toHaveBeenCalled()
+        expect(evaluatedOutsideUniqueLock).toBe(true)
+        evaluateSpy.mockRestore()
+    })
+
+    it('two concurrent refreshUniqueAttributes calls for the same unique attribute store distinct values', async () => {
+        const mockLog = {
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+            getLogLevel: vi.fn(() => 'info'),
+        } as any
+        const locks = new InMemoryLockService(mockLog)
+        const service = new DefinitionService(
+            {
+                normalAttributeDefinitions: [],
+                uniqueAttributeDefinitions: [
+                    {
+                        name: 'UID',
+                        expression: 'USER',
+                        useIncrementalCounter: false,
+                        digits: 1,
+                    },
+                ],
+                attributeMaps: [],
+                skipAccountsWithMissingId: false,
+                forceAttributeRefresh: false,
+                maxAttempts: 20,
+            } as any,
+            mockSchemas,
+            mockLog,
+            locks
+        )
+        service.setStateWrapper({})
+
+        const first = createFusionAccount()
+        first.name = 'neo-1'
+        const second = createFusionAccount()
+        second.name = 'neo-2'
+
+        await Promise.all([service.refreshUniqueAttributes(first), service.refreshUniqueAttributes(second)])
+
+        expect(first.attributes.UID).toBeTruthy()
+        expect(second.attributes.UID).toBeTruthy()
+        expect(first.attributes.UID).not.toBe(second.attributes.UID)
+        const registered = (service as any).getUniqueValues('UID') as Set<string>
+        expect(registered.has(String(first.attributes.UID))).toBe(true)
+        expect(registered.has(String(second.attributes.UID))).toBe(true)
     })
 })

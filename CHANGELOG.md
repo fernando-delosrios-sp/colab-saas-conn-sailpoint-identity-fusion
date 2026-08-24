@@ -27,6 +27,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 - **Uncorrelated sweep finishes review forms and non-matches faster** — After identity scoring, those outcomes can overlap up to the existing Fusion parallel batch cap (12 by default, or the managed-account batch size when it is lower). Automatic merges still apply one at a time. No new setting and no migration.
 - **Process-phase record unique registration overlaps Map work** — Match-disabled Record accounts register unique values in parallel batches up to the Fusion parallel cap (12 by default, or the managed-account batch size when it is lower). Unique-set contents are unchanged; unique-set writes still serialize per attribute name.
 - **Correlated skip-linked is no longer logged at INFO per account** — Already-linked correlated drops and correlated-orphan non-matches stay off the INFO stream at default log level. After the correlated sweep, one DETAIL line reports skip-linked count and remaining work-queue size. Match outcomes and STATUS totals are unchanged.
+- **Output Unique generation evaluates Velocity outside the unique registry lock** — Unique templates (including `$UUID` inject) run without holding `unique:${name}`. That lock only checks and inserts the registered value, so Output-batch Unique work can overlap. Collision still uses an empty `$counter` on the first attempt; uniqueness is unchanged. Unique generation stays JIT on Output, not Process.
 
 ### ✨ New Features
 
