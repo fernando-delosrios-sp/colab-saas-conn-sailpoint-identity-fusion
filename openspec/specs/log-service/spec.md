@@ -84,7 +84,7 @@ When correlation PATCH activity has occurred in the run and the API queue has pe
 
 ### Requirement: Operation heartbeat emits EVENT_SUMMARY lines
 
-The log service SHALL aggregate account-level events recorded via `recordEvent` and correlation activity helpers between heartbeat ticks and emit one or more `EVENT_SUMMARY` text lines at each tick. Counters SHALL reset after each flush. Multiple summary lines MAY be used when a single line would be excessively long. Correlation activity SHALL appear in `EVENT_SUMMARY` lines using subtype segments `link=triggers/accounts` and `merge=triggers/accounts` when non-zero, plus `completed=` with interval delta when non-zero (summed across link and merge completions), and aggregated `skipped=` counts when non-zero. During account-list aggregation (`isAggregationMode`), correlation `EVENT_SUMMARY` segments SHALL NOT include `correlated-action=`.
+The log service SHALL aggregate account-level events recorded via `recordEvent` and correlation activity helpers between heartbeat ticks and emit `EVENT_SUMMARY` text lines when those counters include activity that is not already visible on the STATUS line. Counters SHALL reset after each flush even when no summary line is emitted. Multiple summary lines MAY be used when a single line would be excessively long. Match `EVENT_SUMMARY` SHALL be omitted when the only match activity in the interval is non-matched accounts; STATUS already reports pipeline progress delta and cumulative `matches(Nn/Mm/Aa/Dd)` for that work. Decision, email, and correlation summaries SHALL still emit when those counters are non-zero. Correlation activity SHALL appear in `EVENT_SUMMARY` lines using subtype segments `link=triggers/accounts` and `merge=triggers/accounts` when non-zero, plus `completed=` with interval delta when non-zero (summed across link and merge completions), and aggregated `skipped=` counts when non-zero. During account-list aggregation (`isAggregationMode`), correlation `EVENT_SUMMARY` segments SHALL NOT include `correlated-action=`.
 
 #### Scenario: Match events summarized per tick
 
@@ -92,6 +92,14 @@ The log service SHALL aggregate account-level events recorded via `recordEvent` 
 - **WHEN** the heartbeat flushes event counters
 - **THEN** the connector host SHALL receive an INFO line containing `EVENT_SUMMARY` with match counts
 - **AND** per-account `MATCH FOUND` lines SHALL NOT have been emitted at INFO level for those events
+
+#### Scenario: Non-matched-only interval omits EVENT_SUMMARY matches
+
+- **GIVEN** 225 non-matched accounts recorded since the last heartbeat tick
+- **AND** no manual, automatic-merge, or deferred match outcomes in that interval
+- **WHEN** the heartbeat flushes event counters
+- **THEN** the connector host SHALL NOT receive an `EVENT_SUMMARY matches` line
+- **AND** the STATUS line SHALL still include pipeline progress delta and cumulative `matches(` totals
 
 #### Scenario: Decision events summarized per tick
 
