@@ -22,7 +22,7 @@ This page explains **how and when** to configure settings with examples. For fie
 
 ## Default merge behavior
 
-The **Default attribute merge from multiple sources** setting applies globally to all mapped attributes (unless overridden per attribute). New configurations default to **Main account**.
+The **Default attribute merge from multiple sources** setting applies globally to mapped attributes (unless overridden per attribute) **and** to **unmapped snapshot keys** on refresh: same-named attributes that appear on this account’s live snapshots but have no mapping row. Map does **not** walk the full Fusion schema — names that never appear on this invocation’s snapshots are left unchanged. New configurations default to **Main account**.
 
 | Merge strategy                   | Behavior                                                     | Result format         | Use when                                            |
 | -------------------------------- | ------------------------------------------------------------ | --------------------- | --------------------------------------------------- |
@@ -34,14 +34,14 @@ The **Default attribute merge from multiple sources** setting applies globally t
 
 **Main account and Origin account do not fall back to other accounts.** If the selected snapshot does not contain a mapped value, the result is empty. Choose **First found** when missing values should fall through to configured source order.
 
-The origin snapshot depends on how the Fusion account was created:
+**Origin** and **main** are pointers into the snapshot-key index. When the identity bag is present, **Identities** is a contributing snapshot indexed under the identity id, so `originAccount` or `mainAccount` may name either a managed account or that identity. Identity-origin is not a separate merge path.
 
-| Fusion account origin                          | Main account merge           | Origin account merge         |
-| ---------------------------------------------- | ---------------------------- | ---------------------------- |
-| Managed source account, no valid `mainAccount` | Creating managed account     | Creating managed account     |
-| Managed source account, valid `mainAccount`    | The selected managed account | Creating managed account     |
-| Identity, no valid `mainAccount`               | Identities identity snapshot | Identities identity snapshot |
-| Identity, valid `mainAccount`                  | The selected managed account | Identities identity snapshot |
+| Pointer                                          | Snapshot used                                      |
+| ------------------------------------------------ | -------------------------------------------------- |
+| `originAccount` = managed account key            | That managed snapshot                              |
+| `originAccount` = identity id                    | Identities snapshot                                |
+| `mainAccount` found in the index                 | That snapshot (managed or Identities)              |
+| `mainAccount` missing or not found this run      | Origin snapshot (Main account merge only)          |
 
 **Screenshot Placeholder:** Attribute Mapping with merge strategies.
 ![Attribute mapping and merge](../../assets/images/attribute-management-mapping-merge.png)

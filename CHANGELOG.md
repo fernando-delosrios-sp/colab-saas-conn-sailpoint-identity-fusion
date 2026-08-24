@@ -8,8 +8,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ## 2026-08-24
 
+### ⚠️ Breaking Changes
+
+- **Unmapped same-named attributes refresh with the default merge** — On a full Map, attributes that appear on live snapshots but have no mapping row now follow the stored default attribute merge (First found, List, Main account, and so on). They are no longer left at create-time seed across refresh. Map still does not walk the full Fusion schema. When the identity bag is present, Identities is a first-class snapshot that `mainAccount` or `originAccount` can name. **Migration:** No configuration change is required. The next aggregation after upgrade refreshes those keys. To keep a create-time value, add a mapping row or pin Origin account merge.
+
 ### 🐛 Fixes
 
+- **Non-matched-only ticks no longer emit EVENT_SUMMARY matches** — During uncorrelated sweep, `STATUS` already shows analyzed progress delta and cumulative `matches(Nn/Mm/Aa/Dd)`. Heartbeat now skips `EVENT_SUMMARY matches non-matched=+N/interval` when that is the only match activity. Review, automatic-merge, deferred, decision, email, and correlation summaries still emit.
 - **Match scoring skip is logged as info when scoring is off** — When both automatic merge and manual review are disabled, the connector logs that managed accounts will be treated as NonMatched at INFO instead of ERROR. Missing reviewers while manual review is still on remains ERROR.
 - **Parallel offset pagination no longer hangs or spins** — A failed or empty page in the sliding window is recorded and surfaced instead of being dropped by `Promise.race`, and a missing page in sequence now fails rather than looping without awaiting. A zero `parallelBatchSize` is treated as a window of one so pagination can still start.
 - **Uncorrelated match sweep stays responsive** — The managed-account sweep now yields the event loop at a bounded cadence during pre-scoring, outcome dispatch, and the deferred drain. Previously these loops awaited work that resolved without I/O, which only queues microtasks — Node drains those before running any timer, so a large sweep silenced STATUS, the platform keep-alive, and buffered log output for its full duration and the platform reset the aggregation. Most visible on first runs, where an empty identity pool sends every account through the deferred drain.
@@ -17,6 +22,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### 🔧 Improvements
 
+- **Default keep-alive interval is 250 seconds** — New sources send platform keep-alive (`processingWait`) every 250 seconds instead of 60. Existing sources keep their stored Processing wait time.
 - **Faster Fusion Map and Define on the assembly hot path** — Mapping and Normal Define now do less per-account copying, snapshot scanning, and debug work during account assembly (including Match `assembleManagedAccount`). Mapped values and Velocity results are unchanged.
 - **Uncorrelated sweep finishes review forms and non-matches faster** — After identity scoring, those outcomes can overlap up to the existing Fusion parallel batch cap (12 by default, or the managed-account batch size when it is lower). Automatic merges still apply one at a time. No new setting and no migration.
 
