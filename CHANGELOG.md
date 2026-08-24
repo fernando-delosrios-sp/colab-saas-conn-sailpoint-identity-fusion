@@ -25,6 +25,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 - **Default keep-alive interval is 250 seconds** — New sources send platform keep-alive (`processingWait`) every 250 seconds instead of 60. Existing sources keep their stored Processing wait time.
 - **Faster Fusion Map and Define on the assembly hot path** — Mapping and Normal Define now do less per-account copying, snapshot scanning, and debug work during account assembly (including Match `assembleManagedAccount`). Mapped values and Velocity results are unchanged.
 - **Uncorrelated sweep finishes review forms and non-matches faster** — After identity scoring, those outcomes can overlap up to the existing Fusion parallel batch cap (12 by default, or the managed-account batch size when it is lower). Automatic merges still apply one at a time. No new setting and no migration.
+- **Process-phase record unique registration overlaps Map work** — Match-disabled Record accounts register unique values in parallel batches up to the Fusion parallel cap (12 by default, or the managed-account batch size when it is lower). Unique-set contents are unchanged; unique-set writes still serialize per attribute name.
+- **Correlated skip-linked is no longer logged at INFO per account** — Already-linked correlated drops and correlated-orphan non-matches stay off the INFO stream at default log level. After the correlated sweep, one DETAIL line reports skip-linked count and remaining work-queue size. Match outcomes and STATUS totals are unchanged.
 
 ### ✨ New Features
 

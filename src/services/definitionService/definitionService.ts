@@ -24,7 +24,7 @@ import { FusionAttribute } from '../../data/schema'
 import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { FusionRun } from '../../model/fusionRun'
 import { MappingService } from '../mappingService'
-import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
+import { promiseAllBatched, getFusionParallelBatchSize } from '../fusionService/collections'
 import { buildUniqueRegistrationPlan, UniqueRegistrationPlan } from './uniqueRegistrationPlan'
 
 export interface RecordUniqueRegistrationProgress {
@@ -302,20 +302,17 @@ export class DefinitionService {
             return 0
         }
 
-        let done = 0
-        for (const account of accounts) {
-            await this.registerUniqueValuesFromRecordManagedAccount(account, mappingService, run)
-            done++
-            options?.onProgress?.(done, accounts.length)
-            if (done % 50 === 0) {
-                await yieldToEventLoop()
-            }
-        }
+        await promiseAllBatched(
+            accounts,
+            (account) => this.registerUniqueValuesFromRecordManagedAccount(account, mappingService, run),
+            getFusionParallelBatchSize(this.config),
+            (processed, total) => options?.onProgress?.(processed, total)
+        )
 
         this.log.debug(
             `Registered unique values from ${accounts.length} record managed account(s) using registration plan`
         )
-        return done
+        return accounts.length
     }
 
     public async unregisterUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {

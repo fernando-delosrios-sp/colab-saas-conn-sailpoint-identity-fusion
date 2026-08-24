@@ -18,6 +18,7 @@ describe('DefinitionService record unique registration', () => {
         maxHistoryMessages: 50,
         resetAccounts: false,
         resetForms: false,
+        managedAccountsBatchSize: 12,
     } as unknown as FusionConfig
 
     beforeAll(() => {
@@ -68,6 +69,55 @@ describe('DefinitionService record unique registration', () => {
 
         expect((definitionService as any).getUniqueValues('employeeId').has('E999')).toBe(true)
         expect((definitionService as any).getUniqueValues('email').size).toBe(0)
+    })
+
+    it('registerUniqueValuesFromRecordManagedAccounts registers 25 distinct values with batch size 12', async () => {
+        const definitionService = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
+        const mappingService = new MappingService(config, mockLog)
+        const run = new FusionRun()
+        const accounts = Array.from({ length: 25 }, (_, index) =>
+            managedAccount({
+                id: `src-record::native-${index}`,
+                nativeIdentity: `native-${index}`,
+                attributes: { emp_id: `E${String(index).padStart(3, '0')}` },
+            })
+        )
+
+        await definitionService.registerUniqueValuesFromRecordManagedAccounts(accounts, mappingService, run)
+
+        const registered = (definitionService as any).getUniqueValues('employeeId') as Set<string>
+        expect(registered.size).toBe(25)
+        for (let index = 0; index < 25; index++) {
+            expect(registered.has(`E${String(index).padStart(3, '0')}`)).toBe(true)
+        }
+    })
+
+    it('registers distinct values for the same unique attribute name from two accounts', async () => {
+        const definitionService = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
+        const mappingService = new MappingService(config, mockLog)
+        const run = new FusionRun()
+
+        await definitionService.registerUniqueValuesFromRecordManagedAccounts(
+            [
+                managedAccount({
+                    id: 'src-record::native-a',
+                    nativeIdentity: 'native-a',
+                    attributes: { emp_id: 'E-A' },
+                }),
+                managedAccount({
+                    id: 'src-record::native-b',
+                    nativeIdentity: 'native-b',
+                    attributes: { emp_id: 'E-B' },
+                }),
+            ],
+            mappingService,
+            run
+        )
+
+        const registered = (definitionService as any).getUniqueValues('employeeId') as Set<string>
+        expect(registered.has('E-A')).toBe(true)
+        expect(registered.has('E-B')).toBe(true)
+        expect(registered.size).toBe(2)
     })
 })
 

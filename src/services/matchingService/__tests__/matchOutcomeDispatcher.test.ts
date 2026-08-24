@@ -950,6 +950,74 @@ describe('MatchOutcomeDispatcher', () => {
             expect(run.managedAccountsById.has('source-a-id::native-linked')).toBe(false)
         })
 
+        it('skip-linked does not call log.info', async () => {
+            const { dispatcher, matchingService, run, log } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.initLinkedAccountIndex()
+            run.addToLinkedAccountIndex('source-a-id::native-linked')
+            run.addIdentity('identity-linked', {
+                id: 'identity-linked',
+                name: 'linked-login',
+                displayName: 'Linked Display',
+                attributes: { displayName: 'Linked Display' },
+            } as any)
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)
+
+            const account = managedAccount({
+                uncorrelated: false,
+                identityId: 'identity-linked',
+                nativeIdentity: 'native-linked',
+                id: 'acct-linked',
+            })
+
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(result.processed).toBe(1)
+            expect(result.resolved).toHaveLength(0)
+            const skipLinkedInfo = log.info.mock.calls.filter(
+                ([message]: [unknown]) =>
+                    typeof message === 'string' && /already linked|Dropping managed account/i.test(message)
+            )
+            expect(skipLinkedInfo).toHaveLength(0)
+        })
+
+        it('correlated-orphan does not log INFO per account', async () => {
+            const { dispatcher, matchingService, run, log } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            run.reviewersBySourceId.set(
+                SOURCE_ID,
+                new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+            )
+            run.addIdentity('identity-orphan', {
+                id: 'identity-orphan',
+                name: 'aanderson',
+                displayName: 'Alice Anderson',
+                attributes: { displayName: 'Alice Anderson' },
+            } as any)
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)
+
+            const account = managedAccount({
+                uncorrelated: false,
+                identityId: 'identity-orphan',
+            })
+            run.managedAccountsById.set('source-a-id::native-1', account)
+
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(result.nonMatch).toBe(1)
+            const orphanInfo = log.info.mock.calls.filter(
+                ([message]: [unknown]) =>
+                    typeof message === 'string' && /not linked to Fusion|treating as non-match/i.test(message)
+            )
+            expect(orphanInfo).toHaveLength(0)
+        })
+
         it('applies identity layer to each correlated orphan sharing the same identityId', async () => {
             const { dispatcher, matchingService, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
