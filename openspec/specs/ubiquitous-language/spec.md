@@ -241,8 +241,26 @@ The ubiquitous-language glossary SHALL define **Main account merge**, **Origin a
 #### Scenario: Origin snapshot entry
 - **GIVEN** a reader consults the glossary
 - **WHEN** they look up the object those strategies read
-- **THEN** an **origin snapshot** entry SHALL define it as the managed account whose key equals `originAccount`, or the Identities identity bag for identity-origin Fusion accounts
+- **THEN** an **origin snapshot** entry SHALL define it as the snapshot whose key equals `originAccount` in the snapshot-key index, including the Identities snapshot when that key is the identity id
 - **AND** it SHALL state that this is the same object Velocity exposes as `$account`
+
+### Requirement: Glossary defines unmapped snapshot key and Identities snapshot
+
+The ubiquitous-language glossary SHALL define **unmapped snapshot key** and **Identities snapshot** as Map-step terms. Documentation SHALL NOT describe unmapped Fusion schema names as mapping targets.
+
+#### Scenario: Unmapped snapshot key entry
+
+- **GIVEN** a reader consults the ubiquitous-language glossary
+- **WHEN** they look up names Map merges without an attribute mapping row
+- **THEN** an **unmapped snapshot key** entry SHALL define it as an attribute name that appears on at least one live snapshot in the current `mapAttributes` invocation and is not an `attributeMaps[].newAttribute` mapping target
+- **AND** it SHALL NOT define the term as every Fusion schema attribute
+
+#### Scenario: Identities snapshot entry
+
+- **GIVEN** a reader consults the glossary
+- **WHEN** they look up how the identity bag participates in Map
+- **THEN** an **Identities snapshot** entry SHALL define it as the identity bag registered in the source attribute map and snapshot-key index under the identity id, treated as another contributing account
+- **AND** it SHALL NOT describe identity-origin as a separate merge algebra
 
 ### Requirement: Glossary distinguishes Origin account merge from the $originSource Source-name token
 
@@ -402,7 +420,7 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **Epilogue** | The always-runs terminal block of the account-list operation that emits reports and summaries after the pipeline phases complete, regardless of pipeline success. Ordered most-durable-first (report file, report email, summary send). |
 | **Operation heartbeat** | A periodic logging interval (default 30s) during long-running operations that emits **STATUS line** and **EVENT_SUMMARY line** text to explain phase, step, progress, queue state, and aggregated account activity. |
 | **STATUS line** | The primary situational text line emitted by the operation heartbeat: phase, step, progress, queue delta, memory, and elapsed time (grep prefix `STATUS`). |
-| **EVENT_SUMMARY line** | A heartbeat text line aggregating account-level activity (matches, correlations, outcomes) recorded since the previous tick (grep prefix `EVENT_SUMMARY`). |
+| **EVENT_SUMMARY line** | A heartbeat text line aggregating account-level activity (review/merge matches, correlations, decisions) recorded since the previous tick. Not emitted when the only match activity is non-matched accounts already shown on STATUS (grep prefix `EVENT_SUMMARY`). |
 | **Bulk ingest** | CPU-bound registration of already-fetched pages into operation-run caches during Fetch. Distinct from HTTP retrieval and from identity hydration, which performs follow-up API lookups for missing identities. |
 | **Ingested (progress unit)** | The STATUS `progress=` unit `ingested`, used while bulk ingest registers fetched documents or accounts. Post-HTTP cache registration MUST NOT reuse the `fetched` unit. |
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |
