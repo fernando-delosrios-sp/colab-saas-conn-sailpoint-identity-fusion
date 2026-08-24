@@ -48,6 +48,30 @@ export const switchCase = (str: string, caseType: 'lower' | 'upper' | 'capitaliz
 }
 
 /**
+ * Copy enumerable keys from `source` and its prototypes onto a null-prototype object.
+ * Stops before `Object.prototype` so `$constructor` is not copied from the prototype chain.
+ * Nearer objects override farther ones (own keys win over inherited current-bag keys).
+ */
+const copyVelocityCallerContext = (source: RenderContext, extras?: RenderContext): RenderContext => {
+    const copied = Object.create(null) as RenderContext
+    const layers: object[] = []
+    for (
+        let current: object | null = source;
+        current != null && current !== Object.prototype;
+        current = Object.getPrototypeOf(current)
+    ) {
+        layers.push(current)
+    }
+    for (let i = layers.length - 1; i >= 0; i--) {
+        Object.assign(copied, layers[i])
+    }
+    if (extras) {
+        Object.assign(copied, extras)
+    }
+    return copied
+}
+
+/**
  * Evaluate Velocity template expression with extended context (Math, Date, Datefns)
  * Uses template caching to avoid repeated parsing and compilation
  */
@@ -57,7 +81,7 @@ export const evaluateVelocityTemplate = (
     maxLength?: number
 ): string | undefined => {
     // Null prototype so `$constructor` / `$__proto__` do not resolve via Object.prototype.
-    const renderContext = Object.assign(Object.create(null), context, contextHelpers) as RenderContext
+    const renderContext = Object.assign(copyVelocityCallerContext(context), contextHelpers) as RenderContext
 
     // Check cache for compiled template
     let velocity = templateCache.get(expression)
@@ -97,7 +121,7 @@ export const truncateResultToMaxLength = (
         const velocity = templateCache.get(expression)
         if (velocity) {
             const marker = `<<COUNTER_${crypto.randomUUID()}>>`
-            const testContext = Object.assign(Object.create(null), { ...context, counter: marker })
+            const testContext = copyVelocityCallerContext(context, { counter: marker })
             const testResult = velocity.render(testContext)
 
             const markerIndex = testResult.indexOf(marker)

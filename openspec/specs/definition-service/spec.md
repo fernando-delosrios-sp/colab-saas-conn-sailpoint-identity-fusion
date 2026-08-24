@@ -287,6 +287,25 @@ When `DefinitionService` evaluates a Normal attribute definition and the templat
 - **THEN** `Object.getPrototypeOf(renderContext)` SHALL still be `null`
 - **AND** helper keys SHALL still override caller context keys
 
+#### Scenario: Inherited current-bag attributes are visible to templates
+- **GIVEN** a Velocity caller context whose prototype is `attributeBag.current`
+- **AND** `attributeBag.current` has `firstname` `"Ada"` and `lastname` `"Lovelace"` as own properties
+- **AND** a Normal definition expression `"${firstname} ${lastname}"`
+- **WHEN** `refreshNormalAttributes` runs
+- **THEN** the defined attribute SHALL be `"Ada Lovelace"`
+- **AND** own caller-context keys SHALL still override same-named inherited current-bag keys
+
+### Requirement: Disabled identity scope excludes identity data from Define
+
+When `includeIdentities` is `false`, DefinitionService SHALL NOT expose the identity bag, identity alias, or an Identities origin snapshot from managed-origin rows through the Velocity context. Identity-derived display-attribute overrides SHALL also be disabled for those rows. Managed account snapshots and current mapped attributes SHALL remain available. Identity-origin rows explicitly created for required support identities, such as global reviewers, SHALL retain their own identity context.
+
+#### Scenario: Normal definition cannot read identity attributes when identity scope is disabled
+- **GIVEN** `includeIdentities` is `false`
+- **AND** a managed-origin Fusion account has an identity bag with `department` `"Identity HR"`
+- **AND** a Normal definition expression `"$!identity.department"`
+- **WHEN** `refreshNormalAttributes` runs
+- **THEN** the defined attribute SHALL be absent
+
 ### Requirement: Normal definition evaluation is synchronous per definition
 
 `processNormalDefinition` SHALL NOT return a Promise. `refreshNormalAttributes` MAY remain async for its public signature but SHALL NOT await a Promise per Normal definition that only performs synchronous Velocity evaluation.

@@ -26,6 +26,7 @@ import { FusionRun } from '../../model/fusionRun'
 import { MappingService } from '../mappingService'
 import { promiseAllBatched, getFusionParallelBatchSize } from '../fusionService/collections'
 import { buildUniqueRegistrationPlan, UniqueRegistrationPlan } from './uniqueRegistrationPlan'
+import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
 
 export interface RecordUniqueRegistrationProgress {
     onProgress?: (done: number, total: number) => void
@@ -44,6 +45,7 @@ export class DefinitionService {
     private readonly reverseSources: SourceConfig[]
     readonly registrationPlan: UniqueRegistrationPlan
     private readonly anyNormalDefinitionRefresh: boolean
+    private readonly includeIdentities: boolean
 
     constructor(
         private config: FusionConfig,
@@ -66,6 +68,7 @@ export class DefinitionService {
         )
         this.registrationPlan = buildUniqueRegistrationPlan(config)
         this.anyNormalDefinitionRefresh = this.normalDefinitions.some((def) => def.refresh)
+        this.includeIdentities = config.includeIdentities !== false
     }
 
     public setStateWrapper(state: Record<string, unknown> | undefined): void {
@@ -465,25 +468,30 @@ export class DefinitionService {
 
     private buildVelocityContext(fusionAccount: FusionAccount): Record<string, any> {
         const context: Record<string, any> = Object.create(fusionAccount.attributeBag.current)
+        const identityInputsEnabled = this.identityInputsEnabled(fusionAccount)
+        const identityAlias = identityInputsEnabled ? fusionAccount.identityAlias : undefined
 
-        if (fusionAccount.identityAlias && context.name === undefined) {
-            context.name = fusionAccount.identityAlias
+        if (identityAlias && context.name === undefined) {
+            context.name = identityAlias
         }
 
         const orderedAccounts = this.getOrderedAccountsForContext(fusionAccount)
+        const identityBag = identityInputsEnabled ? fusionAccount.attributeBag.identity : {}
 
-        context.identity = fusionAccount.attributeBag.identity
-        if (fusionAccount.identityAlias) {
+        context.identity = identityBag
+        if (identityAlias) {
             context.identity = {
-                ...fusionAccount.attributeBag.identity,
-                name: fusionAccount.identityAlias,
+                ...identityBag,
+                name: identityAlias,
             }
         }
 
         context.accounts = orderedAccounts
         context.previous = fusionAccount.attributeBag.previous
         context.sources = Object.fromEntries(
-            fusionAccount.attributeBag.sources.entries()
+            [...fusionAccount.attributeBag.sources.entries()].filter(
+                ([sourceName]) => identityInputsEnabled || sourceName !== IDENTITIES_SOURCE_NAME
+            )
         )
         context.account = this.resolveOriginAccountObjectForVelocity(
             fusionAccount,
@@ -511,7 +519,9 @@ export class DefinitionService {
         if (!originId) return undefined
 
         const { originSource } = fusionAccount
-        const identityBag = (fusionAccount.attributeBag.identity ?? {}) as Record<string, unknown>
+        const identityBag = (
+            this.identityInputsEnabled(fusionAccount) ? (fusionAccount.attributeBag.identity ?? {}) : {}
+        ) as Record<string, unknown>
         const identityHasData = Object.keys(identityBag).length > 0
         const { fusionDisplayAttribute, fusionIdentityAttribute } = this.schemas
 
@@ -523,7 +533,7 @@ export class DefinitionService {
             fusionAccount,
             fusionIdentityAttribute
         )
-        const identityAlias = fusionAccount.identityAlias
+        const identityAlias = this.identityInputsEnabled(fusionAccount) ? fusionAccount.identityAlias : undefined
         const identityId = fusionAccount.identityId ?? trimStr(identityBag.id)
 
         const schemaName = configuredSchemaName ?? identityAlias ?? originId
@@ -562,7 +572,14 @@ export class DefinitionService {
     private getOrderedAccountsForContext(
         fusionAccount: FusionAccount
     ): Record<string, any>[] {
-        const { sources, sourceAccountContexts } = fusionAccount.attributeBag
+        const { sourceAccountContexts } = fusionAccount.attributeBag
+        const sources = this.identityInputsEnabled(fusionAccount)
+            ? fusionAccount.attributeBag.sources
+            : new Map(
+                  [...fusionAccount.attributeBag.sources.entries()].filter(
+                      ([sourceName]) => sourceName !== IDENTITIES_SOURCE_NAME
+                  )
+              )
         if (sources.size === 0) return sourceAccountContexts
 
         const ordered = this.buildOrderedAccountList(sources)
@@ -1063,10 +1080,19 @@ export class DefinitionService {
      * accounts keep display values from attribute mapping/definitions.
      */
     private shouldApplyDisplayAttributeOverride(fusionAccount: FusionAccount): boolean {
+        if (!this.identityInputsEnabled(fusionAccount)) return false
         if (fusionAccount.fromIdentity || fusionAccount.type === FusionAccountKind.Identity) {
             return true
         }
         return fusionAccount.isIdentity
+    }
+
+    private identityInputsEnabled(fusionAccount: FusionAccount): boolean {
+        return (
+            this.includeIdentities ||
+            fusionAccount.fromIdentity ||
+            fusionAccount.type === FusionAccountKind.Identity
+        )
     }
 
     private fusionAttributeSafeDefault(

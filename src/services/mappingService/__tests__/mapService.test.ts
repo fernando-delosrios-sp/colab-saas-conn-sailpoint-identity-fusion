@@ -448,6 +448,34 @@ describe('MappingService selective targets', () => {
         expect(fusionAccount.attributeBag.current.department).toBe('HR')
     })
 
+    it('does not expose the Identities snapshot when identity scope is disabled', () => {
+        const disabledIdentityScopeConfig = {
+            ...config,
+            includeIdentities: false,
+            attributeMaps: [
+                {
+                    newAttribute: 'names',
+                    existingAttributes: ['firstname', 'lastname'],
+                    attributeMerge: 'concatenate',
+                },
+            ],
+        } as any
+        const service = new MappingService(disabledIdentityScopeConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.addIdentityLayer({
+            id: 'identity-1',
+            name: 'identity-one',
+            attributes: { firstname: 'Identity', lastname: 'Person', department: 'Identity HR' },
+        } as any)
+        fusionAccount.attributeBag.sources.set('Record Source', [{ givenName: 'Managed', familyName: 'Person' }])
+        fusionAccount.setNeedsRefresh(true)
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.names).toBeUndefined()
+        expect(fusionAccount.attributeBag.current.department).toBeUndefined()
+    })
+
     it('Selective map does not implicit-merge extra keys', () => {
         const selectiveConfig = {
             ...config,

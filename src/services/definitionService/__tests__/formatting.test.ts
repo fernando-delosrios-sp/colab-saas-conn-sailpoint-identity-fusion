@@ -47,6 +47,18 @@ describe('evaluateVelocityTemplate', () => {
             const result = evaluateVelocityTemplate(expr, context)
             expect(result).not.toBe('pwned')
         })
+
+        it('reads enumerable inherited caller-context keys', () => {
+            const context = Object.create({ firstname: 'Ada', lastname: 'Lovelace' })
+            const result = evaluateVelocityTemplate('${firstname} ${lastname}', context)
+            expect(result).toBe('Ada Lovelace')
+        })
+
+        it('own caller-context keys override inherited keys', () => {
+            const context = Object.create({ firstname: 'Ada' }) as Record<string, string>
+            context.firstname = 'Grace'
+            expect(evaluateVelocityTemplate('$firstname', context)).toBe('Grace')
+        })
     })
 
     // ========================================================================
