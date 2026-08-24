@@ -316,6 +316,16 @@ Documentation, specs, and agent-generated text MUST use **correlation** (unquali
 - **THEN** it SHALL name **FusionCorrelation** or `fusionAccount.correlation`
 - **AND** it SHALL NOT use unqualified “correlation” alone if that would be ambiguous
 
+### Requirement: Documentation and logs use Bulk ingest and ingested
+
+New documentation, STATUS progress units, and DETAIL actions for this work SHALL use **Bulk ingest** and unit **ingested**. They SHALL NOT call this stretch hydration, flush, or promise dump.
+
+#### Scenario: DETAIL ingest start uses ingesting action
+
+- **WHEN** Fetch emits a DETAIL line at the start of identity or fusion-account bulk ingest
+- **THEN** the action SHALL use `ingesting` with subject `identities` or `fusion-accounts`
+- **AND** the line SHALL NOT describe the work as hydration
+
 ## Canonical Terms
 
 ### Account taxonomy
