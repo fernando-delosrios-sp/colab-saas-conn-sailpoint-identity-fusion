@@ -7,9 +7,7 @@ export default defineConfig({
             'src/__tests__/test-config.ts',
             'src/operations/__tests__/fixtures/**',
             'src/operations/__tests__/harness/**',
-            'src/operations/__tests__/scenario/framework/**',
-            'src/operations/__tests__/scenario/harness/**',
-            'src/operations/__tests__/scenario/data/**',
+            'src/operations/__tests__/scenario/**',
         ],
         environment: 'node',
         testTimeout: 180_000,
@@ -21,4 +19,3 @@ export default defineConfig({
         },
     },
 })
-

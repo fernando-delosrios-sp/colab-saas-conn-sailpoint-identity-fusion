@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 const { spawnSync } = require('child_process')
-const { resolveScenarioRefFromArgv, resolveChainRefFromArgv, scenarioDir, parseRecordingScenarioRef } = require('./recording-paths.cjs')
+const {
+    resolveScenarioRefFromArgv,
+    resolveChainRefFromArgv,
+    scenarioDir,
+    parseRecordingScenarioRef,
+} = require('./recording-paths.cjs')
 const fs = require('fs')
 
 function resolveScenarioRefFromArgvCompat(argv) {
@@ -24,7 +29,13 @@ function runRefresh(scenarioRefInput) {
 
     const result = spawnSync(
         'npx',
-        ['vitest', 'run', 'src/operations/__tests__/scenario/refreshRecordingReports.test.ts'],
+        [
+            'vitest',
+            'run',
+            '--config',
+            'vitest.scenario.config.ts',
+            'src/operations/__tests__/scenario/refreshRecordingReports.test.ts',
+        ],
         {
             env: { ...process.env, REFRESH_RECORDING_SCENARIO: scenarioRef },
             stdio: 'inherit',
@@ -41,4 +52,3 @@ if (!argScenario) {
 }
 
 runRefresh(argScenario)
-
