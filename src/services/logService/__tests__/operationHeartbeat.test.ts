@@ -775,6 +775,45 @@ describe('OperationHeartbeat timing', () => {
         expect(line).toContain('api=4a/12q/80c(Δ+30/10s)')
     })
 
+    it('formats ingested progress on STATUS with its interval delta', () => {
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Fetch'
+        runContext.progress = { done: 4000, total: 10_000, unit: 'ingested' }
+
+        const line = formatStatusLine(
+            { runContext, intervalMs: 10_000 },
+            { previousProgressDone: 2500 },
+            10_000
+        )
+
+        expect(line).toContain('progress=4000/10000 ingested(Δ+1500/10s)')
+        expect(line).not.toContain('INGEST')
+    })
+
+    it('resets the progress delta when STATUS changes from fetched to ingested', () => {
+        vi.useFakeTimers()
+        const info = vi.fn()
+        const log = { info } as unknown as LogService
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Fetch'
+        runContext.progress = { done: 500, total: 2000, unit: 'fetched' }
+        const heartbeat = new OperationHeartbeat(log, () => ({ runContext, intervalMs: 10_000 }))
+
+        heartbeat.start()
+        vi.advanceTimersByTime(10_000)
+        runContext.progress = { done: 250, total: 2000, unit: 'ingested' }
+        vi.advanceTimersByTime(10_000)
+        runContext.progress = { done: 750, total: 2000, unit: 'ingested' }
+        vi.advanceTimersByTime(10_000)
+
+        expect(info.mock.calls[1][0]).toContain('progress=250/2000 ingested')
+        expect(info.mock.calls[1][0]).not.toContain('ingested(Δ')
+        expect(info.mock.calls[2][0]).toContain('progress=750/2000 ingested(Δ+500/10s)')
+
+        heartbeat.stop()
+        vi.useRealTimers()
+    })
+
     it('shows independent non-zero pipeline and api-queue deltas during Fetch', () => {
         vi.useFakeTimers()
         const info = vi.fn()

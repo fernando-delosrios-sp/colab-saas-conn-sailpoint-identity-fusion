@@ -208,6 +208,21 @@ The ubiquitous-language glossary SHALL define **Operation heartbeat**, **STATUS 
 - **WHEN** a reader consults the ubiquitous-language spec glossary
 - **THEN** it SHALL contain an **EVENT_SUMMARY line** entry describing aggregated account-level activity between heartbeat ticks
 
+### Requirement: Glossary defines bulk ingest terms
+
+The ubiquitous-language glossary SHALL define **Bulk ingest** and **Ingested (progress unit)** as canonical terms for CPU-bound cache registration after Fetch HTTP and for STATUS progress during that work.
+
+#### Scenario: Glossary entry for Bulk ingest
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **Bulk ingest** entry describing registration of already-fetched pages into run caches, distinct from HTTP Fetch and from identity hydration
+
+#### Scenario: Glossary entry for Ingested progress unit
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain an **Ingested (progress unit)** entry describing the STATUS `progress=` unit `ingested`
+- **AND** the entry SHALL state that operators MUST NOT reuse `fetched` for post-HTTP cache registration
+
 ### Requirement: Recording scenario terminology SHALL be canonical
 
 The term **scenario** (recording) SHALL refer to a named, tenant-scoped recording directory under `recordings/<tenant>/{scenarioName}/` containing captured operation steps (`steps.ndjson`), ISC API log (`api-log.ndjson`), compiled replay definition (`scenario.json`), and supporting artifacts. The terms **chain**, **chain reference**, and **chain name** SHALL NOT be used in new code, configuration help text, or documentation when referring to recording or replay artifacts.
@@ -347,6 +362,8 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **Operation heartbeat** | A periodic logging interval (default 30s) during long-running operations that emits **STATUS line** and **EVENT_SUMMARY line** text to explain phase, step, progress, queue state, and aggregated account activity. |
 | **STATUS line** | The primary situational text line emitted by the operation heartbeat: phase, step, progress, queue delta, memory, and elapsed time (grep prefix `STATUS`). |
 | **EVENT_SUMMARY line** | A heartbeat text line aggregating account-level activity (matches, correlations, outcomes) recorded since the previous tick (grep prefix `EVENT_SUMMARY`). |
+| **Bulk ingest** | CPU-bound registration of already-fetched pages into operation-run caches during Fetch. Distinct from HTTP retrieval and from identity hydration, which performs follow-up API lookups for missing identities. |
+| **Ingested (progress unit)** | The STATUS `progress=` unit `ingested`, used while bulk ingest registers fetched documents or accounts. Post-HTTP cache registration MUST NOT reuse the `fetched` unit. |
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |
 | **Correlated account sweep** | A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts. |
 | **Aggregation** | The ISC source-refresh operation. Use **managed source aggregation** or **Fusion source aggregation** when the source matters. |

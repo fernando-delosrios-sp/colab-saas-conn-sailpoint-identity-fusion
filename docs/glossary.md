@@ -50,6 +50,8 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms do n
 | **Pipeline progress delta** | Change in enumerable pipeline work (`progress.done`) since the previous STATUS tick — for example fusion refresh batches, fetch pages, or accounts sent during Output. |
 | **API queue completed delta** | Change in HTTP requests completed through ApiQueue since the previous STATUS tick. Used for stall detection; distinct from pipeline progress. |
 | **EVENT_SUMMARY line** | A heartbeat text line aggregating account-level activity (matches, correlations, outcomes) recorded since the previous tick (grep prefix `EVENT_SUMMARY`). |
+| **Bulk ingest** | CPU-bound registration of already-fetched pages into operation-run caches during Fetch. Distinct from HTTP retrieval and from identity hydration, which performs follow-up API lookups for missing identities. |
+| **Ingested (progress unit)** | The STATUS `progress=` unit `ingested`, used while bulk ingest registers fetched documents or accounts. Post-HTTP cache registration uses `ingested`, not `fetched`. |
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |
 | **Correlated account sweep** | A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts. |
 | **Aggregation** | The ISC source-refresh operation. Use **managed source aggregation** or **Fusion source aggregation** when the source matters. |

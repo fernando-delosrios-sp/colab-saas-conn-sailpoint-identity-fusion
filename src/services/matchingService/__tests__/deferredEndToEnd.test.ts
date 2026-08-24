@@ -55,6 +55,7 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
             sourceType: SourceType.Authoritative,
             config: { deferredMatching: true },
         } as any)
+        run.reviewersBySourceId.set(SOURCE_ID, new Set(['reviewer-id']))
 
         const matchingService = new MatchingService(config, log, run)
         const mappingService = { mapAttributes: vi.fn((account) => account) } as any

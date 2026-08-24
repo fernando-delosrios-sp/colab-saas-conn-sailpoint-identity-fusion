@@ -60,6 +60,8 @@ Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identit
     - Managed machine accounts (`isMachine=true`) are discarded after fetch and never enter the work queue.
     - A warning is logged with discarded machine-account counts (per source and total).
         - If `fusionReportOnAggregation` is enabled and the fusion owner identity was not loaded in the parallel fetch, it is fetched separately.
+    - Identity documents and existing Fusion accounts are **bulk-ingested** into operation-run caches page by page. Registration yields to the event loop at least every 250 records so STATUS and platform keep-alive timers continue running.
+    - During this cache registration, STATUS reports `progress=done/total ingested`, distinct from HTTP `fetched` progress. When ISC provides a total count, a `DETAIL action=ingesting identities count=N` or `DETAIL action=ingesting fusion-accounts count=N` milestone marks the start.
 
 ### Phase 3 — Fusion Account Processing (Refresh)
 

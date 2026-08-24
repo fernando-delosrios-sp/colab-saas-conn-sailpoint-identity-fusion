@@ -683,7 +683,7 @@ describe('FusionService — aggregation', () => {
 
         it('clears orphan from in-scope identity-origin account when originSource attribute is missing but baseline is present', async () => {
             const identityId = 'baseline-only-origin'
-            ctx.mockIdentities.isIdentityInScope = vi.fn(async (id?: string) => id === identityId)
+            ctx.mockIdentities.resolveOriginIdentityInScope = vi.fn(async (id?: string) => id === identityId)
             ctx.mockIdentities.hasIdentityInScope = vi.fn(() => false)
             ctx.mockIdentities.getIdentityById = vi.fn((id?: string) =>
                 id === identityId ? ({ id: identityId, name: 'Baseline Only' } as IdentityDocument) : undefined
@@ -707,13 +707,16 @@ describe('FusionService — aggregation', () => {
 
             const processed = await ctx.fusionService.processFusionAccount(persisted)
             expect(processed.fromIdentity).toBe(true)
-            expect(ctx.mockIdentities.isIdentityInScope).toHaveBeenCalledWith(identityId)
+            expect(ctx.mockIdentities.resolveOriginIdentityInScope).toHaveBeenCalledWith(
+                identityId,
+                expect.objectContaining({ id: identityId })
+            )
             expect(processed.collections.statuses.isOrphan()).toBe(false)
         })
 
         it('clears orphan when scope resolves via baseline-only originAccount without top-level identityId', async () => {
             const originIdentityId = 'baseline-origin-only-id'
-            ctx.mockIdentities.isIdentityInScope = vi.fn(async (id?: string) => id === originIdentityId)
+            ctx.mockIdentities.resolveOriginIdentityInScope = vi.fn(async (id?: string) => id === originIdentityId)
             ctx.mockIdentities.hasIdentityInScope = vi.fn(() => false)
             ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
@@ -734,7 +737,7 @@ describe('FusionService — aggregation', () => {
             expect(persisted.originAccountId).toBe(originIdentityId)
 
             const processed = await ctx.fusionService.processFusionAccount(persisted)
-            expect(ctx.mockIdentities.isIdentityInScope).toHaveBeenCalledWith(originIdentityId)
+            expect(ctx.mockIdentities.resolveOriginIdentityInScope).toHaveBeenCalledWith(originIdentityId, undefined)
             expect(processed.collections.statuses.isOrphan()).toBe(false)
         })
 
@@ -1046,6 +1049,8 @@ describe('FusionService — aggregation', () => {
                 sourceType: 'authoritative',
                 config: { deferredMatching: true },
             })
+            ;(ctx.fusionService as any).run.reviewersBySourceId.set('source-a-id', new Set(['reviewer-a']))
+            ;(ctx.fusionService as any).run.reviewersBySourceId.set('source-b-id', new Set(['reviewer-b']))
             ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
 
@@ -1406,6 +1411,7 @@ describe('FusionService — aggregation', () => {
                 sourceType: 'authoritative',
                 config: { deferredMatching: true },
             })
+            ;(ctx.fusionService as any).run.reviewersBySourceId.set('source-a-id', new Set(['reviewer-a']))
 
             const nonMatchedCandidate = FusionAccount.fromManagedAccount({
                 id: 'acct-prev-nonmatch-1',

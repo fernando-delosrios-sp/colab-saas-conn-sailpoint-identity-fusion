@@ -300,6 +300,8 @@ describe('ClientService', () => {
         const sc = { ...mockConfig, pageSize: 2, sailPointListMax: 250 }
         const client = new ClientService(mockAdapter, null, sc, mockLog)
         activeClients.push(client)
+        const setImmediateSpy = vi.spyOn(global, 'setImmediate')
+        const progress: number[] = []
 
         let calls = 0
         mockAdapter.accountsApi = {
@@ -313,10 +315,16 @@ describe('ClientService', () => {
 
         const result = await client.call(
             (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { paginate: { mode: 'sequential', baseParams: {} } }
+            {
+                paginate: { mode: 'sequential', baseParams: {} },
+                onPageProgress: (loaded) => progress.push(loaded),
+            }
         )
 
         expect(result).toEqual([{ id: 'a' }, { id: 'b' }, { id: 'c' }])
+        expect(progress).toEqual([2, 3, 3])
+        expect(setImmediateSpy).toHaveBeenCalledTimes(2)
+        setImmediateSpy.mockRestore()
     })
 
     it('throws PaginationError on sequential pagination failure', async () => {
@@ -354,6 +362,8 @@ describe('ClientService', () => {
         const sc = { ...mockConfig, pageSize: 2, sailPointListMax: 250 }
         const client = new ClientService(mockAdapter, null, sc, mockLog)
         activeClients.push(client)
+        const setImmediateSpy = vi.spyOn(global, 'setImmediate')
+        const progress: number[] = []
 
         let calls = 0
         mockAdapter.searchApi = {
@@ -367,10 +377,19 @@ describe('ClientService', () => {
 
         const result = await client.call(
             (_api: IscApiSurface, params: any) => (_api.search.searchPost as any)(params),
-            { paginate: { mode: 'searchAfter', search: { indices: ['identities'], query: { query: '*' } } as any } }
+            {
+                paginate: {
+                    mode: 'searchAfter',
+                    search: { indices: ['identities'], query: { query: '*' } } as any,
+                },
+                onPageProgress: (loaded) => progress.push(loaded),
+            }
         )
 
         expect(result).toEqual([{ id: 'id1' }, { id: 'id2' }, { id: 'id3' }])
+        expect(progress).toEqual([2, 3])
+        expect(setImmediateSpy).toHaveBeenCalledTimes(2)
+        setImmediateSpy.mockRestore()
     })
 
     it('throws PaginationError on searchAfter pagination failure', async () => {
@@ -417,7 +436,9 @@ describe('ClientService', () => {
             }
         )
 
-        const collected: any[][] = []
+        const first = await gen.next()
+        const collected: any[][] = [first.value!]
+        expect(progressCalls).toEqual([{ loaded: 2, total: 3 }])
         for await (const page of gen) {
             collected.push(page)
         }
