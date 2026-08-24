@@ -71,8 +71,7 @@ export const processAttributeMapping = (
             attributeMerge === AttributeMergeMode.MainAccount ? (prioritizedAccount ?? originSnapshot) : originSnapshot
         if (!account) return undefined
 
-        const attributeNames = Array.from(new Set([...config.sourceAttributes, config.attributeName]))
-        return findFirstAttributeValue([account], attributeNames)
+        return findFirstAttributeValue([account], config.lookupAttributeNames)
     }
 
     // Handle single-value merge strategies with early return
@@ -98,8 +97,7 @@ const processSingleValueMerge = (
     sourceOrder: string[],
     prioritizedAccount?: Attributes
 ): any => {
-    const { sourceAttributes, attributeName, attributeMerge, source: specifiedSource } = config
-    const attributeNames = Array.from(new Set([...sourceAttributes, attributeName]))
+    const { lookupAttributeNames, attributeMerge, source: specifiedSource } = config
     let prioritizedSource = ''
 
     if (prioritizedAccount) {
@@ -115,7 +113,7 @@ const processSingleValueMerge = (
         const canEvaluatePrioritized =
             attributeMerge !== AttributeMergeMode.Source || !resolvedSource || prioritizedSource === resolvedSource
         if (canEvaluatePrioritized) {
-            const prioritizedValue = findFirstAttributeValue([prioritizedAccount], attributeNames)
+            const prioritizedValue = findFirstAttributeValue([prioritizedAccount], lookupAttributeNames)
             if (prioritizedValue !== undefined) {
                 return prioritizedValue
             }
@@ -133,7 +131,7 @@ const processSingleValueMerge = (
             continue
         }
 
-        const firstValue = findFirstAttributeValue(accounts, attributeNames)
+        const firstValue = findFirstAttributeValue(accounts, lookupAttributeNames)
         if (firstValue !== undefined) {
             return firstValue
         }
@@ -167,9 +165,8 @@ const processMultiValueMerge = (
     sourceAttributeMap: Map<string, Attributes[]>,
     sourceOrder: string[]
 ): any => {
-    const { sourceAttributes, attributeName, attributeMerge } = config
-    const attributeNames = Array.from(new Set([...sourceAttributes, attributeName]))
-    const allValues = collectAllAttributeValues(sourceAttributeMap, sourceOrder, attributeNames)
+    const { lookupAttributeNames, attributeMerge } = config
+    const allValues = collectAllAttributeValues(sourceAttributeMap, sourceOrder, lookupAttributeNames)
     const existingValues = compact(allValues)
 
     if (existingValues.length === 0) {
@@ -251,18 +248,19 @@ export const buildAttributeMappingConfig = (
     const attributeMap = attributeMaps?.find((am) => am.newAttribute === attributeName)
 
     if (attributeMap) {
-        // Use attributeMap configuration
+        const sourceAttributes = attributeMap.existingAttributes || [attributeName]
         return {
             attributeName,
-            sourceAttributes: attributeMap.existingAttributes || [attributeName],
+            sourceAttributes,
+            lookupAttributeNames: Array.from(new Set([...sourceAttributes, attributeName])),
             attributeMerge: attributeMap.attributeMerge || defaultAttributeMerge,
             source: attributeMap.source,
         }
     } else {
-        // Use global attributeMerge policy with direct attribute name
         return {
             attributeName,
             sourceAttributes: [attributeName],
+            lookupAttributeNames: [attributeName],
             attributeMerge: defaultAttributeMerge,
         }
     }

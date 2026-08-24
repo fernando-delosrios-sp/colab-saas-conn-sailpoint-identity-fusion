@@ -1,6 +1,14 @@
 import { attrSplit, attrConcat, processAttributeMapping, buildAttributeMappingConfig } from '../helpers'
 import { Attributes } from '@sailpoint/connector-sdk'
 import { AttributeMergeMode } from '../../../model/config'
+import { AttributeMappingConfig } from '../types'
+
+const mappingConfig = (
+    config: Omit<AttributeMappingConfig, 'lookupAttributeNames'> & { lookupAttributeNames?: string[] }
+): AttributeMappingConfig => ({
+    ...config,
+    lookupAttributeNames: config.lookupAttributeNames ?? Array.from(new Set([...config.sourceAttributes, config.attributeName])),
+})
 
 describe('attributeService helpers', () => {
     describe('attrSplit', () => {
@@ -52,11 +60,11 @@ describe('attributeService helpers', () => {
 
         it('should return first value for "first" merge', () => {
             const map = createMap('Source1', [{ displayName: 'Alice' }, { displayName: 'Bob' }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'displayName',
                 sourceAttributes: ['displayName'],
                 attributeMerge: AttributeMergeMode.First,
-            }
+            })
             expect(processAttributeMapping(config, map, ['Source1'])).toBe('Alice')
         })
 
@@ -64,12 +72,12 @@ describe('attributeService helpers', () => {
             const map = new Map<string, Attributes[]>()
             map.set('HR', [{ email: 'hr@acme.com' }])
             map.set('IT', [{ email: 'it@acme.com' }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'email',
                 sourceAttributes: ['email'],
                 attributeMerge: AttributeMergeMode.Source,
                 source: 'IT',
-            }
+            })
             expect(processAttributeMapping(config, map, ['HR', 'IT'])).toBe('it@acme.com')
         })
 
@@ -77,12 +85,12 @@ describe('attributeService helpers', () => {
             const map = new Map<string, Attributes[]>()
             map.set('HR', [{ email: 'hr@acme.com' }])
             map.set('IT', [{ email: 'it@acme.com' }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'email',
                 sourceAttributes: ['email'],
                 attributeMerge: AttributeMergeMode.Source,
                 source: '$originSource',
-            }
+            })
             const prioritizedAccount = {
                 source: { name: 'HR' },
             } as unknown as Attributes
@@ -93,11 +101,11 @@ describe('attributeService helpers', () => {
             const map = new Map<string, Attributes[]>()
             map.set('HR', [{ jobTitle: 'Engineer' }])
             map.set('IT', [{ jobTitle: 'Director' }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'jobTitle',
                 sourceAttributes: ['jobTitle'],
                 attributeMerge: AttributeMergeMode.MainAccount,
-            }
+            })
             const mainAccount = { jobTitle: 'Manager' } as Attributes
             const originSnapshot = { jobTitle: 'Engineer' } as Attributes
 
@@ -107,11 +115,11 @@ describe('attributeService helpers', () => {
         it('uses the origin snapshot when Main account merge has no main account', () => {
             const map = new Map<string, Attributes[]>()
             map.set('IT', [{ jobTitle: 'Director' }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'jobTitle',
                 sourceAttributes: ['jobTitle'],
                 attributeMerge: AttributeMergeMode.MainAccount,
-            }
+            })
             const originSnapshot = { jobTitle: 'Engineer' } as Attributes
 
             expect(processAttributeMapping(config, map, ['IT'], undefined, originSnapshot)).toBe('Engineer')
@@ -120,11 +128,11 @@ describe('attributeService helpers', () => {
         it('does not fall through when Main account merge snapshot lacks the attribute', () => {
             const map = new Map<string, Attributes[]>()
             map.set('IT', [{ jobTitle: 'Director' }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'jobTitle',
                 sourceAttributes: ['jobTitle'],
                 attributeMerge: AttributeMergeMode.MainAccount,
-            }
+            })
             const mainAccount = {} as Attributes
             const originSnapshot = { jobTitle: 'Engineer' } as Attributes
 
@@ -134,11 +142,11 @@ describe('attributeService helpers', () => {
         it('uses only the origin snapshot when Origin account merge is selected', () => {
             const map = new Map<string, Attributes[]>()
             map.set('IT', [{ jobTitle: 'Director' }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'jobTitle',
                 sourceAttributes: ['jobTitle'],
                 attributeMerge: AttributeMergeMode.OriginAccount,
-            }
+            })
             const mainAccount = { jobTitle: 'Manager' } as Attributes
             const originSnapshot = { jobTitle: 'Engineer' } as Attributes
 
@@ -149,11 +157,11 @@ describe('attributeService helpers', () => {
             const map = new Map<string, Attributes[]>()
             map.set('S1', [{ dept: '[HR]' }])
             map.set('S2', [{ dept: '[IT]' }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'dept',
                 sourceAttributes: ['dept'],
                 attributeMerge: AttributeMergeMode.List,
-            }
+            })
             const result = processAttributeMapping(config, map, ['S1', 'S2'])
             expect(result).toEqual(expect.arrayContaining(['HR', 'IT']))
             expect(result).toHaveLength(2)
@@ -163,22 +171,22 @@ describe('attributeService helpers', () => {
             const map = new Map<string, Attributes[]>()
             map.set('S1', [{ role: 'Admin' }])
             map.set('S2', [{ role: 'User' }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'role',
                 sourceAttributes: ['role'],
                 attributeMerge: AttributeMergeMode.Concatenate,
-            }
+            })
             const result = processAttributeMapping(config, map, ['S1', 'S2'])
             expect(result).toMatch(/\[Admin\].*\[User\]|\[User\].*\[Admin\]/)
         })
 
         it('should return undefined when no accounts', () => {
             const map = createMap('Empty', [])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'displayName',
                 sourceAttributes: ['displayName'],
                 attributeMerge: AttributeMergeMode.First,
-            }
+            })
             expect(processAttributeMapping(config, map, ['Empty'])).toBeUndefined()
         })
 
@@ -186,11 +194,11 @@ describe('attributeService helpers', () => {
             const map = new Map<string, Attributes[]>()
             map.set('S1', [{ roles: ['Admin', 'User'] }])
             map.set('S2', [{ roles: ['Manager'] }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'roles',
                 sourceAttributes: ['roles'],
                 attributeMerge: AttributeMergeMode.List,
-            }
+            })
             const result = processAttributeMapping(config, map, ['S1', 'S2'])
             expect(result).toEqual(['Admin', 'User', 'Manager'])
             expect(result).toHaveLength(3)
@@ -200,11 +208,11 @@ describe('attributeService helpers', () => {
             const map = new Map<string, Attributes[]>()
             map.set('S1', [{ roles: ['Admin', 'User'] }])
             map.set('S2', [{ roles: ['Manager'] }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'roles',
                 sourceAttributes: ['roles'],
                 attributeMerge: AttributeMergeMode.Concatenate,
-            }
+            })
             const result = processAttributeMapping(config, map, ['S1', 'S2'])
             expect(result).toBe('[Admin] [Manager] [User]')
         })
@@ -213,11 +221,11 @@ describe('attributeService helpers', () => {
             const map = new Map<string, Attributes[]>()
             map.set('S1', [{ tags: '[A] [B]' }])
             map.set('S2', [{ tags: ['C', 'D'] }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'tags',
                 sourceAttributes: ['tags'],
                 attributeMerge: AttributeMergeMode.List,
-            }
+            })
             const result = processAttributeMapping(config, map, ['S1', 'S2'])
             expect(result).toEqual(['A', 'B', 'C', 'D'])
         })
@@ -225,11 +233,11 @@ describe('attributeService helpers', () => {
         it('should preserve null and undefined in "list" merge (filtered at output stage)', () => {
             const map = new Map<string, Attributes[]>()
             map.set('S1', [{ items: [null, 'A', undefined, 'B'] as any[] }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'items',
                 sourceAttributes: ['items'],
                 attributeMerge: AttributeMergeMode.List,
-            }
+            })
             const result = processAttributeMapping(config, map, ['S1'])
             expect(result).toEqual([null, 'A', undefined, 'B'])
         })
@@ -237,13 +245,25 @@ describe('attributeService helpers', () => {
         it('should filter null and undefined for "concatenate" merge', () => {
             const map = new Map<string, Attributes[]>()
             map.set('S1', [{ items: [null, 'A', undefined, 'B'] as any[] }])
-            const config = {
+            const config = mappingConfig({
                 attributeName: 'items',
                 sourceAttributes: ['items'],
                 attributeMerge: AttributeMergeMode.Concatenate,
-            }
+            })
             const result = processAttributeMapping(config, map, ['S1'])
             expect(result).toBe('[A] [B]')
+        })
+
+        it('uses precomputed lookup names and does not consult the target name', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('HR', [{ emp_id: 'E1', employeeId: 'E2' }])
+            const config = mappingConfig({
+                attributeName: 'employeeId',
+                sourceAttributes: ['emp_id'],
+                lookupAttributeNames: ['emp_id'],
+                attributeMerge: AttributeMergeMode.First,
+            })
+            expect(processAttributeMapping(config, map, ['HR'])).toBe('E1')
         })
     })
 
@@ -260,6 +280,7 @@ describe('attributeService helpers', () => {
             expect(result).toEqual({
                 attributeName: 'email',
                 sourceAttributes: ['mail', 'emailAddress'],
+                lookupAttributeNames: ['mail', 'emailAddress', 'email'],
                 attributeMerge: 'first',
             })
         })
@@ -269,6 +290,7 @@ describe('attributeService helpers', () => {
             expect(result).toEqual({
                 attributeName: 'displayName',
                 sourceAttributes: ['displayName'],
+                lookupAttributeNames: ['displayName'],
                 attributeMerge: 'first',
             })
         })
@@ -284,6 +306,18 @@ describe('attributeService helpers', () => {
             ]
             const result = buildAttributeMappingConfig('manager', maps, AttributeMergeMode.First)
             expect(result.source).toBe('HR')
+        })
+
+        it('lookup names include source and target names once', () => {
+            const maps = [
+                {
+                    newAttribute: 'employeeId',
+                    existingAttributes: ['emp_id', 'employeeId'],
+                    attributeMerge: AttributeMergeMode.First,
+                },
+            ]
+            const result = buildAttributeMappingConfig('employeeId', maps, AttributeMergeMode.First)
+            expect(result.lookupAttributeNames).toEqual(['emp_id', 'employeeId'])
         })
     })
 })
