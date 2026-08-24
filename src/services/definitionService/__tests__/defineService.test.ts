@@ -365,7 +365,7 @@ describe('DefinitionService.refreshNormalAttributes clearing', () => {
         FusionAccount.configure(minimalConfig)
     })
 
-    const createService = (normalAttributeDefinitions: any[]) =>
+    const createService = (normalAttributeDefinitions: any[], configOverrides: Record<string, unknown> = {}) =>
         new DefinitionService(
             {
                 normalAttributeDefinitions,
@@ -373,6 +373,7 @@ describe('DefinitionService.refreshNormalAttributes clearing', () => {
                 attributeMaps: [],
                 skipAccountsWithMissingId: false,
                 forceAttributeRefresh: false,
+                ...configOverrides,
             } as any,
             mockSchemas,
             mockLog,
@@ -501,6 +502,32 @@ describe('DefinitionService.refreshNormalAttributes clearing', () => {
         await service.refreshNormalAttributes(acc)
 
         expect(acc.attributeBag.current.full).toBe('Ada')
+    })
+
+    it('reads an existing source attribute in a Normal definition', async () => {
+        const service = createService([{ name: 'full', expression: '${firstname} ${lastname}' }])
+        const acc = createRefreshableAccount({ firstname: 'Ada', lastname: 'Lovelace' })
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current.full).toBe('Ada Lovelace')
+    })
+
+    it('does not expose identity attributes when identity scope is disabled', async () => {
+        const service = createService(
+            [{ name: 'identityDepartment', expression: '$!identity.department' }],
+            { includeIdentities: false }
+        )
+        const acc = createRefreshableAccount()
+        acc.addIdentityLayer({
+            id: 'identity-jane',
+            name: 'jane.identity',
+            attributes: { department: 'Identity HR' },
+        } as any)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current.identityDepartment).toBeUndefined()
     })
 
     it('special context keys override current bag names', async () => {

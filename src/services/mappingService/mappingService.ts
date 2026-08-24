@@ -62,6 +62,7 @@ export class MappingService {
     private readonly sourceConfigs: SourceConfig[]
     private readonly sourceOrder: string[]
     private readonly mappingTargetNames: string[]
+    private readonly includeIdentities: boolean
 
     constructor(
         config: FusionConfig,
@@ -72,6 +73,7 @@ export class MappingService {
         this.sourceConfigs = config.sources
         this.sourceOrder = this.sourceConfigs.map((sc) => sc.name)
         this.mappingTargetNames = this.getAttributeMappingTargetNames()
+        this.includeIdentities = config.includeIdentities !== false
     }
 
     mapAttributes(fusionAccount: FusionAccount, _run: FusionRun, options?: MapAttributesOptions): void {
@@ -98,12 +100,18 @@ export class MappingService {
         const attributes = { ...attributeBag.current }
         let sourceOrder = this.sourceOrder
         const identityBag = attributeBag.identity
-        const identityPresent = Object.keys(identityBag).length > 0
+        const identityInputsEnabled =
+            this.includeIdentities ||
+            fusionAccount.fromIdentity ||
+            fusionAccount.type === FusionAccountKind.Identity
+        const identityPresent = identityInputsEnabled && Object.keys(identityBag).length > 0
         if (identityPresent) {
             sourceAttributeMap.set(IDENTITIES_SOURCE_NAME, [identityBag])
             if (!sourceOrder.includes(IDENTITIES_SOURCE_NAME)) {
                 sourceOrder = [...sourceOrder, IDENTITIES_SOURCE_NAME]
             }
+        } else if (!identityInputsEnabled) {
+            sourceAttributeMap.delete(IDENTITIES_SOURCE_NAME)
         }
 
         const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some((accounts) => accounts.length > 0)
