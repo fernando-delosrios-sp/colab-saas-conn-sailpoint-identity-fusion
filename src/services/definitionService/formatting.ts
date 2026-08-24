@@ -58,7 +58,6 @@ export const evaluateVelocityTemplate = (
 ): string | undefined => {
     // Null prototype so `$constructor` / `$__proto__` do not resolve via Object.prototype.
     const renderContext = Object.assign(Object.create(null), context, contextHelpers) as RenderContext
-    logger.debug(`Evaluating velocity template - expression: ${expression}`)
 
     // Check cache for compiled template
     let velocity = templateCache.get(expression)
@@ -67,7 +66,6 @@ export const evaluateVelocityTemplate = (
         const template = velocityjs.parse(expression)
         velocity = new SafeCompile(template)
         templateCache.set(expression, velocity)
-        logger.debug(`Compiled and cached new velocity template: ${expression}`)
     }
 
     let result = velocity.render(renderContext)
@@ -77,13 +75,9 @@ export const evaluateVelocityTemplate = (
     }
 
     if (result === '') {
-        logger.debug(
-            'Velocity template evaluated to empty string (e.g. Normalize helper returned undefined), returning undefined'
-        )
         return undefined
     }
 
-    logger.debug(`Velocity template evaluation result: ${result}`)
     return result
 }
 

@@ -4,7 +4,7 @@ import { FusionAccount } from '../../../model/account'
 import { FusionConfig } from '../../../model/config'
 
 describe('DefinitionService', () => {
-    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
+    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogLevel: vi.fn(() => 'info') } as any
     const mockLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
     const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
     const config = {
@@ -20,7 +20,7 @@ describe('DefinitionService', () => {
 })
 
 describe('DefinitionService.applyDisplayAttributeOverride', () => {
-    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
+    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogLevel: vi.fn(() => 'info') } as any
     const mockLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
     const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
     const config = {
@@ -234,7 +234,7 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
 
 
 describe('DefinitionService.refreshUniqueAttributes preservation', () => {
-    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
+    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogLevel: vi.fn(() => 'info') } as any
     const mockLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
     const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
 
@@ -348,7 +348,7 @@ describe('DefinitionService.refreshUniqueAttributes preservation', () => {
 })
 
 describe('DefinitionService.refreshNormalAttributes clearing', () => {
-    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
+    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogLevel: vi.fn(() => 'info') } as any
     const mockLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
     const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
 
@@ -487,5 +487,31 @@ describe('DefinitionService.refreshNormalAttributes clearing', () => {
         await service.refreshNormalAttributes(acc)
 
         expect(acc.attributeBag.current.fullName).toBe('Jane Smith')
+    })
+
+    it('later Normal definition sees an earlier write', async () => {
+        const service = createService([
+            { name: 'first', expression: 'Ada' },
+            { name: 'full', expression: '$first' },
+        ])
+        const acc = createRefreshableAccount()
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current.full).toBe('Ada')
+    })
+
+    it('special context keys override current bag names', async () => {
+        const service = createService([{ name: 'identityName', expression: '$identity.name' }])
+        const acc = createRefreshableAccount({ identity: 'not-the-identity-object' })
+        acc.addIdentityLayer({
+            id: 'identity-jane',
+            name: 'Jane',
+            attributes: { name: 'Jane' },
+        } as any)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributeBag.current.identityName).toBe('Jane')
     })
 })
