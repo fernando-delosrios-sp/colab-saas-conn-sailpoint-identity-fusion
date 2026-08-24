@@ -15,6 +15,8 @@ vi.mock('../../services/serviceRegistry', () => {
                 detail: vi.fn(),
                 info: vi.fn(),
                 error: vi.fn(),
+                startEventLoopWatchdog: vi.fn(),
+                stopEventLoopWatchdog: vi.fn(),
             },
             proxy: {
                 isProxyService: vi.fn().mockReturnValue(false),
@@ -111,7 +113,13 @@ describe('createOperationHandler', () => {
         it('should run in Proxy mode when proxy client', async () => {
             ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
                 res,
-                log: { detail: vi.fn(), info: vi.fn(), error: vi.fn() },
+                log: {
+                    detail: vi.fn(),
+                    info: vi.fn(),
+                    error: vi.fn(),
+                    startEventLoopWatchdog: vi.fn(),
+                    stopEventLoopWatchdog: vi.fn(),
+                },
                 proxy: {
                     isProxyService: vi.fn().mockReturnValue(false),
                     isProxyMode: vi.fn().mockReturnValue(true),
@@ -207,10 +215,53 @@ describe('createOperationHandler', () => {
             await promise
         })
 
+        it('should watch the event loop for as long as keepAlive runs', async () => {
+            // eslint-disable-next-line prefer-const
+            let resolveRegistry: any
+            let resolveFn: () => void
+            const longPromise = new Promise<void>((resolve) => {
+                resolveFn = () => {
+                    resolveRegistry.res.send()
+                    resolve()
+                }
+            })
+            defaultFn.mockReturnValue(longPromise)
+
+            const options: OperationHandlerOptions = { ...defaultOptions, keepAlive: 'memory' }
+            const handler = createOperationHandler(operationName, defaultFn, options)
+
+            const promise = handler(context, input, res)
+            await Promise.resolve()
+            resolveRegistry = (ServiceRegistry as any).mock.results[(ServiceRegistry as any).mock.results.length - 1].value
+            await Promise.resolve()
+
+            expect(resolveRegistry.log.startEventLoopWatchdog).toHaveBeenCalledTimes(1)
+            expect(resolveRegistry.log.stopEventLoopWatchdog).not.toHaveBeenCalled()
+
+            resolveFn!()
+            await promise
+
+            expect(resolveRegistry.log.stopEventLoopWatchdog).toHaveBeenCalledTimes(1)
+        })
+
+        it('should not watch the event loop when no keepAlive is scheduled', async () => {
+            const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
+            await handler(context, input, res)
+
+            const registry = (ServiceRegistry as any).mock.results[(ServiceRegistry as any).mock.results.length - 1].value
+            expect(registry.log.startEventLoopWatchdog).not.toHaveBeenCalled()
+        })
+
         it('should not start simple keepAlive if run mode is Proxy', async () => {
             ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
                 res,
-                log: { detail: vi.fn(), info: vi.fn(), error: vi.fn() },
+                log: {
+                    detail: vi.fn(),
+                    info: vi.fn(),
+                    error: vi.fn(),
+                    startEventLoopWatchdog: vi.fn(),
+                    stopEventLoopWatchdog: vi.fn(),
+                },
                 proxy: {
                     isProxyService: vi.fn().mockReturnValue(false),
                     isProxyMode: vi.fn().mockReturnValue(true),
@@ -235,7 +286,13 @@ describe('createOperationHandler', () => {
         it('should not start memory keepAlive if proxy server', async () => {
             ;(ServiceRegistry as any).mockImplementationOnce((_config: any, _context: any, res: any, _operationName: any) => ({
                 res,
-                log: { detail: vi.fn(), info: vi.fn(), error: vi.fn() },
+                log: {
+                    detail: vi.fn(),
+                    info: vi.fn(),
+                    error: vi.fn(),
+                    startEventLoopWatchdog: vi.fn(),
+                    stopEventLoopWatchdog: vi.fn(),
+                },
                 proxy: {
                     isProxyService: vi.fn().mockReturnValue(true),
                     isProxyMode: vi.fn().mockReturnValue(false),

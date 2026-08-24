@@ -102,6 +102,9 @@ export function createOperationHandler(
             assertProxyRouting(config)
             const { runMode, isProxyServer } = resolveRunMode(context, serviceRegistry.proxy, operationName)
             interval = scheduleKeepAlive(options, config, runMode, isProxyServer, res)
+            if (interval) {
+                serviceRegistry.log.startEventLoopWatchdog()
+            }
 
             serviceRegistry.log.detail({ mode: runMode })
             serviceRegistry.recording?.startOperation(
@@ -124,7 +127,10 @@ export function createOperationHandler(
             throw new ConnectorError(`${msg}: ${detail}`, ConnectorErrorType.Generic)
         } finally {
             serviceRegistry.run?.clearSimulatedTime?.()
-            if (interval) clearInterval(interval)
+            if (interval) {
+                clearInterval(interval)
+                serviceRegistry.log.stopEventLoopWatchdog()
+            }
         }
     }
 }
