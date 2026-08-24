@@ -49,7 +49,7 @@ What changes — one sentence.
 
 ### Suggested context
 
-Domain terms worth formalising elsewhere, discovered during analysis:
+Domain terms worth formalising via `/domain-modeling`, discovered during analysis:
 
 - **{{term}}** — {{short definition}}. Currently used in {{files}} but not named consistently.
 ```
@@ -61,10 +61,12 @@ Domain terms worth formalising elsewhere, discovered during analysis:
 - **Problem** — one sentence. What hurts.
 - **Solution** — one sentence. What changes.
 - **Benefits** — bullets, ≤6 words each. e.g. "Tests hit one interface", "Pricing logic stops leaking", "Delete 4 shallow wrappers".
-- **Suggested context** — domain terms discovered during analysis that the project might want to formalise elsewhere.
-- **ADR conflict** (if applicable) — one line in a blockquote warning.
+- **Suggested context** — domain terms to route through `/domain-modeling`: ubiquitous-language spec (OpenSpec) or `CONTEXT.md` (legacy). Do not create those files from the report.
+- **Decision conflict** (if applicable) — one line in a blockquote warning. OpenSpec: cite capability spec slug/requirement (e.g. `module-ordering`). Legacy: cite ADR identifier (e.g. ADR-0007).
 
-No paragraphs of explanation. If the diagram needs a paragraph to be understood, redraw the diagram.
+In OpenSpec repos, picked candidates become change packages after grilling — see [OPENSPEC-CHANGE.md](OPENSPEC-CHANGE.md).
+
+No paragraphs of explanation.
 
 ## Diagram patterns
 
@@ -223,3 +225,4 @@ Plain English, concise — but the architectural nouns and verbs come straight f
 **Benefits bullets** name the gain in glossary terms: *"locality: bugs concentrate in one module"*, *"leverage: one interface, N call sites"*, *"interface shrinks; implementation absorbs the wrappers"*. Don't write *"easier to maintain"* or *"cleaner code"* — those terms aren't in the glossary and don't earn their place.
 
 No hedging, no throat-clearing, no "it's worth noting that…". If a sentence could be a bullet, make it a bullet. If a bullet could be cut, cut it. If a term isn't in [LANGUAGE.md](LANGUAGE.md), reach for one that is before inventing a new one.
+
