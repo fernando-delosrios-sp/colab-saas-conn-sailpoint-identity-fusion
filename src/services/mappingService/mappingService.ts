@@ -120,7 +120,7 @@ export class MappingService {
         const mappingTargets = this.mappingTargetNames
         const explicitTargetSet = new Set(mappingTargets)
 
-        const applyMappedValue = (attribute: string, processedValue: unknown): void => {
+        const applyMappedValue = (attribute: string, processedValue: Attributes[string] | undefined): void => {
             if (processedValue === undefined) {
                 if (fusionAccount.isIdentity && fusionAccount.attributeBag.identity[attribute] !== undefined) {
                     attributes[attribute] = fusionAccount.attributeBag.identity[attribute]
