@@ -156,6 +156,46 @@ describe('MatchOutcomeDispatcher', () => {
         return () => maxInFlight
     }
 
+    function trackMaxConcurrentDispatch(forms: { createFusionForm: ReturnType<typeof vi.fn> }) {
+        let inFlight = 0
+        let maxInFlight = 0
+        forms.createFusionForm.mockImplementation(async () => {
+            inFlight += 1
+            maxInFlight = Math.max(maxInFlight, inFlight)
+            await new Promise<void>((resolve) => setImmediate(resolve))
+            inFlight -= 1
+            return {
+                formDefinitionReady: true,
+                newReviewInstancesQueued: 1,
+            }
+        })
+        return () => maxInFlight
+    }
+
+    function stubPartialIdentityMatches(matchingService: MatchingService) {
+        vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+            if (candidateType === 'identity') {
+                fusionAccount.layers.addFusionMatch({
+                    identityId: 'identity-1',
+                    identityName: 'Identity One',
+                    candidateType: 'identity',
+                    scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
+                })
+            }
+            return 1
+        })
+    }
+
+    function partialMatchAccounts(count: number): Account[] {
+        return Array.from({ length: count }, (_, index) =>
+            managedAccount({
+                id: `acct-${index}`,
+                nativeIdentity: `native-${index}`,
+                name: `Managed Account ${index}`,
+            })
+        )
+    }
+
     function seedReviewers(run: FusionRun) {
         run.reviewersBySourceId.set(
             SOURCE_ID,
@@ -1131,6 +1171,104 @@ describe('MatchOutcomeDispatcher', () => {
             await dispatcher.runMatchSweep(accounts, 3)
 
             expect(maxConcurrent()).toBeLessThanOrEqual(3)
+        })
+
+        it('overlaps identity-phase form dispatch up to fusion parallel cap', async () => {
+            const { dispatcher, matchingService, forms, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: {
+                    managedAccountsBatchSize: 4,
+                    fusionEnableManualReview: true,
+                    fusionEnableAutoMerge: false,
+                },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: false } }))
+            seedReviewers(run)
+            stubPartialIdentityMatches(matchingService)
+            const maxInFlight = trackMaxConcurrentDispatch(forms)
+
+            const accounts = partialMatchAccounts(8)
+            const result = await dispatcher.runMatchSweep(accounts, 8)
+
+            expect(result.partial).toBe(8)
+            expect(maxInFlight()).toBeGreaterThan(1)
+            expect(maxInFlight()).toBeLessThanOrEqual(4)
+        })
+
+        it('caps identity-phase dispatch at 12 when batch size is 100', async () => {
+            const { dispatcher, matchingService, forms, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: {
+                    managedAccountsBatchSize: 100,
+                    fusionEnableManualReview: true,
+                    fusionEnableAutoMerge: false,
+                },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: false } }))
+            seedReviewers(run)
+            stubPartialIdentityMatches(matchingService)
+            const maxInFlight = trackMaxConcurrentDispatch(forms)
+
+            const accounts = partialMatchAccounts(20)
+            const result = await dispatcher.runMatchSweep(accounts, 20)
+
+            expect(result.partial).toBe(20)
+            expect(maxInFlight()).toBeGreaterThan(1)
+            expect(maxInFlight()).toBeLessThanOrEqual(12)
+        })
+
+        it('does not overlap processFusionIdentityDecision for exact matches', async () => {
+            const { dispatcher, matchingService, decisionProcessor, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { fusionEnableAutoMerge: true, fusionAutoMergeScore: 100 },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: false } }))
+
+            const identityOne = FusionAccount.fromIdentity({
+                id: 'identity-1',
+                name: 'Identity One',
+                attributes: {},
+            } as any)
+            const identityTwo = FusionAccount.fromIdentity({
+                id: 'identity-2',
+                name: 'Identity Two',
+                attributes: {},
+            } as any)
+            run.registerFusionAccount(identityOne)
+            run.registerFusionAccount(identityTwo)
+
+            let inFlight = 0
+            let maxInFlight = 0
+            decisionProcessor.processFusionIdentityDecision.mockImplementation(async (decision: { identityId?: string }) => {
+                inFlight += 1
+                maxInFlight = Math.max(maxInFlight, inFlight)
+                await new Promise<void>((resolve) => setImmediate(resolve))
+                inFlight -= 1
+                const identityId = decision.identityId ?? 'identity-1'
+                return FusionAccount.fromIdentity({ id: identityId, name: identityId, attributes: {} } as any)
+            })
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    const identityId = fusionAccount.nativeIdentity === 'native-0' ? 'identity-1' : 'identity-2'
+                    fusionAccount.layers.addFusionMatch({
+                        identityId,
+                        identityName: identityId === 'identity-1' ? 'Identity One' : 'Identity Two',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }],
+                    })
+                }
+                return 1
+            })
+
+            const accounts = [
+                managedAccount({ id: 'acct-0', nativeIdentity: 'native-0', name: 'Managed Account 0' }),
+                managedAccount({ id: 'acct-1', nativeIdentity: 'native-1', name: 'Managed Account 1' }),
+            ]
+            const result = await dispatcher.runMatchSweep(accounts, 2)
+
+            expect(result.exact).toBe(2)
+            expect(maxInFlight).toBe(1)
         })
 
         it('drains deferred candidates sequentially within a source', async () => {
