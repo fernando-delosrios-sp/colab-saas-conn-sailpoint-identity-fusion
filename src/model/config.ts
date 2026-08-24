@@ -25,6 +25,8 @@ export interface BaseConfig {
 }
 
 export enum AttributeMergeMode {
+    MainAccount = 'mainAccount',
+    OriginAccount = 'originAccount',
     First = 'first',
     List = 'list',
     Concatenate = 'concatenate',
@@ -32,6 +34,8 @@ export enum AttributeMergeMode {
 }
 
 export type DefaultAttributeMergeMode =
+    | AttributeMergeMode.MainAccount
+    | AttributeMergeMode.OriginAccount
     | AttributeMergeMode.First
     | AttributeMergeMode.List
     | AttributeMergeMode.Concatenate
@@ -45,9 +49,9 @@ export interface AttributeMap {
     newAttribute: string
     /** Source attribute names to read values from */
     existingAttributes: string[]
-    /** Strategy for merging values: keep first, collect as list, concatenate strings, or pick from specific source */
+    /** Strategy for merging values from an account snapshot, source order, all sources, or a named source */
     attributeMerge?: AttributeMergeMode
-    /** Specific source name to use (only applicable when attributeMerge is "source"); supports "$originSource" */
+    /** Specific source for "source" merge; "$originSource" resolves to the prioritized account's source name */
     source?: string
 }
 
@@ -527,12 +531,3 @@ export interface FusionConfig
         InternalConfig {
     recording?: RecordingConfig
 }
-
-
-
-
-
-
-
-
-

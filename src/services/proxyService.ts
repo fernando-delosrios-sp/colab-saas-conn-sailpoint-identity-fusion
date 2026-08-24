@@ -1,7 +1,6 @@
 import { ConnectorError, Response } from '@sailpoint/connector-sdk'
 import { FusionConfig } from '../model/config'
 import { LogService } from './logService'
-import { assert } from '../utils/assert'
 import { isProxyClientConfig, isProxyServerHost, assertProxyServerPassword } from '../utils/proxyRole'
 
 const KEEPALIVE = 2.5 * 60 * 1000

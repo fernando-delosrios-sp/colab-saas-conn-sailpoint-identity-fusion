@@ -1,10 +1,5 @@
 import { FusionAccount } from '../../model/account'
-import {
-    FusionConfig,
-    SourceConfig,
-    AttributeMap,
-    DefaultAttributeMergeMode,
-} from '../../model/config'
+import { FusionConfig, SourceConfig, AttributeMap, DefaultAttributeMergeMode } from '../../model/config'
 import { LogService } from '../logService'
 import { FusionAttribute } from '../../data/schema'
 import { FusionRun } from '../../model/fusionRun'
@@ -14,6 +9,7 @@ import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
 import { trimStr } from '../../utils/safeRead'
 import { getManagedAccountSnapshotKey } from '../../utils/velocityAccountSnapshot'
+import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
 
 export interface MapAttributesOptions {
     onlyTargets?: ReadonlySet<string>
@@ -27,7 +23,7 @@ export class MappingService {
 
     constructor(
         config: FusionConfig,
-        private log: LogService,
+        private log: LogService
     ) {
         this.attributeMaps = config.attributeMaps
         this.attributeMerge = config.attributeMerge
@@ -49,20 +45,17 @@ export class MappingService {
 
         if (needsRefresh && sourceAttributeMap.size > 0) {
             const hasManagedAccountContext = Array.from(sourceAttributeMap.values()).some(
-                (accounts) => accounts.length > 0,
+                (accounts) => accounts.length > 0
             )
-            const shouldPreserveCurrentWithoutContext =
-                !hasManagedAccountContext && !fusionAccount.isIdentity
+            const shouldPreserveCurrentWithoutContext = !hasManagedAccountContext && !fusionAccount.isIdentity
             const sourceOrder = this.sourceConfigs.map((sc) => sc.name)
-            if (fusionAccount.originSource === 'Identities') {
-                sourceOrder.push('Identities')
-                sourceAttributeMap.set('Identities', [attributeBag.identity])
+            if (fusionAccount.originSource === IDENTITIES_SOURCE_NAME) {
+                sourceOrder.push(IDENTITIES_SOURCE_NAME)
+                sourceAttributeMap.set(IDENTITIES_SOURCE_NAME, [attributeBag.identity])
             }
 
-            let prioritizedAccount = this.getMainAccountContextAccount(
-                fusionAccount,
-                sourceAttributeMap,
-            )
+            const originSnapshot = this.getOriginAccountContextAccount(fusionAccount, sourceAttributeMap)
+            let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, sourceAttributeMap)
             const mappingTargets = this.getAttributeMappingTargetNames()
 
             for (const attribute of mappingTargets) {
@@ -80,13 +73,11 @@ export class MappingService {
                     sourceAttributeMap,
                     sourceOrder,
                     prioritizedAccount,
+                    originSnapshot
                 )
 
                 if (processedValue === undefined) {
-                    if (
-                        fusionAccount.isIdentity &&
-                        fusionAccount.attributeBag.identity[attribute] !== undefined
-                    ) {
+                    if (fusionAccount.isIdentity && fusionAccount.attributeBag.identity[attribute] !== undefined) {
                         attributes[attribute] = fusionAccount.attributeBag.identity[attribute]
                     } else if (!shouldPreserveCurrentWithoutContext) {
                         delete attributes[attribute]
@@ -119,10 +110,7 @@ export class MappingService {
     }
 
     private isSystemProvenanceAttribute(name: string): boolean {
-        return (
-            name === FusionAttribute.OriginAccount ||
-            name === FusionAttribute.OriginSource
-        )
+        return name === FusionAttribute.OriginAccount || name === FusionAttribute.OriginSource
     }
 
     private getAttributeMappingTargetNames(): string[] {
@@ -140,11 +128,7 @@ export class MappingService {
             for (const attrName of mappingTargets) {
                 this.cachedAttributeMappingConfig.set(
                     attrName,
-                    buildAttributeMappingConfig(
-                        attrName,
-                        this.attributeMaps,
-                        this.attributeMerge,
-                    ),
+                    buildAttributeMappingConfig(attrName, this.attributeMaps, this.attributeMerge)
                 )
             }
         }
@@ -153,25 +137,40 @@ export class MappingService {
 
     private getMainAccountContextAccount(
         fusionAccount: FusionAccount,
-        sourceAttributeMap: Map<string, Attributes[]>,
+        sourceAttributeMap: Map<string, Attributes[]>
     ): Attributes | undefined {
-        const mainAccountId = trimStr(
-            fusionAccount.attributeBag.current[FusionAttribute.MainAccount],
-        )
+        const mainAccountId = trimStr(fusionAccount.attributeBag.current[FusionAttribute.MainAccount])
         if (!mainAccountId) return undefined
 
         return this.findAccountByIdInSourceMap(sourceAttributeMap, mainAccountId)
     }
 
+    private getOriginAccountContextAccount(
+        fusionAccount: FusionAccount,
+        sourceAttributeMap: Map<string, Attributes[]>
+    ): Attributes | undefined {
+        const originAccountId = trimStr(fusionAccount.originAccountId)
+        if (!originAccountId) return undefined
+
+        if (fusionAccount.originSource === IDENTITIES_SOURCE_NAME) {
+            const identity = fusionAccount.attributeBag.identity
+            const identityId = trimStr(fusionAccount.identityId) ?? trimStr(identity.id)
+            if (identityId !== originAccountId || Object.keys(identity).length === 0) {
+                return undefined
+            }
+            return identity
+        }
+
+        return this.findAccountByIdInSourceMap(sourceAttributeMap, originAccountId)
+    }
+
     private findAccountByIdInSourceMap(
         sourceAttributeMap: Map<string, Record<string, any>[]>,
-        accountId: string,
+        accountId: string
     ): Record<string, any> | undefined {
         for (const accounts of sourceAttributeMap.values()) {
             const match = accounts.find(
-                (account) =>
-                    getManagedAccountSnapshotKey(account) === accountId ||
-                    trimStr(account?._id) === accountId,
+                (account) => getManagedAccountSnapshotKey(account) === accountId || trimStr(account?._id) === accountId
             )
             if (match) return match
         }
@@ -179,10 +178,7 @@ export class MappingService {
         return undefined
     }
 
-    private applyHistoryMapping(
-        processedValue: unknown,
-        fusionAccount: FusionAccount,
-    ): void {
+    private applyHistoryMapping(processedValue: unknown, fusionAccount: FusionAccount): void {
         if (!Array.isArray(processedValue) || processedValue.length === 0) return
 
         const history = processedValue
@@ -194,4 +190,3 @@ export class MappingService {
         fusionAccount.collections.historyOps.importFromArray(history)
     }
 }
-

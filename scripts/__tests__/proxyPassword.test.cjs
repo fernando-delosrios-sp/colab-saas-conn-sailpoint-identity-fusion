@@ -1,3 +1,4 @@
+/* global describe, it, expect, afterEach */
 import { assertProxyCommandAuthorized, proxyPasswordsMatch } from '../proxyPassword.cjs'
 
 describe('proxyPassword.cjs', () => {

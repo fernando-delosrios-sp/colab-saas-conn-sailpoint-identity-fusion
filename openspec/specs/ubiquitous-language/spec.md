@@ -223,6 +223,37 @@ The ubiquitous-language glossary SHALL define **Bulk ingest** and **Ingested (pr
 - **THEN** it SHALL contain an **Ingested (progress unit)** entry describing the STATUS `progress=` unit `ingested`
 - **AND** the entry SHALL state that operators MUST NOT reuse `fetched` for post-HTTP cache registration
 
+### Requirement: Glossary defines Main account merge and Origin account merge
+
+The ubiquitous-language glossary SHALL define **Main account merge**, **Origin account merge**, and **origin snapshot** as Map-step terms. Documentation and configuration labels SHALL use these names, not “Origin source” as a merge radio.
+
+#### Scenario: Main account merge entry
+- **GIVEN** a reader consults the ubiquitous-language glossary
+- **WHEN** they look up the Map strategy that follows `mainAccount`
+- **THEN** a **Main account merge** entry SHALL define it as the strategy that reads mapped values from the `mainAccount` snapshot when that key is found this run, otherwise from the origin snapshot, with stored config value `mainAccount`
+- **AND** it SHALL NOT describe the strategy as First found with a preferred source
+
+#### Scenario: Origin account merge entry
+- **GIVEN** a reader consults the glossary
+- **WHEN** they look up the Map strategy that follows creation provenance
+- **THEN** an **Origin account merge** entry SHALL define it as the strategy that reads mapped values from the origin snapshot only, ignoring `mainAccount`, with stored config value `originAccount`
+
+#### Scenario: Origin snapshot entry
+- **GIVEN** a reader consults the glossary
+- **WHEN** they look up the object those strategies read
+- **THEN** an **origin snapshot** entry SHALL define it as the managed account whose key equals `originAccount`, or the Identities identity bag for identity-origin Fusion accounts
+- **AND** it SHALL state that this is the same object Velocity exposes as `$account`
+
+### Requirement: Glossary distinguishes Origin account merge from the $originSource Source-name token
+
+The ubiquitous-language spec SHALL state that **Origin account merge** pins one origin snapshot, while the **$originSource** token in the Source name field resolves to the prioritized/`mainAccount` **source name** and then takes the first account on that source. Velocity `$originSource` remains the origin source **name** string in Define templates.
+
+#### Scenario: Source-name token is not Origin account merge
+- **GIVEN** documentation describes a per-attribute Source name of `$originSource`
+- **WHEN** the prose refers to that setting
+- **THEN** it SHALL call it the `$originSource` Source-name token
+- **AND** it SHALL NOT call it Origin account merge
+
 ### Requirement: Recording scenario terminology SHALL be canonical
 
 The term **scenario** (recording) SHALL refer to a named, tenant-scoped recording directory under `recordings/<tenant>/{scenarioName}/` containing captured operation steps (`steps.ndjson`), ISC API log (`api-log.ndjson`), compiled replay definition (`scenario.json`), and supporting artifacts. The terms **chain**, **chain reference**, and **chain name** SHALL NOT be used in new code, configuration help text, or documentation when referring to recording or replay artifacts.
@@ -522,7 +553,7 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 | **$counter** | In unique attribute definitions: renders empty on the first attempt and a zero-padded digit suffix on subsequent collision-retry attempts. Controlled by **Minimum counter digits** and **Maximum attempts**. |
 | **$UUID** | Generates a fresh random v4 UUID. Referencing it in the expression triggers a new UUID per attempt. |
 | **$isUnique(value)** | Returns `true` when the given value (after applying the definition's case, trim, spaces, normalize, and maxLength transformations) is not already registered as in use. Allows branching between candidate formats before falling back to `$counter`. |
-| **$originSource** | Resolves to the name of the source that originally created this Fusion account. |
+| **$originSource** | In Define templates, resolves to the name of the source that originally created this Fusion account. Distinct from the **$originSource Source-name token** in Map Source name fields. |
 | **Incremental counter** | A persistent, always-incrementing counter that survives across aggregations. Controlled by **Use incremental counter?** and **Counter start value**. When off, collision-based disambiguation is used instead. |
 | **Collision-based disambiguation** | The default unique-value strategy: the expression is re-evaluated with an incrementing `$counter` suffix until a value is found that is not already in use, up to **Maximum attempts**. |
 
@@ -540,6 +571,10 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Processing Control** | The section managing account maintenance: history retention, empty account deletion, and missing-identifier behavior. |
 | **Attribute Mapping Settings** | The top-level configuration menu for the Map step. Contains Attribute Mapping Definitions. |
 | **Attribute Mapping Definitions** | The section configuring how source attributes are mapped and merged into the Fusion account schema. Controls the default merge strategy and per-attribute mapping rules. |
+| **Main account merge** | A Map strategy that reads mapped values from the `mainAccount` snapshot when that key is found in the current run, otherwise from the origin snapshot. Stored as `mainAccount`. It does not fall through to another account when the selected snapshot lacks a value. |
+| **Origin account merge** | A Map strategy that reads mapped values only from the origin snapshot and ignores `mainAccount`. Stored as `originAccount`. It does not fall through to another account. |
+| **Origin snapshot** | The managed account whose key equals `originAccount`, or the Identities identity bag for an identity-origin Fusion account. The same object Velocity exposes as `$account`. |
+| **$originSource Source-name token** | A per-attribute Source name value that resolves to the prioritized (`mainAccount`) source name, then selects the first account on that source. It is source-level and is not **Origin account merge**. In Velocity, `$originSource` remains the origin source name string. |
 | **Attribute Definition Settings** | The top-level configuration menu for the Define step. Contains Normal Attribute Definitions and Unique Attribute Definitions. |
 | **Normal Attribute Definitions** | The section defining Velocity expressions that compute Fusion account attributes. Runs on every aggregation; supports static (one-time) or refreshable evaluation. |
 | **Unique Attribute Definitions** | The section defining Velocity expressions that generate values guaranteed unique across all Fusion accounts. Uses collision-based disambiguation or incremental counters. |

@@ -17,9 +17,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 ### ✨ New Features
 
 - **Event-loop watchdog** — Operations that run a keep-alive now sample the event loop and emit `WARN EVENT_LOOP blocked <duration>` when timers are starved, naming the phase, step, and progress counter on both sides of the gap, plus a worst-block summary when the operation ends. Warnings are also written unbuffered to stdout, since a blocked loop stops the logger draining its own buffer. See the observability reference.
+- **Main and origin account attribute merging** — New Fusion configurations now default mapped attributes to the selected `mainAccount`, falling back to the immutable origin account only when no valid main account exists. Per-attribute mappings can also pin values to the origin account. Both modes select one account snapshot with no fallback to other accounts; existing configurations keep their stored merge strategy.
 
 ### 📚 Documentation
 
+- **ISC configuration help no longer repeats the same doc link** — Section overviews keep extra guides in See also; the primary configuration reference stays on the section documentation link.
 - **Scenario recording Vitest is opt-in** — `npm test` no longer discovers files under `src/operations/__tests__/scenario/`. Use `npm run test:scenario` for that suite. Named golden replay of one recording is unchanged: `npm run test-recording -- tenant/scenario`.
 
 ---

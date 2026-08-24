@@ -23,7 +23,7 @@
         "includeIdentities": true,
         "identityScopeQuery": "*",
         "maxHistoryMessages": 10,
-        "attributeMerge": "first",
+        "attributeMerge": "mainAccount",
         "maxRetries": 20,
         "requestsPerSecond": 10,
         "maxConcurrentRequests": 20,
@@ -99,7 +99,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Scope",
-                    "sectionHelpMessage": "<strong>Define which identities are in scope.</strong><br><br>Limit processing using an <strong>Identity Scope Query</strong> (standard ISC search syntax). Toggle <strong>Include identities in the scope</strong> to establish a baseline population for Match alongside managed source accounts.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/configuring-sources-and-scope/\">Configuring sources and scope</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/source/\">Source settings reference</a>.",
+                    "sectionHelpMessage": "<strong>Define which identities are in scope.</strong><br><br>Limit processing using an <strong>Identity Scope Query</strong> (standard ISC search syntax). Toggle <strong>Include identities in the scope</strong> to establish a baseline population for Match alongside managed source accounts.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/configuring-sources-and-scope/\">Configuring sources and scope</a>.",
                     "items": [
                         {
                             "key": "includeIdentities",
@@ -124,7 +124,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Sources",
-                    "sectionHelpMessage": "<strong>Select and configure authoritative account sources.</strong><br><br><strong>Source type and behavior:</strong> Define role (Authoritative, Records, Orphan) and handling for non-matched non-identity accounts (disable, defer).<br><br><strong>Aggregation and correlation:</strong> Control timing (delays, retries), optimized aggregation, and correlation strategy (in-process or reverse).<br><br><strong>Filtering and limits:</strong> Process subsets via API/JMESPath filters and set batch capacities.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/configuring-sources-and-scope/\">Configuring sources and scope</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/source-types/\">Source types guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/source/\">Source settings reference</a>.",
+                    "sectionHelpMessage": "<strong>Select and configure authoritative account sources.</strong><br><br><strong>Source type and behavior:</strong> Define role (Authoritative, Records, Orphan) and handling for non-matched non-identity accounts (disable, defer).<br><br><strong>Aggregation and correlation:</strong> Control timing (delays, retries), optimized aggregation, and correlation strategy (in-process or reverse).<br><br><strong>Filtering and limits:</strong> Process subsets via API/JMESPath filters and set batch capacities.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/configuring-sources-and-scope/\">Configuring sources and scope</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/source-types/\">Source types guide</a>.",
                     "items": [
                         {
                             "key": "sources",
@@ -355,7 +355,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Processing Control",
-                    "sectionHelpMessage": "<strong>Control account maintenance.</strong><br><br><strong>History limits:</strong> Cap the number of audit history messages stored per account.<br><br><strong>Delete when empty:</strong> Remove the Fusion account if all its underlying source accounts are deleted.<br><br><strong>Skip missing targets:</strong> Ignore source accounts missing a mapped native identity attribute.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/source/\">Source settings reference</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/configuring-sources-and-scope/\">Configuring sources and scope</a>.",
+                    "sectionHelpMessage": "<strong>Control account maintenance.</strong><br><br><strong>History limits:</strong> Cap the number of audit history messages stored per account.<br><br><strong>Delete when empty:</strong> Remove the Fusion account if all its underlying source accounts are deleted.<br><br><strong>Skip missing targets:</strong> Ignore source accounts missing a mapped native identity attribute.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/configuring-sources-and-scope/\">Configuring sources and scope</a>.",
                     "items": [
                         {
                             "key": "maxHistoryMessages",
@@ -400,7 +400,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Attribute Mapping Definitions",
-                    "sectionHelpMessage": "<strong>Map and merge source attributes.</strong><br><br>Choose a <strong>Default attribute merge</strong> mode. Then configure per-attribute rules to target specific source fields, rename them on the Fusion account, and optionally override the merge strategy or pin specific sources.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/mapping-attributes/\">Mapping attributes guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/mapping/\">Mapping settings reference</a>.",
+                    "sectionHelpMessage": "<strong>Map and merge source attributes.</strong><br><br>Choose a <strong>Default attribute merge</strong> mode. Then configure per-attribute rules to target specific source fields, rename them on the Fusion account, and optionally override the merge strategy or pin specific sources.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/mapping-attributes/\">Mapping attributes guide</a>.",
                     "items": [
                         {
                             "key": "attributeMerge",
@@ -409,6 +409,14 @@
                             "required": true,
                             "helpKey": "When multiple sources provide the same attribute, choose how to combine them.",
                             "options": [
+                                {
+                                    "label": "Main account",
+                                    "value": "mainAccount"
+                                },
+                                {
+                                    "label": "Origin account",
+                                    "value": "originAccount"
+                                },
                                 {
                                     "label": "First found",
                                     "value": "first"
@@ -465,6 +473,14 @@
                                             "required": true,
                                             "helpKey": "Override the default merge strategy for this specific attribute.",
                                             "options": [
+                                                {
+                                                    "label": "Main account",
+                                                    "value": "mainAccount"
+                                                },
+                                                {
+                                                    "label": "Origin account",
+                                                    "value": "originAccount"
+                                                },
                                                 {
                                                     "label": "First found",
                                                     "value": "first"
@@ -759,7 +775,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Matching Settings",
-                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><br><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.<br><br><strong>Thresholds and weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.<br><br><strong>Automatic merge:</strong> Optionally bypass manual review when the combined score meets your automatic merge threshold.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/matching-identities/\">Matching identities guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/tuning-matching-algorithms/\">Tuning matching algorithms</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/matching/\">Matching settings reference</a>.",
+                    "sectionHelpMessage": "<strong>Configure similarity-based match detection.</strong><br><br>Evaluate matches using <strong>Fusion attribute matches</strong> to calculate a <strong>Combined match score</strong>.<br><br><strong>Algorithms:</strong> Text, phonetic, and intelligent gap comparisons.<br><br><strong>Thresholds and weights:</strong> Set minimum scores for individual rules and the overall match. Pass thresholds double as blend weights.<br><br><strong>Automatic merge:</strong> Optionally bypass manual review when the combined score meets your automatic merge threshold.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/matching-identities/\">Matching identities guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/tuning-matching-algorithms/\">Tuning matching algorithms</a>.",
                     "items": [
                         {
                             "key": "fusionEnableManualReview",
@@ -915,7 +931,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Review Settings",
-                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong><br><br>Define <strong>Form attributes</strong> to display to reviewers and set candidate limits. Assign global reviewers to act as fail-safes and optionally email them processing reports after each aggregation.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/review-forms-and-reviewers/\">Review forms and reviewers</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/matching/\">Matching settings reference</a>.",
+                    "sectionHelpMessage": "<strong>Configure manual review for potential matches.</strong><br><br>Define <strong>Form attributes</strong> to display to reviewers and set candidate limits. Assign global reviewers to act as fail-safes and optionally email them processing reports after each aggregation.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/review-forms-and-reviewers/\">Review forms and reviewers</a>.",
                     "items": [
                         {
                             "key": "fusionFormAttributes",
@@ -1030,7 +1046,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Developer Settings",
-                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation) and manage memory consumption during match detection by adjusting batch sizes.<br><br>The section header in ISC shows the <strong>installed connector version</strong> for reference — it updates automatically when you upgrade the connector package.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/operation/\">Operation guides</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/advanced/\">Advanced settings reference</a>.",
+                    "sectionHelpMessage": "<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation) and manage memory consumption during match detection by adjusting batch sizes.<br><br>The section header in ISC shows the <strong>installed connector version</strong> for reference — it updates automatically when you upgrade the connector package.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/operation/\">Operation guides</a>.",
                     "items": [
                         {
                             "key": "resetAccounts",
@@ -1081,7 +1097,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "External Settings",
-                    "sectionHelpMessage": "<strong>Configure external infrastructure for proxy processing, logging, and recording.</strong><br><br>Enable external processing to reveal a shared target URL and password, then choose sub-options for proxy mode, scenario recording, and external logging. When proxy mode is off, external logging sends HTTP POST to the target URL from ISC. When proxy mode is on, the proxy server writes logs to disk.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/proxy-mode/\">Proxy mode reference</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/scenario-recording/\">Scenario recording reference</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/advanced/\">Advanced settings reference</a>.",
+                    "sectionHelpMessage": "<strong>Configure external infrastructure for proxy processing, logging, and recording.</strong><br><br>Enable external processing to reveal a shared target URL and password, then choose sub-options for proxy mode, scenario recording, and external logging. When proxy mode is off, external logging sends HTTP POST to the target URL from ISC. When proxy mode is on, the proxy server writes logs to disk.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/proxy-mode/\">Proxy mode reference</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/scenario-recording/\">Scenario recording reference</a>.",
                     "items": [
                         {
                             "key": "externalProcessingEnabled",
@@ -1178,7 +1194,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Advanced Connection Settings",
-                    "sectionHelpMessage": "<strong>Fine-tune API limits and execution resilience.</strong><br><br>Adjust these parameters to prevent the connector from being rate-limited by Identity Security Cloud, ensure long-running operations complete without timing out, and optimize throughput by adjusting request concurrency and batching sizes.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/operation/tune-api-performance/\">Tune API performance guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/advanced/\">Advanced settings reference</a>.",
+                    "sectionHelpMessage": "<strong>Fine-tune API limits and execution resilience.</strong><br><br>Adjust these parameters to prevent the connector from being rate-limited by Identity Security Cloud, ensure long-running operations complete without timing out, and optimize throughput by adjusting request concurrency and batching sizes.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/operation/tune-api-performance/\">Tune API performance guide</a>.",
                     "items": [
                         {
                             "key": "provisioningTimeout",

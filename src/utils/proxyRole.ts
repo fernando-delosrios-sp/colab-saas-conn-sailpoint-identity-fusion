@@ -33,21 +33,21 @@ export function isProxyServerExecutionHost(config: ProxyRoleConfig): boolean {
     return isProxyServerHost() || config.isProxy === true
 }
 
-export function requiresProxyServerPassword(config: ProxyRoleConfig): boolean {
+function requiresProxyServerPassword(config: ProxyRoleConfig): boolean {
     return config.externalProcessingEnabled === true && config.externalProxyEnabled === true
 }
 
-export function shouldAuthenticateProxyServer(config: ProxyRoleConfig): boolean {
+function shouldAuthenticateProxyServer(config: ProxyRoleConfig): boolean {
     return requiresProxyServerPassword(config) && (config.isProxy === true || isProxyServerHost())
 }
 
-export function proxyPasswordsMatch(serverPassword: string, clientPassword: string): boolean {
+function proxyPasswordsMatch(serverPassword: string, clientPassword: string): boolean {
     const expectedHash = crypto.createHash('sha256').update(serverPassword).digest()
     const actualHash = crypto.createHash('sha256').update(clientPassword).digest()
     return crypto.timingSafeEqual(expectedHash, actualHash)
 }
 
-export const PROXY_PASSWORD_ENV_HINT =
+const PROXY_PASSWORD_ENV_HINT =
     'Add PROXY_PASSWORD to the repo-root .env file (or export it) and restart the proxy server (npm run debug).'
 
 export function assertProxyServerPassword(clientPassword: string | undefined): void {
@@ -63,11 +63,6 @@ export function assertProxyServerPassword(clientPassword: string | undefined): v
         bootstrapLog.error('Proxy password mismatch')
         throw new ConnectorError('Proxy password mismatch', ConnectorErrorType.Generic)
     }
-}
-
-/** @deprecated Use {@link shouldAuthenticateProxyServer} */
-export function isForwardedProxyPayload(config: ProxyRoleConfig): boolean {
-    return config.isProxy === true && requiresProxyServerPassword(config)
 }
 
 /**

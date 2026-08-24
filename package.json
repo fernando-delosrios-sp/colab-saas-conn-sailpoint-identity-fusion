@@ -100,10 +100,7 @@
         },
         "rules": {
             "duplicates": "off"
-        },
-        "ignoreBinaries": [
-            "python3"
-        ]
+        }
     },
     "allowScripts": {
         "fsevents": true

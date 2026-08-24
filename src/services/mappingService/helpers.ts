@@ -61,9 +61,19 @@ export const processAttributeMapping = (
     config: AttributeMappingConfig,
     sourceAttributeMap: Map<string, Attributes[]>,
     sourceOrder: string[],
-    prioritizedAccount?: Attributes
+    prioritizedAccount?: Attributes,
+    originSnapshot?: Attributes
 ): any => {
     const { attributeMerge } = config
+
+    if (attributeMerge === AttributeMergeMode.MainAccount || attributeMerge === AttributeMergeMode.OriginAccount) {
+        const account =
+            attributeMerge === AttributeMergeMode.MainAccount ? (prioritizedAccount ?? originSnapshot) : originSnapshot
+        if (!account) return undefined
+
+        const attributeNames = Array.from(new Set([...config.sourceAttributes, config.attributeName]))
+        return findFirstAttributeValue([account], attributeNames)
+    }
 
     // Handle single-value merge strategies with early return
     if (
