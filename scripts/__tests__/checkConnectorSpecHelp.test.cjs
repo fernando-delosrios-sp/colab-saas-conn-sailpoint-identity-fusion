@@ -146,6 +146,37 @@ describe('connector-spec-help-lib', () => {
         ).toBe(true)
     })
 
+    it('reports See also links that duplicate the section docLink', () => {
+        const spec = {
+            sourceConfig: [
+                {
+                    type: 'menu',
+                    label: 'Source Settings',
+                    items: [
+                        {
+                            type: 'section',
+                            sectionTitle: 'Scope',
+                            sectionHelpMessage:
+                                '<strong>Define scope.</strong><br><br>See also: <a href="https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/source/">Source settings reference</a>.',
+                            docLinkLabel: 'Source settings reference',
+                            docLink: `${DOCS_BASE_URL}configuration/source/`,
+                            items: [],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        expect(
+            collectViolations(spec).some(
+                (v) =>
+                    v.kind === 'sectionHelpMessage' &&
+                    v.id === 'Scope' &&
+                    v.message.includes('duplicate doc link')
+            )
+        ).toBe(true)
+    })
+
     it('slimSpec applies section overview and docLink fields', () => {
         const spec = {
             sourceConfig: [
