@@ -28,7 +28,11 @@ import { trimStr } from '../../utils/safeRead'
 import { isManagedAccountLinkedInFusion } from '../../model/managedAccountLink'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { resolveFusionMaxCandidatesForForm } from '../../data/config'
-import { promiseAllBatched, getScoringMaxConcurrency } from '../fusionService/collections'
+import {
+    promiseAllBatched,
+    getScoringMaxConcurrency,
+    getManagedAccountEventLoopYieldEvery,
+} from '../fusionService/collections'
 import { resolveAccountBeforeScoring } from './preScoreGate'
 import { resolveIdentityMatchOutcome } from './identityMatchResolution'
 import {
@@ -131,6 +135,28 @@ function createEmptyDeferredDrainDiag(): DeferredDrainDiag {
 
 function isAnalysisOnlyMode(mode?: MatchSweepMode): boolean {
     return mode === MatchSweepMode.AnalysisOnly
+}
+
+/**
+ * Bounded macrotask yielding for `for … await` loops over the managed-account queue.
+ *
+ * An `await` that completes without real I/O only queues a microtask, and Node drains the whole
+ * microtask queue before it runs any timer or immediate. A sweep over a large account set can
+ * therefore starve the operation heartbeat and the platform keep-alive for its entire duration —
+ * and starve the logger's buffered writes with them — unless it surrenders a macrotask turn.
+ *
+ * @param every - Iterations to run between yields.
+ * @returns Callback to await once per iteration.
+ */
+function createLoopYielder(every: number): () => Promise<void> {
+    let sinceYield = 0
+    return async () => {
+        sinceYield += 1
+        if (sinceYield >= every) {
+            sinceYield = 0
+            await yieldToEventLoop()
+        }
+    }
 }
 
 function resolveDeferredDrainResolution(
@@ -457,6 +483,7 @@ export class MatchOutcomeDispatcher {
         const resolved: ResolvedMatch[] = []
         const diag = createEmptyDeferredDrainDiag()
         const scoringDeps = this.scoringDeps()
+        const yieldDrain = createLoopYielder(getManagedAccountEventLoopYieldEvery(this.deps.config))
 
         for (const analysis of sorted) {
             const key = analysis.fusionAccount.managedKey
@@ -464,6 +491,7 @@ export class MatchOutcomeDispatcher {
 
             let promotedNonMatches = 0
             await scoreDeferredForAccount(analysis, scoringDeps, diag, remainingInQueue, materializedEarly)
+            await yieldDrain()
 
             const resolution = resolveDeferredDrainResolution(analysis, this.deps.run, options?.mode)
             const scoredResult: ManagedAccountMatchingResult = { analysis, resolution }
@@ -606,9 +634,11 @@ export class MatchOutcomeDispatcher {
         }
 
         const toScore: PendingScore[] = []
+        const yieldPreScore = createLoopYielder(getManagedAccountEventLoopYieldEvery(this.deps.config))
 
         for (const account of accounts) {
             const preScore = await resolveAccountBeforeScoring(account, this.deps, this.preScoreCallbacks())
+            await yieldPreScore()
             if (preScore.action === 'skip-linked') {
                 processedCount++
                 updateProgress()
@@ -632,9 +662,11 @@ export class MatchOutcomeDispatcher {
                 this.scoringDeps()
             )
 
+            const yieldDispatch = createLoopYielder(getManagedAccountEventLoopYieldEvery(this.deps.config))
             for (const scored of identityResults) {
                 run.recordAnalysis(scored.analysis)
                 const resolved = await this.dispatchOutcome(scored)
+                await yieldDispatch()
                 processedCount++
                 updateProgress()
                 if (resolved) {

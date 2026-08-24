@@ -56,6 +56,7 @@ During long `accountList` aggregations, the connector emits standardized text pr
 | `PHASE` / `STEP` | Info | Pipeline boundary markers (`START` / `END elapsed=…`) |
 | `DETAIL` | Info | Operational milestones as `key=value` pairs (sources loaded, emails sent, mode) |
 | `WARN STALL` | Warn | API queue stopped completing requests for two consecutive heartbeat ticks; includes active request labels |
+| `WARN EVENT_LOOP` | Warn | The event loop was blocked long enough to starve keep-alive and heartbeat timers; reports the blocked duration plus the phase/step on both sides of the gap, and a worst-block summary when the operation ends |
 | `EPILOGUE` | Info | Report epilogue (`START` / `END elapsed=…`; not a numbered phase) |
 | `METRIC` | Info | Phase/step timing metrics |
 
@@ -150,4 +151,16 @@ grep 'DETAIL.*decisions=' connector.log
 grep 'decisions(' connector.log
 ```
 
-**General grep targets:** `STATUS`, `WARN STALL`, `EVENT_SUMMARY`, `PHASE 4 Process START`, `DETAIL`
+**General grep targets:** `STATUS`, `WARN STALL`, `WARN EVENT_LOOP`, `EVENT_SUMMARY`, `PHASE 4 Process START`, `DETAIL`
+
+## Silent runs and platform resets
+
+When the platform resets an aggregation after a period with no log output, the cause is almost always a blocked event loop: keep-alive and `STATUS` are both timers, so neither can fire while synchronous work runs. Search the run for `WARN EVENT_LOOP` — the `before=` segment names the phase, step, and progress counter that was active when output stopped, which is the code path that needs to yield.
+
+```bash
+grep 'WARN EVENT_LOOP' connector.log
+```
+
+Because samples cannot run during the block, each warning appears only once the loop recovers. If the platform terminates the run before that, the gap between the last `STATUS` timestamp and the reset marks the same window.
+
+`WARN EVENT_LOOP` is written twice: once through the normal logger, and once straight to stdout as plain text. A blocked loop also stops the logger draining its buffer, so the plain-text copy can be the only one that survives. A line present in raw form but missing from the structured log points at the logging pipeline rather than the loop.

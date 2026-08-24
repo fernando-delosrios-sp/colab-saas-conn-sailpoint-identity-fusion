@@ -3,6 +3,7 @@ import { ApiQueue } from '../clientService/queue'
 import { QueuePriority } from '../clientService/types'
 import { getCallerInfo } from './helpers'
 import { HeartbeatSnapshot, OperationHeartbeat, formatDetailSuffix } from './operationHeartbeat'
+import { EventLoopWatchdog, formatRunContextLabel } from './eventLoopWatchdog'
 import {
     CorrelationSkipReason,
     OperationPhase,
@@ -229,6 +230,7 @@ export class LogService {
     private static readonly ISSUE_MESSAGE_MAX_LENGTH = 180
     private runContext: OperationRunContext | null = null
     private operationHeartbeat: OperationHeartbeat | null = null
+    private eventLoopWatchdog: EventLoopWatchdog | null = null
     private phaseRecordingHook?: (
         phaseNumber: number,
         phase: OperationPhase,
@@ -437,6 +439,20 @@ export class LogService {
     stopOperationHeartbeat(): void {
         this.operationHeartbeat?.stop()
         this.operationHeartbeat = null
+    }
+
+    /** Starts reporting event-loop starvation, which silences keep-alive and heartbeat output. */
+    startEventLoopWatchdog(): void {
+        this.stopEventLoopWatchdog()
+        this.eventLoopWatchdog = new EventLoopWatchdog(this, {
+            getContext: () => formatRunContextLabel(this.runContext),
+        })
+        this.eventLoopWatchdog.start()
+    }
+
+    stopEventLoopWatchdog(): void {
+        this.eventLoopWatchdog?.stop()
+        this.eventLoopWatchdog = null
     }
 
     /**

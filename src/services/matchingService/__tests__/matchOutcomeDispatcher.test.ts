@@ -164,6 +164,56 @@ describe('MatchOutcomeDispatcher', () => {
     }
 
     describe('runMatchSweep', () => {
+        it('lets timers run while sweeping a large account set', async () => {
+            // A first run has no identities to score against, so every await in the sweep settles
+            // without I/O. Microtasks alone never let Node reach the timer phase, which is what
+            // silences the heartbeat and the platform keep-alive for the whole sweep.
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { managedAccountsBatchSize: 10 },
+            })
+            run.sourcesByName.set(
+                SOURCE_NAME,
+                sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
+            )
+            seedReviewers(run)
+
+            // Longest stretch of accounts handled without the event loop reaching a macrotask.
+            let accountsSinceTurn = 0
+            let worstStretch = 0
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async () => {
+                accountsSinceTurn += 1
+                worstStretch = Math.max(worstStretch, accountsSinceTurn)
+                return 0
+            })
+
+            const accounts = Array.from({ length: 200 }, (_, index) =>
+                managedAccount({
+                    id: `acct-${index}`,
+                    nativeIdentity: `native-${index}`,
+                    name: `Managed Account ${index}`,
+                })
+            )
+            for (const account of accounts) {
+                run.managedAccountsById.set(`${SOURCE_ID}::${account.nativeIdentity}`, account)
+            }
+
+            let sweeping = true
+            const markTurn = () => {
+                if (!sweeping) return
+                accountsSinceTurn = 0
+                setImmediate(markTurn)
+            }
+            setImmediate(markTurn)
+
+            await dispatcher.runMatchSweep(accounts, accounts.length)
+            sweeping = false
+
+            // managedAccountsBatchSize 10 caps the yield cadence at 10 accounts; 25 leaves slack
+            // while still failing loudly if a loop runs the whole set without yielding.
+            expect(worstStretch).toBeLessThanOrEqual(25)
+        })
+
         it('dispatches an exact match to automatic merge when the combined score meets the threshold', async () => {
             const { dispatcher, matchingService, forms, decisionProcessor, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
