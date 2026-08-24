@@ -13,6 +13,8 @@ export type AttributeMappingConfig = {
     attributeName: string
     /** Source attribute names to look for in managed accounts */
     sourceAttributes: string[]
+    /** Unique source attribute names plus target name, computed at construction time. */
+    lookupAttributeNames: string[]
     /** Strategy for merging values from multiple sources */
     attributeMerge: AttributeMergeMode
     /** Specific source name (only used with "source" merge strategy) */

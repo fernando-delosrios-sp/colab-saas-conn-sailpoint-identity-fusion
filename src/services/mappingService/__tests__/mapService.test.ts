@@ -202,4 +202,55 @@ describe('MappingService selective targets', () => {
 
         expect(fusionAccount.attributes.jobTitle).toBe('Engineer')
     })
+
+    it('does not replace current bag object when needsRefresh is false and history is empty', () => {
+        const service = new MappingService(config, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.setNeedsRefresh(false)
+        fusionAccount.attributeBag.current.displayName = 'Kept'
+        const before = fusionAccount.attributeBag.current
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.displayName).toBe('Kept')
+        expect(fusionAccount.attributeBag.current).toBe(before)
+    })
+
+    it('uses rewritten mainAccount from the same invocation index for Main account merge', () => {
+        const rewriteConfig = {
+            ...config,
+            attributeMaps: [
+                {
+                    newAttribute: 'mainAccount',
+                    existingAttributes: ['mainAccount'],
+                    attributeMerge: AttributeMergeMode.First,
+                },
+                {
+                    newAttribute: 'jobTitle',
+                    existingAttributes: ['jobTitle'],
+                    attributeMerge: AttributeMergeMode.MainAccount,
+                },
+            ],
+        } as any
+        const service = new MappingService(rewriteConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.setNeedsRefresh(true)
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-1',
+                mainAccount: 'src-1::native-2',
+                jobTitle: 'Engineer',
+            },
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-2',
+                jobTitle: 'Manager',
+            },
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributes.jobTitle).toBe('Manager')
+    })
 })
