@@ -656,4 +656,57 @@ describe('DefinitionService.refreshUniqueAttributes unique-registry lock', () =>
         expect(registered.has(String(first.attributes.UID))).toBe(true)
         expect(registered.has(String(second.attributes.UID))).toBe(true)
     })
+
+    it('uses empty $counter on the first collision-strategy attempt', async () => {
+        const mockLog = {
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+            getLogLevel: vi.fn(() => 'info'),
+        } as any
+        const locks = new InMemoryLockService(mockLog)
+        const service = new DefinitionService(
+            {
+                normalAttributeDefinitions: [],
+                uniqueAttributeDefinitions: [
+                    {
+                        name: 'UID',
+                        expression: 'USER',
+                        useIncrementalCounter: false,
+                        digits: 1,
+                    },
+                ],
+                attributeMaps: [],
+                skipAccountsWithMissingId: false,
+                forceAttributeRefresh: false,
+                maxAttempts: 20,
+            } as any,
+            mockSchemas,
+            mockLog,
+            locks
+        )
+        service.setStateWrapper({})
+
+        const seed = createFusionAccount()
+        seed.name = 'seed'
+        await service.refreshUniqueAttributes(seed)
+        expect(seed.attributes.UID).toBe('USER')
+
+        const counters: string[] = []
+        const originalEvaluate = templateEvaluator.evaluateAttributeTemplate
+        const evaluateSpy = vi.spyOn(templateEvaluator, 'evaluateAttributeTemplate').mockImplementation((...args) => {
+            const context = args[1] as { counter?: string }
+            counters.push(context.counter ?? '')
+            return originalEvaluate(...args)
+        })
+
+        const colliding = createFusionAccount()
+        colliding.name = 'colliding'
+        await service.refreshUniqueAttributes(colliding)
+
+        expect(counters[0]).toBe('')
+        expect(colliding.attributes.UID).toBe('USER1')
+        evaluateSpy.mockRestore()
+    })
 })
