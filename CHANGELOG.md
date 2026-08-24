@@ -17,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### 🔧 Improvements
 
+- **Faster Fusion Map and Define on the assembly hot path** — Mapping and Normal Define now do less per-account copying, snapshot scanning, and debug work during account assembly (including Match `assembleManagedAccount`). Mapped values and Velocity results are unchanged.
 - **Uncorrelated sweep finishes review forms and non-matches faster** — After identity scoring, those outcomes can overlap up to the existing Fusion parallel batch cap (12 by default, or the managed-account batch size when it is lower). Automatic merges still apply one at a time. No new setting and no migration.
 
 ### ✨ New Features
