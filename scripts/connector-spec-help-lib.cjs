@@ -49,6 +49,30 @@ function seeAlso(links) {
     return `<br><br>See also: ${rendered}.`
 }
 
+/**
+ * @param {string} url
+ */
+function normalizeDocUrl(url) {
+    return String(url)
+        .trim()
+        .replace(/#.*$/, '')
+        .replace(/\/+$/, '')
+}
+
+/**
+ * @param {string} html
+ * @returns {string[]}
+ */
+function extractHtmlHrefs(html) {
+    const hrefs = []
+    const re = /href="([^"]+)"/gi
+    let match
+    while ((match = re.exec(String(html || ''))) !== null) {
+        hrefs.push(match[1])
+    }
+    return hrefs
+}
+
 /** @type {Record<string, { sectionHelpMessage: string; docLinkLabel: string; docLinkPath: string }>} */
 const SECTION_HELP = {
     'Connection Settings': {
@@ -66,7 +90,6 @@ const SECTION_HELP = {
             '<strong>Define which identities are in scope.</strong><br><br>Limit processing using an <strong>Identity Scope Query</strong> (standard ISC search syntax). Toggle <strong>Include identities in the scope</strong> to establish a baseline population for Match alongside managed source accounts.' +
             seeAlso([
                 ['use-guides/configuration/configuring-sources-and-scope/', 'Configuring sources and scope'],
-                ['configuration/source/', 'Source settings reference'],
             ]),
         docLinkLabel: 'Source settings reference',
         docLinkPath: 'configuration/source/',
@@ -77,7 +100,6 @@ const SECTION_HELP = {
             seeAlso([
                 ['use-guides/configuration/configuring-sources-and-scope/', 'Configuring sources and scope'],
                 ['use-guides/configuration/source-types/', 'Source types guide'],
-                ['configuration/source/', 'Source settings reference'],
             ]),
         docLinkLabel: 'Source settings reference',
         docLinkPath: 'configuration/source/',
@@ -86,7 +108,6 @@ const SECTION_HELP = {
         sectionHelpMessage:
             '<strong>Control account maintenance.</strong><br><br><strong>History limits:</strong> Cap the number of audit history messages stored per account.<br><br><strong>Delete when empty:</strong> Remove the Fusion account if all its underlying source accounts are deleted.<br><br><strong>Skip missing targets:</strong> Ignore source accounts missing a mapped native identity attribute.' +
             seeAlso([
-                ['configuration/source/', 'Source settings reference'],
                 ['use-guides/configuration/configuring-sources-and-scope/', 'Configuring sources and scope'],
             ]),
         docLinkLabel: 'Source settings reference',
@@ -97,7 +118,6 @@ const SECTION_HELP = {
             '<strong>Map and merge source attributes.</strong><br><br>Choose a <strong>Default attribute merge</strong> mode. Then configure per-attribute rules to target specific source fields, rename them on the Fusion account, and optionally override the merge strategy or pin specific sources.' +
             seeAlso([
                 ['use-guides/configuration/mapping-attributes/', 'Mapping attributes guide'],
-                ['configuration/mapping/', 'Mapping settings reference'],
             ]),
         docLinkLabel: 'Mapping settings reference',
         docLinkPath: 'configuration/mapping/',
@@ -128,7 +148,6 @@ const SECTION_HELP = {
             seeAlso([
                 ['use-guides/configuration/matching-identities/', 'Matching identities guide'],
                 ['use-guides/configuration/tuning-matching-algorithms/', 'Tuning matching algorithms'],
-                ['configuration/matching/', 'Matching settings reference'],
             ]),
         docLinkLabel: 'Matching settings reference',
         docLinkPath: 'configuration/matching/',
@@ -138,7 +157,6 @@ const SECTION_HELP = {
             '<strong>Configure manual review for potential matches.</strong><br><br>Define <strong>Form attributes</strong> to display to reviewers and set candidate limits. Assign global reviewers to act as fail-safes and optionally email them processing reports after each aggregation.' +
             seeAlso([
                 ['use-guides/configuration/review-forms-and-reviewers/', 'Review forms and reviewers'],
-                ['configuration/matching/', 'Matching settings reference'],
             ]),
         docLinkLabel: 'Matching settings reference',
         docLinkPath: 'configuration/matching/',
@@ -148,7 +166,6 @@ const SECTION_HELP = {
             '<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation) and manage memory consumption during match detection by adjusting batch sizes.<br><br>The section header in ISC shows the <strong>installed connector version</strong> for reference — it updates automatically when you upgrade the connector package.' +
             seeAlso([
                 ['use-guides/operation/', 'Operation guides'],
-                ['configuration/advanced/', 'Advanced settings reference'],
             ]),
         docLinkLabel: 'Advanced settings reference',
         docLinkPath: 'configuration/advanced/',
@@ -159,7 +176,6 @@ const SECTION_HELP = {
             seeAlso([
                 ['reference/proxy-mode/', 'Proxy mode reference'],
                 ['reference/scenario-recording/', 'Scenario recording reference'],
-                ['configuration/advanced/', 'Advanced settings reference'],
             ]),
         docLinkLabel: 'Advanced settings reference',
         docLinkPath: 'configuration/advanced/',
@@ -169,7 +185,6 @@ const SECTION_HELP = {
             '<strong>Fine-tune API limits and execution resilience.</strong><br><br>Adjust these parameters to prevent the connector from being rate-limited by Identity Security Cloud, ensure long-running operations complete without timing out, and optimize throughput by adjusting request concurrency and batching sizes.' +
             seeAlso([
                 ['use-guides/operation/tune-api-performance/', 'Tune API performance guide'],
-                ['configuration/advanced/', 'Advanced settings reference'],
             ]),
         docLinkLabel: 'Advanced settings reference',
         docLinkPath: 'configuration/advanced/',
@@ -337,6 +352,30 @@ function collectViolations(spec) {
                         id: title,
                         message: 'docLink should point to a configuration reference page',
                     })
+                } else if (item.sectionHelpMessage) {
+                    const sectionUrls = [
+                        item.docLink,
+                        ...extractHtmlHrefs(item.sectionHelpMessage),
+                    ].map(normalizeDocUrl)
+                    const seen = new Set()
+                    const duplicates = new Set()
+                    for (const url of sectionUrls) {
+                        if (!url) {
+                            continue
+                        }
+                        if (seen.has(url)) {
+                            duplicates.add(url)
+                        }
+                        seen.add(url)
+                    }
+                    if (duplicates.size > 0) {
+                        violations.push({
+                            kind: 'sectionHelpMessage',
+                            id: title,
+                            message:
+                                'duplicate doc link in the same section (See also must not repeat docLink)',
+                        })
+                    }
                 }
                 walkItems(item.items, menuLabel)
                 continue
