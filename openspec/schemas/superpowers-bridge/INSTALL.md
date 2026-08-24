@@ -18,8 +18,5 @@ For each configuration file that exists in the project:
 3. Append this fragment as a new section to the end of the rule file. 
    *(Note: Most tools support Markdown, but if a tool requires a specific format like JSON, adapt the content accordingly).*
 
-## 3. Install Required Skills
-Suggest or run the command to install the baseline `superpowers` skills package:
-```bash
-npx skills add obra/superpowers
-```
+## 3. Skills
+This project does not install the `obra/superpowers` skill pack. Follow the workflow routing in `AGENTS.md` and this schema's artifact steps without those skills.
