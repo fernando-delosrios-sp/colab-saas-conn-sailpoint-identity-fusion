@@ -89,6 +89,62 @@ describe('attributeService helpers', () => {
             expect(processAttributeMapping(config, map, ['HR', 'IT'], prioritizedAccount)).toBe('hr@acme.com')
         })
 
+        it('uses the main account snapshot when Main account merge is selected', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('HR', [{ jobTitle: 'Engineer' }])
+            map.set('IT', [{ jobTitle: 'Director' }])
+            const config = {
+                attributeName: 'jobTitle',
+                sourceAttributes: ['jobTitle'],
+                attributeMerge: AttributeMergeMode.MainAccount,
+            }
+            const mainAccount = { jobTitle: 'Manager' } as Attributes
+            const originSnapshot = { jobTitle: 'Engineer' } as Attributes
+
+            expect(processAttributeMapping(config, map, ['HR', 'IT'], mainAccount, originSnapshot)).toBe('Manager')
+        })
+
+        it('uses the origin snapshot when Main account merge has no main account', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('IT', [{ jobTitle: 'Director' }])
+            const config = {
+                attributeName: 'jobTitle',
+                sourceAttributes: ['jobTitle'],
+                attributeMerge: AttributeMergeMode.MainAccount,
+            }
+            const originSnapshot = { jobTitle: 'Engineer' } as Attributes
+
+            expect(processAttributeMapping(config, map, ['IT'], undefined, originSnapshot)).toBe('Engineer')
+        })
+
+        it('does not fall through when Main account merge snapshot lacks the attribute', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('IT', [{ jobTitle: 'Director' }])
+            const config = {
+                attributeName: 'jobTitle',
+                sourceAttributes: ['jobTitle'],
+                attributeMerge: AttributeMergeMode.MainAccount,
+            }
+            const mainAccount = {} as Attributes
+            const originSnapshot = { jobTitle: 'Engineer' } as Attributes
+
+            expect(processAttributeMapping(config, map, ['IT'], mainAccount, originSnapshot)).toBeUndefined()
+        })
+
+        it('uses only the origin snapshot when Origin account merge is selected', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('IT', [{ jobTitle: 'Director' }])
+            const config = {
+                attributeName: 'jobTitle',
+                sourceAttributes: ['jobTitle'],
+                attributeMerge: AttributeMergeMode.OriginAccount,
+            }
+            const mainAccount = { jobTitle: 'Manager' } as Attributes
+            const originSnapshot = { jobTitle: 'Engineer' } as Attributes
+
+            expect(processAttributeMapping(config, map, ['IT'], mainAccount, originSnapshot)).toBe('Engineer')
+        })
+
         it('should return list for "list" merge', () => {
             const map = new Map<string, Attributes[]>()
             map.set('S1', [{ dept: '[HR]' }])

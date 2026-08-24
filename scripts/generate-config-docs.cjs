@@ -159,10 +159,12 @@ const FIELD_EXPLANATIONS = {
     },
     mapping: {
         attributeMerge:
-            'Default strategy when multiple sources provide a value for the same Fusion attribute. Override per attribute when needed.',
+            'Default strategy when multiple sources provide a value for the same Fusion attribute. Options, in order: **Main account** (`mainAccount`, the default), **Origin account** (`originAccount`), **First found** (`first`), **Keep a list of values** (`list`), and **Concatenate different values** (`concatenate`). Per-attribute mappings also offer **Source name** (`source`). Main and Origin account modes select one snapshot with no fallback to other accounts.',
         newAttribute: 'Target attribute name on the Fusion account schema.',
         existingAttributes:
             'One or more source attribute names to pull values from. The connector tries each in order according to the merge strategy.',
+        source:
+            'When the per-attribute merge is **Source name**, the source whose first account supplies the value. `$originSource` is a source-level token: it resolves to the prioritized (`mainAccount`) source name, then the first account on that source. It is not **Origin account** merge, which pins the exact origin snapshot.',
     },
     definition: {
         name: 'Attribute name written to the Fusion account after the Velocity template and post-processing transforms run.',
@@ -324,7 +326,7 @@ const SECTION_INTRO_OVERRIDES = {
     'Connection Settings':
         '**Configure how this connector connects to Identity Security Cloud.**\n\nUse **Identity Security Cloud API URL** to specify the base URL of your ISC tenant (for example, `https://tenant.api.identitynow.com`).\n\nProvide the **Personal Access Token ID** and **Personal Access Token Secret** for an account that has the required API permissions (Sources, Identities, Accounts, Workflows/Forms). These values authenticate all connector operations.\n\nSee also: [Tune API performance](../use-guides/operation/tune-api-performance.md) · [ISC PAT scopes](../reference/pat-scopes.md).',
     Scope:
-        '**Define which identities are in scope.**\n\nLimit processing using an **Identity Scope Query** (standard ISC search syntax). Toggle **Include identities in the scope** to establish a baseline population for Match alongside managed source accounts.\n\nSee also: [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) · [Source settings reference](source.md).',
+        '**Define which identities are in scope.**\n\nLimit processing using an **Identity Scope Query** (standard ISC search syntax). Toggle **Include identities in the scope** to establish a baseline population for Match alongside managed source accounts.\n\nSee also: [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md).',
     Sources:
         '**Select and configure authoritative account sources.**\n\n**Source type and behavior:** Define role (Authoritative, Records, Orphan) and handling for non-matched non-identity accounts (disable, defer).\n\n**Aggregation and correlation:** Control timing (delays, retries), optimized aggregation, and correlation strategy (in-process or reverse).\n\n**Filtering and limits:** Process subsets via API/JMESPath filters and set batch capacities.\n\nSee also: [Configuring sources and scope](../use-guides/configuration/configuring-sources-and-scope.md) · [Source types](../use-guides/configuration/source-types.md).',
     'Processing Control':
