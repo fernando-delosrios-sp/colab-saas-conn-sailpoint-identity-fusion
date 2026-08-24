@@ -76,7 +76,7 @@ During long `accountList` aggregations, the connector emits standardized prefixe
 | Prefix | Level | Use for |
 | --- | --- | --- |
 | `STATUS` | Info | Periodic heartbeat: phase, step, progress, `api=` queue segment, elapsed time |
-| `EVENT_SUMMARY` | Info | Interval deltas for matches, decisions, correlations, emails |
+| `EVENT_SUMMARY` | Info | Interval deltas for review/merge matches, decisions, correlations, emails (not emitted for non-matched-only ticks; use `STATUS`) |
 | `PHASE` / `STEP` | Info | Pipeline boundary markers (`START` / `END elapsed=…`) |
 | `DETAIL` | Info | Milestones as `key=value` pairs |
 | `WARN STALL` | Warn | API queue idle for two consecutive heartbeat ticks |

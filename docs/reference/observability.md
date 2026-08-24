@@ -52,7 +52,7 @@ During long `accountList` aggregations, the connector emits standardized text pr
 | Prefix | Level | Purpose |
 | ------ | ----- | ------- |
 | `STATUS` | Info | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, pipeline progress with delta, compact `api=Na/Nq/Nc` segment with delta (`q` = FIFO queue length plus requests waiting for a rate-limit slot), memory, elapsed time |
-| `EVENT_SUMMARY` | Info | Aggregated match/decision/correlation/email counts since the previous heartbeat tick |
+| `EVENT_SUMMARY` | Info | Interval deltas for review/merge matches, decisions, correlations, and emails. Omitted when the tick only recorded non-matched accounts — that work is already on `STATUS` as progress delta plus cumulative `matches(` |
 | `PHASE` / `STEP` | Info | Pipeline boundary markers (`START` / `END elapsed=…`) |
 | `DETAIL` | Info | Operational milestones as `key=value` pairs (sources loaded, emails sent, mode) |
 | `WARN STALL` | Warn | API queue stopped completing requests for two consecutive heartbeat ticks; includes active request labels |

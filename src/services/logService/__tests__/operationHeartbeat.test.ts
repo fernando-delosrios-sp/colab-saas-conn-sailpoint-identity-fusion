@@ -1,4 +1,8 @@
-import { OperationRunContext, formatCorrelationSummarySegment } from '../operationRunContext'
+import {
+    OperationRunContext,
+    createEmptyEventCounters,
+    formatCorrelationSummarySegment,
+} from '../operationRunContext'
 import {
     OperationHeartbeat,
     countCorrelationQueuePending,
@@ -291,6 +295,33 @@ describe('operation heartbeat formatters', () => {
         expect(refreshLine).not.toContain('fusion-reviews=')
         expect(refreshLine).not.toContain('fusion-review-instances=')
         expect(refreshLine).not.toContain('api=')
+    })
+
+    it('omits EVENT_SUMMARY matches when the interval only has non-matched outcomes', () => {
+        const events = createEmptyEventCounters()
+        events.nonMatch = 225
+
+        expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([])
+    })
+
+    it('keeps EVENT_SUMMARY matches when the interval includes review or merge outcomes', () => {
+        const events = createEmptyEventCounters()
+        events.nonMatch = 220
+        events.formsQueued = 5
+
+        expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([
+            'EVENT_SUMMARY matches non-matched=+220/10s manual=+5/10s',
+        ])
+    })
+
+    it('still emits EVENT_SUMMARY decisions when matches are only non-matched', () => {
+        const events = createEmptyEventCounters()
+        events.nonMatch = 225
+        events.decisionMerge = 1
+
+        expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([
+            'EVENT_SUMMARY decisions merge=+1/10s',
+        ])
     })
 
     it('formats EVENT_SUMMARY lines for matches and correlations', () => {

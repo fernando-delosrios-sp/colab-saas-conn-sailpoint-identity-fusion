@@ -271,8 +271,10 @@ export function formatEventSummaryLines(
     const inProcessPhase = phase === 'Process'
 
     if (inProcessPhase) {
+        const hasReviewOrMergeOutcomes =
+            events.formsQueued > 0 || events.autoMerged > 0 || events.matchDeferred > 0
         const matchParts: string[] = []
-        if (events.nonMatch > 0) {
+        if (hasReviewOrMergeOutcomes && events.nonMatch > 0) {
             matchParts.push(`non-matched=${formatIntervalDeltaCount(events.nonMatch, intervalMs)}`)
         }
         if (events.formsQueued > 0) {
