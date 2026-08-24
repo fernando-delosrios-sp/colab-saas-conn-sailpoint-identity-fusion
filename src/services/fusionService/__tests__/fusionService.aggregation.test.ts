@@ -1230,11 +1230,77 @@ describe('FusionService — aggregation', () => {
                 callOrder.push(account.id ?? '')
                 return originalProcessManagedAccount(account)
             })
+            const sweepSpy = vi.spyOn(ctx.fusionService.matchOutcomeDispatcher, 'runMatchSweep')
 
             await ctx.fusionService.processManagedAccounts()
 
             expect(callOrder).toHaveLength(2)
             expect(new Set(callOrder.slice(0, 2))).toEqual(new Set(['acct-corr-a', 'acct-corr-b']))
+            const oneAccountSweeps = sweepSpy.mock.calls.filter(
+                (call) => Array.isArray(call[0]) && call[0].length === 1 && call[1] === 1
+            )
+            expect(oneAccountSweeps).toHaveLength(2)
+            expect(new Set(oneAccountSweeps.map((call) => (call[0] as Account[])[0]?.id))).toEqual(
+                new Set(['acct-corr-a', 'acct-corr-b'])
+            )
+        })
+
+        it('emits one correlated-sweep DETAIL with skip-linked count and remaining queue size', async () => {
+            const linkedA = {
+                id: 'acct-linked-corr-a',
+                nativeIdentity: 'native-linked-corr-a',
+                name: 'Linked Correlated A',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                identityId: 'identity-linked-a',
+                attributes: {},
+                uncorrelated: false,
+            } as Account
+            const linkedB = {
+                id: 'acct-linked-corr-b',
+                nativeIdentity: 'native-linked-corr-b',
+                name: 'Linked Correlated B',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                identityId: 'identity-linked-b',
+                attributes: {},
+                uncorrelated: false,
+            } as Account
+            const uncorrelated = {
+                id: 'acct-unc-remaining',
+                nativeIdentity: 'native-unc-remaining',
+                name: 'Uncorrelated Remaining',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+            const workQueue = new Map([
+                ['source-a-id::native-linked-corr-a', linkedA],
+                ['source-a-id::native-linked-corr-b', linkedB],
+                ['source-a-id::native-unc-remaining', uncorrelated],
+            ])
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            vi.spyOn(ctx.mockSources, 'managedSources', 'get').mockReturnValue([])
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: {},
+            })
+            ctx.fusionService.setFusionAccount(FusionAccount.fromManagedAccount(linkedA))
+            ctx.fusionService.setFusionAccount(FusionAccount.fromManagedAccount(linkedB))
+
+            await ctx.fusionService.processManagedAccounts()
+
+            expect(ctx.mockLog.detail).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action: 'correlated account sweep complete',
+                    droppedLinked: 2,
+                    remaining: 1,
+                })
+            )
         })
 
         it('short-circuits duplicate checks when an identity-origin match already exists', async () => {

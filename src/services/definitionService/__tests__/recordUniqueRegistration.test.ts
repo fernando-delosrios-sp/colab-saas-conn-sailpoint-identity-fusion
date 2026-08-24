@@ -83,13 +83,45 @@ describe('DefinitionService record unique registration', () => {
             })
         )
 
-        await definitionService.registerUniqueValuesFromRecordManagedAccounts(accounts, mappingService, run)
+        const processedAtBatchEnd: number[] = []
+        await definitionService.registerUniqueValuesFromRecordManagedAccounts(accounts, mappingService, run, {
+            onProgress: (processed) => processedAtBatchEnd.push(processed),
+        })
 
         const registered = (definitionService as any).getUniqueValues('employeeId') as Set<string>
         expect(registered.size).toBe(25)
         for (let index = 0; index < 25; index++) {
             expect(registered.has(`E${String(index).padStart(3, '0')}`)).toBe(true)
         }
+        expect(processedAtBatchEnd).toEqual([12, 24, 25])
+    })
+
+    it('registerUniqueValuesFromRecordManagedAccounts skips missing unique values without error', async () => {
+        const definitionService = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
+        const mappingService = new MappingService(config, mockLog)
+        const run = new FusionRun()
+
+        await definitionService.registerUniqueValuesFromRecordManagedAccounts(
+            [
+                managedAccount({
+                    id: 'src-record::native-missing-email',
+                    nativeIdentity: 'native-missing-email',
+                    attributes: { emp_id: 'E-MISS' },
+                }),
+                managedAccount({
+                    id: 'src-record::native-both',
+                    nativeIdentity: 'native-both',
+                    attributes: { emp_id: 'E-BOTH', email: 'both@example.com' },
+                }),
+            ],
+            mappingService,
+            run
+        )
+
+        expect((definitionService as any).getUniqueValues('employeeId').has('E-MISS')).toBe(true)
+        expect((definitionService as any).getUniqueValues('employeeId').has('E-BOTH')).toBe(true)
+        expect((definitionService as any).getUniqueValues('email').has('both@example.com')).toBe(true)
+        expect((definitionService as any).getUniqueValues('email').size).toBe(1)
     })
 
     it('registers distinct values for the same unique attribute name from two accounts', async () => {
