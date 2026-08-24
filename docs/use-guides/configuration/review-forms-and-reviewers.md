@@ -21,7 +21,7 @@ For reviewer assignment and access profiles, see [Managing reviewers](managing-r
 | **Owners are global reviewers?** | Add Fusion source owner and governance group to all review forms | Yes for pilots |
 | **Send report to owner on aggregation?** | Email report after each aggregation | Yes (useful for monitoring) |
 
-!!! note
+!!! note "Candidate limit behavior"
     When the candidate limit is exceeded, only the highest-scoring potential matches are included.
 
 For localization (**Default Language**, **Identity Language Attribute**, form locale behavior), see [Managing reviewers — Localization and reviewer experience](managing-reviewers.md#localization-and-reviewer-experience).

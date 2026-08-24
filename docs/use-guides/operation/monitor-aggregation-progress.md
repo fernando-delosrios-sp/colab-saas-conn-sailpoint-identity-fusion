@@ -113,7 +113,7 @@ For match segments (`matches(...)`), decision segments (`decisions(...)`), corre
 | **Info** | Standard operational messages | Production monitoring (recommended) |
 | **Debug** | All logs including debug details | Troubleshooting; high volume |
 
-!!! note
+!!! note "Debug log volume"
     Debug level generates high log volume; use temporarily. ISC debug logging (`spConnDebugLoggingEnabled`) is separate and does not replace external delivery.
 
 ---

@@ -159,7 +159,7 @@ When using **Keep a list of values** or **Concatenate**, consider the ISC schema
 | **Keep a list of values** | Multi-valued (array)   | Use index transform or join | Entitlements, roles, groups               |
 | **Concatenate**           | Single-valued (string) | Direct mapping              | Human-readable display; search            |
 
-!!! note
+!!! note "Schema implications"
 
     After **Discover Schema**, ISC may show multi-valued attributes as entitlement-type (multi-valued) fields. Your identity profile transforms must handle arrays appropriately.
 
