@@ -39,7 +39,7 @@
 ## 5. Verification
 
 - [x] 5.1 `npx vitest run src/services/definitionService/__tests__/recordUniqueRegistration.test.ts src/services/definitionService/__tests__/defineService.test.ts src/services/matchingService/__tests__/matchOutcomeDispatcher.test.ts src/services/fusionService/__tests__/fusionService.aggregation.test.ts src/operations/helpers/__tests__/accountListPhaseInstrumentation.test.ts`
-- [ ] 5.2 `npm run typecheck`
+- [x] 5.2 `npm run typecheck`
 - [x] 5.3 `npm run lint` (do not pipe to `tail`)
 - [x] 5.4 `git diff --stat` must **not** include `src/services/mappingService/`, `src/services/definitionService/formatting.ts`, `src/services/logService/operationHeartbeat.ts`, or `connector-spec.json`. Unique generation changes are **expected** in `definitionService.ts` / `defineService.test.ts`.
 
