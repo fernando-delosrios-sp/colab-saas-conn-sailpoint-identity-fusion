@@ -43,6 +43,7 @@ export class DefinitionService {
     private readonly maxAttempts?: number
     private readonly reverseSources: SourceConfig[]
     readonly registrationPlan: UniqueRegistrationPlan
+    private readonly anyNormalDefinitionRefresh: boolean
 
     constructor(
         private config: FusionConfig,
@@ -64,6 +65,7 @@ export class DefinitionService {
             (sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute
         )
         this.registrationPlan = buildUniqueRegistrationPlan(config)
+        this.anyNormalDefinitionRefresh = this.normalDefinitions.some((def) => def.refresh)
     }
 
     public setStateWrapper(state: Record<string, unknown> | undefined): void {
@@ -97,7 +99,7 @@ export class DefinitionService {
 
         for (const definition of this.normalDefinitions) {
             try {
-                await this.processNormalDefinition(definition, fusionAccount, context)
+                this.processNormalDefinition(definition, fusionAccount, context)
             } catch (error) {
                 this.log.error(
                     `Error generating normal attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
@@ -127,18 +129,20 @@ export class DefinitionService {
         const forceRefresh =
             this.forceAttributeRefresh ||
             fusionAccount.needsReset ||
-            this.normalDefinitions.some((def) => def.refresh)
+            this.anyNormalDefinitionRefresh
         const shouldRefresh = fusionAccount.needsRefresh || forceRefresh
         if (!shouldRefresh) return
 
-        this.log.debug(
-            `Refreshing normal attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`
-        )
+        if (this.log.getLogLevel() === 'debug') {
+            this.log.debug(
+                `Refreshing normal attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`
+            )
+        }
         const context = this.buildVelocityContext(fusionAccount)
 
         for (const definition of this.normalDefinitions) {
             try {
-                await this.processNormalDefinition(definition, fusionAccount, context)
+                this.processNormalDefinition(definition, fusionAccount, context)
             } catch (error) {
                 this.log.error(
                     `Error generating normal attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
@@ -463,7 +467,7 @@ export class DefinitionService {
     // ========================================================================
 
     private buildVelocityContext(fusionAccount: FusionAccount): Record<string, any> {
-        const context: Record<string, any> = { ...fusionAccount.attributeBag.current }
+        const context: Record<string, any> = Object.create(fusionAccount.attributeBag.current)
 
         if (fusionAccount.identityAlias && context.name === undefined) {
             context.name = fusionAccount.identityAlias
@@ -623,11 +627,11 @@ export class DefinitionService {
     // Private — Normal Definition Processing
     // ========================================================================
 
-    private async processNormalDefinition(
+    private processNormalDefinition(
         definition: NormalAttributeDefinition,
         fusionAccount: FusionAccount,
         context: Record<string, any>
-    ): Promise<void> {
+    ): void {
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
 
         if (this.applyDisplayAttributeOverrideIfApplicable(fusionAccount, definition.name)) {
@@ -681,9 +685,11 @@ export class DefinitionService {
         if (result.value !== undefined && result.value !== null) {
             fusionAccount.attributes[definition.name] = result.value
             context[definition.name] = result.value
-            this.log.debug(
-                `[${fusionAccount.name}] ${definition.name} = ${typeof result.value === 'object' ? JSON.stringify(result.value) : result.value}`
-            )
+            if (this.log.getLogLevel() === 'debug') {
+                this.log.debug(
+                    `[${fusionAccount.name}] ${definition.name} = ${typeof result.value === 'object' ? JSON.stringify(result.value) : result.value}`
+                )
+            }
         } else {
             this.applyNormalDefinitionClearOrSafeDefault(
                 definition.name,

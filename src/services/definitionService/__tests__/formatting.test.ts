@@ -16,6 +16,11 @@ describe('evaluateVelocityTemplate', () => {
             expect(result).toBe('John Doe')
         })
 
+        it('renders $firstName without requiring debug logging', () => {
+            const result = evaluateVelocityTemplate('$firstName', { firstName: 'John' })
+            expect(result).toBe('John')
+        })
+
         it('should evaluate template with braces notation', () => {
             const context = { firstName: 'John', lastName: 'Doe' }
             const result = evaluateVelocityTemplate('${firstName}.${lastName}@example.com', context)
