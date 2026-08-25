@@ -768,7 +768,14 @@ export class MatchingService {
                 matching.attribute,
                 (identityAttribute ?? '').toString()
             )
-            return scoreNameMatcherNormalized(normAccount, normIdentity, matching)
+            return scoreNameMatcherNormalized(
+                normAccount,
+                normIdentity,
+                matching,
+                this.run
+                    ? { tokenCache: this.run.nameMatcherTokenCache, phoneticCache: this.run.nameMatcherPhoneticCache }
+                    : undefined
+            )
         }
         return this.scoreAttribute(
             (accountAttribute ?? '').toString(),

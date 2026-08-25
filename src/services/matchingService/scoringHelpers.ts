@@ -2,7 +2,7 @@ import { doubleMetaphone } from 'double-metaphone'
 import { MatchingConfig, effectiveSkipMatchIfMissing } from '../../model/config'
 import { ScoreReport } from './types'
 import { jaroWinkler, diceCoefficient } from './stringComparison'
-import { match as nameMatch, matchNormalized as nameMatchNormalized } from './nameMatching'
+import { match as nameMatch, matchNormalized as nameMatchNormalized, type NameMatcherCaches } from './nameMatching'
 import { evaluateVelocityTemplate } from '../definitionService/formatting'
 type RenderContext = Record<string, any>
 import { missing, trimStr } from '../../utils/safeRead'
@@ -172,8 +172,13 @@ export const scoreBinary = (
  * Called by the ScoringService cache layer after pre-normalizing both sides;
  * avoids repeated normalization in the O(n×m) loop — mirrors the scoreLIG3Normalized pattern.
  */
-export function scoreNameMatcherNormalized(normA: string, normB: string, matching: MatchingConfig): ScoreReport {
-    const similarity = nameMatchNormalized(normA, normB)
+export function scoreNameMatcherNormalized(
+    normA: string,
+    normB: string,
+    matching: MatchingConfig,
+    caches?: NameMatcherCaches
+): ScoreReport {
+    const similarity = nameMatchNormalized(normA, normB, caches)
     const score = Math.round(similarity * 100)
     const threshold = matching.fusionScore ?? 0
     return makeScoreReport(matching, score, score >= threshold)
