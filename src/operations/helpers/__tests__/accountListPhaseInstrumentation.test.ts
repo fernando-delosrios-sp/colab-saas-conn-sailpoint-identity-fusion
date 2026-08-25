@@ -1,7 +1,7 @@
 import { FusionRun } from '../../../model/fusionRun'
 import { OperationRunContext } from '../../../services/logService/operationRunContext'
 import { createOperationTestRegistry } from '../../__tests__/harness/operationTestRegistry'
-import { outputPhase, processPhase, fetchPhase } from '../accountListPhases'
+import { outputPhase, processPhase, fetchPhase, refreshPhase } from '../accountListPhases'
 
 describe('accountListPhases step instrumentation', () => {
     afterEach(() => {
@@ -151,6 +151,61 @@ describe('fetchPhase global reviewer hydration', () => {
 
         expect((sources as any).fetchGlobalOwnerIdentityIds).not.toHaveBeenCalled()
         expect(identities.fetchIdentities).toHaveBeenCalledWith([])
+    })
+})
+
+describe('refreshPhase workload summary', () => {
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('emits DETAIL refresh workload with bucket millisecond keys when Fusion accounts were processed', async () => {
+        const registry = createOperationTestRegistry()
+        const log = registry.log
+        const fusion = registry.fusion as any
+        log.bindRunContext(new OperationRunContext())
+        log.phaseStart(3, 'Refresh')
+        fusion.ensureGlobalReviewerOwnersInScope = vi.fn().mockResolvedValue(undefined)
+        fusion.processFusionAccounts = vi.fn().mockImplementation(async () => {
+            const ctx = log.getRunContext()
+            ctx?.recordRefreshSubStep('prelude', 1)
+            ctx?.recordRefreshSubStep('managedLayer', 2)
+            ctx?.recordRefreshSubStep('map', 3)
+            ctx?.recordRefreshSubStep('normalDefine', 4)
+            ctx?.incrementRefreshAccountsProcessed()
+            return [{ id: 'fa-1' }]
+        })
+        vi.spyOn(log, 'detail')
+
+        await refreshPhase(registry)
+
+        expect(log.detail).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: 'refresh workload',
+                accounts: 1,
+                preludeMs: 1,
+                managedLayerMs: 2,
+                mapMs: 3,
+                normalDefineMs: 4,
+            })
+        )
+        const workloadCalls = vi.mocked(log.detail).mock.calls.filter(([payload]) => payload.action === 'refresh workload')
+        expect(workloadCalls).toHaveLength(1)
+    })
+
+    it('skips refresh workload DETAIL when Refresh processes zero Fusion accounts', async () => {
+        const registry = createOperationTestRegistry()
+        const log = registry.log
+        const fusion = registry.fusion as any
+        log.bindRunContext(new OperationRunContext())
+        log.phaseStart(3, 'Refresh')
+        fusion.ensureGlobalReviewerOwnersInScope = vi.fn().mockResolvedValue(undefined)
+        fusion.processFusionAccounts = vi.fn().mockResolvedValue([])
+        vi.spyOn(log, 'detail')
+
+        await refreshPhase(registry)
+
+        expect(log.detail).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'refresh workload' }))
     })
 })
 

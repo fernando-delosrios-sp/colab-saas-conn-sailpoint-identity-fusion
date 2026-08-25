@@ -1,5 +1,68 @@
 export type OperationPhase = 'Setup' | 'Fetch' | 'Refresh' | 'Process' | 'Output' | 'Epilogue'
 
+export type RefreshSubStepBucket =
+    | 'prelude'
+    | 'managedLayer'
+    | 'uniqueRegister'
+    | 'map'
+    | 'normalDefine'
+    | 'correlation'
+    | 'finalize'
+
+type RefreshBucketMetrics = {
+    totalMs: number
+    invocations: number
+}
+
+export type RefreshWorkloadPatch = {
+    definitionsEvaluated?: number
+    definitionsSkipped?: number
+    managedAccountsBlended?: number
+    queueEntriesScanned?: number
+}
+
+export type RefreshPhaseMetrics = {
+    accountsProcessed: number
+    buckets: Record<RefreshSubStepBucket, RefreshBucketMetrics>
+    definitionsEvaluated: number
+    definitionsSkipped: number
+    managedAccountsBlended: number
+    queueEntriesScanned: number
+}
+
+const REFRESH_SUB_STEP_BUCKETS: RefreshSubStepBucket[] = [
+    'prelude',
+    'managedLayer',
+    'uniqueRegister',
+    'map',
+    'normalDefine',
+    'correlation',
+    'finalize',
+]
+
+function createEmptyRefreshBucket(): RefreshBucketMetrics {
+    return { totalMs: 0, invocations: 0 }
+}
+
+function createEmptyRefreshPhaseMetrics(): RefreshPhaseMetrics {
+    return {
+        accountsProcessed: 0,
+        buckets: {
+            prelude: createEmptyRefreshBucket(),
+            managedLayer: createEmptyRefreshBucket(),
+            uniqueRegister: createEmptyRefreshBucket(),
+            map: createEmptyRefreshBucket(),
+            normalDefine: createEmptyRefreshBucket(),
+            correlation: createEmptyRefreshBucket(),
+            finalize: createEmptyRefreshBucket(),
+        },
+        definitionsEvaluated: 0,
+        definitionsSkipped: 0,
+        managedAccountsBlended: 0,
+        queueEntriesScanned: 0,
+    }
+}
+
 type MatchEventType = 'exact' | 'partial' | 'deferred'
 type DecisionEventType = 'newIdentity' | 'merge' | 'noMatch' | 'autoMerge'
 
@@ -179,6 +242,7 @@ export class OperationRunContext {
     private phaseCorrelation: CorrelationActivityCounters = createEmptyCorrelationActivityCounters()
     /** Run-scoped correlation counters (not reset at phase boundaries). */
     private runCorrelation: CorrelationActivityCounters = createEmptyCorrelationActivityCounters()
+    private refreshMetrics: RefreshPhaseMetrics = createEmptyRefreshPhaseMetrics()
 
     constructor(startedAt: number = Date.now()) {
         this.operationStartedAt = startedAt
@@ -316,6 +380,55 @@ export class OperationRunContext {
         this.resetPhaseCorrelationCounters()
         return { correlations: segment }
     }
+
+    resetRefreshMetrics(): void {
+        this.refreshMetrics = createEmptyRefreshPhaseMetrics()
+    }
+
+    recordRefreshSubStep(
+        bucket: RefreshSubStepBucket,
+        ms: number,
+        workloadPatch?: RefreshWorkloadPatch
+    ): void {
+        if (this.phase !== 'Refresh') return
+        const metrics = this.refreshMetrics.buckets[bucket]
+        metrics.totalMs += ms
+        metrics.invocations++
+        if (workloadPatch?.definitionsEvaluated) {
+            this.refreshMetrics.definitionsEvaluated += workloadPatch.definitionsEvaluated
+        }
+        if (workloadPatch?.definitionsSkipped) {
+            this.refreshMetrics.definitionsSkipped += workloadPatch.definitionsSkipped
+        }
+        if (workloadPatch?.managedAccountsBlended) {
+            this.refreshMetrics.managedAccountsBlended += workloadPatch.managedAccountsBlended
+        }
+        if (workloadPatch?.queueEntriesScanned) {
+            this.refreshMetrics.queueEntriesScanned += workloadPatch.queueEntriesScanned
+        }
+    }
+
+    incrementRefreshAccountsProcessed(): void {
+        if (this.phase !== 'Refresh') return
+        this.refreshMetrics.accountsProcessed++
+    }
+
+    flushRefreshMetricsSummary(): Record<string, unknown> | undefined {
+        if (this.refreshMetrics.accountsProcessed === 0) return undefined
+        const summary: Record<string, unknown> = {
+            accounts: this.refreshMetrics.accountsProcessed,
+        }
+        for (const bucket of REFRESH_SUB_STEP_BUCKETS) {
+            summary[`${bucket}Ms`] = Math.round(this.refreshMetrics.buckets[bucket].totalMs)
+        }
+        summary.definitionsEvaluated = this.refreshMetrics.definitionsEvaluated
+        summary.definitionsSkipped = this.refreshMetrics.definitionsSkipped
+        summary.managedAccountsBlended = this.refreshMetrics.managedAccountsBlended
+        summary.queueEntriesScanned = this.refreshMetrics.queueEntriesScanned
+        this.resetRefreshMetrics()
+        return summary
+    }
+
 }
 
 /** Value portion for PHASE END / DETAIL (without leading `correlations` label). */

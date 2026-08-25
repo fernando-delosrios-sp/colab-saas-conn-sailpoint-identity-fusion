@@ -9,6 +9,7 @@ import { MappingService } from '../mappingService'
 import { DefinitionService } from '../definitionService'
 import { FusionReportBlend } from '../../model/fusionReportBlend'
 import { assert } from '../../utils/assert'
+import { measureMs, measureMsSync } from '../../utils/measureMs'
 
 export interface AccountAssemblyDeps {
     run: FusionRun
@@ -25,6 +26,12 @@ export interface AccountAssemblyDeps {
 export interface AssembleAccountOptions {
     addBlendHistory?: boolean
     skipBlendHistoryForManagedKeys?: ReadonlySet<string>
+    onQueueScan?: (entriesExamined: number) => void
+}
+
+export type AttributeProcessingOptions = {
+    onSubStep?: (step: 'map' | 'normalDefine', ms: number) => void
+    onDefineStats?: (stats: { evaluated: number; skipped: number }) => void
 }
 
 /**
@@ -88,6 +95,7 @@ export class AccountAssembly {
                 addBlendHistory: options.addBlendHistory ?? true,
                 skipBlendHistoryForManagedKeys: options.skipBlendHistoryForManagedKeys,
                 onBlend: (account) => this.recordBlend(fusionAccount, account),
+                onQueueScan: options.onQueueScan,
             }
         )
         this.deps.log.debug(
@@ -99,9 +107,19 @@ export class AccountAssembly {
     /**
      * Applies the Map/Define attribute processing pipeline.
      */
-    public async applyAttributeProcessing(fusionAccount: FusionAccount): Promise<void> {
-        this.deps.mappingService.mapAttributes(fusionAccount, this.deps.run)
-        await this.deps.definitionService.refreshNormalAttributes(fusionAccount)
+    public async applyAttributeProcessing(
+        fusionAccount: FusionAccount,
+        options?: AttributeProcessingOptions
+    ): Promise<void> {
+        const mapMs = measureMsSync(() => {
+            this.deps.mappingService.mapAttributes(fusionAccount, this.deps.run)
+        })
+        options?.onSubStep?.('map', mapMs)
+
+        const normalDefineMs = await measureMs(async () => {
+            await this.deps.definitionService.refreshNormalAttributes(fusionAccount, options?.onDefineStats)
+        })
+        options?.onSubStep?.('normalDefine', normalDefineMs)
         this.deps.definitionService.refreshReverseCorrelationAttributes(fusionAccount)
     }
 

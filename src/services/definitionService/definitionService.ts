@@ -126,15 +126,24 @@ export class DefinitionService {
         this.ensureCoreSchemaAttributes(fusionAccount)
     }
 
-    public async refreshNormalAttributes(fusionAccount: FusionAccount): Promise<void> {
-        if (this.normalDefinitions.length === 0) return
+    public async refreshNormalAttributes(
+        fusionAccount: FusionAccount,
+        onStats?: (stats: { evaluated: number; skipped: number }) => void
+    ): Promise<void> {
+        if (this.normalDefinitions.length === 0) {
+            onStats?.({ evaluated: 0, skipped: 0 })
+            return
+        }
 
         const forceRefresh =
             this.forceAttributeRefresh ||
             fusionAccount.needsReset ||
             this.anyNormalDefinitionRefresh
         const shouldRefresh = fusionAccount.needsRefresh || forceRefresh
-        if (!shouldRefresh) return
+        if (!shouldRefresh) {
+            onStats?.({ evaluated: 0, skipped: this.normalDefinitions.length })
+            return
+        }
 
         if (this.log.getLogLevel() === 'debug') {
             this.log.debug(
@@ -153,6 +162,7 @@ export class DefinitionService {
                 )
             }
         }
+        onStats?.({ evaluated: this.normalDefinitions.length, skipped: 0 })
     }
 
     public async refreshUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {

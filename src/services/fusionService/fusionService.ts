@@ -29,6 +29,7 @@ import {
     getFusionParallelBatchSize,
 } from './collections'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
+import { measureMs } from '../../utils/measureMs'
 import { buildFusionReport, buildMatchingResultsSnapshot as buildMatchingResultsSnapshotFromState } from './fusionReportBuilder'
 import { skipBlendHistoryKeysForDecisionAccountId } from './helpers'
 import { ManagedAccountAnalysisRecorder } from './managedAccountAnalysisRecorder'
@@ -485,30 +486,74 @@ export class FusionService {
 
         assert(this.run.managedAccountsById, 'Managed accounts have not been loaded')
 
-        this.applyReviewerLayersToFusionAccount(fusionAccount)
-        const mergeDecision = this.applyIdentityLayerForFusionAccount(fusionAccount)
-        const skipBlendHistoryForManagedKeys = skipBlendHistoryKeysForDecisionAccountId(mergeDecision?.account.id)
-        await this.setOriginIdentityInScopeIfNeeded(fusionAccount, originIdentityInScope)
+        let mergeDecision: FusionDecision | undefined
+        let skipBlendHistoryForManagedKeys: ReadonlySet<string> | undefined
+        const accountIdsBefore = fusionAccount.accountIdsSet.size
+        let queueEntriesScanned = 0
 
-        // Pass direct reference to work queue - deletions will remove processed accounts.
-        await this.accountAssembly.addManagedAccountLayer(fusionAccount, {
-            addBlendHistory: true,
-            skipBlendHistoryForManagedKeys,
+        const preludeMs = await measureMs(async () => {
+            this.applyReviewerLayersToFusionAccount(fusionAccount)
+            mergeDecision = this.applyIdentityLayerForFusionAccount(fusionAccount)
+            skipBlendHistoryForManagedKeys = skipBlendHistoryKeysForDecisionAccountId(mergeDecision?.account.id)
+            await this.setOriginIdentityInScopeIfNeeded(fusionAccount, originIdentityInScope)
+        })
+        this.log.recordRefreshSubStep('prelude', preludeMs)
+
+        const managedLayerMs = await measureMs(async () => {
+            await this.accountAssembly.addManagedAccountLayer(fusionAccount, {
+                addBlendHistory: true,
+                skipBlendHistoryForManagedKeys,
+                onQueueScan: (entriesExamined) => {
+                    queueEntriesScanned += entriesExamined
+                },
+            })
+        })
+        this.log.recordRefreshSubStep('managedLayer', managedLayerMs, {
+            queueEntriesScanned,
+            managedAccountsBlended: Math.max(0, fusionAccount.accountIdsSet.size - accountIdsBefore),
         })
 
         await yieldToEventLoop()
 
-        if (!resetDefinition) {
-            await this.definitionService.registerUniqueAttributes(fusionAccount)
-        }
+        const uniqueRegisterMs = await measureMs(async () => {
+            if (!resetDefinition) {
+                await this.definitionService.registerUniqueAttributes(fusionAccount)
+            }
+        })
+        this.log.recordRefreshSubStep('uniqueRegister', uniqueRegisterMs)
 
         fusionAccount.setNeedsRefresh(
             fusionAccount.needsRefresh || refreshDefinition || refreshMapping || this.config.forceAttributeRefresh
         )
         fusionAccount.setNeedsReset(resetDefinition)
-        await this.accountAssembly.applyAttributeProcessing(fusionAccount)
-        await this.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, mergeDecision)
-        this.finalizeProcessedFusionAccount(fusionAccount)
+
+        let defineStats: { definitionsEvaluated: number; definitionsSkipped: number } | undefined
+        await this.accountAssembly.applyAttributeProcessing(fusionAccount, {
+            onDefineStats: (stats) => {
+                defineStats = {
+                    definitionsEvaluated: stats.evaluated,
+                    definitionsSkipped: stats.skipped,
+                }
+            },
+            onSubStep: (step, ms) => {
+                if (step === 'map') {
+                    this.log.recordRefreshSubStep('map', ms)
+                    return
+                }
+                this.log.recordRefreshSubStep('normalDefine', ms, defineStats)
+            },
+        })
+
+        const correlationMs = await measureMs(async () => {
+            await this.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, mergeDecision)
+        })
+        this.log.recordRefreshSubStep('correlation', correlationMs)
+
+        const finalizeMs = await measureMs(async () => {
+            this.finalizeProcessedFusionAccount(fusionAccount)
+        })
+        this.log.recordRefreshSubStep('finalize', finalizeMs)
+        this.log.incrementRefreshAccountsProcessed()
 
         return fusionAccount
     }

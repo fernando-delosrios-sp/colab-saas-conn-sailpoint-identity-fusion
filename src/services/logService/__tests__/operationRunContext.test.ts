@@ -182,6 +182,70 @@ describe('OperationRunContext', () => {
             decisionAutoMerge: 0,
         })
     })
+
+    it('ignores refresh sub-step recordings when phase is Process', () => {
+        const ctx = new OperationRunContext()
+        ctx.phase = 'Process'
+        ctx.recordRefreshSubStep('prelude', 12)
+        ctx.incrementRefreshAccountsProcessed()
+        expect(ctx.flushRefreshMetricsSummary()).toBeUndefined()
+
+        ctx.phase = 'Refresh'
+        ctx.incrementRefreshAccountsProcessed()
+        expect(ctx.flushRefreshMetricsSummary()).toEqual(
+            expect.objectContaining({
+                accounts: 1,
+                preludeMs: 0,
+            })
+        )
+    })
+
+    it('accumulates refresh sub-step recordings across multiple calls', () => {
+        const ctx = new OperationRunContext()
+        ctx.phase = 'Refresh'
+        ctx.recordRefreshSubStep('map', 3)
+        ctx.recordRefreshSubStep('map', 5)
+        ctx.recordRefreshSubStep('normalDefine', 2, { definitionsEvaluated: 4 })
+        ctx.incrementRefreshAccountsProcessed()
+        ctx.incrementRefreshAccountsProcessed()
+
+        expect(ctx.flushRefreshMetricsSummary()).toEqual(
+            expect.objectContaining({
+                accounts: 2,
+                mapMs: 8,
+                normalDefineMs: 2,
+                definitionsEvaluated: 4,
+            })
+        )
+    })
+
+    it('flush returns undefined when accountsProcessed is 0', () => {
+        const ctx = new OperationRunContext()
+        ctx.phase = 'Refresh'
+        ctx.resetRefreshMetrics()
+        ctx.recordRefreshSubStep('prelude', 4)
+        expect(ctx.flushRefreshMetricsSummary()).toBeUndefined()
+    })
+
+    it('flush includes accounts and bucket millisecond totals', () => {
+        const ctx = new OperationRunContext()
+        ctx.phase = 'Refresh'
+        ctx.recordRefreshSubStep('prelude', 1.4)
+        ctx.recordRefreshSubStep('managedLayer', 2.2)
+        ctx.recordRefreshSubStep('map', 3)
+        ctx.recordRefreshSubStep('normalDefine', 4)
+        ctx.incrementRefreshAccountsProcessed()
+
+        expect(ctx.flushRefreshMetricsSummary()).toEqual(
+            expect.objectContaining({
+                accounts: 1,
+                preludeMs: 1,
+                managedLayerMs: 2,
+                mapMs: 3,
+                normalDefineMs: 4,
+            })
+        )
+    })
 })
 
 describe('LogService operation helpers', () => {
@@ -215,6 +279,21 @@ describe('LogService operation helpers', () => {
         expect(mockLogger.info).toHaveBeenCalledWith(
             expect.stringMatching(/\[accountList\] PHASE 3 Refresh END correlations link=1\/4 elapsed=/)
         )
+    })
+
+    it('passthrough reset and flush Refresh metrics to run context', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false, operationContext: 'accountList' })
+        const ctx = new OperationRunContext()
+        log.bindRunContext(ctx)
+        ctx.phase = 'Refresh'
+        ctx.recordRefreshSubStep('prelude', 9)
+        ctx.incrementRefreshAccountsProcessed()
+        log.resetRefreshMetrics()
+        expect(log.flushRefreshMetricsSummary()).toBeUndefined()
+
+        ctx.recordRefreshSubStep('map', 1)
+        ctx.incrementRefreshAccountsProcessed()
+        expect(log.flushRefreshMetricsSummary()).toEqual(expect.objectContaining({ accounts: 1, mapMs: 1 }))
     })
 
 })

@@ -25,6 +25,7 @@ export interface AddManagedAccountOptions {
     addBlendHistory?: boolean
     skipBlendHistoryForManagedKeys?: ReadonlySet<string>
     onBlend?: (account: Account) => void
+    onQueueScan?: (entriesExamined: number) => void
 }
 
 /**
@@ -167,6 +168,7 @@ export class FusionLayers {
             addBlendHistory = true,
             skipBlendHistoryForManagedKeys,
             onBlend,
+            onQueueScan,
         } = options
         const normalizeManagedAccountKeySet = (input: Set<string>): Set<string> => {
             const result = new Set<string>()
@@ -209,7 +211,8 @@ export class FusionLayers {
             attributeBag,
             addBlendHistory,
             skipBlendHistoryForManagedKeys,
-            onBlend
+            onBlend,
+            onQueueScan
         )
 
         const inventoryKeys = new Set(workQueue.managedAccountInventory.keys())
@@ -444,9 +447,12 @@ export class FusionLayers {
         attributeBag: { sources: Map<string, Attributes[]> },
         addBlendHistory: boolean,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
-        onBlend?: (account: Account) => void
+        onBlend?: (account: Account) => void,
+        onQueueScan?: (entriesExamined: number) => void
     ): void {
         if (this.collections.previousAccountIds.size === 0 && this.collections.missingAccountIds.size === 0) return
+
+        onQueueScan?.(queue.managedAccountsById.size)
 
         for (const [id, account] of queue.entries()) {
             if (!this.collections.previousAccountIds.has(id) && !this.collections.missingAccountIds.has(id))

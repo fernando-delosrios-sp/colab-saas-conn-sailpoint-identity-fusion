@@ -3,7 +3,6 @@ import { FusionConfig, SourceConfig, AttributeMap, DefaultAttributeMergeMode } f
 import { LogService } from '../logService'
 import { FusionAttribute } from '../../data/schema'
 import { FusionRun } from '../../model/fusionRun'
-import { FusionAccountKind } from '../../model/fusionAccountTypes'
 import { Attributes } from '@sailpoint/connector-sdk'
 import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
@@ -77,8 +76,6 @@ export class MappingService {
     }
 
     mapAttributes(fusionAccount: FusionAccount, _run: FusionRun, options?: MapAttributesOptions): void {
-        if (fusionAccount.type === FusionAccountKind.Identity) return
-
         const { attributeBag, needsRefresh } = fusionAccount
         const sourceAttributeMap = attributeBag.sources
         for (const source of fusionAccount.sources) {
@@ -100,10 +97,7 @@ export class MappingService {
         const attributes = { ...attributeBag.current }
         let sourceOrder = this.sourceOrder
         const identityBag = attributeBag.identity
-        const identityInputsEnabled =
-            this.includeIdentities ||
-            fusionAccount.fromIdentity ||
-            fusionAccount.type === FusionAccountKind.Identity
+        const identityInputsEnabled = this.includeIdentities || fusionAccount.fromIdentity
         const identityPresent = identityInputsEnabled && Object.keys(identityBag).length > 0
         if (identityPresent) {
             sourceAttributeMap.set(IDENTITIES_SOURCE_NAME, [identityBag])
