@@ -1,8 +1,8 @@
 import { doubleMetaphone } from 'double-metaphone'
 import { MatchingConfig, effectiveSkipMatchIfMissing } from '../../model/config'
-import { ScoreReport } from './types'
+import { RuleScoreNumeric, ScoreReport } from './types'
 import { jaroWinkler, diceCoefficient } from './stringComparison'
-import { match as nameMatch, matchNormalized as nameMatchNormalized, type NameMatcherCaches } from './nameMatching'
+import { match as nameMatch, matchNormalized as nameMatchNormalized } from './nameMatching'
 import { evaluateVelocityTemplate } from '../definitionService/formatting'
 type RenderContext = Record<string, any>
 import { missing, trimStr } from '../../utils/safeRead'
@@ -23,7 +23,7 @@ export function normalizeLIG3(str: string): string {
  * Build a ScoreReport without spreading the entire MatchingConfig.
  * Explicit field construction avoids allocating a full object copy per comparison in the hot loop.
  */
-function makeScoreReport(
+export function makeScoreReport(
     matching: MatchingConfig,
     score: number,
     isMatch: boolean,
@@ -45,29 +45,48 @@ function makeScoreReport(
     return r
 }
 
+function reportFromNumeric(matching: MatchingConfig, numeric: RuleScoreNumeric): ScoreReport {
+    return makeScoreReport(
+        matching,
+        numeric.score,
+        numeric.isMatch,
+        numeric.comment,
+        numeric.skipped ? true : undefined
+    )
+}
+
+function matchedNumeric(score: number, isMatch: boolean, comment?: string): RuleScoreNumeric {
+    const result: RuleScoreNumeric = { score, isMatch, skipped: false }
+    if (comment !== undefined) result.comment = comment
+    return result
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+export const scoreDiceNumeric = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): RuleScoreNumeric => {
+    const similarity = diceCoefficient.similarity(accountAttribute, identityAttribute)
+    const score = Math.round(similarity * 100)
+    const threshold = matching.fusionScore ?? 0
+    return matchedNumeric(score, score >= threshold)
+}
 
 export const scoreDice = (
     accountAttribute: string,
     identityAttribute: string,
     matching: MatchingConfig
-): ScoreReport => {
-    const similarity = diceCoefficient.similarity(accountAttribute, identityAttribute)
-    const score = Math.round(similarity * 100)
+): ScoreReport => reportFromNumeric(matching, scoreDiceNumeric(accountAttribute, identityAttribute, matching))
 
-    const threshold = matching.fusionScore ?? 0
-    const isMatch = score >= threshold
-
-    return makeScoreReport(matching, score, isMatch)
-}
-
-export const scoreDoubleMetaphone = (
+export const scoreDoubleMetaphoneNumeric = (
     accountAttribute: string,
     identityAttribute: string,
     matching: MatchingConfig
-): ScoreReport => {
+): RuleScoreNumeric => {
     const accountCodes = doubleMetaphone(accountAttribute)
     const identityCodes = doubleMetaphone(identityAttribute)
 
@@ -114,39 +133,49 @@ export const scoreDoubleMetaphone = (
     }
 
     const threshold = matching.fusionScore ?? 0
-    const isMatch = score >= threshold
+    return matchedNumeric(score, score >= threshold, comment)
+}
 
-    return makeScoreReport(matching, score, isMatch, comment)
+export const scoreDoubleMetaphone = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport =>
+    reportFromNumeric(matching, scoreDoubleMetaphoneNumeric(accountAttribute, identityAttribute, matching))
+
+export const scoreJaroWinklerNumeric = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): RuleScoreNumeric => {
+    const similarity = jaroWinkler.similarity(accountAttribute, identityAttribute)
+    const score = Math.round(similarity * 100)
+    const threshold = matching.fusionScore ?? 0
+    return matchedNumeric(score, score >= threshold)
 }
 
 export const scoreJaroWinkler = (
     accountAttribute: string,
     identityAttribute: string,
     matching: MatchingConfig
-): ScoreReport => {
-    const similarity = jaroWinkler.similarity(accountAttribute, identityAttribute)
+): ScoreReport => reportFromNumeric(matching, scoreJaroWinklerNumeric(accountAttribute, identityAttribute, matching))
+
+export const scoreNameMatcherNumeric = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): RuleScoreNumeric => {
+    const similarity = nameMatch(accountAttribute, identityAttribute)
     const score = Math.round(similarity * 100)
-
     const threshold = matching.fusionScore ?? 0
-    const isMatch = score >= threshold
-
-    return makeScoreReport(matching, score, isMatch)
+    return matchedNumeric(score, score >= threshold)
 }
 
 export const scoreNameMatcher = (
     accountAttribute: string,
     identityAttribute: string,
     matching: MatchingConfig
-): ScoreReport => {
-    const similarity = nameMatch(accountAttribute, identityAttribute)
-    // nameMatch returns a normalized score (0-1), convert to 0-100
-    const score = Math.round(similarity * 100)
-
-    const threshold = matching.fusionScore ?? 0
-    const isMatch = score >= threshold
-
-    return makeScoreReport(matching, score, isMatch)
-}
+): ScoreReport => reportFromNumeric(matching, scoreNameMatcherNumeric(accountAttribute, identityAttribute, matching))
 
 /**
  * Strict exact-match scoring. Returns 100 when the two values are identical
@@ -155,33 +184,51 @@ export const scoreNameMatcher = (
  * is required. Missing values (empty after trim) score 0 and follow the existing
  * skip-on-missing behavior in the scoring pipeline.
  */
+export const scoreBinaryNumeric = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): RuleScoreNumeric => {
+    const score = accountAttribute !== '' && accountAttribute === identityAttribute ? 100 : 0
+    const threshold = matching.fusionScore ?? 0
+    return matchedNumeric(score, score >= threshold)
+}
+
 export const scoreBinary = (
     accountAttribute: string,
     identityAttribute: string,
     matching: MatchingConfig
-): ScoreReport => {
-    const score = accountAttribute !== '' && accountAttribute === identityAttribute ? 100 : 0
-    const threshold = matching.fusionScore ?? 0
-    const isMatch = score >= threshold
-
-    return makeScoreReport(matching, score, isMatch)
-}
+): ScoreReport => reportFromNumeric(matching, scoreBinaryNumeric(accountAttribute, identityAttribute, matching))
 
 /**
  * Name matching on already-normalized strings (output of {@link normalizeName}).
  * Called by the ScoringService cache layer after pre-normalizing both sides;
  * avoids repeated normalization in the O(n×m) loop — mirrors the scoreLIG3Normalized pattern.
  */
+export function scoreNameMatcherNormalizedNumeric(
+    normA: string,
+    normB: string,
+    matching: MatchingConfig,
+    tokenCache?: Map<string, string[]>,
+    phoneticCache?: Map<string, [string, string]>
+): RuleScoreNumeric {
+    const similarity = nameMatchNormalized(normA, normB, tokenCache, phoneticCache)
+    const score = Math.round(similarity * 100)
+    const threshold = matching.fusionScore ?? 0
+    return matchedNumeric(score, score >= threshold)
+}
+
 export function scoreNameMatcherNormalized(
     normA: string,
     normB: string,
     matching: MatchingConfig,
-    caches?: NameMatcherCaches
+    tokenCache?: Map<string, string[]>,
+    phoneticCache?: Map<string, [string, string]>
 ): ScoreReport {
-    const similarity = nameMatchNormalized(normA, normB, caches)
-    const score = Math.round(similarity * 100)
-    const threshold = matching.fusionScore ?? 0
-    return makeScoreReport(matching, score, score >= threshold)
+    return reportFromNumeric(
+        matching,
+        scoreNameMatcherNormalizedNumeric(normA, normB, matching, tokenCache, phoneticCache)
+    )
 }
 
 /**
@@ -216,21 +263,21 @@ export function lig3UpperBoundSkipIfUnreachable(
  * LIG3 scoring on already-normalized strings. Called by the ScoringService cache layer
  * after it has pre-normalized both sides; avoids repeated normalization in the O(n×m) loop.
  */
-export function scoreLIG3Normalized(normA: string, normB: string, matching: MatchingConfig): ScoreReport {
+export function scoreLIG3NormalizedNumeric(normA: string, normB: string, matching: MatchingConfig): RuleScoreNumeric {
     const s1 = normA
     const s2 = normB
 
     if (s1.length === 0 && s2.length === 0) {
         const threshold = matching.fusionScore ?? 0
-        return makeScoreReport(matching, 0, 0 >= threshold, 'Both values empty')
+        return matchedNumeric(0, 0 >= threshold, 'Both values empty')
     }
 
     if (s1 === s2) {
-        return makeScoreReport(matching, 100, true, 'Exact match')
+        return matchedNumeric(100, true, 'Exact match')
     }
 
     if (s1.length === 0 || s2.length === 0) {
-        return makeScoreReport(matching, 0, false, 'Empty string comparison')
+        return matchedNumeric(0, false, 'Empty string comparison')
     }
 
     const baseScore = calculateLIG3Similarity(s1, s2)
@@ -255,10 +302,20 @@ export function scoreLIG3Normalized(normA: string, normB: string, matching: Matc
         comment = 'Low similarity'
     }
 
-    return makeScoreReport(matching, score, isMatch, comment)
+    return matchedNumeric(score, isMatch, comment)
+}
+
+export function scoreLIG3Normalized(normA: string, normB: string, matching: MatchingConfig): ScoreReport {
+    return reportFromNumeric(matching, scoreLIG3NormalizedNumeric(normA, normB, matching))
 }
 
 /** Public entry point: normalizes both sides then delegates to {@link scoreLIG3Normalized}. */
+export const scoreLIG3Numeric = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): RuleScoreNumeric => scoreLIG3NormalizedNumeric(normalizeLIG3(accountAttribute), normalizeLIG3(identityAttribute), matching)
+
 export const scoreLIG3 = (accountAttribute: string, identityAttribute: string, matching: MatchingConfig): ScoreReport =>
     scoreLIG3Normalized(normalizeLIG3(accountAttribute), normalizeLIG3(identityAttribute), matching)
 
@@ -348,16 +405,16 @@ function calculatePrefixBonus(s1: string, s2: string): number {
  * Similarity from a user-defined Velocity template. Template is compiled once per process (shared cache).
  * Context: $accountValue, $candidateValue, $attribute.
  */
-export const scoreCustomVelocity = (
+export const scoreCustomVelocityNumeric = (
     accountAttribute: string,
     identityAttribute: string,
     matching: MatchingConfig
-): ScoreReport => {
+): RuleScoreNumeric => {
     const expression = (matching.customVelocityExpression ?? '').trim()
     const threshold = matching.fusionScore ?? 0
 
     if (!expression) {
-        return makeScoreReport(matching, 0, false, 'Custom Velocity expression is empty')
+        return matchedNumeric(0, false, 'Custom Velocity expression is empty')
     }
 
     const context = Object.assign(Object.create(null), {
@@ -369,17 +426,22 @@ export const scoreCustomVelocity = (
     const rendered = evaluateVelocityTemplate(expression, context)
     if (missing(rendered)) {
         if (effectiveSkipMatchIfMissing(matching)) {
-            return makeScoreReport(matching, 0, false, 'Rule skipped (custom Velocity returned no value)', true)
+            return { score: 0, isMatch: false, skipped: true, comment: 'Rule skipped (custom Velocity returned no value)' }
         }
-        return makeScoreReport(matching, 0, false, 'Custom Velocity returned no value')
+        return matchedNumeric(0, false, 'Custom Velocity returned no value')
     }
 
     const n = Number(trimStr(rendered))
     if (!Number.isFinite(n)) {
-        return makeScoreReport(matching, 0, false, 'Velocity output is not a valid number')
+        return matchedNumeric(0, false, 'Velocity output is not a valid number')
     }
 
     const score = Math.round(Math.max(0, Math.min(100, n)))
-    const isMatch = score >= threshold
-    return makeScoreReport(matching, score, isMatch)
+    return matchedNumeric(score, score >= threshold)
 }
+
+export const scoreCustomVelocity = (
+    accountAttribute: string,
+    identityAttribute: string,
+    matching: MatchingConfig
+): ScoreReport => reportFromNumeric(matching, scoreCustomVelocityNumeric(accountAttribute, identityAttribute, matching))

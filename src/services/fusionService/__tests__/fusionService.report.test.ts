@@ -112,7 +112,7 @@ describe('FusionService — report', () => {
         })
     })
 
-    describe('initializeManagedAccountProcessing captureBreakdown wiring', () => {
+    describe('initializeManagedAccountProcessing scoring prep', () => {
         async function initializeWithReportCaptureFlag(shouldCaptureReportData: boolean): Promise<FusionService> {
             const localRun = new FusionRun()
             localRun.log = ctx.mockLog
@@ -122,7 +122,8 @@ describe('FusionService — report', () => {
             })
 
             ctx.mockMatchingService.buildTrigramIndex = vi.fn()
-            ctx.mockMatchingService.configureScoring = vi.fn()
+            const configureScoring = vi.fn()
+            Object.assign(ctx.mockMatchingService, { configureScoring })
 
             const service = new FusionService({
                 config: ctx.mockConfig,
@@ -144,18 +145,20 @@ describe('FusionService — report', () => {
             return service
         }
 
-        it('sets captureBreakdown false when report capture is disabled', async () => {
+        it('does not call configureScoring when report capture is disabled', async () => {
             await initializeWithReportCaptureFlag(false)
-            expect(ctx.mockMatchingService.configureScoring).toHaveBeenCalledWith({ captureBreakdown: false })
+            expect((ctx.mockMatchingService as { configureScoring?: ReturnType<typeof vi.fn> }).configureScoring).not.toHaveBeenCalled()
+            expect(ctx.mockMatchingService.buildTrigramIndex).toHaveBeenCalled()
         })
 
-        it('sets captureBreakdown true when report capture is enabled', async () => {
-            vi.mocked(ctx.mockMatchingService.configureScoring).mockClear()
+        it('does not call configureScoring when report capture is enabled', async () => {
+            const configureScoring = vi.fn()
+            Object.assign(ctx.mockMatchingService, { configureScoring, buildTrigramIndex: vi.fn() })
             await initializeWithReportCaptureFlag(true)
-            expect(ctx.mockMatchingService.configureScoring).toHaveBeenCalledWith({ captureBreakdown: true })
+            expect(configureScoring).not.toHaveBeenCalled()
         })
 
-        it('sets captureBreakdown true when run is in record mode', async () => {
+        it('does not call configureScoring when run is in record mode', async () => {
             const recordConfig = {
                 recording: { mode: 'record' as const, chainName: 'test-chain', store: 'ndjson' as const },
             } as FusionConfig
@@ -166,7 +169,9 @@ describe('FusionService — report', () => {
                 configurable: true,
             })
 
-            ctx.mockMatchingService.configureScoring = vi.fn()
+            const configureScoring = vi.fn()
+            ctx.mockMatchingService.buildTrigramIndex = vi.fn()
+            Object.assign(ctx.mockMatchingService, { configureScoring })
 
             const service = new FusionService({
                 config: ctx.mockConfig,
@@ -185,7 +190,8 @@ describe('FusionService — report', () => {
             service.setTracker(new AggregationTracker())
 
             await service.initializeManagedAccountProcessing()
-            expect(ctx.mockMatchingService.configureScoring).toHaveBeenCalledWith({ captureBreakdown: true })
+            expect(configureScoring).not.toHaveBeenCalled()
+            expect(ctx.mockMatchingService.buildTrigramIndex).toHaveBeenCalled()
         })
     })
 
