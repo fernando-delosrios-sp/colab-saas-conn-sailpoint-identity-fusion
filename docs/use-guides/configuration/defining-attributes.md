@@ -69,6 +69,8 @@ Add each attribute under **Normal Attribute Definitions** or **Unique Attribute 
 | No     | No              | Recalculated only when underlying source data changes; falsy or failed output **clears** the stored value | Standard values that update only when source data updates           |
 | Yes    | (Ignored)       | Calculated only when it has no value; existing values are never recalculated | Immutable values (initial assignment, one-time calculations)        |
 
+Underlying source data has changed when a managed account is newly blended or removed, or when a managed account’s `modified` timestamp is newer than the Fusion account’s by more than a short grace period.
+
 !!! warning "Breaking behavior"
     When a Normal definition runs and the Velocity expression fails or renders empty output, the connector removes the attribute from the Fusion account. Use `$previous` in the expression to retain the last value when source input is temporarily missing, or enable **Static** for write-once attributes.
 

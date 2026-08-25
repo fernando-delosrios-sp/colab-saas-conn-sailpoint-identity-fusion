@@ -53,4 +53,12 @@ describe('isNewerThan', () => {
     it('should return false when both are empty/falsy', () => {
         expect(isNewerThan(undefined, undefined)).toBe(false)
     })
+
+    it('should return false when first date is newer than reference by less than thresholdMs', () => {
+        expect(isNewerThan('2024-01-15T10:00:30.000Z', '2024-01-15T10:00:00.000Z', 60_000)).toBe(false)
+    })
+
+    it('should return true when first date is newer than reference by more than thresholdMs', () => {
+        expect(isNewerThan('2024-01-15T10:01:30.000Z', '2024-01-15T10:00:00.000Z', 60_000)).toBe(true)
+    })
 })
