@@ -72,6 +72,19 @@ describe('accountListPhases step instrumentation', () => {
         })
     })
 
+    it('processPhase warns when mandatoryMissingBlockCount is greater than zero', async () => {
+        const registry = createRegistry()
+        const log = registry.log
+        registry.sources.run.mandatoryMissingBlockCount = 3
+        vi.spyOn(log, 'warn')
+
+        await processPhase(registry, { isPersistent: false })
+
+        expect(log.warn).toHaveBeenCalledWith(
+            'Mandatory missing block: 3 account(s) — scored zero identity candidates (missing indexed mandatory attributes)'
+        )
+    })
+
     it('processPhase completion DETAIL includes correlation segment when activity recorded', async () => {
         const registry = createRegistry()
         const log = registry.log

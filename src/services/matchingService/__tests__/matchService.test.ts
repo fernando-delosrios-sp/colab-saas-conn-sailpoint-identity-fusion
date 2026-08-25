@@ -318,7 +318,48 @@ describe('MatchingService', () => {
         })
     })
 
-    describe('getCandidates full-scan fallback', () => {
+    describe('buildTrigramIndex index guard', () => {
+        it('does not index a threshold-zero mandatory attribute and keeps identities reachable via other rules', () => {
+            const zeroScoreEmail = {
+                attribute: 'email',
+                algorithm: 'binary' as const,
+                fusionScore: 0,
+                mandatory: true,
+            }
+            const employeeIdRule = {
+                attribute: 'employeeId',
+                algorithm: 'binary' as const,
+                fusionScore: 100,
+                mandatory: true,
+            }
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [zeroScoreEmail, employeeIdRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const identityWithoutEmail = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { employeeId: 'E123' },
+            } as any)
+            service.buildTrigramIndex([identityWithoutEmail])
+
+            expect(run.indexedMandatoryAttributes).toEqual(['employeeId'])
+            expect(run.indexedMandatoryAttributes).not.toContain('email')
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'E123' },
+            } as any)
+            const candidates = service.getCandidates(managed, mockLog)
+
+            expect(candidates).toBeDefined()
+            expect(candidates?.has(identityWithoutEmail)).toBe(true)
+        })
+    })
+
+    describe('getCandidates mandatory-missing block', () => {
         const mandatoryRule = {
             attribute: 'email',
             algorithm: 'binary' as const,
@@ -326,7 +367,7 @@ describe('MatchingService', () => {
             mandatory: true,
         }
 
-        it('increments fullScanFallbackCount when mandatory attributes are missing', () => {
+        it('returns an empty set and increments mandatoryMissingBlockCount when indexed mandatory attributes are missing', () => {
             const run = new FusionRun(mockLog)
             const service = new MatchingService(
                 { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
@@ -345,11 +386,14 @@ describe('MatchingService', () => {
                 attributes: {},
             } as any)
 
-            expect(service.getCandidates(managed, mockLog)).toBeUndefined()
-            expect(run.fullScanFallbackCount).toBe(1)
+            const candidates = service.getCandidates(managed, mockLog)
+            expect(candidates).toBeInstanceOf(Set)
+            expect(candidates?.size).toBe(0)
+            expect(run.mandatoryMissingBlockCount).toBe(1)
+            expect(run.fullScanFallbackCount).toBe(0)
         })
 
-        it('does not increment fullScanFallbackCount when trigram index is not built', () => {
+        it('does not increment mandatoryMissingBlockCount when trigram index is not built', () => {
             const run = new FusionRun(mockLog)
             const service = new MatchingService(
                 { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
@@ -363,10 +407,11 @@ describe('MatchingService', () => {
             } as any)
 
             expect(service.getCandidates(managed, mockLog)).toBeUndefined()
+            expect(run.mandatoryMissingBlockCount).toBe(0)
             expect(run.fullScanFallbackCount).toBe(0)
         })
 
-        it('accumulates fullScanFallbackCount across multiple accounts', () => {
+        it('accumulates mandatoryMissingBlockCount across multiple accounts', () => {
             const run = new FusionRun(mockLog)
             const service = new MatchingService(
                 { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
@@ -393,10 +438,11 @@ describe('MatchingService', () => {
             service.getCandidates(managed1, mockLog)
             service.getCandidates(managed2, mockLog)
 
-            expect(run.fullScanFallbackCount).toBe(2)
+            expect(run.mandatoryMissingBlockCount).toBe(2)
+            expect(run.fullScanFallbackCount).toBe(0)
         })
 
-        it('emits throttled warning log on first full-scan fallback', () => {
+        it('emits throttled warning log on first mandatory-missing block', () => {
             const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
             const run = new FusionRun(log)
             const service = new MatchingService(
@@ -419,8 +465,33 @@ describe('MatchingService', () => {
             service.getCandidates(managed, log)
 
             expect(log.warn).toHaveBeenCalledWith(
-                'Full identity scan fallback #1: account has no value for any mandatory trigram attribute'
+                'Mandatory missing block #1: account has no value for any indexed mandatory attribute — zero identity candidates'
             )
+            expect(log.warn).not.toHaveBeenCalledWith(expect.stringContaining('Full identity scan fallback'))
+        })
+
+        it('performs zero identity comparisons when getCandidates returns an empty set', async () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { email: 'foo@example.com' },
+            } as any)
+            service.buildTrigramIndex([identity])
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: {},
+            } as any)
+            const candidates = service.getCandidates(managed, mockLog)
+
+            const comparisons = await service.scoreFusionAccount(managed, candidates ?? [])
+            expect(comparisons).toBe(0)
         })
     })
 

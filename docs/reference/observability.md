@@ -167,3 +167,22 @@ grep 'WARN EVENT_LOOP' connector.log
 Because samples cannot run during the block, each warning appears only once the loop recovers. If the platform terminates the run before that, the gap between the last `STATUS` timestamp and the reset marks the same window.
 
 `WARN EVENT_LOOP` is written twice: once through the normal logger, and once straight to stdout as plain text. A blocked loop also stops the logger draining its buffer, so the plain-text copy can be the only one that survives. A line present in raw form but missing from the structured log points at the logging pipeline rather than the loop.
+
+## Trigram blocking counters (`accountList` Process)
+
+After managed-account matching, Process may emit warnings for run-scoped trigram counters. They are not interchangeable:
+
+| Counter | When it increments | Meaning |
+| --- | --- | --- |
+| `mandatoryMissingBlockCount` | Built trigram index with at least one indexable mandatory attribute, and the managed account has no value for any of those attributes | Scoring used an **empty** identity candidate set. No full identity scan ran. |
+| `fullScanFallbackCount` | `getCandidates` returned `undefined` because trigram blocking was unavailable (index not built or no indexable mandatory attributes) | Caller scored the **full** identity corpus. |
+
+Indexable mandatory attributes are rules with `mandatory === true` and `(fusionScore ?? 0) > 0`. Threshold-zero or unset mandatory rules are not indexed.
+
+**Example grep targets:**
+
+```bash
+grep 'Mandatory missing block' connector.log
+grep 'Full identity scan fallback' connector.log
+```
+

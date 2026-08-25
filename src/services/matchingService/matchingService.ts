@@ -283,12 +283,13 @@ export class MatchingService {
      * Build the trigram blocking index over all fusion identities for their mandatory matching attributes.
      * Must be called once before {@link getCandidates} is used.
      *
-     * The index maps each mandatory attribute to an inverted trigram map so that a managed account
+     * The index maps each indexable mandatory attribute to an inverted trigram map so that a managed account
      * can retrieve only the identity candidates that share at least one trigram with its attribute value,
      * reducing the scoring candidate pool from O(m) to O(k) where k << m.
      *
-     * Only mandatory attributes are indexed: non-mandatory attributes cannot be used to safely eliminate
-     * candidates, since a missing or non-matching non-mandatory attribute does not disqualify a pair.
+     * Only mandatory attributes with a strictly positive `fusionScore` are indexed. Threshold-zero or unset
+     * mandatory rules cannot safely eliminate candidates. Non-mandatory attributes also cannot be used to
+     * eliminate candidates, since a missing or non-matching non-mandatory attribute does not disqualify a pair.
      *
      * @param identities - All fusion identities to index (pass `allFusionIdentities` — collected
      *   internally into an array so generators can be reused across multiple attribute sweeps)
@@ -299,12 +300,14 @@ export class MatchingService {
         this.run.indexedMandatoryAttributes = []
         this.run.trigramIndexBuilt = false
 
-        const mandatoryConfigs = this.matchingConfigs.filter((c) => c.mandatory === true)
-        if (mandatoryConfigs.length === 0) return
+        const indexableMandatory = this.matchingConfigs.filter(
+            (c) => c.mandatory === true && (c.fusionScore ?? 0) > 0
+        )
+        if (indexableMandatory.length === 0) return
 
         // Collect once; generators can only be iterated once but we need one sweep per attribute.
         const identityArray = Array.from(identities)
-        for (const config of mandatoryConfigs) {
+        for (const config of indexableMandatory) {
             const idx = buildAttributeIndex(identityArray, config.attribute)
             this.run.trigramIndexByAttribute.set(config.attribute, idx)
             this.run.indexedMandatoryAttributes.push(config.attribute)
@@ -314,15 +317,16 @@ export class MatchingService {
 
     /**
      * Return a pre-filtered candidate set for `account` using the trigram blocking index,
-     * or `undefined` if no filtering was possible (index not built, no mandatory attributes,
-     * or account has no value for any mandatory attribute).
+     * an empty Set when the account has no value for any indexed mandatory attribute, or
+     * `undefined` if no filtering was possible (index not built or no indexable mandatory attributes).
      *
      * When `undefined` is returned the caller must fall back to a full identity scan.
+     * An empty Set means zero candidates: the caller must not full-scan.
      *
      * The returned Set already has `excludeIds` applied, so the caller can iterate it directly.
      *
      * @param account - The managed account being scored
-     * @param log - Optional logger; when provided, throttled warnings are emitted on full-scan fallback
+     * @param log - Optional logger; when provided, throttled warnings are emitted on mandatory-missing block
      * @param excludeIds - Identity IDs to exclude from the candidate set (e.g. auto-assigned identities)
      */
     public getCandidates(
@@ -354,17 +358,15 @@ export class MatchingService {
         }
 
         if (resultSet === undefined) {
-            // All mandatory attributes were missing on this account — fall back to full scan.
-            if (this.run) {
-                this.run.fullScanFallbackCount = (this.run.fullScanFallbackCount ?? 0) + 1
-                const fallbackCount = this.run.fullScanFallbackCount
-                if (log && (fallbackCount <= 5 || fallbackCount % 100 === 0)) {
-                    log.warn(
-                        `Full identity scan fallback #${fallbackCount}: account has no value for any mandatory trigram attribute`
-                    )
-                }
+            // All indexed mandatory attributes were missing — no identity can pass those rules.
+            this.run.mandatoryMissingBlockCount = (this.run.mandatoryMissingBlockCount ?? 0) + 1
+            const blockCount = this.run.mandatoryMissingBlockCount
+            if (log && (blockCount <= 5 || blockCount % 100 === 0)) {
+                log.warn(
+                    `Mandatory missing block #${blockCount}: account has no value for any indexed mandatory attribute — zero identity candidates`
+                )
             }
-            return undefined
+            return new Set()
         }
 
         // Apply auto-assigned exclusions within the candidate set.

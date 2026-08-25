@@ -278,6 +278,11 @@ export async function processPhase(serviceRegistry: ServiceRegistry, _options: P
         }
     )
 
+    if (sources.run.mandatoryMissingBlockCount > 0) {
+        log.warn(
+            `Mandatory missing block: ${sources.run.mandatoryMissingBlockCount} account(s) — scored zero identity candidates (missing indexed mandatory attributes)`
+        )
+    }
     if (sources.run.fullScanFallbackCount > 0) {
         log.warn(
             `Full identity scan fallback: ${sources.run.fullScanFallbackCount} account(s) — trigram blocking was ineffective`
