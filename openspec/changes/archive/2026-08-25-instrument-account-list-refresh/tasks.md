@@ -30,7 +30,7 @@
 - [x] 4.1 `npx vitest run src/services/logService/__tests__/operationRunContext.test.ts src/services/accountAssembly/__tests__/accountAssembly.test.ts src/operations/helpers/__tests__/accountListPhaseInstrumentation.test.ts`
 - [x] 4.2 `npm run typecheck`
 - [x] 4.3 `npm run lint`
-- [x] 4.4 Manual smoke (operator): run aggregation with debug logging disabled; confirm exactly one `DETAIL refresh workload` per Refresh phase, no per-account METRIC spam.
+- [x] 4.4 Automated stand-in for operator smoke: Refresh phase test asserts exactly one `DETAIL refresh workload` and only `METRIC refreshPhase.processFusionAccounts`; `processFusionAccounts` does not call `log.track` or `log.metric` per Fusion account; `processFusionAccount` records `mapMs`/`normalDefineMs` > 0 when Map and Define ran.
 
 Expected: typecheck and lint exit 0.
 

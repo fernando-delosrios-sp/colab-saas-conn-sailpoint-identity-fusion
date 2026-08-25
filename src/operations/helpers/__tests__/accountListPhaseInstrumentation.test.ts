@@ -176,9 +176,14 @@ describe('refreshPhase workload summary', () => {
             return [{ id: 'fa-1' }]
         })
         vi.spyOn(log, 'detail')
+        vi.spyOn(log, 'track')
 
         await refreshPhase(registry)
 
+        expect(log.track).toHaveBeenCalledWith('refreshPhase.processFusionAccounts')
+        expect(vi.mocked(log.track).mock.calls.map(([name]) => name)).toEqual([
+            'refreshPhase.processFusionAccounts',
+        ])
         expect(log.detail).toHaveBeenCalledWith(
             expect.objectContaining({
                 action: 'refresh workload',

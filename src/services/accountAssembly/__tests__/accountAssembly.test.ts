@@ -123,6 +123,23 @@ describe('AccountAssembly', () => {
             expect(onDefineStats).toHaveBeenCalledWith({ evaluated: 2, skipped: 0 })
             expect(mockDefinitionService.refreshNormalAttributes).toHaveBeenCalledWith(account, onDefineStats)
         })
+
+        it('reports map and normalDefine durations greater than zero when attribute processing ran', async () => {
+            let now = 1_000
+            vi.spyOn(performance, 'now').mockImplementation(() => {
+                now += 2.5
+                return now
+            })
+            const onSubStep = vi.fn()
+            const account = FusionAccount.fromIdentity({ id: 'id-1', name: 'Identity 1' })
+            await assembly.applyAttributeProcessing(account, { onSubStep })
+
+            const mapMs = onSubStep.mock.calls.find((call) => call[0] === 'map')?.[1]
+            const normalDefineMs = onSubStep.mock.calls.find((call) => call[0] === 'normalDefine')?.[1]
+            expect(mapMs).toBeGreaterThan(0)
+            expect(normalDefineMs).toBeGreaterThan(0)
+            vi.mocked(performance.now).mockRestore()
+        })
     })
 
     describe('registerFusionAccount', () => {

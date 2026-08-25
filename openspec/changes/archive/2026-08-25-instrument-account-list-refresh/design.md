@@ -154,7 +154,7 @@ Add optional callback `onQueueScan?: (entriesExamined: number)` on `addManagedAc
 
 ## Git workflow
 
-- Branch: `perf/instrument-account-list-refresh` from operator's current branch
+- Branch: applied on operator branch `2.2.0/preview` (ferspec local venue — no `openspec/<name>` or `perf/<name>` feature branch)
 - Commits: `feat(log): add Refresh phase sub-step metrics` — conventional, match repo history
 - Do not push unless asked
 
