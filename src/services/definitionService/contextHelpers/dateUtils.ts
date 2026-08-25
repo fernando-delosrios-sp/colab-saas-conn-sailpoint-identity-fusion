@@ -134,6 +134,18 @@ function buildFormatRegex(formatStr: string): { regex: RegExp; matchedTokens: st
     return { regex: new RegExp(`^${pattern}$`), matchedTokens }
 }
 
+const formatRegexCache = new Map<string, { regex: RegExp; matchedTokens: string[] }>()
+
+export function getCachedFormatRegex(formatStr: string): { regex: RegExp; matchedTokens: string[] } {
+    const cached = formatRegexCache.get(formatStr)
+    if (cached) {
+        return cached
+    }
+    const compiled = buildFormatRegex(formatStr)
+    formatRegexCache.set(formatStr, compiled)
+    return compiled
+}
+
 function parsePrimitiveDateInput(dateStr: string | Date | number, formatStr?: string): Date | undefined {
     if (dateStr instanceof Date) {
         return new Date(dateStr)
@@ -168,7 +180,7 @@ function applyTimezoneOffset(parsedDate: Date, timezoneOffsetMinutes: number): D
 }
 
 function parseWithFormat(dateStr: string, formatStr: string): Date | undefined {
-    const { regex, matchedTokens } = buildFormatRegex(formatStr)
+    const { regex, matchedTokens } = getCachedFormatRegex(formatStr)
     const match = dateStr.match(regex)
     if (!match) {
         return undefined

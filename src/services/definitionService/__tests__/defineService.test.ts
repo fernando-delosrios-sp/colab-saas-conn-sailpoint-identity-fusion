@@ -1,9 +1,10 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest'
+import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
 import { DefinitionService } from '../definitionService'
 import { FusionAccount } from '../../../model/account'
 import { FusionConfig } from '../../../model/config'
 import { InMemoryLockService } from '../../lockService'
 import * as templateEvaluator from '../templateEvaluator'
+import * as formatting from '../formatting'
 
 describe('DefinitionService', () => {
     const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogLevel: vi.fn(() => 'info') } as any
@@ -735,5 +736,179 @@ describe('DefinitionService.refreshUniqueAttributes unique-registry lock', () =>
         expect(counters[0]).toBe('')
         expect(colliding.attributes.UID).toBe('USER1')
         evaluateSpy.mockRestore()
+    })
+})
+
+describe('refresh flag semantics', () => {
+    const mockLog = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        getLogLevel: vi.fn(() => 'info'),
+    } as any
+    const mockLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
+    const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
+
+    beforeAll(() => {
+        FusionAccount.configure({
+            sources: [{ name: 'HR', id: 'src-hr', type: 'authoritative' }],
+            fusionAccountRefreshThresholdInSeconds: 3600,
+            maxHistoryMessages: 50,
+            resetAccounts: false,
+            resetForms: false,
+        } as unknown as FusionConfig)
+    })
+
+    const createService = (normalAttributeDefinitions: any[], configOverrides: Record<string, unknown> = {}) =>
+        new DefinitionService(
+            {
+                normalAttributeDefinitions,
+                uniqueAttributeDefinitions: [],
+                attributeMaps: [],
+                skipAccountsWithMissingId: false,
+                forceAttributeRefresh: false,
+                ...configOverrides,
+            } as any,
+            mockSchemas,
+            mockLog,
+            mockLocks
+        )
+
+    const createPersistedAccount = (attrs: Record<string, any>) => {
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-native-1',
+            name: 'Persisted Account',
+            sourceName: 'Identity Fusion NG',
+            uncorrelated: true,
+            attributes: { ...attrs },
+        } as any)
+        acc.setNeedsRefresh(false)
+        acc.setNeedsReset(false)
+        return acc
+    }
+
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('refresh false skips unchanged account', async () => {
+        const evaluateSpy = vi.spyOn(templateEvaluator, 'evaluateAttributeTemplate')
+        const service = createService([
+            { name: 'department', expression: 'should-not-run', refresh: false },
+        ])
+        const acc = createPersistedAccount({ department: 'Engineering' })
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(evaluateSpy).not.toHaveBeenCalled()
+        expect(acc.attributeBag.current.department).toBe('Engineering')
+    })
+
+    it('refresh true runs every aggregation', async () => {
+        const evaluateSpy = vi.spyOn(templateEvaluator, 'evaluateAttributeTemplate')
+        const service = createService([
+            { name: 'department', expression: 'refreshed-value', refresh: true },
+        ])
+        const acc = createPersistedAccount({ department: 'Engineering' })
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(evaluateSpy).toHaveBeenCalled()
+        expect(acc.attributeBag.current.department).toBe('refreshed-value')
+    })
+
+    it('needsRefresh triggers refresh false definitions', async () => {
+        const evaluateSpy = vi.spyOn(templateEvaluator, 'evaluateAttributeTemplate')
+        const service = createService([
+            { name: 'department', expression: 'recalculated', refresh: false },
+        ])
+        const acc = createPersistedAccount({ department: 'Engineering' })
+        acc.setNeedsRefresh(true)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(evaluateSpy).toHaveBeenCalled()
+        expect(acc.attributeBag.current.department).toBe('recalculated')
+    })
+
+    it('force attribute refresh triggers refresh false definitions', async () => {
+        const evaluateSpy = vi.spyOn(templateEvaluator, 'evaluateAttributeTemplate')
+        const service = createService(
+            [{ name: 'department', expression: 'forced', refresh: false }],
+            { forceAttributeRefresh: true }
+        )
+        const acc = createPersistedAccount({ department: 'Engineering' })
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(evaluateSpy).toHaveBeenCalled()
+        expect(acc.attributeBag.current.department).toBe('forced')
+    })
+
+    it('stale account skips Define when no refresh true definitions apply', async () => {
+        const evaluateSpy = vi.spyOn(templateEvaluator, 'evaluateAttributeTemplate')
+        const service = createService([
+            { name: 'department', expression: 'should-not-run', refresh: false },
+            { name: 'title', expression: 'also-skip', refresh: false },
+        ])
+        const acc = createPersistedAccount({ department: 'Engineering', title: 'Engineer' })
+        const stats: { evaluated: number; skipped: number }[] = []
+
+        await service.refreshNormalAttributes(acc, (s) => stats.push(s))
+
+        expect(evaluateSpy).not.toHaveBeenCalled()
+        expect(stats[0]).toEqual({ evaluated: 0, skipped: 2 })
+        expect(acc.attributeBag.current.department).toBe('Engineering')
+        expect(acc.attributeBag.current.title).toBe('Engineer')
+    })
+
+    it('refresh false skips unchanged account when a sibling definition has refresh true', async () => {
+        const evaluateSpy = vi.spyOn(templateEvaluator, 'evaluateAttributeTemplate')
+        const service = createService([
+            { name: 'department', expression: 'should-not-run', refresh: false },
+            { name: 'computed', expression: 'fresh', refresh: true },
+        ])
+        const acc = createPersistedAccount({ department: 'Engineering', computed: 'stale' })
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(evaluateSpy).toHaveBeenCalledTimes(1)
+        expect(evaluateSpy.mock.calls[0][0].name).toBe('computed')
+        expect(acc.attributeBag.current.department).toBe('Engineering')
+        expect(acc.attributeBag.current.computed).toBe('fresh')
+    })
+
+    it('later definition sees earlier write without per-eval full copy', async () => {
+        const copySpy = vi.spyOn(formatting, 'createRenderContextForPass')
+        const service = createService([
+            { name: 'first', expression: 'alpha', refresh: true },
+            { name: 'second', expression: '${first}-beta', refresh: true },
+        ])
+        const acc = createPersistedAccount({ first: 'old', second: 'old' })
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(copySpy).toHaveBeenCalledTimes(1)
+        expect(Object.getPrototypeOf(copySpy.mock.results[0].value)).toBeNull()
+        expect(acc.attributeBag.current.first).toBe('alpha')
+        expect(acc.attributeBag.current.second).toBe('alpha-beta')
+    })
+
+    it('copies caller context once per refresh pass with 3 definitions', async () => {
+        const passSpy = vi.spyOn(formatting, 'createRenderContextForPass')
+        const service = createService([
+            { name: 'one', expression: '1', refresh: true },
+            { name: 'two', expression: '2', refresh: true },
+            { name: 'three', expression: '3', refresh: true },
+        ])
+        const acc = createPersistedAccount({ one: 'a', two: 'b', three: 'c' })
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(passSpy).toHaveBeenCalledTimes(1)
+        expect(acc.attributeBag.current.one).toBe('1')
+        expect(acc.attributeBag.current.two).toBe('2')
+        expect(acc.attributeBag.current.three).toBe('3')
     })
 })

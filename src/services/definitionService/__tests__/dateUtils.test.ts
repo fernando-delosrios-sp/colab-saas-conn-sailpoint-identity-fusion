@@ -1,6 +1,7 @@
 import {
     format,
     parse,
+    getCachedFormatRegex,
     addDays,
     addMonths,
     addYears,
@@ -81,6 +82,14 @@ describe('attributeService dateUtils', () => {
             const d4 = parse('2024-01-15 12:00+02', 'yyyy-MM-dd HH:mmX')
             expect(d4.getUTCDate()).toBe(15)
             expect(d4.getUTCHours()).toBe(10)
+        })
+
+        it('reuses compiled format regex for the same format string', () => {
+            const first = getCachedFormatRegex('yyyy-MM-dd')
+            const second = getCachedFormatRegex('yyyy-MM-dd')
+            expect(second).toBe(first)
+            expect(parse('2024-01-15', 'yyyy-MM-dd')?.getUTCDate()).toBe(15)
+            expect(parse('2024-02-20', 'yyyy-MM-dd')?.getUTCDate()).toBe(20)
         })
     })
 

@@ -52,7 +52,7 @@ export const switchCase = (str: string, caseType: 'lower' | 'upper' | 'capitaliz
  * Stops before `Object.prototype` so `$constructor` is not copied from the prototype chain.
  * Nearer objects override farther ones (own keys win over inherited current-bag keys).
  */
-const copyVelocityCallerContext = (source: RenderContext, extras?: RenderContext): RenderContext => {
+export const copyVelocityCallerContext = (source: RenderContext, extras?: RenderContext): RenderContext => {
     const copied = Object.create(null) as RenderContext
     const layers: object[] = []
     for (
@@ -72,21 +72,20 @@ const copyVelocityCallerContext = (source: RenderContext, extras?: RenderContext
 }
 
 /**
- * Evaluate Velocity template expression with extended context (Math, Date, Datefns)
- * Uses template caching to avoid repeated parsing and compilation
+ * Build one null-prototype render context for a Normal Define refresh pass.
+ * Helpers are assigned once and override same-named caller keys.
  */
-export const evaluateVelocityTemplate = (
+export const createRenderContextForPass = (callerContext: RenderContext): RenderContext => {
+    return Object.assign(copyVelocityCallerContext(callerContext), contextHelpers) as RenderContext
+}
+
+const renderVelocityTemplate = (
     expression: string,
-    context: RenderContext,
+    renderContext: RenderContext,
     maxLength?: number
 ): string | undefined => {
-    // Null prototype so `$constructor` / `$__proto__` do not resolve via Object.prototype.
-    const renderContext = Object.assign(copyVelocityCallerContext(context), contextHelpers) as RenderContext
-
-    // Check cache for compiled template
     let velocity = templateCache.get(expression)
     if (!velocity) {
-        // Parse and compile template, then cache it
         const template = velocityjs.parse(expression)
         velocity = new SafeCompile(template)
         templateCache.set(expression, velocity)
@@ -103,6 +102,29 @@ export const evaluateVelocityTemplate = (
     }
 
     return result
+}
+
+/**
+ * Evaluate Velocity using a prebuilt render context without recopying caller keys.
+ */
+export const evaluateVelocityTemplateWithContext = (
+    renderContext: RenderContext,
+    expression: string,
+    maxLength?: number
+): string | undefined => {
+    return renderVelocityTemplate(expression, renderContext, maxLength)
+}
+
+/**
+ * Evaluate Velocity template expression with extended context (Math, Date, Datefns)
+ * Uses template caching to avoid repeated parsing and compilation
+ */
+export const evaluateVelocityTemplate = (
+    expression: string,
+    context: RenderContext,
+    maxLength?: number
+): string | undefined => {
+    return renderVelocityTemplate(expression, createRenderContextForPass(context), maxLength)
 }
 
 /**

@@ -1,6 +1,7 @@
 import { NormalAttributeDefinition, UniqueAttributeDefinition } from '../../model/config'
 import {
     evaluateVelocityTemplate,
+    evaluateVelocityTemplateWithContext,
     normalize,
     removeSpaces,
     switchCase,
@@ -12,6 +13,7 @@ type RenderContext = Record<string, any>
 
 export interface EvaluateOptions {
     expressionOverride?: string
+    renderContext?: RenderContext
 }
 
 export interface EvaluateResult {
@@ -31,7 +33,9 @@ export function evaluateAttributeTemplate(
 
     let value: any
     try {
-        value = evaluateVelocityTemplate(expression, context)
+        value = options?.renderContext
+            ? evaluateVelocityTemplateWithContext(options.renderContext, expression)
+            : evaluateVelocityTemplate(expression, context)
     } catch (error) {
         return {
             value: undefined,

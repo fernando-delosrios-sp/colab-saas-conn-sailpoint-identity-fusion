@@ -1,4 +1,4 @@
-import { evaluateVelocityTemplate, truncateResultToMaxLength } from '../formatting'
+import { evaluateVelocityTemplate, createRenderContextForPass, truncateResultToMaxLength } from '../formatting'
 
 /**
  * Test suite for evaluateVelocityTemplate with contextHelpers
@@ -46,6 +46,13 @@ describe('evaluateVelocityTemplate', () => {
             const expr = '#set($f=$constructor("return \\"pwned\\""))$f()'
             const result = evaluateVelocityTemplate(expr, context)
             expect(result).not.toBe('pwned')
+        })
+
+        it('createRenderContextForPass keeps a null prototype and helper override', () => {
+            const renderContext = createRenderContextForPass({ Math: 'caller-math', firstName: 'Ada' })
+            expect(Object.getPrototypeOf(renderContext)).toBeNull()
+            expect(typeof renderContext.Math).toBe('object')
+            expect(renderContext.firstName).toBe('Ada')
         })
 
         it('reads enumerable inherited caller-context keys', () => {
