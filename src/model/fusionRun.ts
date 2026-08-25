@@ -117,6 +117,10 @@ export class FusionRun {
     trigramIndexByAttribute: Map<string, Map<string, Set<FusionAccount>>> = new Map()
     normalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
     nameNormalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
+    /** Run-scoped name-matcher token arrays keyed by already-normalized name string. */
+    nameMatcherTokenCache: Map<string, string[]> = new Map()
+    /** Run-scoped Double Metaphone codes keyed by name-matcher token. */
+    nameMatcherPhoneticCache: Map<string, [string, string]> = new Map()
     indexedMandatoryAttributes: string[] = []
     trigramIndexBuilt: boolean = false
     formsCreated: number = 0

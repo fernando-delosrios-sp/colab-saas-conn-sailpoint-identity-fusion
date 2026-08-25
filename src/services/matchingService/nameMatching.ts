@@ -11,6 +11,32 @@
 import { jaroWinklerSimilarity } from './stringComparison'
 import { doubleMetaphone } from 'double-metaphone'
 
+/** Optional FusionRun-backed maps so name-matcher scoring reuses tokens and phonetic codes. */
+export type NameMatcherCaches = {
+    tokenCache: Map<string, string[]>
+    phoneticCache: Map<string, [string, string]>
+}
+
+function getCachedTokens(normalized: string, cache?: Map<string, string[]>): string[] {
+    if (!cache) return normalized.split(' ')
+    let tokens = cache.get(normalized)
+    if (!tokens) {
+        tokens = normalized.split(' ')
+        cache.set(normalized, tokens)
+    }
+    return tokens
+}
+
+function getCachedPhoneticCodes(token: string, cache?: Map<string, [string, string]>): [string, string] {
+    if (cache) {
+        const cached = cache.get(token)
+        if (cached) return cached
+    }
+    const codes = doubleMetaphone(token)
+    cache?.set(token, codes)
+    return codes
+}
+
 // Module-level regex constants — compiled once, reused on every normalizeName call (hot scoring loop)
 const NAME_DIACRITICS_RE = /[\u0300-\u036f]/g
 const NAME_SPECIAL_CHARS_RE = /[^a-z0-9\s]/g
@@ -46,8 +72,8 @@ export function match(name1: string, name2: string): number {
     if (normalized1 === normalized2) return 1.0
 
     // normalizeName guarantees trimmed single-space separation — no empty tokens possible.
-    const tokens1 = normalized1.split(' ')
-    const tokens2 = normalized2.split(' ')
+    const tokens1 = getCachedTokens(normalized1)
+    const tokens2 = getCachedTokens(normalized2)
 
     // No valid tokens to compare
     if (tokens1.length === 0 || tokens2.length === 0) return 0
@@ -82,18 +108,22 @@ export function isMatch(name1: string, name2: string, threshold: number = 0.85):
  * Skips the normalization step so the caller can cache normalized values and avoid
  * re-normalizing in the O(n×m) scoring loop — mirrors the scoreLIG3Normalized pattern.
  */
-export function matchNormalized(normalized1: string, normalized2: string): number {
+export function matchNormalized(
+    normalized1: string,
+    normalized2: string,
+    caches?: NameMatcherCaches
+): number {
     if (!normalized1 || !normalized2) return 0
     if (normalized1 === normalized2) return 1.0
 
     // normalizeName guarantees single-space separation and no leading/trailing whitespace,
     // so splitting on ' ' is safe and avoids the regex overhead.
-    const tokens1 = normalized1.split(' ')
-    const tokens2 = normalized2.split(' ')
+    const tokens1 = getCachedTokens(normalized1, caches?.tokenCache)
+    const tokens2 = getCachedTokens(normalized2, caches?.tokenCache)
 
     const tokenScore = calculateTokenSimilarity(tokens1, tokens2)
     const stringSimilarity = jaroWinklerSimilarity(normalized1, normalized2)
-    const phoneticScore = calculatePhoneticSimilarity(tokens1, tokens2)
+    const phoneticScore = calculatePhoneticSimilarity(tokens1, tokens2, caches?.phoneticCache)
 
     return tokenScore * 0.5 + phoneticScore * 0.3 + stringSimilarity * 0.2
 }
@@ -173,7 +203,11 @@ function calculateTokenSimilarity(tokens1: string[], tokens2: string[]): number 
  * Calculate phonetic similarity between name tokens
  * Uses Double Metaphone for phonetic encoding
  */
-function calculatePhoneticSimilarity(tokens1: string[], tokens2: string[]): number {
+function calculatePhoneticSimilarity(
+    tokens1: string[],
+    tokens2: string[],
+    phoneticCache?: Map<string, [string, string]>
+): number {
     if (tokens1.length === 0 || tokens2.length === 0) return 0
 
     // Filter out single-character tokens (initials) first
@@ -190,7 +224,7 @@ function calculatePhoneticSimilarity(tokens1: string[], tokens2: string[]): numb
 
     // Pre-compute phonetic codes for validTokens2 so doubleMetaphone is called O(n1+n2)
     // times instead of O(n1*n2) — each code pair is computed once and reused across all token1s.
-    const codes2List = validTokens2.map((t) => doubleMetaphone(t))
+    const codes2List = validTokens2.map((t) => getCachedPhoneticCodes(t, phoneticCache))
 
     // Compare phonetic codes for each token pair.
     // Keep exact matches as full credit, but allow partial credit for near matches.
@@ -198,7 +232,7 @@ function calculatePhoneticSimilarity(tokens1: string[], tokens2: string[]): numb
     let phoneticScore = 0
 
     for (const token1 of validTokens1) {
-        const codes1 = doubleMetaphone(token1)
+        const codes1 = getCachedPhoneticCodes(token1, phoneticCache)
         let bestForToken = 0
 
         for (const codes2 of codes2List) {

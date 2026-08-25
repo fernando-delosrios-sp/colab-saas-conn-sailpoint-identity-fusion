@@ -1,9 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { doubleMetaphone } from 'double-metaphone'
 import { MatchingService, COMBINED_SCORE_ROW_ATTRIBUTE } from '../matchingService'
 import { FusionAccount } from '../../../model/account'
 import { MatchCandidateType } from '../types'
 import { FusionConfig } from '../../../model/config'
 import { FusionRun } from '../../../model/fusionRun'
+
+vi.mock('double-metaphone', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('double-metaphone')>()
+    return {
+        ...actual,
+        doubleMetaphone: vi.fn((value: string) => actual.doubleMetaphone(value)),
+    }
+})
 
 describe('MatchingService', () => {
     const mockLog = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } as any
@@ -279,6 +288,85 @@ describe('MatchingService', () => {
             expect(log.warn).toHaveBeenCalledWith(
                 'Full identity scan fallback #1: account has no value for any mandatory trigram attribute'
             )
+        })
+    })
+
+    describe('name-matcher FusionRun caches', () => {
+        const nameRule = {
+            attribute: 'displayName',
+            algorithm: 'name-matcher' as const,
+            fusionScore: 50,
+            mandatory: false,
+        }
+
+        const nameMatcherConfig = { matchingConfigs: [nameRule], fusionManualReviewScore: 0 } as any
+
+        it('invokes doubleMetaphone once per distinct token when scoring two identities with the same first name', async () => {
+            vi.mocked(doubleMetaphone).mockClear()
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(nameMatcherConfig, mockLog, run)
+            service.configureScoring({ captureBreakdown: true })
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { displayName: 'Alice Smith' },
+            } as any)
+            const identity1 = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { displayName: 'Alice Jones' },
+            } as any)
+            const identity2 = FusionAccount.fromIdentity({
+                id: 'id-2',
+                attributes: { displayName: 'Alice Brown' },
+            } as any)
+
+            await service.scoreFusionAccount(managed, [identity1, identity2])
+
+            const distinctTokens = new Set(['alice', 'smith', 'jones', 'brown'])
+            expect(doubleMetaphone).toHaveBeenCalledTimes(distinctTokens.size)
+        })
+
+        it('multi-identity sweep with name-matcher rule produces same scores as before caching', async () => {
+            const cachedRun = new FusionRun(mockLog)
+            const cachedService = new MatchingService(nameMatcherConfig, mockLog, cachedRun)
+            const uncachedService = new MatchingService(nameMatcherConfig, mockLog)
+            cachedService.configureScoring({ captureBreakdown: true })
+            uncachedService.configureScoring({ captureBreakdown: true })
+
+            const managedAttrs = { displayName: 'Alice Smith' }
+            const identitySpecs = [
+                { id: 'id-1', attributes: { displayName: 'Alice Jones' } },
+                { id: 'id-2', attributes: { displayName: 'Alice Brown' } },
+                { id: 'id-3', attributes: { displayName: 'Alice Smith' } },
+            ]
+
+            const cachedManaged = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { ...managedAttrs },
+            } as any)
+            const uncachedManaged = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { ...managedAttrs },
+            } as any)
+
+            const cachedIdentities = identitySpecs.map((spec) => FusionAccount.fromIdentity(spec as any))
+            const uncachedIdentities = identitySpecs.map((spec) => FusionAccount.fromIdentity(spec as any))
+
+            await cachedService.scoreFusionAccount(cachedManaged, cachedIdentities)
+            await uncachedService.scoreFusionAccount(uncachedManaged, uncachedIdentities)
+
+            const cachedScores = cachedManaged.fusionMatchesRaw.map((m) => ({
+                id: m.identityId,
+                scores: m.scores.map((s) => ({ attribute: s.attribute, score: s.score })),
+            }))
+            const uncachedScores = uncachedManaged.fusionMatchesRaw.map((m) => ({
+                id: m.identityId,
+                scores: m.scores.map((s) => ({ attribute: s.attribute, score: s.score })),
+            }))
+            expect(cachedScores).toEqual(uncachedScores)
         })
     })
 })
