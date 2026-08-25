@@ -37,7 +37,7 @@ When comparing a managed account against an identity candidate during identity-s
 - **THEN** no `FusionMatch` SHALL be added to the fusion account
 - **AND** the comparison SHALL NOT allocate individual per-rule `ScoreReport` objects
 
-#### Scenario: Threshold-passing comparison stores full breakdown without re-scoring
+#### Scenario: Threshold-passing comparison stores full breakdown
 
 - **GIVEN** `candidateType` is `Identity`
 - **AND** a managed account and identity candidate produce a combined score at or above the manual review threshold with no failed mandatory rules
