@@ -1,0 +1,3 @@
+## 2025-08-25 - [Prism simplification for chained readUnknown calls]
+**Learning:** Simplification of chained `readUnknown` calls (e.g. `readUnknown(obj, 'a') ?? readUnknown(obj, 'b')`) with a new `readFirstUnknown` utility improves readability while maintaining fallback behavior and safe handling of unknown objects. This codebase-specific pattern must loop checking explicitly for `!== undefined && !== null`.
+**Action:** Implemented `readFirstUnknown` in `src/utils/safeRead.ts` and replaced chains in `src/services/formService/formLifecycle.ts`, `src/services/formService/formService.ts`, and `src/utils/attributes.ts`.
