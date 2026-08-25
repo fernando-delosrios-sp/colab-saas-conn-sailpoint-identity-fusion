@@ -6,10 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
-## 2026-08-25
+## 2026-08-25 · v2.2.0
 
 ### 🔧 Improvements
 
+- **Refresh STATUS uses one consistent progress counter** — Refresh heartbeats now report `progress=done/total refreshed(Δ+N/interval)` like Fetch reports `fetched`. The redundant standalone `refreshed(N)` counter is removed; Map and Define refresh behavior is unchanged. Log scrapers matching Refresh `processed(Δ` or `refreshed(N)` should migrate to the `refreshed` progress unit.
 - **Processing wait time is capped at 180 seconds** — Platform keep-alive (`processingWait`) defaults to 180 seconds and cannot exceed that. Existing sources stored above 180 are clamped at runtime.
 
 ---

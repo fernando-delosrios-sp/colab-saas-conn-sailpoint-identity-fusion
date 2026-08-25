@@ -66,6 +66,7 @@ Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identit
 ### Phase 3 — Fusion Account Processing (Refresh)
 
     - Processes all _existing_ fusion accounts. This step "depletes" the matching managed accounts from the work queue (the map of all managed accounts).
+    - STATUS reports phase advancement as `progress=done/total refreshed`, with an interval delta after the first Refresh heartbeat (for example `refreshed(Δ+192/10s)`).
     - For each account:
         - Identity layer is applied to match collected identities with Fusion accounts.
         - Managed account layer is applied to match collected managed accounts with Fusion accounts.

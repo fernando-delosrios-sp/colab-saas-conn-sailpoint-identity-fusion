@@ -397,7 +397,9 @@ export class FusionService {
                 return await this.processFusionAccount(x)
             },
             this.config,
-            this.log
+            this.log,
+            undefined,
+            'refreshed'
         )
         this.log.detail({
             action: 'fusion accounts phase finished',
@@ -504,11 +506,6 @@ export class FusionService {
             fusionAccount.needsRefresh || refreshDefinition || refreshMapping || this.config.forceAttributeRefresh
         )
         fusionAccount.setNeedsReset(resetDefinition)
-
-        if (fusionAccount.needsRefresh) {
-            this.log.recordRefreshedAccount()
-        }
-
         await this.accountAssembly.applyAttributeProcessing(fusionAccount)
         await this.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, mergeDecision)
         this.finalizeProcessedFusionAccount(fusionAccount)

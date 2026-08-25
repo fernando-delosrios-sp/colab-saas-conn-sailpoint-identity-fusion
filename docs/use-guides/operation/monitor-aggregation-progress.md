@@ -85,7 +85,7 @@ During long `accountList` aggregations, the connector emits standardized prefixe
 **Example line:**
 
 ```
-14:30:45 [INFO]  [accountList] STATUS phase=4 step=process progress=1200/5400 api=42/3/891 elapsed=183s
+14:30:45 [INFO]  [accountList] STATUS phase=Refresh progress=19032/102407 refreshed(Δ+192/10s) mem=1992.07MB(96%) elapsed=22M 14S
 ```
 
 ### Quick grep targets

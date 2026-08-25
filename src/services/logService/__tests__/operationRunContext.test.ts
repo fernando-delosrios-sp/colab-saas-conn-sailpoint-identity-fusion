@@ -149,14 +149,6 @@ describe('OperationRunContext', () => {
         expect(summary).toEqual({ correlations: 'link=1/1' })
     })
 
-    it('increments refreshedCount', () => {
-        const ctx = new OperationRunContext()
-        expect(ctx.refreshedCount).toBe(0)
-        ctx.incrementRefreshedCount()
-        ctx.incrementRefreshedCount()
-        expect(ctx.refreshedCount).toBe(2)
-    })
-
     it('tracks cumulative outcomes separately from flushed tick counters', () => {
         const ctx = new OperationRunContext()
         ctx.recordEvent('nonMatch')
@@ -225,20 +217,6 @@ describe('LogService operation helpers', () => {
         )
     })
 
-    it('records refreshed accounts only during Refresh phase', () => {
-        const log = new LogService({ spConnDebugLoggingEnabled: false, operationContext: 'accountList' })
-        const ctx = new OperationRunContext()
-        log.bindRunContext(ctx)
-
-        ctx.phase = 'Process'
-        log.recordRefreshedAccount()
-        expect(ctx.refreshedCount).toBe(0)
-
-        ctx.phase = 'Refresh'
-        log.recordRefreshedAccount()
-        log.recordRefreshedAccount()
-        expect(ctx.refreshedCount).toBe(2)
-    })
 })
 
 

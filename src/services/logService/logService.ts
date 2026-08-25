@@ -396,12 +396,6 @@ export class LogService {
         }
     }
 
-    recordRefreshedAccount(): void {
-        if (this.runContext?.phase === 'Refresh') {
-            this.runContext.incrementRefreshedCount()
-        }
-    }
-
     recordEvent(category: string, detail?: Record<string, unknown>): void {
         this.runContext?.recordEvent(category, detail)
     }

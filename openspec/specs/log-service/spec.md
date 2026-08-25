@@ -82,6 +82,33 @@ When correlation PATCH activity has occurred in the run and the API queue has pe
 - **WHEN** the next STATUS heartbeat fires
 - **THEN** the STATUS line SHALL include `completed=147` and `pending=1853` in the correlation segment
 
+### Requirement: Refresh STATUS SHALL render refreshed progress the same way as fetched
+
+When `log.setProgress` is invoked with unit `refreshed` during Refresh phase, the operation heartbeat SHALL include that progress on the STATUS line in the same shape as Fetch `fetched`: `progress={done}/{total} refreshed` with an optional delta suffix after the first tick (or after a unit change). Refresh STATUS SHALL NOT append a separate cumulative `refreshed(N)` segment. The heartbeat SHALL NOT emit a distinct `REFRESH` line kind. The log service SHALL NOT expose `recordRefreshedAccount` or a `refreshedCount` field for STATUS.
+
+#### Scenario: Refreshed unit appears on STATUS like Fetch fetched
+
+- **GIVEN** Refresh phase has called `setProgress(19032, 102407, 'refreshed')`
+- **WHEN** the operation heartbeat interval fires
+- **THEN** the connector host SHALL receive an INFO STATUS line
+- **AND** the line SHALL include `progress=19032/102407 refreshed`
+- **AND** the line SHALL NOT contain `processed(`
+- **AND** the line SHALL NOT contain `refreshed(` as a standalone cumulative segment
+
+#### Scenario: Refreshed progress delta uses previous tick baseline
+
+- **GIVEN** progress was 19032/102407 refreshed at the previous STATUS tick
+- **AND** a caller invokes `setProgress(19224, 102407, 'refreshed')` before the next tick
+- **WHEN** the next STATUS heartbeat fires
+- **THEN** the STATUS line SHALL include a pipeline progress delta of `+192` over the heartbeat interval attached to unit `refreshed`
+
+#### Scenario: Unit change from fetched to refreshed resets delta baseline
+
+- **GIVEN** the previous STATUS tick showed unit `fetched`
+- **WHEN** the next tick shows unit `refreshed`
+- **THEN** the refreshed progress delta suffix MAY be omitted on that first refreshed tick
+- **AND** subsequent refreshed ticks SHALL include deltas against the refreshed baseline
+
 ### Requirement: Operation heartbeat emits EVENT_SUMMARY lines
 
 The log service SHALL aggregate account-level events recorded via `recordEvent` and correlation activity helpers between heartbeat ticks and emit `EVENT_SUMMARY` text lines when those counters include activity that is not already visible on the STATUS line. Counters SHALL reset after each flush even when no summary line is emitted. Multiple summary lines MAY be used when a single line would be excessively long. Match `EVENT_SUMMARY` SHALL be omitted when the only match activity in the interval is non-matched accounts; STATUS already reports pipeline progress delta and cumulative `matches(Nn/Mm/Aa/Dd)` for that work. Decision, email, and correlation summaries SHALL still emit when those counters are non-zero. Correlation activity SHALL appear in `EVENT_SUMMARY` lines using subtype segments `link=triggers/accounts` and `merge=triggers/accounts` when non-zero, plus `completed=` with interval delta when non-zero (summed across link and merge completions), and aggregated `skipped=` counts when non-zero. During account-list aggregation (`isAggregationMode`), correlation `EVENT_SUMMARY` segments SHALL NOT include `correlated-action=`.
@@ -233,8 +260,10 @@ Decision metrics SHALL be recorded via `recordEvent('decision', { type })` with 
 #### Scenario: Refresh STATUS includes correlation segment
 
 - **GIVEN** an account-list operation in Refresh phase with cumulative link correlation activity
+- **AND** pipeline progress uses unit `refreshed`
 - **WHEN** the next STATUS heartbeat fires
-- **THEN** the STATUS line SHALL include a correlation segment with link totals alongside `refreshed(N)`
+- **THEN** the STATUS line SHALL include a correlation segment with link totals alongside `progress=` with unit `refreshed`
+- **AND** the line SHALL NOT require a standalone `refreshed(N)` segment
 
 ### Requirement: Heartbeat interval is configurable in Advanced Connection Settings
 
