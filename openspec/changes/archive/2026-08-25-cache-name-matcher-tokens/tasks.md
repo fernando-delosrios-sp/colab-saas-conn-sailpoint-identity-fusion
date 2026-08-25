@@ -6,7 +6,7 @@
 ## 2. Name-matcher cache wiring
 
 - [x] 2.1 Add cache-aware helpers in `nameMatching.ts` (e.g. `getCachedTokens`, `getCachedPhoneticCodes`) that read/write the FusionRun maps.
-- [x] 2.2 Update `matchNormalized` / `calculatePhoneticSimilarity` to use cached tokens and phonetic codes when a cache bag is provided.
+- [x] 2.2 Update `matchNormalized` / `calculatePhoneticSimilarity` to use cached tokens and phonetic codes when FusionRun maps are passed.
 - [x] 2.3 Wire `MatchingService` / `scoreNameMatcherNormalized` to pass `FusionRun` cache maps into the name-matcher path.
 
 ## 3. Score parity tests
