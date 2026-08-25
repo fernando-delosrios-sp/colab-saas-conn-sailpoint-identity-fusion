@@ -97,10 +97,11 @@ export class DefinitionService {
 
     public async refreshAllAttributes(fusionAccount: FusionAccount): Promise<void> {
         const context = this.buildVelocityContext(fusionAccount)
+        const renderContext = createRenderContextForPass(context)
 
         for (const definition of this.normalDefinitions) {
             try {
-                this.processNormalDefinition(definition, fusionAccount, context)
+                this.processNormalDefinition(definition, fusionAccount, context, renderContext)
             } catch (error) {
                 this.log.error(
                     `Error generating normal attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
