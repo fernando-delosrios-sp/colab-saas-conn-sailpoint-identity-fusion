@@ -47,7 +47,7 @@ Add each attribute under **Normal Attribute Definitions** or **Unique Attribute 
 
 | Goal | Section | Expression hint |
 | --- | --- | --- |
-| Full name (dynamic) | Normal | `$firstname $lastname` with **Refresh on each aggregation?** = Yes |
+| Full name (dynamic) | Normal | `$firstname $lastname` with **Always recalculate?** = Yes |
 | Username with collision handling | Unique | `#set($i=$firstname.substring(0,1))$i$lastname` + transforms |
 | Immutable UUID | Unique | `$UUID` |
 | Sequential employee number | Unique | `EMP-$counter` with **Use incremental counter?** = Yes |
@@ -61,13 +61,13 @@ Add each attribute under **Normal Attribute Definitions** or **Unique Attribute 
 
 ### Normal type
 
-**Behavior:** Standard computed attribute; recalculated based on **Refresh on each aggregation?** and **Static** settings.
+**Behavior:** Standard computed attribute; recalculated based on **Always recalculate?** and **Static** settings.
 
-| Static | Refresh setting | Behavior                                                                   | Use case                                                            |
-| ------ | --------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| No     | Yes             | Recalculated every aggregation; falsy or failed output **clears** the stored value | Dynamic values that should update (full name, age, formatted dates) |
-| No     | No              | Recalculated only when underlying source data changes; falsy or failed output **clears** the stored value | Standard values that update only when source data updates           |
-| Yes    | (Ignored)       | Calculated only when it has no value; existing values are never recalculated | Immutable values (initial assignment, one-time calculations)        |
+| Static | Always recalculate | Behavior                                                                   | Use case                                                            |
+| ------ | ------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| No     | Yes                | Recalculated every aggregation even if source data is unchanged; falsy or failed output **clears** the stored value | Dynamic values that should update (full name, age, formatted dates) |
+| No     | No                 | Recalculated only when underlying source data changes; falsy or failed output **clears** the stored value | Standard values that update only when source data updates           |
+| Yes    | (Ignored)          | Calculated only when it has no value; existing values are never recalculated | Immutable values (initial assignment, one-time calculations)        |
 
 Underlying source data has changed when a managed account is newly blended or removed, or when a managed account’s `modified` timestamp is newer than the Fusion account’s by more than a short grace period.
 
@@ -77,13 +77,13 @@ Underlying source data has changed when a managed account is newly blended or re
 **Examples:**
 
 ```velocity
-# Full name (refresh: Yes)
+# Full name (Always recalculate: Yes)
 $firstname $lastname
 
-# Formatted hire date (refresh: No, unless hireDate changes)
+# Formatted hire date (Always recalculate: No, unless hireDate changes)
 $Datefns.format($hireDate, 'MMMM dd, yyyy')
 
-# Years of service (refresh: Yes, dynamic)
+# Years of service (Always recalculate: Yes, dynamic)
 $Math.floor($Datefns.differenceInDays($Datefns.now(), $hireDate) / 365)
 ```
 

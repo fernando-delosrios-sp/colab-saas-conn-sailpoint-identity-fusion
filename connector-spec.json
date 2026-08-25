@@ -525,7 +525,7 @@
                 {
                     "type": "section",
                     "sectionTitle": "Normal Attribute Definitions",
-                    "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong> Apache Velocity; optional per-definition refresh. Post-template options: case, character normalization, spaces, trim, max length.<br><br>Definitions run top to bottom — each result is available to the next. See the Velocity context reference for <code>$accounts</code>, <code>$identity</code>, <code>$previous</code>, and helper functions.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/defining-attributes/\">Defining attributes guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/velocity-context/\">Velocity context reference</a>.",
+                    "sectionHelpMessage": "<strong>Define dynamic computed attributes.</strong> Apache Velocity; optional Always recalculate. Post-template options: case, character normalization, spaces, trim, max length.<br><br>Definitions run top to bottom — each result is available to the next. See the Velocity context reference for <code>$accounts</code>, <code>$identity</code>, <code>$previous</code>, and helper functions.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/configuration/defining-attributes/\">Defining attributes guide</a> · <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/reference/velocity-context/\">Velocity context reference</a>.",
                     "items": [
                         {
                             "key": "normalAttributeDefinitions",
@@ -566,11 +566,11 @@
                                         },
                                         {
                                             "key": "refresh",
-                                            "label": "Refresh on each aggregation?",
+                                            "label": "Always recalculate?",
                                             "parentKey": "static",
                                             "parentValue": "false",
                                             "type": "toggle",
-                                            "helpKey": "When enabled, the value is recalculated on every aggregation."
+                                            "helpKey": "When enabled, the expression runs every aggregation even if managed source data is unchanged. When disabled, existing values are kept unless source data changed, the account is reset, or force attribute refresh is on."
                                         }
                                     ]
                                 },
