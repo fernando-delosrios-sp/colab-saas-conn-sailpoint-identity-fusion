@@ -164,11 +164,12 @@ With threshold 3600s (test file default): Fusion `2024-01-15T10:00:00.000Z`, man
 - `openspec/changes/honor-managed-account-refresh-threshold/specs/fusion-service/spec.md` (already in this package)
 - `CHANGELOG.md`
 - Optional one sentence: `docs/use-guides/configuration/defining-attributes.md`
+- Test-only (verification 3.1): `src/services/mappingService/__tests__/mapService.test.ts` identity-skip stub needs iterable `sources` and `history` — MappingService product code unchanged
 
 **Out of scope:**
 
 - `src/services/definitionService/**` — skip logic stays; this only makes `needsRefresh` truthful
-- `src/services/mappingService/**`
+- `src/services/mappingService/**` product code — skip logic stays; the 3.1 identity-skip **test stub** is listed above
 - `src/services/fusionService/fusionService.ts` `setNeedsRefresh` OR with force flags
 - Identity-layer comparison
 - `src/utils/date.ts` implementation (tests only if adding threshold examples)
