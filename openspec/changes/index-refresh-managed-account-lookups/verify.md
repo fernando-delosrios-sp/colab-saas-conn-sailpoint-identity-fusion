@@ -20,3 +20,8 @@
 - `processPreviousRunMatchedAccounts` no longer calls `queue.entries()`.
 - Lookup is `queue.get(id)` over the union of previous and missing keys.
 - Absent queue keys are skipped; a key in both sets is claimed once.
+- Large-queue case asserts uncorrelated status and `onQueueScan === 2` (not the 122-entry queue size) as the CI stand-in for `queueEntriesScanned`.
+
+## Follow-ups from verify
+
+Uncorrelated status is asserted on the large-queue scenario. Live tenant throughput compare remains optional outside CI.

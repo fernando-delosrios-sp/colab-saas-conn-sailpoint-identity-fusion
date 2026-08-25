@@ -23,7 +23,10 @@
 - `needsRefresh`, `needsReset`, and `forceAttributeRefresh` override the skip.
 - Account-level early return when every Normal definition has `refresh: false`.
 - One `createRenderContextForPass` per `refreshNormalAttributes` invocation.
+- `copyVelocityCallerContext` lives in `velocityCallerContext.ts` so tests can spy one copy per pass.
+- Tenant-like mix (17 refresh-true, 5 refresh-false) asserts `onStats` `{ evaluated: 17, skipped: 5 }` on an unchanged account (CI stand-in for task 5.4).
+- `refreshAllAttributes` reuses the same per-account render context for Normal definitions.
 
-## Note
+## Follow-ups from verify
 
-Task 5.4 tenant-profile comparison is covered in CI by `onStats` skipped/evaluated counts on mixed refresh flags, not a live tenant run.
+Warnings and suggestions from `/opsx-verify` were addressed in follow-up tests and the `velocityCallerContext` extract. Live tenant `normalDefineMs` compare remains optional outside CI.

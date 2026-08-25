@@ -5,6 +5,7 @@ import { FusionConfig } from '../../../model/config'
 import { InMemoryLockService } from '../../lockService'
 import * as templateEvaluator from '../templateEvaluator'
 import * as formatting from '../formatting'
+import * as velocityCallerContext from '../velocityCallerContext'
 
 describe('DefinitionService', () => {
     const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogLevel: vi.fn(() => 'info') } as any
@@ -896,6 +897,7 @@ describe('refresh flag semantics', () => {
     })
 
     it('copies caller context once per refresh pass with 3 definitions', async () => {
+        const copySpy = vi.spyOn(velocityCallerContext, 'copyVelocityCallerContext')
         const passSpy = vi.spyOn(formatting, 'createRenderContextForPass')
         const service = createService([
             { name: 'one', expression: '1', refresh: true },
@@ -907,8 +909,51 @@ describe('refresh flag semantics', () => {
         await service.refreshNormalAttributes(acc)
 
         expect(passSpy).toHaveBeenCalledTimes(1)
+        expect(copySpy).toHaveBeenCalledTimes(1)
         expect(acc.attributeBag.current.one).toBe('1')
         expect(acc.attributeBag.current.two).toBe('2')
         expect(acc.attributeBag.current.three).toBe('3')
+    })
+
+    it('tenant-like mix skips refresh-false defs on unchanged accounts', async () => {
+        const refreshTrue = Array.from({ length: 17 }, (_, i) => ({
+            name: `dyn${i}`,
+            expression: `dyn-${i}`,
+            refresh: true,
+        }))
+        const refreshFalse = Array.from({ length: 5 }, (_, i) => ({
+            name: `stable${i}`,
+            expression: `should-not-run-${i}`,
+            refresh: false,
+        }))
+        const attrs: Record<string, string> = {}
+        for (const def of [...refreshTrue, ...refreshFalse]) {
+            attrs[def.name] = `prior-${def.name}`
+        }
+        const service = createService([...refreshFalse, ...refreshTrue])
+        const acc = createPersistedAccount(attrs)
+        const stats: { evaluated: number; skipped: number }[] = []
+
+        await service.refreshNormalAttributes(acc, (s) => stats.push(s))
+
+        expect(stats[0]).toEqual({ evaluated: 17, skipped: 5 })
+        expect(acc.attributeBag.current.stable0).toBe('prior-stable0')
+        expect(acc.attributeBag.current.dyn0).toBe('dyn-0')
+    })
+
+    it('refreshAllAttributes reuses one render context for Normal definitions', async () => {
+        const copySpy = vi.spyOn(velocityCallerContext, 'copyVelocityCallerContext')
+        const service = createService([
+            { name: 'first', expression: 'alpha', refresh: true },
+            { name: 'second', expression: '${first}-beta', refresh: true },
+        ])
+        const acc = createPersistedAccount({ first: 'old', second: 'old' })
+        acc.setNeedsRefresh(true)
+
+        await service.refreshAllAttributes(acc)
+
+        expect(copySpy).toHaveBeenCalledTimes(1)
+        expect(acc.attributeBag.current.first).toBe('alpha')
+        expect(acc.attributeBag.current.second).toBe('alpha-beta')
     })
 })

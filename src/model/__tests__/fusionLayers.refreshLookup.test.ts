@@ -4,6 +4,7 @@ import { FusionConfig } from '../config'
 import { FusionRun } from '../fusionRun'
 import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { FusionAttribute } from '../../data/schema'
+import { StatusEntitlement } from '../statusEntitlement'
 
 describe('FusionLayers previous/missing targeted lookups', () => {
     beforeAll(() => {
@@ -59,10 +60,12 @@ describe('FusionLayers previous/missing targeted lookups', () => {
         expect(entriesSpy).not.toHaveBeenCalled()
         expect(acc.accountIds).toContain('src-a::keep-1')
         expect(acc.accountIds).toContain('src-b::keep-2')
+        expect(acc.statuses).toContain(StatusEntitlement.Uncorrelated)
         expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
         expect(run.managedAccountsById.has('src-b::keep-2')).toBe(false)
         expect(run.managedAccountsById.size).toBe(120)
         expect(scanned[0]).toBe(2)
+        expect(scanned[0]).not.toBe(122)
         entriesSpy.mockRestore()
     })
 
