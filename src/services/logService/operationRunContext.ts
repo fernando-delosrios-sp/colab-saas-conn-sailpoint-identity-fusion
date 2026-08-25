@@ -174,8 +174,6 @@ export class OperationRunContext {
     stepStartedAt?: number
     phaseStartedAt?: number
     epilogueStartedAt?: number
-    /** Cumulative fusion accounts with needsRefresh during the Refresh phase. */
-    refreshedCount = 0
     private events: EventCounters = createEmptyEventCounters()
     private cumulativeOutcomes: CumulativeOutcomes = createEmptyCumulativeOutcomes()
     private phaseCorrelation: CorrelationActivityCounters = createEmptyCorrelationActivityCounters()
@@ -317,10 +315,6 @@ export class OperationRunContext {
         })
         this.resetPhaseCorrelationCounters()
         return { correlations: segment }
-    }
-
-    incrementRefreshedCount(): void {
-        this.refreshedCount++
     }
 }
 

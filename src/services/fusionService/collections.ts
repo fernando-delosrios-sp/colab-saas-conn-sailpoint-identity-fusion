@@ -58,11 +58,12 @@ export async function promiseAllBatched<T, R>(
  */
 function createBatchProgressUpdater(
     log: LogService,
-    totalItems: number
+    totalItems: number,
+    progressUnit: string
 ): (processed: number, total: number) => void {
     if (totalItems === 0) return () => {}
     return (processed: number, total: number) => {
-        log.setProgress(processed, total, 'processed')
+        log.setProgress(processed, total, progressUnit)
     }
 }
 
@@ -94,6 +95,8 @@ export async function forEachBatched<T>(
  * Batch processing with config-driven batch sizing and progress logging.
  * Wraps promiseAllBatched with the configured batch size and an
  * automatically created progress logger.
+ *
+ * @param progressUnit - Heartbeat progress unit (default: `processed`)
  */
 export async function batchProcess<T, R>(
     items: T[],
@@ -101,10 +104,11 @@ export async function batchProcess<T, R>(
     fn: (item: T) => Promise<R>,
     config: FusionConfig,
     log: LogService,
-    batchSize?: number
+    batchSize?: number,
+    progressUnit = 'processed'
 ): Promise<R[]> {
     const size = batchSize ?? getFusionParallelBatchSize(config)
-    return promiseAllBatched(items, fn, size, createBatchProgressUpdater(log, items.length))
+    return promiseAllBatched(items, fn, size, createBatchProgressUpdater(log, items.length, progressUnit))
 }
 
 /** Configured batch size for managed-account processing. */

@@ -1,6 +1,7 @@
-import { compact, promiseAllBatched, forEachBatched, getScoringMaxConcurrency } from '../collections'
+import { compact, promiseAllBatched, forEachBatched, getScoringMaxConcurrency, batchProcess } from '../collections'
 import { yieldToEventLoop } from '../../../utils/yieldToEventLoop'
 import type { FusionConfig } from '../../../model/config'
+import type { LogService } from '../../logService'
 
 describe('collections utilities', () => {
     describe('compact', () => {
@@ -72,6 +73,26 @@ describe('collections utilities', () => {
             expect(onBatchComplete).toHaveBeenNthCalledWith(1, 2, 5)
             expect(onBatchComplete).toHaveBeenNthCalledWith(2, 4, 5)
             expect(onBatchComplete).toHaveBeenNthCalledWith(3, 5, 5)
+        })
+    })
+
+    describe('batchProcess', () => {
+        it('uses processed as the default progress unit', async () => {
+            const setProgress = vi.fn()
+            const log = { setProgress } as unknown as LogService
+
+            await batchProcess([1, 2], 'items', async (item) => item, {} as FusionConfig, log, 1)
+
+            expect(setProgress).toHaveBeenLastCalledWith(2, 2, 'processed')
+        })
+
+        it('uses an explicit refreshed progress unit', async () => {
+            const setProgress = vi.fn()
+            const log = { setProgress } as unknown as LogService
+
+            await batchProcess([1, 2], 'items', async (item) => item, {} as FusionConfig, log, 1, 'refreshed')
+
+            expect(setProgress).toHaveBeenLastCalledWith(2, 2, 'refreshed')
         })
     })
 

@@ -533,15 +533,14 @@ describe('OperationHeartbeat timing', () => {
         heartbeat.start()
         vi.advanceTimersByTime(10_000)
         runContext.phase = 'Refresh'
-        runContext.progress = { done: 6468, total: 18811, unit: 'processed' }
-        runContext.refreshedCount = 6454
+        runContext.progress = { done: 6468, total: 18811, unit: 'refreshed' }
         vi.advanceTimersByTime(10_000)
 
         const refreshStatusLine = info.mock.calls[1][0] as string
         expect(refreshStatusLine).toContain('phase=Refresh')
-        expect(refreshStatusLine).toContain('progress=6468/18811 processed')
-        expect(refreshStatusLine).not.toMatch(/processed\(Δ-/)
-        expect(refreshStatusLine).not.toContain('processed(Δ')
+        expect(refreshStatusLine).toContain('progress=6468/18811 refreshed')
+        expect(refreshStatusLine).not.toContain('refreshed(Δ')
+        expect(refreshStatusLine).not.toMatch(/\brefreshed\(\d+\)/)
 
         heartbeat.stop()
         vi.useRealTimers()
@@ -554,8 +553,7 @@ describe('OperationHeartbeat timing', () => {
         const log = { info, warn } as unknown as LogService
         const runContext = new OperationRunContext()
         runContext.phase = 'Refresh'
-        runContext.progress = { done: 7596, total: 18495, unit: 'processed' }
-        runContext.refreshedCount = 280
+        runContext.progress = { done: 7596, total: 18495, unit: 'refreshed' }
 
         const heartbeat = new OperationHeartbeat(log, () => ({
             runContext,
@@ -574,27 +572,24 @@ describe('OperationHeartbeat timing', () => {
 
         heartbeat.start()
         vi.advanceTimersByTime(10_000)
-        runContext.progress = { done: 10296, total: 18495, unit: 'processed' }
-        runContext.refreshedCount = 390
+        runContext.progress = { done: 10296, total: 18495, unit: 'refreshed' }
         vi.advanceTimersByTime(10_000)
-        runContext.progress = { done: 13008, total: 18495, unit: 'processed' }
-        runContext.refreshedCount = 500
+        runContext.progress = { done: 13008, total: 18495, unit: 'refreshed' }
         vi.advanceTimersByTime(10_000)
 
         expect(warn).not.toHaveBeenCalled()
-        expect(info.mock.calls[2][0]).toContain('progress=13008/18495 processed(Δ+2712/10s)')
-        expect(info.mock.calls[2][0]).toContain('refreshed(500)')
+        expect(info.mock.calls[2][0]).toContain('progress=13008/18495 refreshed(Δ+2712/10s)')
+        expect(info.mock.calls[2][0]).not.toMatch(/\brefreshed\(\d+\)/)
         expect(info.mock.calls[2][0]).not.toContain('api=')
 
         heartbeat.stop()
         vi.useRealTimers()
     })
 
-    it('shows cumulative refreshed count during Refresh phase STATUS', () => {
+    it('renders refreshed progress without a standalone cumulative segment', () => {
         const runContext = new OperationRunContext()
         runContext.phase = 'Refresh'
-        runContext.progress = { done: 13548, total: 18811, unit: 'processed' }
-        runContext.refreshedCount = 500
+        runContext.progress = { done: 13548, total: 18811, unit: 'refreshed' }
 
         const line = formatStatusLine(
             {
@@ -607,14 +602,15 @@ describe('OperationHeartbeat timing', () => {
         )
 
         expect(line).toContain('phase=Refresh')
-        expect(line).toContain('progress=13548/18811 processed(Δ+6252/10s)')
-        expect(line).toContain('refreshed(500)')
+        expect(line).toContain('progress=13548/18811 refreshed(Δ+6252/10s)')
+        expect(line).not.toMatch(/\brefreshed\(\d+\)/)
+        expect(line).not.toContain('processed(')
     })
 
-    it('includes correlation segment on Refresh STATUS when link activity occurred', () => {
+    it('includes correlation segment alongside refreshed progress on Refresh STATUS', () => {
         const runContext = new OperationRunContext()
         runContext.phase = 'Refresh'
-        runContext.refreshedCount = 120
+        runContext.progress = { done: 120, total: 200, unit: 'refreshed' }
         runContext.recordCorrelationActivity({ kind: 'link', accounts: 8 })
 
         const line = formatStatusLine(
@@ -626,7 +622,8 @@ describe('OperationHeartbeat timing', () => {
             10_000
         )
 
-        expect(line).toContain('refreshed(120)')
+        expect(line).toContain('progress=120/200 refreshed')
+        expect(line).not.toMatch(/\brefreshed\(\d+\)/)
         expect(line).toContain('correlations link=1/8')
     })
 
@@ -762,11 +759,10 @@ describe('OperationHeartbeat timing', () => {
         )
     })
 
-    it('omits refreshed segment outside Refresh phase', () => {
+    it('keeps processed as the Process batch progress unit', () => {
         const runContext = new OperationRunContext()
         runContext.phase = 'Process'
         runContext.progress = { done: 100, total: 200, unit: 'processed' }
-        runContext.refreshedCount = 50
 
         const line = formatStatusLine(
             { runContext, intervalMs: 10_000 },
@@ -774,7 +770,8 @@ describe('OperationHeartbeat timing', () => {
             10_000
         )
 
-        expect(line).not.toContain('refreshed(')
+        expect(line).toContain('progress=100/200 processed')
+        expect(line).not.toContain('refreshed')
     })
 
     it('formats Fetch phase STATUS with fetched progress delta', () => {

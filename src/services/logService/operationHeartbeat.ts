@@ -217,7 +217,6 @@ export function formatStatusLine(
     }
 
     if (runContext.phase === 'Refresh') {
-        parts.push(`refreshed(${runContext.refreshedCount})`)
         const phaseCorrelation = runContext.getPhaseCorrelationCounters()
         if (phaseCorrelation.linkTriggers > 0 || phaseCorrelation.mergeTriggers > 0) {
             const segment = formatCorrelationSummarySegment(phaseCorrelation, {

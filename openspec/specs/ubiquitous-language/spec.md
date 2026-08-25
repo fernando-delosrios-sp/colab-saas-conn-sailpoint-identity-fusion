@@ -223,6 +223,26 @@ The ubiquitous-language glossary SHALL define **Bulk ingest** and **Ingested (pr
 - **THEN** it SHALL contain an **Ingested (progress unit)** entry describing the STATUS `progress=` unit `ingested`
 - **AND** the entry SHALL state that operators MUST NOT reuse `fetched` for post-HTTP cache registration
 
+### Requirement: Glossary defines Refreshed progress unit
+
+The ubiquitous-language glossary SHALL define **Refreshed (progress unit)** as the canonical STATUS `progress=` unit while account-list Refresh walks Fusion accounts.
+
+#### Scenario: Glossary entry for Refreshed progress unit
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **Refreshed (progress unit)** entry describing the STATUS `progress=` unit `refreshed`
+- **AND** the entry SHALL state that Refresh STATUS MUST NOT reuse unit `processed` and MUST NOT emit a standalone `refreshed(N)` cumulative
+
+### Requirement: Documentation and logs use refreshed for Refresh STATUS
+
+New documentation and Refresh-phase STATUS progress SHALL use unit **refreshed**. They SHALL NOT describe Refresh pipeline throughput as unit `processed` or as a separate `refreshed(N)` token.
+
+#### Scenario: Refresh STATUS examples use refreshed unit
+
+- **WHEN** operator docs show a Refresh STATUS example
+- **THEN** the progress segment SHALL use unit `refreshed`
+- **AND** the example SHALL NOT include a standalone `refreshed(N)` segment
+
 ### Requirement: Glossary defines Main account merge and Origin account merge
 
 The ubiquitous-language glossary SHALL define **Main account merge**, **Origin account merge**, and **origin snapshot** as Map-step terms. Documentation and configuration labels SHALL use these names, not “Origin source” as a merge radio.
@@ -423,6 +443,7 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **EVENT_SUMMARY line** | A heartbeat text line aggregating account-level activity (review/merge matches, correlations, decisions) recorded since the previous tick. Not emitted when the only match activity is non-matched accounts already shown on STATUS (grep prefix `EVENT_SUMMARY`). |
 | **Bulk ingest** | CPU-bound registration of already-fetched pages into operation-run caches during Fetch. Distinct from HTTP retrieval and from identity hydration, which performs follow-up API lookups for missing identities. |
 | **Ingested (progress unit)** | The STATUS `progress=` unit `ingested`, used while bulk ingest registers fetched documents or accounts. Post-HTTP cache registration MUST NOT reuse the `fetched` unit. |
+| **Refreshed (progress unit)** | The STATUS `progress=` unit `refreshed`, used while account-list Refresh walks Fusion accounts. Refresh pipeline throughput MUST NOT reuse unit `processed` or emit a standalone `refreshed(N)` cumulative. |
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |
 | **Correlated account sweep** | A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts. |
 | **Aggregation** | The ISC source-refresh operation. Use **managed source aggregation** or **Fusion source aggregation** when the source matters. |
