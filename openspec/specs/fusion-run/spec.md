@@ -413,16 +413,29 @@ For each orphan correlated managed account whose identity is hydrated, the conne
 - **THEN** it SHALL split the identity-id set into chunks of no more than 50 ids per query
 - **AND** it SHALL execute the chunked queries in parallel with per-chunk error isolation
 
+### Requirement: FusionRun tracks mandatory-missing block count
+
+FusionRun SHALL expose a run-scoped numeric field `mandatoryMissingBlockCount` initialized to zero at run start. MatchingService SHALL increment this field when getCandidates returns an empty candidate set because the managed account has no value for any indexable mandatory trigram attribute.
+
+#### Scenario: Counter starts at zero
+- **WHEN** a new FusionRun is constructed for an operation
+- **THEN** `mandatoryMissingBlockCount` SHALL be `0`
+
+#### Scenario: Counter accumulates across multiple accounts
+- **GIVEN** two managed accounts each triggering mandatory-missing block in the same run
+- **WHEN** both are processed through getCandidates
+- **THEN** `mandatoryMissingBlockCount` SHALL equal `2`
+
 ### Requirement: FusionRun tracks full-scan trigram fallback count
 
-FusionRun SHALL expose a run-scoped numeric field `fullScanFallbackCount` initialized to zero at run start. MatchingService SHALL increment this field when trigram candidate blocking falls back to a full identity scan due to missing mandatory attribute values on a managed account.
+FusionRun SHALL expose a run-scoped numeric field `fullScanFallbackCount` initialized to zero at run start. MatchingService SHALL increment this field only when getCandidates returns undefined because trigram blocking was unavailable, not when returning an empty set for mandatory-missing accounts.
 
 #### Scenario: Counter starts at zero
 - **WHEN** a new FusionRun is constructed for an operation
 - **THEN** `fullScanFallbackCount` SHALL be `0`
 
 #### Scenario: Counter accumulates across multiple accounts
-- **GIVEN** two managed accounts each triggering full-scan fallback in the same run
+- **GIVEN** two managed accounts each triggering full-scan fallback because trigram blocking was unavailable in the same run
 - **WHEN** both are processed through `getCandidates`
 - **THEN** `fullScanFallbackCount` SHALL equal `2`
 
