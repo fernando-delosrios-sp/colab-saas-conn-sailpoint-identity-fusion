@@ -13,7 +13,7 @@ import { InMemoryLockService } from '../lockService'
 import { StateWrapper } from './stateWrapper'
 import { SimpleKey, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { applyOutputTransforms, evaluateAttributeTemplate } from './templateEvaluator'
-import { padNumber } from './formatting'
+import { createRenderContextForPass, padNumber } from './formatting'
 import crypto from 'crypto'
 import { assert } from '../../utils/assert'
 import { FUSION_STATE_CONFIG_PATH } from './constants'
@@ -44,7 +44,6 @@ export class DefinitionService {
     private readonly maxAttempts?: number
     private readonly reverseSources: SourceConfig[]
     readonly registrationPlan: UniqueRegistrationPlan
-    private readonly anyNormalDefinitionRefresh: boolean
     private readonly includeIdentities: boolean
 
     constructor(
@@ -67,7 +66,6 @@ export class DefinitionService {
             (sc) => sc.correlationMode === 'reverse' && sc.correlationAttribute
         )
         this.registrationPlan = buildUniqueRegistrationPlan(config)
-        this.anyNormalDefinitionRefresh = this.normalDefinitions.some((def) => def.refresh)
         this.includeIdentities = config.includeIdentities !== false
     }
 
@@ -135,12 +133,12 @@ export class DefinitionService {
             return
         }
 
-        const forceRefresh =
-            this.forceAttributeRefresh ||
-            fusionAccount.needsReset ||
-            this.anyNormalDefinitionRefresh
-        const shouldRefresh = fusionAccount.needsRefresh || forceRefresh
-        if (!shouldRefresh) {
+        const shouldRefresh =
+            fusionAccount.needsRefresh || fusionAccount.needsReset || this.forceAttributeRefresh
+        const hasRefreshableDefinitions = this.normalDefinitions.some(
+            (definition) => definition.refresh && !this.shouldSkipStaticDefinition(definition, fusionAccount)
+        )
+        if (!shouldRefresh && !hasRefreshableDefinitions) {
             onStats?.({ evaluated: 0, skipped: this.normalDefinitions.length })
             return
         }
@@ -151,10 +149,18 @@ export class DefinitionService {
             )
         }
         const context = this.buildVelocityContext(fusionAccount)
+        const renderContext = createRenderContextForPass(context)
 
+        let evaluated = 0
+        let skipped = 0
         for (const definition of this.normalDefinitions) {
             try {
-                this.processNormalDefinition(definition, fusionAccount, context)
+                const outcome = this.processNormalDefinition(definition, fusionAccount, context, renderContext)
+                if (outcome === 'evaluated') {
+                    evaluated++
+                } else {
+                    skipped++
+                }
             } catch (error) {
                 this.log.error(
                     `Error generating normal attribute ${definition.name} for account: ${fusionAccount.name} (${fusionAccount.sourceName})`,
@@ -162,7 +168,7 @@ export class DefinitionService {
                 )
             }
         }
-        onStats?.({ evaluated: this.normalDefinitions.length, skipped: 0 })
+        onStats?.({ evaluated, skipped })
     }
 
     public async refreshUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
@@ -654,16 +660,17 @@ export class DefinitionService {
     private processNormalDefinition(
         definition: NormalAttributeDefinition,
         fusionAccount: FusionAccount,
-        context: Record<string, any>
-    ): void {
+        context: Record<string, any>,
+        renderContext?: Record<string, any>
+    ): 'evaluated' | 'skipped' {
         const { fusionIdentityAttribute, fusionDisplayAttribute } = this.schemas
 
         if (this.applyDisplayAttributeOverrideIfApplicable(fusionAccount, definition.name)) {
-            return
+            return 'skipped'
         }
 
         if (this.isSystemProvenanceAttribute(definition.name)) {
-            return
+            return 'skipped'
         }
 
         const { current } = fusionAccount.attributeBag
@@ -680,18 +687,32 @@ export class DefinitionService {
             isExistingFusionAccount
 
         if (isImmutableIdentityAttribute || isImmutableDisplayAttribute) {
-            return
+            return 'skipped'
         }
 
-        if (definition.static && isExistingFusionAccount) {
-            return
+        if (this.shouldSkipStaticDefinition(definition, fusionAccount)) {
+            return 'skipped'
         }
 
         if (this.isUniqueAttribute(definition.name) && current[definition.name] !== undefined) {
-            return
+            return 'skipped'
         }
 
-        const result = evaluateAttributeTemplate(definition, context)
+        if (
+            !definition.refresh &&
+            !fusionAccount.needsRefresh &&
+            !fusionAccount.needsReset &&
+            !this.forceAttributeRefresh &&
+            hasExistingValue
+        ) {
+            return 'skipped'
+        }
+
+        const result = evaluateAttributeTemplate(
+            definition,
+            context,
+            renderContext ? { renderContext } : undefined
+        )
         if (result.error) {
             this.log.error(
                 `Error evaluating normal attribute ${definition.name}: ${result.error}`
@@ -701,14 +722,18 @@ export class DefinitionService {
                 fusionAccount,
                 context,
                 fusionIdentityAttribute,
-                fusionDisplayAttribute
+                fusionDisplayAttribute,
+                renderContext
             )
-            return
+            return 'evaluated'
         }
 
         if (result.value !== undefined && result.value !== null) {
             fusionAccount.attributes[definition.name] = result.value
             context[definition.name] = result.value
+            if (renderContext) {
+                renderContext[definition.name] = result.value
+            }
             if (this.log.getLogLevel() === 'debug') {
                 this.log.debug(
                     `[${fusionAccount.name}] ${definition.name} = ${typeof result.value === 'object' ? JSON.stringify(result.value) : result.value}`
@@ -720,9 +745,11 @@ export class DefinitionService {
                 fusionAccount,
                 context,
                 fusionIdentityAttribute,
-                fusionDisplayAttribute
+                fusionDisplayAttribute,
+                renderContext
             )
         }
+        return 'evaluated'
     }
 
     private applyNormalDefinitionClearOrSafeDefault(
@@ -730,7 +757,8 @@ export class DefinitionService {
         fusionAccount: FusionAccount,
         context: Record<string, any>,
         fusionIdentityAttribute: string,
-        fusionDisplayAttribute: string
+        fusionDisplayAttribute: string,
+        renderContext?: Record<string, any>
     ): void {
         const safeDefault = this.fusionAttributeSafeDefault(
             attributeName,
@@ -741,10 +769,16 @@ export class DefinitionService {
         if (safeDefault !== undefined) {
             fusionAccount.attributes[attributeName] = safeDefault
             context[attributeName] = safeDefault
+            if (renderContext) {
+                renderContext[attributeName] = safeDefault
+            }
             return
         }
         delete fusionAccount.attributes[attributeName]
         delete context[attributeName]
+        if (renderContext) {
+            delete renderContext[attributeName]
+        }
     }
 
     // ========================================================================
@@ -1082,6 +1116,13 @@ export class DefinitionService {
             fusionAccount.type === FusionAccountKind.Fusion &&
             Object.keys(fusionAccount.previousAttributes ?? {}).length > 0
         )
+    }
+
+    private shouldSkipStaticDefinition(
+        definition: NormalAttributeDefinition,
+        fusionAccount: FusionAccount
+    ): boolean {
+        return Boolean(definition.static && this.isExistingFusionAccount(fusionAccount))
     }
 
     /**
