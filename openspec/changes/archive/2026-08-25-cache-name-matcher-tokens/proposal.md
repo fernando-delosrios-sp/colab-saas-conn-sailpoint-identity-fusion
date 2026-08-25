@@ -8,7 +8,7 @@ The default matching algorithm is `name-matcher`. Each managed-account × identi
 - From: `matchNormalized` splits normalized strings on every comparison.
 - To: `FusionRun` holds a run-scoped `Map<string, string[]>` (normalized name → tokens). First access splits and caches; subsequent comparisons reuse.
 - Reason: Token splits are identical for the same normalized name across all comparisons in a run.
-- Impact: New fields on `FusionRun`; `nameMatching.ts` reads/writes through run or a passed cache bag.
+- Impact: New fields on `FusionRun`; `nameMatching.ts` reads/writes through run or passed token and phonetic maps.
 
 **Name-matcher phonetic code cache on FusionRun**
 - From: `doubleMetaphone` runs for every token on every comparison.

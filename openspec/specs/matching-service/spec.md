@@ -170,7 +170,7 @@ MatchingService SHALL build a trigram blocking index over fusion identities for 
 
 ### Requirement: MatchingService receives FusionRun for state access
 
-MatchingService SHALL receive FusionRun at construction time and read/write all shared state through it. MatchingService SHALL NOT hold internal mutable state beyond configuration. The trigram index (`trigramIndexByAttribute`, `indexedMandatoryAttributes`, `trigramIndexBuilt`) and normalization caches (`normalizedCache`, `nameNormalizedCache`) SHALL live on FusionRun, not on MatchingService.
+MatchingService SHALL receive FusionRun at construction time and read/write all shared state through it. MatchingService SHALL NOT hold internal mutable state beyond configuration. The trigram index (`trigramIndexByAttribute`, `indexedMandatoryAttributes`, `trigramIndexBuilt`), normalization caches (`normalizedCache`, `nameNormalizedCache`), and name-matcher artifact caches (`nameMatcherTokenCache`, `nameMatcherPhoneticCache`) SHALL live on FusionRun, not on MatchingService.
 
 #### Scenario: MatchingService reads fusion identities from FusionRun
 - **WHEN** MatchingService needs the set of existing fusion identities
@@ -190,6 +190,18 @@ MatchingService SHALL receive FusionRun at construction time and read/write all 
 - **WHEN** MatchingService normalizes a string value for scoring
 - **THEN** it SHALL read and write run.normalizedCache and run.nameNormalizedCache
 - **AND** there SHALL be no normalizedCache or nameNormalizedCache fields on MatchingService
+
+#### Scenario: Name-matcher token splits are cached on FusionRun
+- **GIVEN** a normalized name string produced by the name-matcher normalization path
+- **WHEN** name-matcher scoring splits that string into tokens more than once during the same operation run
+- **THEN** the token array SHALL be read from run.nameMatcherTokenCache after the first split
+- **AND** MatchingService SHALL NOT re-split the same normalized string on every comparison
+
+#### Scenario: Name-matcher phonetic codes are cached on FusionRun
+- **GIVEN** a name token with length greater than one
+- **WHEN** name-matcher phonetic scoring encodes that token more than once during the same operation run
+- **THEN** doubleMetaphone SHALL be invoked at most once for that token
+- **AND** subsequent comparisons SHALL read codes from run.nameMatcherPhoneticCache
 
 ### Requirement: Binary algorithm produces a 100 score only for identical string values
 
