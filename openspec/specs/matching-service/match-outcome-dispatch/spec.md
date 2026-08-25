@@ -38,6 +38,13 @@ The connector SHALL provide a `MatchOutcomeDispatcher` module in `src/services/m
 - **WHEN** `runMatchSweep()` completes
 - **THEN** it SHALL return `MatchSweepResult` containing `processed`, `matchScoringMs`, counts by resolution, and a `ResolvedMatch[]` list
 
+#### Scenario: Identity candidate pool uses getCandidates result including empty set
+
+- **GIVEN** MatchingService.getCandidates returns a Set (including an empty Set)
+- **WHEN** identity-phase scoring runs for a managed account
+- **THEN** MatchOutcomeDispatcher SHALL pass that Set as the identity pool to scoreFusionAccount
+- **AND** SHALL NOT substitute run.allFusionIdentities unless getCandidates returns undefined
+
 ---
 
 ### Requirement: MatchOutcomeDispatcher owns the two-sweep match lifecycle
