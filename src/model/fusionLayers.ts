@@ -452,11 +452,15 @@ export class FusionLayers {
     ): void {
         if (this.collections.previousAccountIds.size === 0 && this.collections.missingAccountIds.size === 0) return
 
-        onQueueScan?.(queue.managedAccountsById.size)
+        const candidateIds = new Set([
+            ...this.collections.previousAccountIds,
+            ...this.collections.missingAccountIds,
+        ])
+        onQueueScan?.(candidateIds.size)
 
-        for (const [id, account] of queue.entries()) {
-            if (!this.collections.previousAccountIds.has(id) && !this.collections.missingAccountIds.has(id))
-                continue
+        for (const id of candidateIds) {
+            const account = queue.get(id)
+            if (!account) continue
 
             this.collections.statuses.setUncorrelatedAccount(id)
             this.uncorrelatedValue = true
