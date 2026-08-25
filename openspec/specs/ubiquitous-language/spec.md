@@ -581,9 +581,10 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 
 | Term | Definition |
 |---|---|
-| **Normal attribute definition** | A Define-step rule that computes a Fusion account attribute value using an Apache Velocity template. Runs during every aggregation; may be configured as **Static** (never recalculated) or **Refresh on each aggregation** (always recalculated). |
+| **Normal attribute definition** | A Define-step rule that computes a Fusion account attribute value using an Apache Velocity template. Recalculation follows **Static** and **Refresh on each aggregation**: Refresh-on definitions evaluate every aggregation; Refresh-off definitions evaluate when underlying source data changes (`needsRefresh`), on reset, or when force attribute refresh is enabled. |
 | **Unique attribute definition** | A Define-step rule that generates a value guaranteed to be unique across all Fusion accounts. Uses collision-based disambiguation or an incremental counter. Runs after normal definitions. |
 | **Static attribute** | A normal attribute evaluated only once — when the attribute has no value. Existing values are never recalculated. Overrides **Refresh on each aggregation**. |
+| **Refresh on each aggregation** | Per-definition toggle (`definition.refresh`) for Normal attribute definitions. When on, the definition evaluates every aggregation even if source data is unchanged. When off, evaluation is skipped for existing values unless the Fusion account `needsRefresh`, `needsReset`, or force attribute refresh is enabled. |
 | **$account** | The origin account snapshot available in Velocity templates — the managed source account that triggered creation, or the identity-origin row when the origin is the Identities source. |
 | **$accounts** | An ordered list of all managed source account snapshots contributing to the Fusion account. Ordered by configured sources, then insertion order. |
 | **$sources** | A Map keyed by source name containing per-source account snapshots. Accessible via dot notation (`$sources.Workday`). |
@@ -615,7 +616,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Origin snapshot** | The managed account whose key equals `originAccount`, or the Identities identity bag for an identity-origin Fusion account. The same object Velocity exposes as `$account`. |
 | **$originSource Source-name token** | A per-attribute Source name value that resolves to the prioritized (`mainAccount`) source name, then selects the first account on that source. It is source-level and is not **Origin account merge**. In Velocity, `$originSource` remains the origin source name string. |
 | **Attribute Definition Settings** | The top-level configuration menu for the Define step. Contains Normal Attribute Definitions and Unique Attribute Definitions. |
-| **Normal Attribute Definitions** | The section defining Velocity expressions that compute Fusion account attributes. Runs on every aggregation; supports static (one-time) or refreshable evaluation. |
+| **Normal Attribute Definitions** | The section defining Velocity expressions that compute Fusion account attributes. Each definition honors **Static** and **Refresh on each aggregation**; Refresh-off definitions do not re-evaluate unchanged accounts that already have a value. |
 | **Unique Attribute Definitions** | The section defining Velocity expressions that generate values guaranteed unique across all Fusion accounts. Uses collision-based disambiguation or incremental counters. |
 | **Attribute Matching Settings** | The top-level configuration menu for the Match step. Contains Matching Settings and Review Settings. |
 | **Matching Settings** | The section configuring per-attribute matching rules (algorithm, threshold, weight, mandatory, skip flags), the manual review score threshold, and automatic assignment. |
