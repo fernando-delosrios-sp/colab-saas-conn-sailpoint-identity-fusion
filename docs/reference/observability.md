@@ -6,10 +6,10 @@ This reference describes connector log formats for monitoring, alerting, and ext
 
 Routing depends on connector role (see `resolveExternalLogRoute` in the connector):
 
-| Role | Route | Destination |
-| --- | --- | --- |
-| Direct ISC, logging on | `http` | HTTP POST to **External target URL** |
-| Proxy client (ISC) | `noop` | No external delivery — server owns logs |
+| Role                     | Route  | Destination                                                   |
+| ------------------------ | ------ | ------------------------------------------------------------- |
+| Direct ISC, logging on   | `http` | HTTP POST to **External target URL**                          |
+| Proxy client (ISC)       | `noop` | No external delivery — server owns logs                       |
 | Proxy server, logging on | `disk` | Append to `LOG_FILE` or `logs/<tenant>/fusion-{YYYYMMDD}.log` |
 
 ### Plain-text line format
@@ -49,29 +49,34 @@ Point **External target URL** (with proxy mode off) at `http://your-host:3000/`.
 
 During long `accountList` aggregations, the connector emits standardized text prefixes in log messages (prefixed with `[accountList]`). Config bootstrap messages use `[config]`. Use these for monitoring and alerting instead of legacy patterns.
 
-| Prefix | Level | Purpose |
-| ------ | ----- | ------- |
-| `STATUS` | Info | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, pipeline progress with delta, compact `api=Na/Nq/Nc` segment with delta (`q` = FIFO queue length plus requests waiting for a rate-limit slot), memory, elapsed time |
-| `EVENT_SUMMARY` | Info | Interval deltas for review/merge matches, decisions, correlations, and emails. Omitted when the tick only recorded non-matched accounts — that work is already on `STATUS` as progress delta plus cumulative `matches(` |
-| `PHASE` / `STEP` | Info | Pipeline boundary markers (`START` / `END elapsed=…`) |
-| `DETAIL` | Info | Operational milestones as `key=value` pairs (sources loaded, emails sent, mode) |
-| `WARN STALL` | Warn | API queue stopped completing requests for two consecutive heartbeat ticks; includes active request labels |
-| `WARN EVENT_LOOP` | Warn | The event loop was blocked long enough to starve keep-alive and heartbeat timers; reports the blocked duration plus the phase/step on both sides of the gap, and a worst-block summary when the operation ends |
-| `EPILOGUE` | Info | Report epilogue (`START` / `END elapsed=…`; not a numbered phase) |
-| `METRIC` | Info | Phase/step timing metrics |
+| Prefix            | Level | Purpose                                                                                                                                                                                                                                                     |
+| ----------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `STATUS`          | Info  | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, pipeline progress with delta, compact `api=Na/Nq/Nc` segment with delta (`q` = FIFO queue length plus requests waiting for a rate-limit slot), memory, elapsed time |
+| `EVENT_SUMMARY`   | Info  | Interval deltas for review/merge matches, decisions, correlations, and emails. Omitted when the tick only recorded non-matched accounts — that work is already on `STATUS` as progress delta plus cumulative `matches(`                                     |
+| `PHASE` / `STEP`  | Info  | Pipeline boundary markers (`START` / `END elapsed=…`)                                                                                                                                                                                                       |
+| `DETAIL`          | Info  | Operational milestones as `key=value` pairs (sources loaded, emails sent, mode)                                                                                                                                                                             |
+| `WARN STALL`      | Warn  | API queue stopped completing requests for two consecutive heartbeat ticks; includes active request labels                                                                                                                                                   |
+| `WARN EVENT_LOOP` | Warn  | The event loop was blocked long enough to starve keep-alive and heartbeat timers; reports the blocked duration plus the phase/step on both sides of the gap, and a worst-block summary when the operation ends                                              |
+| `EPILOGUE`        | Info  | Report epilogue (`START` / `END elapsed=…`; not a numbered phase)                                                                                                                                                                                           |
+| `METRIC`          | Info  | Phase/step timing metrics                                                                                                                                                                                                                                   |
 
-### STATUS progress units
+### STATUS pipeline progress
 
-The `progress=done/total unit` segment distinguishes the kind of pipeline work:
+Fetch reports independent population counters on the same STATUS line:
 
-- `fetched` — HTTP pages retrieved from ISC.
-- `ingested` — already-fetched identity documents or Fusion accounts registered into operation-run caches.
-- `refreshed` — Fusion accounts visited during the Refresh phase.
-- Other phase-specific units such as `processed`, `analyzed`, or `sent` describe Process and Output work.
+```text
+STATUS phase=Fetch fusion-accounts=42500/102407(Δ+8000/10s) managed-accounts=94044/158951(Δ+5250/10s) api=20a/12q/584c …
+```
 
-Bulk ingest remains in the Fetch phase but uses `ingested` so operators can distinguish API retrieval from CPU-bound cache registration. The first STATUS tick after a unit change omits the delta; later ticks show the interval delta normally. Ingest start may also emit `DETAIL action=ingesting identities count=N` or `DETAIL action=ingesting fusion-accounts count=N`. There is no separate `INGEST` line kind.
+- `fusion-accounts=done/total` — existing Fusion accounts registered into the run cache.
+- `managed-accounts=done/total` — aggregate managed accounts registered from all configured sources.
+- `identities=done/total` — scoped identities registered when identity Fetch runs; omitted when skipped.
 
-Refresh follows the same single-unit shape as Fetch: `progress=19032/102407 refreshed(Δ+192/10s)`. It does not add a separate `refreshed(N)` cumulative segment.
+Each population has its own interval delta and does not overwrite the others. A segment is omitted until its total is known or registration begins. Per-source HTTP offsets remain under `queue-pending`.
+
+Identity and Fusion-account **bulk ingest** still yields so heartbeat and keep-alive timers can run. Optional milestones such as `DETAIL action=ingesting identities count=N` and `DETAIL action=ingesting fusion-accounts count=N` identify that work; Fetch STATUS no longer uses a single `progress=… fetched|ingested` fraction.
+
+Other phases retain `progress=done/total unit`. For example, Refresh uses `progress=19032/102407 refreshed(Δ+192/10s)`. Process and Output may use units such as `processed`, `analyzed`, or `sent`.
 
 ## Correlation activity format
 
@@ -101,12 +106,12 @@ Compact counters mirror match discovery during Process phase (`STATUS`, `DETAIL`
 
 `matches(5n/2m/4a/1d)`
 
-| Token | Meaning |
-| ----- | ------- |
-| `n` | Non-match outcomes |
-| `m` | Manual review forms queued |
-| `a` | Automatic merges applied |
-| `d` | Deferred matches discovered |
+| Token | Meaning                     |
+| ----- | --------------------------- |
+| `n`   | Non-match outcomes          |
+| `m`   | Manual review forms queued  |
+| `a`   | Automatic merges applied    |
+| `d`   | Deferred matches discovered |
 
 When `total=` is present (for example on phase-complete `DETAIL` lines), it is the sum of all four counts.
 
@@ -116,25 +121,25 @@ Reviewer and automatic merge decisions use the same compact style (`STATUS`, `DE
 
 `decisions(1n/1m/0nm/0a)`
 
-| Token | Meaning |
-| ----- | ------- |
-| `n` | **New identity** — reviewer chose to create a new identity (authoritative source) |
-| `m` | **Merge** — reviewer chose to merge into an existing identity |
-| `nm` | **No-match** — reviewer confirmed no match (record/orphan sources) |
-| `a` | **Auto-merge** — system merged without review (exact-match threshold) |
+| Token | Meaning                                                                           |
+| ----- | --------------------------------------------------------------------------------- |
+| `n`   | **New identity** — reviewer chose to create a new identity (authoritative source) |
+| `m`   | **Merge** — reviewer chose to merge into an existing identity                     |
+| `nm`  | **No-match** — reviewer confirmed no match (record/orphan sources)                |
+| `a`   | **Auto-merge** — system merged without review (exact-match threshold)             |
 
 ## Decision headline lines (Info)
 
 Each finished review form emits a discovery line during Fetch; applied lines appear when the decision takes effect:
 
-| Headline | When logged | Example |
-| -------- | ----------- | ------- |
-| `MERGE DECISION DISCOVERED` | Fetch — form parsed | `MERGE DECISION DISCOVERED: Sergei Vladimir [Umbrella Corporation] → Albert Wesker by Chris Redfield` |
-| `NEW IDENTITY DECISION DISCOVERED` | Fetch — form parsed | `NEW IDENTITY DECISION DISCOVERED: New User [Umbrella Corporation] by Chris Redfield` |
-| `NO-MATCH DECISION DISCOVERED` | Fetch — record/orphan no-match | `NO-MATCH DECISION DISCOVERED: Record User [HR] by Reviewer (record)` |
-| `MERGE DECISION APPLIED` | Refresh — merge layered onto target fusion account | `MERGE DECISION APPLIED: … → merged into target identity` |
-| `NEW IDENTITY DECISION APPLIED` | Process — new fusion account registered | `NEW IDENTITY DECISION APPLIED: … → registered as fusion account` |
-| `AUTO-MERGE DECISION APPLIED` | Process — automatic merge from scoring | `AUTO-MERGE DECISION APPLIED: … → merged into target identity` |
+| Headline                           | When logged                                        | Example                                                                                               |
+| ---------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `MERGE DECISION DISCOVERED`        | Fetch — form parsed                                | `MERGE DECISION DISCOVERED: Sergei Vladimir [Umbrella Corporation] → Albert Wesker by Chris Redfield` |
+| `NEW IDENTITY DECISION DISCOVERED` | Fetch — form parsed                                | `NEW IDENTITY DECISION DISCOVERED: New User [Umbrella Corporation] by Chris Redfield`                 |
+| `NO-MATCH DECISION DISCOVERED`     | Fetch — record/orphan no-match                     | `NO-MATCH DECISION DISCOVERED: Record User [HR] by Reviewer (record)`                                 |
+| `MERGE DECISION APPLIED`           | Refresh — merge layered onto target fusion account | `MERGE DECISION APPLIED: … → merged into target identity`                                             |
+| `NEW IDENTITY DECISION APPLIED`    | Process — new fusion account registered            | `NEW IDENTITY DECISION APPLIED: … → registered as fusion account`                                     |
+| `AUTO-MERGE DECISION APPLIED`      | Process — automatic merge from scoring             | `AUTO-MERGE DECISION APPLIED: … → merged into target identity`                                        |
 
 Merge decisions are **discovered** in Phase 2 (Fetch) and **applied** in Phase 3 (Refresh). New-identity decisions are **discovered** in Phase 2 and **applied** in Phase 4 (`STEP process-decisions`).
 

@@ -18,13 +18,13 @@ describe('formatRunContextLabel', () => {
         expect(formatRunContextLabel(null)).toBeUndefined()
     })
 
-    it('summarizes phase, step, and progress', () => {
+    it('summarizes phase, step, and Fetch population progress', () => {
         const runContext = new OperationRunContext()
         runContext.phase = 'Fetch'
         runContext.step = 'ingest-identities'
-        runContext.progress = { done: 750, total: 2000, unit: 'ingested' }
+        runContext.setFetchPopulationProgress('identities', 750, 2000)
 
-        expect(formatRunContextLabel(runContext)).toBe('phase=Fetch step=ingest-identities progress=750/2000')
+        expect(formatRunContextLabel(runContext)).toBe('phase=Fetch step=ingest-identities identities=750/2000')
     })
 })
 

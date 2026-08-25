@@ -27,6 +27,7 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         error: vi.fn(),
         detail: vi.fn(),
         setProgress: vi.fn(),
+        setFetchPopulationProgress: vi.fn(),
     }
     const client: any = {
         execute: async (fn: () => Promise<any>) => fn(),
@@ -45,9 +46,21 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
             }
             if (policy?.paginate) {
                 if (policy.paginate.mode === 'parallel') {
-                    return client.paginateParallel((params: any) => fn(api, params), policy.paginate.baseParams ?? {}, policy.priority, policy.context, policy.abortSignal, policy.paginate.limit)
+                    return client.paginateParallel(
+                        (params: any) => fn(api, params),
+                        policy.paginate.baseParams ?? {},
+                        policy.priority,
+                        policy.context,
+                        policy.abortSignal,
+                        policy.paginate.limit
+                    )
                 }
-                return client.paginate((params: any) => fn(api, params), policy.paginate.baseParams ?? {}, policy.priority, policy.context)
+                return client.paginate(
+                    (params: any) => fn(api, params),
+                    policy.paginate.baseParams ?? {},
+                    policy.priority,
+                    policy.context
+                )
             }
             return fn(api)
         }),
@@ -124,10 +137,9 @@ describe('SourceService Accounts JMESPath filter', () => {
 
         await service.fetchManagedAccounts()
 
-        expect(log.setProgress).toHaveBeenCalledWith(100, 300, 'fetched')
-        expect(log.setProgress).toHaveBeenCalledWith(200, 300, 'fetched')
-        expect(log.setProgress).toHaveBeenCalledWith(300, 300, 'fetched')
-        expect(log.setProgress).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), 'ingested')
+        expect(log.setFetchPopulationProgress).toHaveBeenNthCalledWith(1, 'managed-accounts', 1, 300)
+        expect(log.setFetchPopulationProgress).toHaveBeenNthCalledWith(2, 'managed-accounts', 2, 300)
+        expect(log.setProgress).not.toHaveBeenCalled()
     })
 
     it('aggregates fetch progress across concurrent managed sources on each page callback', async () => {
@@ -149,6 +161,7 @@ describe('SourceService Accounts JMESPath filter', () => {
             warn: vi.fn(),
             error: vi.fn(),
             setProgress: vi.fn(),
+            setFetchPopulationProgress: vi.fn(),
         }
         const client: any = {
             execute: async (fn: () => Promise<any>) => fn(),
@@ -205,10 +218,9 @@ describe('SourceService Accounts JMESPath filter', () => {
 
         await service.fetchManagedAccounts()
 
-        expect(log.setProgress).toHaveBeenCalledWith(100, 200, 'fetched')
-        expect(log.setProgress).toHaveBeenCalledWith(250, 500, 'fetched')
-        expect(log.setProgress).toHaveBeenCalledWith(400, 500, 'fetched')
-        expect(log.setProgress).toHaveBeenCalledWith(500, 500, 'fetched')
+        expect(log.setFetchPopulationProgress).toHaveBeenCalledWith('managed-accounts', 1, 1)
+        expect(log.setFetchPopulationProgress).toHaveBeenCalledWith('managed-accounts', 2, 500)
+        expect(log.setProgress).not.toHaveBeenCalled()
     })
 
     it('rejects invalid JMESPath expressions in validation', () => {
@@ -223,7 +235,7 @@ describe('SourceService Accounts JMESPath filter', () => {
 })
 
 describe('SourceService.fetchFusionAccounts bulk ingest', () => {
-    it('registers each page before requesting the next and reports ingested progress', async () => {
+    it('registers each page before requesting the next and reports Fusion population progress', async () => {
         const { service, log } = createService()
         ;(service as any).fusionSourceIdValue = 'fusion-source-id'
         const setImmediateSpy = vi.spyOn(global, 'setImmediate')
@@ -231,10 +243,7 @@ describe('SourceService.fetchFusionAccounts bulk ingest', () => {
         vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(
             async function* (_sourceId, _abort, _limit, onPageProgress) {
                 onPageProgress?.(2, 3)
-                yield [
-                    { id: 'f1', nativeIdentity: 'native-1' } as any,
-                    { id: 'f2', nativeIdentity: 'native-2' } as any,
-                ]
+                yield [{ id: 'f1', nativeIdentity: 'native-1' } as any, { id: 'f2', nativeIdentity: 'native-2' } as any]
                 expect(service.fusionAccountsByNativeIdentity?.has('native-1')).toBe(true)
                 onPageProgress?.(3, 3)
                 yield [{ id: 'f3', nativeIdentity: 'native-3' } as any]
@@ -250,16 +259,15 @@ describe('SourceService.fetchFusionAccounts bulk ingest', () => {
         ])
         expect(setImmediateSpy).toHaveBeenCalledTimes(2)
         expect(log.detail).toHaveBeenCalledWith({ action: 'ingesting fusion-accounts', count: 3 })
-        expect(log.setProgress).toHaveBeenLastCalledWith(3, 3, 'ingested')
+        expect(log.setFetchPopulationProgress).toHaveBeenLastCalledWith('fusion-accounts', 3, 3)
+        expect(log.setProgress).not.toHaveBeenCalled()
         setImmediateSpy.mockRestore()
     })
 
-    it('replaces the previous map and skips ingested progress when empty', async () => {
+    it('replaces the previous map and omits Fusion population progress when empty', async () => {
         const { service, log } = createService()
         ;(service as any).fusionSourceIdValue = 'fusion-source-id'
-        service.fusionAccountsByNativeIdentity = new Map([
-            ['stale', { id: 'stale', nativeIdentity: 'stale' } as any],
-        ])
+        service.fusionAccountsByNativeIdentity = new Map([['stale', { id: 'stale', nativeIdentity: 'stale' } as any]])
         vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* () {
             yield* []
         })
@@ -267,10 +275,12 @@ describe('SourceService.fetchFusionAccounts bulk ingest', () => {
         await service.fetchFusionAccounts()
 
         expect(service.fusionAccountsByNativeIdentity.size).toBe(0)
-        expect(log.setProgress).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), 'ingested')
-        expect(log.detail).not.toHaveBeenCalledWith(
-            expect.objectContaining({ action: 'ingesting fusion-accounts' })
+        expect(log.setFetchPopulationProgress).not.toHaveBeenCalledWith(
+            'fusion-accounts',
+            expect.anything(),
+            expect.anything()
         )
+        expect(log.detail).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'ingesting fusion-accounts' }))
     })
 })
 
@@ -547,14 +557,14 @@ describe('SourceService reverse correlation setup hardening', () => {
         })
 
         ;(service as any).fusionSourceIdValue = 'fusion-source-id'
-        ;service.run.sourcesByName.set('Fusion Source', {
+        service.run.sourcesByName.set('Fusion Source', {
             id: 'fusion-source-id',
             name: 'Fusion Source',
             isManaged: false,
             sourceType: SourceType.Authoritative,
             config: undefined,
         })
-        ;service.run.sourcesByName.set('HR Source', {
+        service.run.sourcesByName.set('HR Source', {
             id: 'managed-source-id',
             name: 'HR Source',
             isManaged: true,
@@ -603,7 +613,7 @@ describe('SourceService reverse correlation setup hardening', () => {
             correlationDisplayName: 'Reverse Native Identity',
         })
 
-        ;service.run.sourcesByName.set('HR Source', {
+        service.run.sourcesByName.set('HR Source', {
             id: 'managed-source-id',
             name: 'HR Source',
             isManaged: true,
@@ -647,7 +657,7 @@ describe('SourceService reverse correlation setup hardening', () => {
             })
 
             ;(service as any).fusionSourceIdValue = 'fusion-source-id'
-            ;service.run.sourcesByName.set('Fusion Source', {
+            service.run.sourcesByName.set('Fusion Source', {
                 id: 'fusion-source-id',
                 name: 'Fusion Source',
                 isManaged: false,
@@ -661,7 +671,7 @@ describe('SourceService reverse correlation setup hardening', () => {
                 correlationAttribute: 'reverseNativeIdentity',
                 correlationDisplayName: 'Reverse Native Identity',
             }
-            ;service.run.sourcesByName.set('HR Source', {
+            service.run.sourcesByName.set('HR Source', {
                 id: 'managed-source-id',
                 name: 'HR Source',
                 isManaged: true,
@@ -857,14 +867,15 @@ describe('SourceService identity attribute create error mapping', () => {
     })
 })
 
-
 describe('ensureIdentityAttribute', () => {
-    const setupIdentityAttributesApi = (overrides: {
-        existing?: { searchable: boolean }
-        updated?: any
-        created?: any
-        conflict?: boolean
-    } = {}) => {
+    const setupIdentityAttributesApi = (
+        overrides: {
+            existing?: { searchable: boolean }
+            updated?: any
+            created?: any
+            conflict?: boolean
+        } = {}
+    ) => {
         const getIdentityAttribute = vi.fn().mockResolvedValue({ data: overrides.existing ?? null })
         const putIdentityAttribute = vi.fn().mockResolvedValue({ data: overrides.updated ?? { name: 'attr' } })
         const createIdentityAttribute = vi.fn().mockImplementation(async (payload: any) => {
@@ -930,7 +941,6 @@ describe('ensureIdentityAttribute', () => {
         })
     })
 })
-
 
 describe('SourceService fetchGlobalOwnerIdentityIds', () => {
     it('expands GOVERNANCE_GROUP source owners to member identity IDs', async () => {

@@ -163,9 +163,8 @@ export class IdentityService {
                     QueuePriority.HIGH,
                     'IdentityService>fetchIdentities searchPost',
                     undefined,
-                    (loaded, total) => {
+                    (_loaded, total) => {
                         knownTotal = total
-                        this.log.setProgress(loaded, total ?? loaded, 'fetched')
                     }
                 )
 
@@ -187,7 +186,7 @@ export class IdentityService {
                         {
                             onProgress: (pageDone) => {
                                 const done = pageStart + pageDone
-                                this.log.setProgress(done, knownTotal ?? done, 'ingested')
+                                this.log.setFetchPopulationProgress('identities', done, knownTotal ?? done)
                             },
                         }
                     )
@@ -260,10 +259,11 @@ export class IdentityService {
         const query = buildIdentityQuery(`id:"${id}"`)
 
         return wrapConnectorError(async () => {
-            const identities = await this.client.call<IdentityDocument>(
-                searchPostPaginated,
-                { paginate: { mode: 'searchAfter', search: query as any }, priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentityById searchPost' }
-            )
+            const identities = await this.client.call<IdentityDocument>(searchPostPaginated, {
+                paginate: { mode: 'searchAfter', search: query as any },
+                priority: QueuePriority.HIGH,
+                context: 'IdentityService>fetchIdentityById searchPost',
+            })
             identities.forEach((identity) => this.run.addIdentity(identity.id, identity))
             return identities[0]
         }, `Failed to fetch identity by ID "${id}"`)
@@ -281,10 +281,11 @@ export class IdentityService {
         const query = buildIdentityQuery(`name.exact:"${name}"`)
 
         return wrapConnectorError(async () => {
-            const identities = await this.client.call<IdentityDocument>(
-                searchPostPaginated,
-                { paginate: { mode: 'searchAfter', search: query as any }, priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentityByName searchPost' }
-            )
+            const identities = await this.client.call<IdentityDocument>(searchPostPaginated, {
+                paginate: { mode: 'searchAfter', search: query as any },
+                priority: QueuePriority.HIGH,
+                context: 'IdentityService>fetchIdentityByName searchPost',
+            })
             identities.forEach((identity) => this.run.addIdentity(identity.id, identity))
             return identities[0]
         }, `Failed to fetch identity by name "${name}"`)
@@ -329,7 +330,6 @@ export class IdentityService {
         } as IdentityDocument
     }
 
-
     // ------------------------------------------------------------------------
     // Public Lookup Methods
     // ------------------------------------------------------------------------
@@ -359,10 +359,11 @@ export class IdentityService {
             const queryStr = `id:("${batch.join('" OR "')}")`
             const query = buildIdentityQuery(queryStr)
             try {
-                const identities = await this.client.call<IdentityDocument>(
-                    searchPostPaginated,
-                    { paginate: { mode: 'searchAfter', search: query as any }, priority: QueuePriority.HIGH, context: 'IdentityService>hydrateMissingIdentitiesById searchPost' }
-                )
+                const identities = await this.client.call<IdentityDocument>(searchPostPaginated, {
+                    paginate: { mode: 'searchAfter', search: query as any },
+                    priority: QueuePriority.HIGH,
+                    context: 'IdentityService>hydrateMissingIdentitiesById searchPost',
+                })
                 identities.forEach((identity) => {
                     this.run.addIdentity(identity.id, identity)
                 })
@@ -497,10 +498,11 @@ export class IdentityService {
             requestBody: [{ op: 'replace', path: '/identityId', value: identityId }],
         }
 
-        return this.client.call(
-            (api: any) => api.accounts.updateAccount(requestParameters).then((r: any) => r.data),
-            { priority: QueuePriority.LOW, context: 'IdentityService>correlateAccounts' }
-        )
+        return this.client
+            .call((api: any) => api.accounts.updateAccount(requestParameters).then((r: any) => r.data), {
+                priority: QueuePriority.LOW,
+                context: 'IdentityService>correlateAccounts',
+            })
             .then(() => {
                 this.log.recordCorrelationCompleted({ kind })
                 this.log.debug(
@@ -556,10 +558,7 @@ export class IdentityService {
      * When bulk identity scope is disabled, a successfully hydrated origin identity
      * document is sufficient — no second scoped search is required.
      */
-    public async resolveOriginIdentityInScope(
-        id: string,
-        hydratedIdentity?: IdentityDocument
-    ): Promise<boolean> {
+    public async resolveOriginIdentityInScope(id: string, hydratedIdentity?: IdentityDocument): Promise<boolean> {
         if (!id) return false
 
         const cached = hydratedIdentity?.id === id ? hydratedIdentity : this.getIdentityById(id)
@@ -615,14 +614,11 @@ export class IdentityService {
         const query = buildIdentityQuery(queryString)
 
         return wrapConnectorError(async () => {
-            const identities = await this.client.call<IdentityDocument>(
-                searchPostPaginated,
-                {
-                    paginate: { mode: 'searchAfter', search: query as any },
-                    priority: QueuePriority.HIGH,
-                    context: 'IdentityService>isIdentityInScope searchPost',
-                }
-            )
+            const identities = await this.client.call<IdentityDocument>(searchPostPaginated, {
+                paginate: { mode: 'searchAfter', search: query as any },
+                priority: QueuePriority.HIGH,
+                context: 'IdentityService>isIdentityInScope searchPost',
+            })
             return identities.some((identity) => identity.id === id && !identity.protected)
         }, `Failed to check identity scope for "${id}"`)
     }
@@ -640,10 +636,11 @@ export class IdentityService {
      * Fetches and converts identity attributes into SchemaAttributes.
      */
     public async fetchIdentitySchemaAttributes(): Promise<any[]> {
-        const identityAttrs = (await this.client.call(
-            (api: any) => api.identityAttributes.listIdentityAttributes().then((r: any) => r.data ?? []),
-            { priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentitySchemaAttributes' }
-        ) as any[]) ?? []
+        const identityAttrs =
+            ((await this.client.call(
+                (api: any) => api.identityAttributes.listIdentityAttributes().then((r: any) => r.data ?? []),
+                { priority: QueuePriority.HIGH, context: 'IdentityService>fetchIdentitySchemaAttributes' }
+            )) as any[]) ?? []
 
         const allowedTypes = ['string', 'boolean', 'int', 'long']
 
@@ -663,10 +660,3 @@ export class IdentityService {
             })
     }
 }
-
-
-
-
-
-
-

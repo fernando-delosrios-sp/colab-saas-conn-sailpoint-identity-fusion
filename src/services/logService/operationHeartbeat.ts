@@ -5,6 +5,8 @@ import {
     OperationPhase,
     OperationRunContext,
     CumulativeOutcomes,
+    FETCH_POPULATIONS,
+    FetchPopulation,
     formatCorrelationSummarySegment,
     formatCorrelationSummaryValue,
     hasCorrelationActivity,
@@ -35,6 +37,7 @@ export type HeartbeatSnapshot = {
 export type StatusLineBaselines = {
     previousProcessed?: number
     previousProgressDone?: number
+    previousFetchPopulationDone?: Partial<Record<FetchPopulation, number>>
 }
 
 function formatMb(bytes: number): string {
@@ -60,11 +63,7 @@ export function formatPhaseEndDetailSuffix(detail?: Record<string, unknown>): st
     return ` ${parts.join(' ')}`
 }
 
-export function formatDeltaSuffix(
-    current: number,
-    previous: number | undefined,
-    intervalMs: number
-): string {
+export function formatDeltaSuffix(current: number, previous: number | undefined, intervalMs: number): string {
     if (previous === undefined) return ''
     const delta = current - previous
     return `(Δ${delta >= 0 ? '+' : ''}${delta}/${Math.round(intervalMs / 1000)}s)`
@@ -88,6 +87,25 @@ function formatProgressSegment(
         return `progress=${fraction} ${unit}${deltaSuffix}`
     }
     return `progress=${fraction}${deltaSuffix}`
+}
+
+function formatFetchPopulationSegments(
+    runContext: OperationRunContext,
+    previousDone: Partial<Record<FetchPopulation, number>> | undefined,
+    intervalMs: number
+): string[] {
+    const progress = runContext.getFetchPopulationProgress()
+    return FETCH_POPULATIONS.flatMap((population) => {
+        const current = progress[population]
+        if (!current || (current.done === 0 && current.total === 0)) return []
+        return [
+            `${population}=${current.done}/${current.total}${formatDeltaSuffix(
+                current.done,
+                previousDone?.[population],
+                intervalMs
+            )}`,
+        ]
+    })
 }
 
 export function formatMatchOutcomesSegment(outcomes: CumulativeOutcomes, includeTotal = false): string {
@@ -128,12 +146,8 @@ function shouldShowMatchOutcomesInStatus(runContext: OperationRunContext): boole
 function shouldShowDecisionOutcomesInStatus(runContext: OperationRunContext): boolean {
     if (runContext.phase !== 'Process') return false
     if (runContext.step === 'process-decisions') return true
-    const {
-        decisionNewIdentity,
-        decisionMerge,
-        decisionNoMatch,
-        decisionAutoMerge,
-    } = runContext.getCumulativeOutcomes()
+    const { decisionNewIdentity, decisionMerge, decisionNoMatch, decisionAutoMerge } =
+        runContext.getCumulativeOutcomes()
     return decisionNewIdentity + decisionMerge + decisionNoMatch + decisionAutoMerge > 0
 }
 
@@ -194,12 +208,14 @@ export function formatStatusLine(
     intervalMs: number
 ): string {
     const { runContext, queueStats, memory, pendingItems, fusionPending, correlationQueuePending } = snapshot
-    const { previousProcessed, previousProgressDone } = baselines
+    const { previousProcessed, previousProgressDone, previousFetchPopulationDone } = baselines
     const parts: string[] = ['STATUS']
 
     if (runContext.phase) parts.push(`phase=${runContext.phase}`)
     if (runContext.step) parts.push(`step=${runContext.step}`)
-    if (runContext.progress) {
+    if (runContext.phase === 'Fetch') {
+        parts.push(...formatFetchPopulationSegments(runContext, previousFetchPopulationDone, intervalMs))
+    } else if (runContext.progress) {
         const { done, total, unit } = runContext.progress
         parts.push(formatProgressSegment(done, total, unit, previousProgressDone, intervalMs))
     }
@@ -233,12 +249,7 @@ export function formatStatusLine(
     }
 
     if (queueStats) {
-        const apiQueueSegment = formatApiQueueSegment(
-            queueStats,
-            previousProcessed,
-            intervalMs,
-            runContext.phase
-        )
+        const apiQueueSegment = formatApiQueueSegment(queueStats, previousProcessed, intervalMs, runContext.phase)
         if (apiQueueSegment) {
             parts.push(apiQueueSegment)
         }
@@ -270,8 +281,7 @@ export function formatEventSummaryLines(
     const inProcessPhase = phase === 'Process'
 
     if (inProcessPhase) {
-        const hasReviewOrMergeOutcomes =
-            events.formsQueued > 0 || events.autoMerged > 0 || events.matchDeferred > 0
+        const hasReviewOrMergeOutcomes = events.formsQueued > 0 || events.autoMerged > 0 || events.matchDeferred > 0
         const matchParts: string[] = []
         if (hasReviewOrMergeOutcomes && events.nonMatch > 0) {
             matchParts.push(`non-matched=${formatIntervalDeltaCount(events.nonMatch, intervalMs)}`)
@@ -340,9 +350,7 @@ export function countCorrelationQueuePending(pendingItems: QueuedItemInfo[] | un
     return pendingItems.filter((item) => item.label != null && CORRELATE_ACCOUNTS_LABEL_PREFIX.test(item.label)).length
 }
 
-type ParsedQueueLabel =
-    | { kind: 'paginated'; base: string; offset: number }
-    | { kind: 'plain'; label: string }
+type ParsedQueueLabel = { kind: 'paginated'; base: string; offset: number } | { kind: 'plain'; label: string }
 
 function parseQueueLabel(label: string): ParsedQueueLabel {
     const match = label.match(OFFSET_LABEL_SUFFIX)
@@ -412,10 +420,7 @@ export function groupActiveLabels(activeItems: QueuedItemInfo[] | undefined, lim
         .join(', ')
 }
 
-function formatFusionReviewInventory(
-    pending: FusionPendingSnapshot | undefined,
-    phase: OperationPhase | null
-): string {
+function formatFusionReviewInventory(pending: FusionPendingSnapshot | undefined, phase: OperationPhase | null): string {
     if (phase !== 'Fetch' || !pending) return ''
     const parts: string[] = []
     if (pending.fusionReviewsFound > 0) parts.push(`fusion-reviews=${pending.fusionReviewsFound}`)
@@ -431,8 +436,7 @@ export function formatStallWarning(
     activeItems: QueuedItemInfo[] | undefined,
     pendingItems?: QueuedItemInfo[]
 ): string {
-    const pendingSuffix =
-        pendingItems && pendingItems.length > 0 ? ` | pending=${groupActiveLabels(pendingItems)}` : ''
+    const pendingSuffix = pendingItems && pendingItems.length > 0 ? ` | pending=${groupActiveLabels(pendingItems)}` : ''
     return `WARN STALL api-queue completed unchanged ${Math.round(unchangedMs / 1000)}s | active=${groupActiveLabels(activeItems)}${pendingSuffix}`
 }
 
@@ -442,6 +446,7 @@ export class OperationHeartbeat {
     private previousProgressDone?: number
     private previousPhase?: OperationPhase | null
     private previousProgressUnit?: string
+    private previousFetchPopulationDone: Partial<Record<FetchPopulation, number>> = {}
     private zeroDeltaTicks = 0
 
     constructor(
@@ -463,6 +468,7 @@ export class OperationHeartbeat {
         this.previousProgressDone = undefined
         this.previousPhase = undefined
         this.previousProgressUnit = undefined
+        this.previousFetchPopulationDone = {}
         this.zeroDeltaTicks = 0
     }
 
@@ -494,6 +500,7 @@ export class OperationHeartbeat {
             {
                 previousProcessed: this.previousProcessed,
                 previousProgressDone: this.previousProgressDone,
+                previousFetchPopulationDone: this.previousFetchPopulationDone,
             },
             snapshot.intervalMs
         )
@@ -514,9 +521,7 @@ export class OperationHeartbeat {
         if (this.zeroDeltaTicks >= 2) {
             this.log.info(`${statusLine}${statusSuffix}`)
             if (this.zeroDeltaTicks === 2) {
-                this.log.warn(
-                    formatStallWarning(snapshot.intervalMs * this.zeroDeltaTicks, activeItems, pendingItems)
-                )
+                this.log.warn(formatStallWarning(snapshot.intervalMs * this.zeroDeltaTicks, activeItems, pendingItems))
             }
         } else {
             this.log.info(statusLine)
@@ -532,6 +537,13 @@ export class OperationHeartbeat {
         if (runContext.progress) {
             this.previousProgressDone = runContext.progress.done
         }
+        if (runContext.phase === 'Fetch') {
+            for (const [population, progress] of Object.entries(runContext.getFetchPopulationProgress())) {
+                this.previousFetchPopulationDone[population as FetchPopulation] = progress.done
+            }
+        } else {
+            this.previousFetchPopulationDone = {}
+        }
         this.previousPhase = runContext.phase
         this.previousProgressUnit = runContext.progress?.unit
         if (queueStats) {
@@ -541,20 +553,3 @@ export class OperationHeartbeat {
 }
 
 export { formatDetailSuffix }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

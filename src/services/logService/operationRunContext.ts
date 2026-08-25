@@ -1,13 +1,7 @@
 export type OperationPhase = 'Setup' | 'Fetch' | 'Refresh' | 'Process' | 'Output' | 'Epilogue'
 
 export type RefreshSubStepBucket =
-    | 'prelude'
-    | 'managedLayer'
-    | 'uniqueRegister'
-    | 'map'
-    | 'normalDefine'
-    | 'correlation'
-    | 'finalize'
+    'prelude' | 'managedLayer' | 'uniqueRegister' | 'map' | 'normalDefine' | 'correlation' | 'finalize'
 
 type RefreshBucketMetrics = {
     totalMs: number
@@ -116,6 +110,15 @@ type ProgressSnapshot = {
     total: number
     unit?: string
 }
+
+export type FetchPopulation = 'fusion-accounts' | 'managed-accounts' | 'identities'
+
+export type FetchPopulationProgress = {
+    done: number
+    total: number
+}
+
+export const FETCH_POPULATIONS: readonly FetchPopulation[] = ['fusion-accounts', 'managed-accounts', 'identities']
 
 export function createEmptyCorrelationActivityCounters(): CorrelationActivityCounters {
     return {
@@ -234,6 +237,7 @@ export class OperationRunContext {
     phase: OperationPhase | null = null
     step: string | null = null
     progress?: ProgressSnapshot
+    private fetchPopulationProgress: Partial<Record<FetchPopulation, FetchPopulationProgress>> = {}
     stepStartedAt?: number
     phaseStartedAt?: number
     epilogueStartedAt?: number
@@ -246,6 +250,18 @@ export class OperationRunContext {
 
     constructor(startedAt: number = Date.now()) {
         this.operationStartedAt = startedAt
+    }
+
+    setFetchPopulationProgress(population: FetchPopulation, done: number, total: number): void {
+        this.fetchPopulationProgress[population] = { done, total }
+    }
+
+    getFetchPopulationProgress(): Readonly<Partial<Record<FetchPopulation, FetchPopulationProgress>>> {
+        return { ...this.fetchPopulationProgress }
+    }
+
+    clearFetchPopulationProgress(): void {
+        this.fetchPopulationProgress = {}
     }
 
     recordEvent(category: string, detail?: Record<string, unknown>): void {
@@ -385,11 +401,7 @@ export class OperationRunContext {
         this.refreshMetrics = createEmptyRefreshPhaseMetrics()
     }
 
-    recordRefreshSubStep(
-        bucket: RefreshSubStepBucket,
-        ms: number,
-        workloadPatch?: RefreshWorkloadPatch
-    ): void {
+    recordRefreshSubStep(bucket: RefreshSubStepBucket, ms: number, workloadPatch?: RefreshWorkloadPatch): void {
         if (this.phase !== 'Refresh') return
         const metrics = this.refreshMetrics.buckets[bucket]
         metrics.totalMs += ms
@@ -428,7 +440,6 @@ export class OperationRunContext {
         this.resetRefreshMetrics()
         return summary
     }
-
 }
 
 /** Value portion for PHASE END / DETAIL (without leading `correlations` label). */
@@ -454,9 +465,7 @@ export function formatCorrelationSummaryValue(
     }
     if (counters.correlatedAction > 0 && !options?.excludeCorrelatedAction) {
         if (options?.intervalMs && !options?.cumulative) {
-            parts.push(
-                `correlated-action=+${counters.correlatedAction}/${Math.round(options.intervalMs / 1000)}s`
-            )
+            parts.push(`correlated-action=+${counters.correlatedAction}/${Math.round(options.intervalMs / 1000)}s`)
         } else {
             parts.push(`correlated-action=${counters.correlatedAction}`)
         }
@@ -486,9 +495,3 @@ export function formatCorrelationSummarySegment(
     if (!value) return ''
     return `correlations ${value}`
 }
-
-
-
-
-
-

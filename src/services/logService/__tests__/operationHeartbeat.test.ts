@@ -1,8 +1,4 @@
-import {
-    OperationRunContext,
-    createEmptyEventCounters,
-    formatCorrelationSummarySegment,
-} from '../operationRunContext'
+import { OperationRunContext, createEmptyEventCounters, formatCorrelationSummarySegment } from '../operationRunContext'
 import {
     OperationHeartbeat,
     countCorrelationQueuePending,
@@ -208,7 +204,8 @@ describe('operation heartbeat formatters', () => {
 
     it('omits progress and api-queue deltas on first STATUS tick', () => {
         const runContext = new OperationRunContext()
-        runContext.progress = { done: 250, total: 1000, unit: 'fetched' }
+        runContext.phase = 'Fetch'
+        runContext.setFetchPopulationProgress('managed-accounts', 250, 1000)
 
         const line = formatStatusLine(
             {
@@ -229,8 +226,8 @@ describe('operation heartbeat formatters', () => {
             10_000
         )
 
-        expect(line).toContain('progress=250/1000 fetched')
-        expect(line).not.toContain('progress=250/1000 fetched(Δ')
+        expect(line).toContain('managed-accounts=250/1000')
+        expect(line).not.toContain('managed-accounts=250/1000(Δ')
         expect(line).toContain('api=2a/0q/12c')
         expect(line).not.toContain('api=2a/0q/12c(Δ')
     })
@@ -255,9 +252,33 @@ describe('operation heartbeat formatters', () => {
                     averageProcessingTime: 4733,
                 },
                 pendingItems: [
-                    { id: '1', priority: 1, label: 'IdentityService>correlate', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
-                    { id: '2', priority: 1, label: 'IdentityService>correlate', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
-                    { id: '3', priority: 1, label: 'MatchingService>score', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
+                    {
+                        id: '1',
+                        priority: 1,
+                        label: 'IdentityService>correlate',
+                        createdAt: 0,
+                        retryCount: 0,
+                        maxRetries: 3,
+                        waitTimeMs: 100,
+                    },
+                    {
+                        id: '2',
+                        priority: 1,
+                        label: 'IdentityService>correlate',
+                        createdAt: 0,
+                        retryCount: 0,
+                        maxRetries: 3,
+                        waitTimeMs: 100,
+                    },
+                    {
+                        id: '3',
+                        priority: 1,
+                        label: 'MatchingService>score',
+                        createdAt: 0,
+                        retryCount: 0,
+                        maxRetries: 3,
+                        waitTimeMs: 100,
+                    },
                 ] as any,
                 fusionPending: {
                     fusionReviewsFound: 143,
@@ -319,9 +340,7 @@ describe('operation heartbeat formatters', () => {
         events.nonMatch = 225
         events.decisionMerge = 1
 
-        expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([
-            'EVENT_SUMMARY decisions merge=+1/10s',
-        ])
+        expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual(['EVENT_SUMMARY decisions merge=+1/10s'])
     })
 
     it('formats EVENT_SUMMARY lines for matches and correlations', () => {
@@ -409,9 +428,7 @@ describe('operation heartbeat formatters', () => {
             recordUniqueRegistered: 0,
             emailSent: 0,
         }
-        expect(formatEventSummaryLines(events, 'Refresh', 10_000)).toEqual([
-            'EVENT_SUMMARY correlations link=2/3',
-        ])
+        expect(formatEventSummaryLines(events, 'Refresh', 10_000)).toEqual(['EVENT_SUMMARY correlations link=2/3'])
         expect(formatEventSummaryLines(events, 'Process', 10_000)).toEqual([
             'EVENT_SUMMARY matches non-matched=+5/10s manual=+2/10s auto=+4/10s deferred=+3/10s',
             'EVENT_SUMMARY forms new-identity-assignment=1',
@@ -421,9 +438,33 @@ describe('operation heartbeat formatters', () => {
 
     it('groups active queue labels', () => {
         const grouped = groupActiveLabels([
-            { id: '1', priority: 1, label: 'IdentityService>correlate', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
-            { id: '2', priority: 1, label: 'IdentityService>correlate', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
-            { id: '3', priority: 1, label: 'MatchingService>score', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
+            {
+                id: '1',
+                priority: 1,
+                label: 'IdentityService>correlate',
+                createdAt: 0,
+                retryCount: 0,
+                maxRetries: 3,
+                waitTimeMs: 100,
+            },
+            {
+                id: '2',
+                priority: 1,
+                label: 'IdentityService>correlate',
+                createdAt: 0,
+                retryCount: 0,
+                maxRetries: 3,
+                waitTimeMs: 100,
+            },
+            {
+                id: '3',
+                priority: 1,
+                label: 'MatchingService>score',
+                createdAt: 0,
+                retryCount: 0,
+                maxRetries: 3,
+                waitTimeMs: 100,
+            },
         ] as any)
         expect(grouped).toContain('IdentityService>correlate×2')
         expect(grouped).toContain('MatchingService>score')
@@ -438,9 +479,21 @@ describe('operation heartbeat formatters', () => {
             waitTimeMs: 100,
         }
         const grouped = groupActiveLabels([
-            { ...item, id: '1', label: 'IdentityService>correlateAccounts 768daab640cd4c51b2ebe5441b76fda8::SF0000950' },
-            { ...item, id: '2', label: 'IdentityService>correlateAccounts 768daab640cd4c51b2ebe5441b76fda8::SF0001005' },
-            { ...item, id: '3', label: 'IdentityService>correlateAccounts 768daab640cd4c51b2ebe5441b76fda8::SF0000748' },
+            {
+                ...item,
+                id: '1',
+                label: 'IdentityService>correlateAccounts 768daab640cd4c51b2ebe5441b76fda8::SF0000950',
+            },
+            {
+                ...item,
+                id: '2',
+                label: 'IdentityService>correlateAccounts 768daab640cd4c51b2ebe5441b76fda8::SF0001005',
+            },
+            {
+                ...item,
+                id: '3',
+                label: 'IdentityService>correlateAccounts 768daab640cd4c51b2ebe5441b76fda8::SF0000748',
+            },
         ] as any)
         expect(grouped).toBe('IdentityService>correlateAccounts×3')
     })
@@ -471,16 +524,22 @@ describe('operation heartbeat formatters', () => {
             },
         ] as any)
 
-        expect(grouped).toBe(
-            'Identity Fusion NG [18500, 18750], Workday - Employees [18000]'
-        )
+        expect(grouped).toBe('Identity Fusion NG [18500, 18750], Workday - Employees [18000]')
     })
 
     it('formats stall warning with active and pending queue labels', () => {
         expect(formatStallWarning(60_000, [])).toBe('WARN STALL api-queue completed unchanged 60s | active=none')
         expect(
             formatStallWarning(60_000, [], [
-                { id: '1', priority: 1, label: 'FormService>create', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 100 },
+                {
+                    id: '1',
+                    priority: 1,
+                    label: 'FormService>create',
+                    createdAt: 0,
+                    retryCount: 0,
+                    maxRetries: 3,
+                    waitTimeMs: 100,
+                },
             ] as any)
         ).toBe('WARN STALL api-queue completed unchanged 60s | active=none | pending=FormService>create')
     })
@@ -523,7 +582,7 @@ describe('OperationHeartbeat timing', () => {
         const log = { info } as unknown as LogService
         const runContext = new OperationRunContext()
         runContext.phase = 'Fetch'
-        runContext.progress = { done: 18311, total: 18811, unit: 'fetched' }
+        runContext.setFetchPopulationProgress('managed-accounts', 18311, 18811)
 
         const heartbeat = new OperationHeartbeat(log, () => ({
             runContext,
@@ -594,7 +653,13 @@ describe('OperationHeartbeat timing', () => {
         const line = formatStatusLine(
             {
                 runContext,
-                memory: { rss: 642_777_088, heapUsed: 353_370_112, heapTotal: 419_430_400, external: 0, arrayBuffers: 0 },
+                memory: {
+                    rss: 642_777_088,
+                    heapUsed: 353_370_112,
+                    heapTotal: 419_430_400,
+                    external: 0,
+                    arrayBuffers: 0,
+                },
                 intervalMs: 10_000,
             },
             { previousProgressDone: 7296 },
@@ -710,9 +775,33 @@ describe('OperationHeartbeat timing', () => {
 
     it('countCorrelationQueuePending counts correlateAccounts labels only', () => {
         const pendingItems = [
-            { id: '1', priority: 1, label: 'IdentityService>correlateAccounts', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 0 },
-            { id: '2', priority: 1, label: 'IdentityService>correlateAccounts acct-1', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 0 },
-            { id: '3', priority: 1, label: 'MatchingService>score', createdAt: 0, retryCount: 0, maxRetries: 3, waitTimeMs: 0 },
+            {
+                id: '1',
+                priority: 1,
+                label: 'IdentityService>correlateAccounts',
+                createdAt: 0,
+                retryCount: 0,
+                maxRetries: 3,
+                waitTimeMs: 0,
+            },
+            {
+                id: '2',
+                priority: 1,
+                label: 'IdentityService>correlateAccounts acct-1',
+                createdAt: 0,
+                retryCount: 0,
+                maxRetries: 3,
+                waitTimeMs: 0,
+            },
+            {
+                id: '3',
+                priority: 1,
+                label: 'MatchingService>score',
+                createdAt: 0,
+                retryCount: 0,
+                maxRetries: 3,
+                waitTimeMs: 0,
+            },
         ] as any
 
         expect(countCorrelationQueuePending(pendingItems)).toBe(2)
@@ -764,20 +853,17 @@ describe('OperationHeartbeat timing', () => {
         runContext.phase = 'Process'
         runContext.progress = { done: 100, total: 200, unit: 'processed' }
 
-        const line = formatStatusLine(
-            { runContext, intervalMs: 10_000 },
-            {},
-            10_000
-        )
+        const line = formatStatusLine({ runContext, intervalMs: 10_000 }, {}, 10_000)
 
         expect(line).toContain('progress=100/200 processed')
         expect(line).not.toContain('refreshed')
     })
 
-    it('formats Fetch phase STATUS with fetched progress delta', () => {
+    it('renders concurrent Fetch population counters without a shared progress segment', () => {
         const runContext = new OperationRunContext()
         runContext.phase = 'Fetch'
-        runContext.progress = { done: 1200, total: 5000, unit: 'fetched' }
+        runContext.setFetchPopulationProgress('fusion-accounts', 42_500, 102_407)
+        runContext.setFetchPopulationProgress('managed-accounts', 94_044, 158_951)
 
         const line = formatStatusLine(
             {
@@ -794,49 +880,54 @@ describe('OperationHeartbeat timing', () => {
                 },
                 intervalMs: 10_000,
             },
-            { previousProgressDone: 800, previousProcessed: 50 },
+            {
+                previousFetchPopulationDone: {
+                    'fusion-accounts': 40_000,
+                    'managed-accounts': 90_000,
+                },
+                previousProcessed: 50,
+            },
             10_000
         )
 
         expect(line).toContain('phase=Fetch')
-        expect(line).toContain('progress=1200/5000 fetched(Δ+400/10s)')
+        expect(line).toContain('fusion-accounts=42500/102407(Δ+2500/10s)')
+        expect(line).toContain('managed-accounts=94044/158951(Δ+4044/10s)')
+        expect(line).not.toContain('identities=')
+        expect(line).not.toContain('progress=')
         expect(line).toContain('api=4a/12q/80c(Δ+30/10s)')
     })
 
-    it('formats ingested progress on STATUS with its interval delta', () => {
+    it('omits an empty Fetch population counter', () => {
         const runContext = new OperationRunContext()
         runContext.phase = 'Fetch'
-        runContext.progress = { done: 4000, total: 10_000, unit: 'ingested' }
+        runContext.setFetchPopulationProgress('fusion-accounts', 0, 0)
 
-        const line = formatStatusLine(
-            { runContext, intervalMs: 10_000 },
-            { previousProgressDone: 2500 },
-            10_000
-        )
+        const line = formatStatusLine({ runContext, intervalMs: 10_000 }, {}, 10_000)
 
-        expect(line).toContain('progress=4000/10000 ingested(Δ+1500/10s)')
-        expect(line).not.toContain('INGEST')
+        expect(line).not.toContain('fusion-accounts=')
     })
 
-    it('resets the progress delta when STATUS changes from fetched to ingested', () => {
+    it('keeps each Fetch population delta independent when identities appear later', () => {
         vi.useFakeTimers()
         const info = vi.fn()
         const log = { info } as unknown as LogService
         const runContext = new OperationRunContext()
         runContext.phase = 'Fetch'
-        runContext.progress = { done: 500, total: 2000, unit: 'fetched' }
+        runContext.setFetchPopulationProgress('managed-accounts', 8_500, 158_951)
         const heartbeat = new OperationHeartbeat(log, () => ({ runContext, intervalMs: 10_000 }))
 
         heartbeat.start()
         vi.advanceTimersByTime(10_000)
-        runContext.progress = { done: 250, total: 2000, unit: 'ingested' }
-        vi.advanceTimersByTime(10_000)
-        runContext.progress = { done: 750, total: 2000, unit: 'ingested' }
+        runContext.setFetchPopulationProgress('managed-accounts', 16_500, 158_951)
+        runContext.setFetchPopulationProgress('fusion-accounts', 2_500, 102_407)
+        runContext.setFetchPopulationProgress('identities', 250, 10_000)
         vi.advanceTimersByTime(10_000)
 
-        expect(info.mock.calls[1][0]).toContain('progress=250/2000 ingested')
-        expect(info.mock.calls[1][0]).not.toContain('ingested(Δ')
-        expect(info.mock.calls[2][0]).toContain('progress=750/2000 ingested(Δ+500/10s)')
+        expect(info.mock.calls[1][0]).toContain('managed-accounts=16500/158951(Δ+8000/10s)')
+        expect(info.mock.calls[1][0]).toContain('fusion-accounts=2500/102407')
+        expect(info.mock.calls[1][0]).not.toContain('fusion-accounts=2500/102407(Δ')
+        expect(info.mock.calls[1][0]).toContain('identities=250/10000')
 
         heartbeat.stop()
         vi.useRealTimers()
@@ -848,7 +939,7 @@ describe('OperationHeartbeat timing', () => {
         const log = { info } as unknown as LogService
         const runContext = new OperationRunContext()
         runContext.phase = 'Fetch'
-        runContext.progress = { done: 500, total: 2000, unit: 'fetched' }
+        runContext.setFetchPopulationProgress('managed-accounts', 500, 2000)
 
         let queueProcessed = 10
         const heartbeat = new OperationHeartbeat(log, () => ({
@@ -869,11 +960,11 @@ describe('OperationHeartbeat timing', () => {
         heartbeat.start()
         vi.advanceTimersByTime(10_000)
 
-        runContext.progress = { done: 900, total: 2000, unit: 'fetched' }
+        runContext.setFetchPopulationProgress('managed-accounts', 900, 2000)
         queueProcessed = 25
         vi.advanceTimersByTime(10_000)
 
-        expect(info.mock.calls[1][0]).toContain('progress=900/2000 fetched(Δ+400/10s)')
+        expect(info.mock.calls[1][0]).toContain('managed-accounts=900/2000(Δ+400/10s)')
         expect(info.mock.calls[1][0]).toContain('api=2a/3q/25c(Δ+15/10s)')
 
         heartbeat.stop()
@@ -886,7 +977,7 @@ describe('OperationHeartbeat timing', () => {
         const log = { info } as unknown as LogService
         const runContext = new OperationRunContext()
         runContext.phase = 'Fetch'
-        runContext.progress = { done: 500, total: 101_561, unit: 'fetched' }
+        runContext.setFetchPopulationProgress('managed-accounts', 500, 101_561)
 
         const heartbeat = new OperationHeartbeat(log, () => ({
             runContext,
@@ -906,25 +997,14 @@ describe('OperationHeartbeat timing', () => {
         heartbeat.start()
         vi.advanceTimersByTime(10_000)
 
-        runContext.progress = { done: 750, total: 101_561, unit: 'fetched' }
+        runContext.setFetchPopulationProgress('managed-accounts', 750, 101_561)
         vi.advanceTimersByTime(10_000)
 
         const secondStatus = info.mock.calls[1][0] as string
-        expect(secondStatus).toContain('progress=750/101561 fetched(Δ+250/10s)')
+        expect(secondStatus).toContain('managed-accounts=750/101561(Δ+250/10s)')
         expect(secondStatus).not.toContain('Δ+2500/10s')
 
         heartbeat.stop()
         vi.useRealTimers()
     })
 })
-
-
-
-
-
-
-
-
-
-
-

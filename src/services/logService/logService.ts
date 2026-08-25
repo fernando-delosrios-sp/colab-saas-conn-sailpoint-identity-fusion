@@ -6,6 +6,7 @@ import { HeartbeatSnapshot, OperationHeartbeat, formatDetailSuffix } from './ope
 import { EventLoopWatchdog, formatRunContextLabel } from './eventLoopWatchdog'
 import {
     CorrelationSkipReason,
+    FetchPopulation,
     OperationPhase,
     OperationRunContext,
     RefreshSubStepBucket,
@@ -295,6 +296,9 @@ export class LogService {
     phaseStart(phaseNumber: number, phase: OperationPhase): void {
         if (this.runContext) {
             this.runContext.phase = phase
+            if (phase !== 'Fetch') {
+                this.runContext.clearFetchPopulationProgress()
+            }
             this.runContext.phaseStartedAt = Date.now()
             this.runContext.resetPhaseCorrelationCounters()
             if (phase === 'Process') {
@@ -314,6 +318,9 @@ export class LogService {
             this.runContext.phaseStartedAt = undefined
             this.runContext.step = null
             this.runContext.progress = undefined
+            if (phase === 'Fetch') {
+                this.runContext.clearFetchPopulationProgress()
+            }
         }
     }
 
@@ -326,6 +333,7 @@ export class LogService {
             this.runContext.phase = 'Epilogue'
             this.runContext.step = null
             this.runContext.progress = undefined
+            this.runContext.clearFetchPopulationProgress()
             this.runContext.epilogueStartedAt = Date.now()
         }
         this.info(`EPILOGUE ${block} START`)
@@ -333,8 +341,7 @@ export class LogService {
 
     epilogueEnd(block: string, detail?: Record<string, unknown>): void {
         const startedAt = this.runContext?.epilogueStartedAt
-        const elapsed =
-            startedAt !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(Date.now() - startedAt)}` : ''
+        const elapsed = startedAt !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(Date.now() - startedAt)}` : ''
         this.info(`EPILOGUE ${block} END${formatDetailSuffix(detail)}${elapsed}`)
         if (this.runContext) {
             this.runContext.epilogueStartedAt = undefined
@@ -351,8 +358,7 @@ export class LogService {
 
     stepEnd(step: string, detail?: Record<string, unknown>): void {
         const startedAt = this.runContext?.stepStartedAt
-        const elapsed =
-            startedAt !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(Date.now() - startedAt)}` : ''
+        const elapsed = startedAt !== undefined ? ` elapsed=${PhaseTimer.formatElapsed(Date.now() - startedAt)}` : ''
         this.info(`STEP ${step} END${formatDetailSuffix(detail)}${elapsed}`)
         if (this.runContext) {
             this.runContext.step = null
@@ -382,8 +388,7 @@ export class LogService {
                     typeof options?.trackDone === 'function' ? options.trackDone(result) : options?.trackDone
                 tracked.done(doneData)
             }
-            const endDetail =
-                typeof options?.endDetail === 'function' ? options.endDetail(result) : options?.endDetail
+            const endDetail = typeof options?.endDetail === 'function' ? options.endDetail(result) : options?.endDetail
             this.stepEnd(step, endDetail)
             return result
         } catch (error) {
@@ -396,6 +401,17 @@ export class LogService {
         if (this.runContext) {
             this.runContext.progress = { done, total, unit }
         }
+    }
+
+    /**
+     * Updates one independent Fetch inventory counter.
+     *
+     * @param population - One of `fusion-accounts`, `managed-accounts`, or `identities`
+     * @param done - Items registered into the operation-run cache
+     * @param total - Known inventory census, or the running registered count when unknown
+     */
+    setFetchPopulationProgress(population: FetchPopulation, done: number, total: number): void {
+        this.runContext?.setFetchPopulationProgress(population, done, total)
     }
 
     recordEvent(category: string, detail?: Record<string, unknown>): void {
@@ -565,7 +581,15 @@ export class LogService {
             }).then(() => {})
 
         const pending: Promise<void> = (
-            this.apiQueue ? this.apiQueue.enqueue(doFetch, { priority: QueuePriority.LOW, label: 'LogService>sendExternalLog', noRetry: true }).then(() => {}) : doFetch()
+            this.apiQueue
+                ? this.apiQueue
+                      .enqueue(doFetch, {
+                          priority: QueuePriority.LOW,
+                          label: 'LogService>sendExternalLog',
+                          noRetry: true,
+                      })
+                      .then(() => {})
+                : doFetch()
         )
             .catch(() => {})
             .finally(() => {
@@ -784,7 +808,12 @@ export class LogService {
      */
     metric(name: string, startedAt: number, data?: Record<string, any>): void {
         const durationMs = Date.now() - startedAt
-        const dataStr = data ? ' ' + Object.entries(data).map(([k, v]) => `${k}=${v}`).join(' ') : ''
+        const dataStr = data
+            ? ' ' +
+              Object.entries(data)
+                  .map(([k, v]) => `${k}=${v}`)
+                  .join(' ')
+            : ''
         this.info(`METRIC ${name}${dataStr} duration=${PhaseTimer.formatElapsed(durationMs)}`)
     }
 
@@ -827,14 +856,3 @@ export class LogService {
         this.pendingExternalLogs.clear()
     }
 }
-
-
-
-
-
-
-
-
-
-
-
