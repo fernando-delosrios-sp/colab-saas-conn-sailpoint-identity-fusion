@@ -8,6 +8,8 @@ import {
     CorrelationSkipReason,
     OperationPhase,
     OperationRunContext,
+    RefreshSubStepBucket,
+    RefreshWorkloadPatch,
     createEmptyCumulativeOutcomes,
 } from './operationRunContext'
 import { formatPhaseEndDetailSuffix } from './operationHeartbeat'
@@ -418,6 +420,22 @@ export class LogService {
 
     flushPhaseCorrelationSummary(): Record<string, unknown> | undefined {
         return this.runContext?.flushPhaseCorrelationSummary()
+    }
+
+    resetRefreshMetrics(): void {
+        this.runContext?.resetRefreshMetrics()
+    }
+
+    recordRefreshSubStep(bucket: RefreshSubStepBucket, ms: number, workloadPatch?: RefreshWorkloadPatch): void {
+        this.runContext?.recordRefreshSubStep(bucket, ms, workloadPatch)
+    }
+
+    incrementRefreshAccountsProcessed(): void {
+        this.runContext?.incrementRefreshAccountsProcessed()
+    }
+
+    flushRefreshMetricsSummary(): Record<string, unknown> | undefined {
+        return this.runContext?.flushRefreshMetricsSummary()
     }
 
     getCumulativeOutcomes() {

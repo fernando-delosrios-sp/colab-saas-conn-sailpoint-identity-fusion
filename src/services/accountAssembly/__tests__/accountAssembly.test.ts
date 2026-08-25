@@ -94,7 +94,7 @@ describe('AccountAssembly', () => {
             const fusionAccount = await assembly.assembleManagedAccount(account)
             expect(fusionAccount).toBeInstanceOf(FusionAccount)
             expect(mockMappingService.mapAttributes).toHaveBeenCalledWith(fusionAccount, mockRun)
-            expect(mockDefinitionService.refreshNormalAttributes).toHaveBeenCalledWith(fusionAccount)
+            expect(mockDefinitionService.refreshNormalAttributes).toHaveBeenCalledWith(fusionAccount, undefined)
             expect(mockDefinitionService.refreshReverseCorrelationAttributes).toHaveBeenCalledWith(fusionAccount)
         })
     })
@@ -105,8 +105,23 @@ describe('AccountAssembly', () => {
             await assembly.applyAttributeProcessing(account)
 
             expect(mockMappingService.mapAttributes).toHaveBeenCalledWith(account, mockRun)
-            expect(mockDefinitionService.refreshNormalAttributes).toHaveBeenCalledWith(account)
+            expect(mockDefinitionService.refreshNormalAttributes).toHaveBeenCalledWith(account, undefined)
             expect(mockDefinitionService.refreshReverseCorrelationAttributes).toHaveBeenCalledWith(account)
+        })
+
+        it('times map and normalDefine separately via onSubStep', async () => {
+            const onSubStep = vi.fn()
+            const onDefineStats = vi.fn()
+            mockDefinitionService.refreshNormalAttributes.mockImplementation(async (_account: unknown, onStats?: (stats: { evaluated: number; skipped: number }) => void) => {
+                onStats?.({ evaluated: 2, skipped: 0 })
+            })
+            const account = FusionAccount.fromIdentity({ id: 'id-1', name: 'Identity 1' })
+            await assembly.applyAttributeProcessing(account, { onSubStep, onDefineStats })
+
+            expect(onSubStep).toHaveBeenCalledWith('map', expect.any(Number))
+            expect(onSubStep).toHaveBeenCalledWith('normalDefine', expect.any(Number))
+            expect(onDefineStats).toHaveBeenCalledWith({ evaluated: 2, skipped: 0 })
+            expect(mockDefinitionService.refreshNormalAttributes).toHaveBeenCalledWith(account, onDefineStats)
         })
     })
 

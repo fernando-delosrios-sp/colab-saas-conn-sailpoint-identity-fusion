@@ -194,11 +194,20 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
 
 export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<void> {
     const { log, fusion } = serviceRegistry
+    const ctx = log.getRunContext()
+    if (ctx && ctx.phase !== 'Refresh') {
+        ctx.phase = 'Refresh'
+    }
+    log.resetRefreshMetrics()
     log.detail({ action: 'refreshing fusion accounts' })
     await fusion.ensureGlobalReviewerOwnersInScope()
     const refreshOp = log.track('refreshPhase.processFusionAccounts')
     const processedFusionAccounts = await fusion.processFusionAccounts()
     refreshOp.done({ count: processedFusionAccounts.length })
+    const summary = log.flushRefreshMetricsSummary()
+    if (summary) {
+        log.detail({ action: 'refresh workload', ...summary })
+    }
     log.detail({ action: 'refresh phase complete' })
 }
 
