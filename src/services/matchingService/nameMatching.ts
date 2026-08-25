@@ -11,12 +11,6 @@
 import { jaroWinklerSimilarity } from './stringComparison'
 import { doubleMetaphone } from 'double-metaphone'
 
-/** Optional FusionRun-backed maps so name-matcher scoring reuses tokens and phonetic codes. */
-export type NameMatcherCaches = {
-    tokenCache: Map<string, string[]>
-    phoneticCache: Map<string, [string, string]>
-}
-
 function getCachedTokens(normalized: string, cache?: Map<string, string[]>): string[] {
     if (!cache) return normalized.split(' ')
     let tokens = cache.get(normalized)
@@ -111,19 +105,20 @@ export function isMatch(name1: string, name2: string, threshold: number = 0.85):
 export function matchNormalized(
     normalized1: string,
     normalized2: string,
-    caches?: NameMatcherCaches
+    tokenCache?: Map<string, string[]>,
+    phoneticCache?: Map<string, [string, string]>
 ): number {
     if (!normalized1 || !normalized2) return 0
     if (normalized1 === normalized2) return 1.0
 
     // normalizeName guarantees single-space separation and no leading/trailing whitespace,
     // so splitting on ' ' is safe and avoids the regex overhead.
-    const tokens1 = getCachedTokens(normalized1, caches?.tokenCache)
-    const tokens2 = getCachedTokens(normalized2, caches?.tokenCache)
+    const tokens1 = getCachedTokens(normalized1, tokenCache)
+    const tokens2 = getCachedTokens(normalized2, tokenCache)
 
     const tokenScore = calculateTokenSimilarity(tokens1, tokens2)
     const stringSimilarity = jaroWinklerSimilarity(normalized1, normalized2)
-    const phoneticScore = calculatePhoneticSimilarity(tokens1, tokens2, caches?.phoneticCache)
+    const phoneticScore = calculatePhoneticSimilarity(tokens1, tokens2, phoneticCache)
 
     return tokenScore * 0.5 + phoneticScore * 0.3 + stringSimilarity * 0.2
 }
