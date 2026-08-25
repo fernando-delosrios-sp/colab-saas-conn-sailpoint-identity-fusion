@@ -41,6 +41,6 @@ _(none)_
 
 ## Apply status
 
-- **Status**: TODO
+- **Status**: Applied (`e935b41` on `2.2.0/preview`)
 - **Depends on**: none
 - **Issue**:
