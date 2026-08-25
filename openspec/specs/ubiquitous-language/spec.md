@@ -208,9 +208,19 @@ The ubiquitous-language glossary SHALL define **Operation heartbeat**, **STATUS 
 - **WHEN** a reader consults the ubiquitous-language spec glossary
 - **THEN** it SHALL contain an **EVENT_SUMMARY line** entry describing aggregated account-level activity between heartbeat ticks
 
+### Requirement: Glossary defines Fetch population counter
+
+The ubiquitous-language glossary SHALL define **Fetch population counter** as a Fetch-phase STATUS segment for one inventory (`fusion-accounts`, `managed-accounts`, or `identities`), independent of other inventories and distinct from the non-Fetch `progress=` slot.
+
+#### Scenario: Glossary entry for Fetch population counter
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **Fetch population counter** entry
+- **AND** the entry SHALL state that Fetch STATUS MUST NOT use a single `fetched` or `ingested` `progress=` fraction for parallel inventories
+
 ### Requirement: Glossary defines bulk ingest terms
 
-The ubiquitous-language glossary SHALL define **Bulk ingest** and **Ingested (progress unit)** as canonical terms for CPU-bound cache registration after Fetch HTTP and for STATUS progress during that work.
+The ubiquitous-language glossary SHALL define **Bulk ingest** as CPU-bound cache registration after Fetch HTTP, distinct from HTTP Fetch and from identity hydration. It SHALL define **Ingested (progress unit)** as the historical name of that work. Fetch STATUS SHALL use **Fetch population counters**, not unit `ingested`, as the pipeline fraction. DETAIL ingest actions MAY still use `ingesting`.
 
 #### Scenario: Glossary entry for Bulk ingest
 
@@ -220,8 +230,8 @@ The ubiquitous-language glossary SHALL define **Bulk ingest** and **Ingested (pr
 #### Scenario: Glossary entry for Ingested progress unit
 
 - **WHEN** a reader consults the ubiquitous-language spec glossary
-- **THEN** it SHALL contain an **Ingested (progress unit)** entry describing the STATUS `progress=` unit `ingested`
-- **AND** the entry SHALL state that operators MUST NOT reuse `fetched` for post-HTTP cache registration
+- **THEN** it SHALL contain an **Ingested (progress unit)** entry
+- **AND** the entry SHALL state that Fetch STATUS MUST NOT use `ingested` as the sole pipeline `progress=` unit
 
 ### Requirement: Glossary defines Refreshed progress unit
 
@@ -387,13 +397,19 @@ Documentation, specs, and agent-generated text MUST use **correlation** (unquali
 
 ### Requirement: Documentation and logs use Bulk ingest and ingested
 
-New documentation, STATUS progress units, and DETAIL actions for this work SHALL use **Bulk ingest** and unit **ingested**. They SHALL NOT call this stretch hydration, flush, or promise dump.
+New documentation and DETAIL actions for bulk-ingest work SHALL use **Bulk ingest** and `ingesting` actions. They SHALL NOT call this stretch hydration, flush, or promise dump. Fetch STATUS examples SHALL use Fetch population counters, not `progress=… ingested`.
 
 #### Scenario: DETAIL ingest start uses ingesting action
 
 - **WHEN** Fetch emits a DETAIL line at the start of identity or fusion-account bulk ingest
 - **THEN** the action SHALL use `ingesting` with subject `identities` or `fusion-accounts`
 - **AND** the line SHALL NOT describe the work as hydration
+
+#### Scenario: Fetch STATUS examples use population counters
+
+- **WHEN** operator docs show a Fetch STATUS example with concurrent Fusion and managed loads
+- **THEN** the example SHALL include `fusion-accounts=` and `managed-accounts=`
+- **AND** the example SHALL NOT use a single Fetch `progress=` with unit `fetched` or `ingested`
 
 ## Canonical Terms
 
@@ -439,10 +455,11 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **Phase** | A major stage of an operation pipeline (for example the identity documents phase, the Fusion accounts phase, or the managed accounts phase). The report step is not a phase; see **Epilogue**. |
 | **Epilogue** | The always-runs terminal block of the account-list operation that emits reports and summaries after the pipeline phases complete, regardless of pipeline success. Ordered most-durable-first (report file, report email, summary send). |
 | **Operation heartbeat** | A periodic logging interval (default 30s) during long-running operations that emits **STATUS line** and **EVENT_SUMMARY line** text to explain phase, step, progress, queue state, and aggregated account activity. |
-| **STATUS line** | The primary situational text line emitted by the operation heartbeat: phase, step, progress, queue delta, memory, and elapsed time (grep prefix `STATUS`). |
+| **STATUS line** | The primary situational text line emitted by the operation heartbeat: phase, step, Fetch population counters or pipeline `progress=`, compact `api=Na/Nq/Nc` (with delta), memory, and elapsed time (grep prefix `STATUS`). |
 | **EVENT_SUMMARY line** | A heartbeat text line aggregating account-level activity (review/merge matches, correlations, decisions) recorded since the previous tick. Not emitted when the only match activity is non-matched accounts already shown on STATUS (grep prefix `EVENT_SUMMARY`). |
 | **Bulk ingest** | CPU-bound registration of already-fetched pages into operation-run caches during Fetch. Distinct from HTTP retrieval and from identity hydration, which performs follow-up API lookups for missing identities. |
-| **Ingested (progress unit)** | The STATUS `progress=` unit `ingested`, used while bulk ingest registers fetched documents or accounts. Post-HTTP cache registration MUST NOT reuse the `fetched` unit. |
+| **Fetch population counter** | A Fetch STATUS segment for one inventory: `fusion-accounts`, `managed-accounts`, or `identities`. Counters are independent; Fetch STATUS MUST NOT use a single `fetched` or `ingested` `progress=` fraction for parallel inventories. |
+| **Ingested (progress unit)** | Historical name of bulk-ingest work. Fetch STATUS MUST NOT use `ingested` as the sole pipeline `progress=` unit; DETAIL milestones MAY still use `ingesting`. |
 | **Refreshed (progress unit)** | The STATUS `progress=` unit `refreshed`, used while account-list Refresh walks Fusion accounts. Refresh pipeline throughput MUST NOT reuse unit `processed` or emit a standalone `refreshed(N)` cumulative. |
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |
 | **Correlated account sweep** | A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts. |
