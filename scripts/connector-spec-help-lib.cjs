@@ -124,7 +124,7 @@ const SECTION_HELP = {
     },
     'Normal Attribute Definitions': {
         sectionHelpMessage:
-            '<strong>Define dynamic computed attributes.</strong> Apache Velocity; optional per-definition refresh. Post-template options: case, character normalization, spaces, trim, max length.<br><br>Definitions run top to bottom — each result is available to the next. See the Velocity context reference for <code>$accounts</code>, <code>$identity</code>, <code>$previous</code>, and helper functions.' +
+            '<strong>Define dynamic computed attributes.</strong> Apache Velocity; optional Always recalculate. Post-template options: case, character normalization, spaces, trim, max length.<br><br>Definitions run top to bottom — each result is available to the next. See the Velocity context reference for <code>$accounts</code>, <code>$identity</code>, <code>$previous</code>, and helper functions.' +
             seeAlso([
                 ['use-guides/configuration/defining-attributes/', 'Defining attributes guide'],
                 ['reference/velocity-context/', 'Velocity context reference'],

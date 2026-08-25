@@ -10,6 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### 🔧 Improvements
 
+- **Always recalculate** replaces **Refresh on each aggregation?** — The Normal definition toggle label and help now state that the expression re-runs even when managed source data is unchanged. The stored `refresh` config key is unchanged.
 - **Refresh logs an aggregate workload summary** — After Refresh processes Fusion accounts, one `DETAIL refresh workload` line reports account count and millisecond totals for prelude, managed-account layer, unique registration, Map, Normal Define, correlation, and finalize, plus definition and queue-scan counters. Use it to compare before/after Refresh optimizations. Aggregation output is unchanged.
 - **Refresh STATUS uses one consistent progress counter** — Refresh heartbeats now report `progress=done/total refreshed(Δ+N/interval)` like Fetch reports `fetched`. The redundant standalone `refreshed(N)` counter is removed; Map and Define refresh behavior is unchanged. Log scrapers matching Refresh `processed(Δ` or `refreshed(N)` should migrate to the `refreshed` progress unit.
 - **Processing wait time is capped at 180 seconds** — Platform keep-alive (`processingWait`) defaults to 180 seconds and cannot exceed that. Existing sources stored above 180 are clamped at runtime.
