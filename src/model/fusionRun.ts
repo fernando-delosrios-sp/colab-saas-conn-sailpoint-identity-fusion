@@ -105,6 +105,7 @@ export class FusionRun {
     fusionBlends: FusionReportBlend[] = []
     matchScoringMs = 0
     fullScanFallbackCount = 0
+    mandatoryMissingBlockCount = 0
     analysisRecorder?: ManagedAccountAnalysisRecording
     phaseTimings: { phase: string; elapsed: string }[] = []
     private pendingDisableOperations = new Set<Promise<void>>()

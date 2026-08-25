@@ -20,6 +20,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 - **Refresh re-blends previous and missing managed accounts by key** — Persisted Fusion rows look up `previousAccountIds` and `missingAccountIds` in the managed-account work queue instead of scanning every queue entry. Blend, claim, and uncorrelated status behavior is unchanged.
 - **Unchanged Fusion accounts skip Refresh-off Map and Define** — Fusion accounts no longer treat every managed account with a real modified date as dirty. Refresh-off Map and Define run when the managed account is newer than the Fusion account beyond a short grace window, or on new blend, delete, or force refresh.
 - **Existing Unique values register without waiting on the uniqueness lock** — Refresh and Process unique registration insert Unique values already on the account without queuing behind the per-attribute uniqueness lock. Newly generated Unique values still take that lock for check-then-add. Uniqueness of generated values is unchanged.
+- **Accounts missing indexed mandatory attributes skip the identity corpus scan** — When trigram blocking is built and a managed account has no value for any mandatory rule with minimum similarity greater than zero, matching uses an empty candidate set instead of scoring every identity. Process reports `mandatoryMissingBlockCount` separately from a full-scan fallback.
+
+### 🐛 Fixes
+
+- **Threshold-zero mandatory attributes no longer filter identity candidates** — Mandatory match rules with minimum similarity unset or zero are not added to the trigram index, so identities that lack that attribute can still match on other rules.
 
 ---
 

@@ -30,6 +30,7 @@ describe('FusionRun', () => {
         expect(run.fusionBlends).toEqual([])
         expect(run.matchScoringMs).toBe(0)
         expect(run.fullScanFallbackCount).toBe(0)
+        expect(run.mandatoryMissingBlockCount).toBe(0)
         expect(run.pendingDisableOperationsCount).toBe(0)
         expect(run.nameMatcherTokenCache).toBeInstanceOf(Map)
         expect(run.nameMatcherTokenCache.size).toBe(0)

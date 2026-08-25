@@ -6,6 +6,7 @@ import { FusionRun } from '../../../model/fusionRun'
 import { AggregationTracker } from '../../../model/aggregationTracker'
 import { AccountAssembly } from '../../accountAssembly'
 import { MatchingService } from '../matchingService'
+import { MatchCandidateType } from '../types'
 import { MatchOutcomeDispatcher, MatchSweepMode } from '../matchOutcomeDispatcher'
 import { createAutomaticMergeDecision } from '../../formService/helpers'
 import type { SourceInfo } from '../../sourceService'
@@ -252,6 +253,32 @@ describe('MatchOutcomeDispatcher', () => {
             // managedAccountsBatchSize 10 caps the yield cadence at 10 accounts; 25 leaves slack
             // while still failing loudly if a loop runs the whole set without yielding.
             expect(worstStretch).toBeLessThanOrEqual(25)
+        })
+
+        it('does not score allFusionIdentities when getCandidates returns an empty set', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+
+            const corpusIdentity = FusionAccount.fromIdentity({
+                id: 'id-corpus',
+                attributes: { email: 'foo@example.com' },
+            } as any)
+            run.registerFusionAccount(corpusIdentity)
+
+            vi.spyOn(matchingService, 'getCandidates').mockReturnValue(new Set())
+            const identityPools: FusionAccount[][] = []
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (_account, pool, candidateType) => {
+                if (candidateType === MatchCandidateType.Identity) {
+                    identityPools.push(Array.from(pool))
+                }
+                return 0
+            })
+
+            await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(identityPools).toEqual([[]])
         })
 
         it('dispatches an exact match to automatic merge when the combined score meets the threshold', async () => {

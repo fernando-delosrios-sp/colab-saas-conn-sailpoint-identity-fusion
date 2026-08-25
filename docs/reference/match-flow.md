@@ -53,6 +53,8 @@ For each Fusion account (new or updated):
     - If combined score ≥ **manual review match score** and mandatory rules pass → potential match.
 3. Sort identities by similarity score (highest first).
 
+Before full similarity scoring, **trigram blocking** may pre-filter identity candidates using mandatory rules whose minimum similarity is greater than zero. If a managed account has no value for any of those indexed attributes, the candidate set is empty and no identity comparisons run (`mandatoryMissingBlockCount`). A full identity scan happens only when blocking is unavailable (`getCandidates` returns undefined). See [Observability — trigram blocking counters](observability.md#trigram-blocking-counters-accountlist-process).
+
 Rule and threshold configuration: [Matching identities](../use-guides/configuration/matching-identities.md) · [Tuning matching algorithms](../use-guides/configuration/tuning-matching-algorithms.md).
 
 ---
