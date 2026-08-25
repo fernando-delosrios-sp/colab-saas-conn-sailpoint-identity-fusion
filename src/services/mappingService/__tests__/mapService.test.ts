@@ -67,7 +67,12 @@ describe('MappingService selective targets', () => {
     it('skips identity-type accounts', () => {
         const service = new MappingService(config, mockLog)
         const run = new FusionRun()
-        const account = { type: FusionAccountKind.Identity, attributeBag: { current: {} } } as FusionAccount
+        const account = {
+            type: FusionAccountKind.Identity,
+            attributeBag: { current: {} },
+            sources: [],
+            history: [],
+        } as unknown as FusionAccount
         service.mapAttributes(account, run, { onlyTargets: new Set(['employeeId']) })
     })
 

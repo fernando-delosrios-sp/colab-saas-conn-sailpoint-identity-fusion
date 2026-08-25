@@ -197,14 +197,16 @@ export class FusionLayers {
             addBlendHistory,
             skipBlendHistoryForManagedKeys,
             onBlend,
-            identityInfo?.id
+            identityInfo?.id,
+            modified
         )
         this.processDeclaredAccountIds(
             workQueue,
             attributeBag,
             addBlendHistory,
             skipBlendHistoryForManagedKeys,
-            onBlend
+            onBlend,
+            modified
         )
         this.processPreviousRunMatchedAccounts(
             workQueue,
@@ -212,7 +214,8 @@ export class FusionLayers {
             addBlendHistory,
             skipBlendHistoryForManagedKeys,
             onBlend,
-            onQueueScan
+            onQueueScan,
+            modified
         )
 
         const inventoryKeys = new Set(workQueue.managedAccountInventory.keys())
@@ -300,6 +303,7 @@ export class FusionLayers {
         addBlendHistory: boolean = true,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
         attributeBag?: { sources: Map<string, Attributes[]> },
+        fusionModified?: string
     ) {
         const accountId = getManagedAccountKeyFromAccount(account)
         if (!accountId) {
@@ -327,7 +331,7 @@ export class FusionLayers {
         }
         if (!this.needsRefreshValue) {
             const thresholdMs = this.fusionAccountRefreshThresholdInSeconds * 1000
-            if (isNewerThan(account.modified, undefined, thresholdMs)) {
+            if (fusionModified && isNewerThan(account.modified, fusionModified, thresholdMs)) {
                 this.needsRefreshValue = true
             }
         }
@@ -373,7 +377,8 @@ export class FusionLayers {
         addBlendHistory: boolean,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
         onBlend?: (account: Account) => void,
-        identityId?: string
+        identityId?: string,
+        fusionModified?: string
     ): void {
         if (identityId === undefined) return
 
@@ -389,7 +394,8 @@ export class FusionLayers {
                     account,
                     addBlendHistory,
                     skipBlendHistoryForManagedKeys,
-                    attributeBag
+                    attributeBag,
+                    fusionModified
                 )
                 if (blended && onBlend) onBlend(account)
                 queue.claimAccount(id, account.identityId)
@@ -408,7 +414,8 @@ export class FusionLayers {
         attributeBag: { sources: Map<string, Attributes[]> },
         addBlendHistory: boolean,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
-        onBlend?: (account: Account) => void
+        onBlend?: (account: Account) => void,
+        fusionModified?: string
     ): void {
         if (this.collections.accountIds.size === 0) return
 
@@ -424,7 +431,8 @@ export class FusionLayers {
                 account,
                 addBlendHistory,
                 skipBlendHistoryForManagedKeys,
-                attributeBag
+                attributeBag,
+                fusionModified
             )
             if (blended && onBlend) onBlend(account)
             queue.claimAccount(accountId, account.identityId)
@@ -448,7 +456,8 @@ export class FusionLayers {
         addBlendHistory: boolean,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
         onBlend?: (account: Account) => void,
-        onQueueScan?: (entriesExamined: number) => void
+        onQueueScan?: (entriesExamined: number) => void,
+        fusionModified?: string
     ): void {
         if (this.collections.previousAccountIds.size === 0 && this.collections.missingAccountIds.size === 0) return
 
@@ -470,7 +479,8 @@ export class FusionLayers {
                 account,
                 addBlendHistory,
                 skipBlendHistoryForManagedKeys,
-                attributeBag
+                attributeBag,
+                fusionModified
             )
             if (blended && onBlend) onBlend(account)
             queue.claimAccount(id, account.identityId)

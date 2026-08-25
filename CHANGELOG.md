@@ -15,6 +15,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 - **Processing wait time is capped at 180 seconds** — Platform keep-alive (`processingWait`) defaults to 180 seconds and cannot exceed that. Existing sources stored above 180 are clamped at runtime.
 - **Normal Define honors per-definition refresh and copies Velocity context once per account** — Definitions with Refresh off skip evaluation when the Fusion account is unchanged (no source-data refresh, reset, or force attribute refresh) and already has a value. Definitions with Refresh on still run every aggregation. Each account builds one null-prototype render context for the Define pass instead of copying caller context per definition. Datefns format regexes are cached by format string.
 - **Refresh re-blends previous and missing managed accounts by key** — Persisted Fusion rows look up `previousAccountIds` and `missingAccountIds` in the managed-account work queue instead of scanning every queue entry. Blend, claim, and uncorrelated status behavior is unchanged.
+- **Unchanged Fusion accounts skip Refresh-off Map and Define** — Fusion accounts no longer treat every managed account with a real modified date as dirty. Refresh-off Map and Define run when the managed account is newer than the Fusion account beyond a short grace window, or on new blend, delete, or force refresh.
 
 ---
 

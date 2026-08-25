@@ -750,6 +750,99 @@ describe('FusionAccount', () => {
         })
     })
 
+    describe('managed-account modified vs fusion modified', () => {
+        const fusionModified = '2024-06-01T12:00:00.000Z'
+
+        const persistedFusionWithQueuedManaged = (options: {
+            fusionModified?: string
+            managedModified: string
+        }) => {
+            const fusionAccountPayload: Record<string, unknown> = {
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Persisted Account',
+                sourceName: 'Identity Fusion NG',
+                attributes: {
+                    accounts: ['src-a::keep-1'],
+                },
+            }
+            if (options.fusionModified !== undefined) {
+                fusionAccountPayload.modified = options.fusionModified
+            }
+            const acc = FusionAccount.fromFusionAccount(fusionAccountPayload as unknown as Account)
+            const run = new FusionRun()
+            run.managedAccountsById.set('src-a::keep-1', {
+                id: 'isc-keep-1',
+                sourceId: 'src-a',
+                nativeIdentity: 'keep-1',
+                sourceName: 'Source A',
+                modified: options.managedModified,
+                attributes: {},
+            } as any)
+            acc.addManagedAccountLayer(run)
+            return { acc, run }
+        }
+
+        it('previously correlated stale managed account does not force refresh', () => {
+            const { acc, run } = persistedFusionWithQueuedManaged({
+                fusionModified,
+                managedModified: '2024-01-01T00:00:00.000Z',
+            })
+
+            expect(acc.needsRefresh).toBe(false)
+            expect(acc.accountIds).toContain('src-a::keep-1')
+            expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
+        })
+
+        it('managed account newer than fusion modified beyond the threshold forces refresh', () => {
+            const { acc } = persistedFusionWithQueuedManaged({
+                fusionModified,
+                managedModified: '2024-06-01T14:00:00.000Z',
+            })
+
+            expect(acc.needsRefresh).toBe(true)
+        })
+
+        it('managed account newer than fusion modified within the threshold does not force refresh', () => {
+            const { acc } = persistedFusionWithQueuedManaged({
+                fusionModified,
+                managedModified: '2024-06-01T12:30:00.000Z',
+            })
+
+            expect(acc.needsRefresh).toBe(false)
+        })
+
+        it('new blend still forces refresh', () => {
+            const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
+            const run = new FusionRun()
+            run.managedAccountsById.set('src-a::native-1', {
+                id: 'isc-acc-1',
+                sourceId: 'src-a',
+                nativeIdentity: 'native-1',
+                sourceName: 'Source A',
+                modified: '2020-01-01T00:00:00.000Z',
+                attributes: {},
+            } as any)
+            run.managedAccountsByIdentityId.set('id-1', new Set(['src-a::native-1']))
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.needsRefresh).toBe(true)
+            expect(acc.accountIds).toContain('src-a::native-1')
+            expect(run.managedAccountsById.size).toBe(0)
+        })
+
+        it('missing fusion modified does not use epoch as the refresh reference', () => {
+            const { acc, run } = persistedFusionWithQueuedManaged({
+                managedModified: '2024-06-01T14:00:00.000Z',
+            })
+
+            expect(acc.needsRefresh).toBe(false)
+            expect(acc.accountIds).toContain('src-a::keep-1')
+            expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
+        })
+    })
+
     describe('attribute-bag setters', () => {
         it('addAccountId adds to correlated set and sync reflects it', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
