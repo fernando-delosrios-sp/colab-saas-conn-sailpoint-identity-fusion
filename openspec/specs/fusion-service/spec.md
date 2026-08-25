@@ -221,7 +221,7 @@ FusionService SHALL orchestrate the managed-account Process-phase pipeline in or
 
 ### Requirement: FusionService delegates match outcome dispatch to MatchOutcomeDispatcher
 
-FusionService SHALL delegate managed-account match outcome dispatch to `MatchOutcomeDispatcher.runMatchSweep()`. FusionService SHALL NOT call MatchOutcomeDispatcher scoring internals (for example `scoreIdentityPhase`, deferred drain helpers) or invoke `MatchingService` comparison methods directly to perform a sweep. FusionService MAY call `MatchingService` scoring-prep methods (`buildTrigramIndex`, `configureScoring`) during `initializeManagedAccountProcessing`.
+FusionService SHALL delegate managed-account match outcome dispatch to `MatchOutcomeDispatcher.runMatchSweep()`. FusionService SHALL NOT call MatchOutcomeDispatcher scoring internals (for example `scoreIdentityPhase`, deferred drain helpers) or invoke `MatchingService` comparison methods directly to perform a sweep. FusionService MAY call `MatchingService.buildTrigramIndex` during `initializeManagedAccountProcessing`.
 
 #### Scenario: Uncorrelated sweep delegates to MatchOutcomeDispatcher
 
@@ -239,7 +239,7 @@ FusionService SHALL delegate managed-account match outcome dispatch to `MatchOut
 
 - **WHEN** `initializeManagedAccountProcessing` completes
 - **THEN** FusionService SHALL have called `matchingService.buildTrigramIndex` with the current fusion identity iterable
-- **AND** FusionService SHALL have called `matchingService.configureScoring` with `captureBreakdown` derived from report-capture settings
+- **AND** FusionService SHALL NOT call `matchingService.configureScoring`
 - **AND** FusionService SHALL have seeded deferred candidates and built the linked-account key index as part of the same init phase
 
 #### Scenario: FusionService does not orchestrate sweep scoring internals

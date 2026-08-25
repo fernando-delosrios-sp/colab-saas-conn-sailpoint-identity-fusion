@@ -152,10 +152,11 @@ describe('FusionService — report', () => {
         })
 
         it('does not call configureScoring when report capture is enabled', async () => {
-            const configureScoring = vi.fn()
-            Object.assign(ctx.mockMatchingService, { configureScoring, buildTrigramIndex: vi.fn() })
             await initializeWithReportCaptureFlag(true)
-            expect(configureScoring).not.toHaveBeenCalled()
+            expect(
+                (ctx.mockMatchingService as { configureScoring?: ReturnType<typeof vi.fn> }).configureScoring
+            ).not.toHaveBeenCalled()
+            expect(ctx.mockMatchingService.buildTrigramIndex).toHaveBeenCalled()
         })
 
         it('does not call configureScoring when run is in record mode', async () => {

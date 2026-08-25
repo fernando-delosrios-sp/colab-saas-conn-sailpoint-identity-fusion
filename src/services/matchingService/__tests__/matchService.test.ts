@@ -116,6 +116,7 @@ describe('MatchingService', () => {
         })
 
         it('stores no matches when a mandatory rule fails on the fast path', async () => {
+            const reportSpy = vi.spyOn(scoringHelpers, 'makeScoreReport')
             const mandatoryRule = { ...binaryRule, mandatory: true }
             const service = new MatchingService(
                 { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
@@ -132,9 +133,11 @@ describe('MatchingService', () => {
                 attributes: { employeeId: 'B' },
             } as any)
 
-            await service.scoreFusionAccount(managed, [identity])
+            await service.scoreFusionAccount(managed, [identity], MatchCandidateType.Identity)
 
             expect(managed.fusionMatchesRaw).toHaveLength(0)
+            expect(reportSpy).not.toHaveBeenCalled()
+            reportSpy.mockRestore()
         })
 
         it('uses numeric fast path for identity sweep', async () => {
@@ -165,6 +168,7 @@ describe('MatchingService', () => {
                 mockLog
             )
             const fastPathSpy = vi.spyOn(service as any, 'evaluateCombinedScorePass')
+            const scoreReportSpy = vi.spyOn(scoringHelpers, 'scoreBinary')
 
             const managed = FusionAccount.fromManagedAccount({
                 sourceId: 'src-1',
@@ -179,6 +183,9 @@ describe('MatchingService', () => {
             await service.scoreFusionAccount(managed, [identity], MatchCandidateType.Deferred)
 
             expect(fastPathSpy).not.toHaveBeenCalled()
+            expect(managed.fusionMatchesRaw).toHaveLength(0)
+            expect(scoreReportSpy).toHaveBeenCalled()
+            scoreReportSpy.mockRestore()
         })
 
         it('invokes each configured scorer once on a passing identity comparison', async () => {
