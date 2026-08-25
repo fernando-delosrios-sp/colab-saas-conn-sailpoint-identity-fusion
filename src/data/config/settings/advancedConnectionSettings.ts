@@ -12,7 +12,7 @@ export const connectorSpecInitialValues = {
     requestsPerSecond: 10,
     maxConcurrentRequests: 20,
     parallelBatchSize: 16,
-    processingWait: 250,
+    processingWait: 180,
     heartbeatInterval: 10,
 } as const
 
@@ -32,10 +32,12 @@ export type AdvancedConnectionSettingsReadResult = AdvancedConnectionSettingsSec
 }
 
 export function readSettings(raw: Record<string, unknown>): AdvancedConnectionSettingsReadResult {
-    const processingWaitMs =
+    const requestedProcessingWaitMs =
         raw.processingWait !== undefined
             ? (raw.processingWait as number) * 1000
             : runtimeDefaults.processingWait
+    // ISC keep-alive cannot exceed 180s; default equals that cap.
+    const processingWaitMs = Math.min(requestedProcessingWaitMs, runtimeDefaults.processingWait)
 
     const statsLoggingIntervalMs =
         raw.heartbeatInterval !== undefined

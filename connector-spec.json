@@ -28,7 +28,7 @@
         "requestsPerSecond": 10,
         "maxConcurrentRequests": 20,
         "parallelBatchSize": 16,
-        "processingWait": 250,
+        "processingWait": 180,
         "heartbeatInterval": 10,
         "managedAccountsBatchSize": 100,
         "scoringMaxConcurrency": 12,
@@ -1245,7 +1245,8 @@
                             "type": "number",
                             "required": false,
                             "min": "10",
-                            "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts."
+                            "max": "180",
+                            "helpKey": "How often (in seconds) to send a progress signal during long operations to prevent timeouts. Must not exceed 180."
                         },
                         {
                             "key": "heartbeatInterval",

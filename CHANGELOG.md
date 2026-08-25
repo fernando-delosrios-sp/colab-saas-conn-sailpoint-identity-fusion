@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-08-25
+
+### 🔧 Improvements
+
+- **Processing wait time is capped at 180 seconds** — Platform keep-alive (`processingWait`) defaults to 180 seconds and cannot exceed that. Existing sources stored above 180 are clamped at runtime.
+
+---
+
 ## 2026-08-24
 
 ### ⚠️ Breaking Changes
