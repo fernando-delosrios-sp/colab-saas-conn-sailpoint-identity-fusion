@@ -4,6 +4,7 @@ import { AggregationTracker } from '../aggregationTracker'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionService } from '../fusionService'
 import { StandardCommand } from '@sailpoint/connector-sdk'
+import { OperationRunContext } from '../../logService/operationRunContext'
 
 describe('FusionService — aggregation', () => {
     let ctx: FusionServiceTestContext
@@ -176,10 +177,79 @@ describe('FusionService — aggregation', () => {
             // Since processFusionAccounts calls processFusionAccount internally, let's spy on that if we can,
             // or verify side effects.
 
+            const trackSpy = vi.spyOn(ctx.mockLog, 'track')
+            const metricSpy = vi.spyOn(ctx.mockLog, 'metric')
+
             const result = await ctx.fusionService.processFusionAccounts()
 
             expect(result).toHaveLength(1)
             expect(result[0].managedKey).toBe(`fusion-1`)
+            expect(trackSpy).not.toHaveBeenCalled()
+            expect(metricSpy).not.toHaveBeenCalled()
+        })
+
+        it('records mapMs and normalDefineMs greater than zero when attribute processing ran during Refresh', async () => {
+            let now = 1_000
+            vi.spyOn(performance, 'now').mockImplementation(() => {
+                now += 2.5
+                return now
+            })
+            const runContext = new OperationRunContext()
+            runContext.phase = 'Refresh'
+            ctx.mockLog.recordRefreshSubStep.mockImplementation((bucket, ms, patch) => {
+                runContext.recordRefreshSubStep(bucket, ms, patch)
+            })
+            ctx.mockLog.incrementRefreshAccountsProcessed.mockImplementation(() => {
+                runContext.incrementRefreshAccountsProcessed()
+            })
+            ctx.mockLog.flushRefreshMetricsSummary.mockImplementation(() => runContext.flushRefreshMetricsSummary())
+            ctx.mockMappingService.mapAttributes.mockImplementation(() => undefined)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue(undefined)
+
+            const mockAccount = {
+                nativeIdentity: 'fusion-refresh-1',
+                attributes: {
+                    id: 'fusion-refresh-1',
+                    name: 'Refresh Fusion Account',
+                },
+            } as unknown as Account
+
+            await ctx.fusionService.processFusionAccount(mockAccount, {
+                refreshMapping: true,
+                refreshDefinition: true,
+                resetDefinition: false,
+            })
+
+            const summary = ctx.mockLog.flushRefreshMetricsSummary()
+            expect(summary?.mapMs).toBeGreaterThan(0)
+            expect(summary?.normalDefineMs).toBeGreaterThan(0)
+            vi.mocked(performance.now).mockRestore()
+        })
+
+        it('does not increment Refresh metrics when processFusionAccount runs outside Refresh', async () => {
+            const runContext = new OperationRunContext()
+            runContext.phase = 'Process'
+            ctx.mockLog.recordRefreshSubStep.mockImplementation((bucket, ms, patch) => {
+                runContext.recordRefreshSubStep(bucket, ms, patch)
+            })
+            ctx.mockLog.incrementRefreshAccountsProcessed.mockImplementation(() => {
+                runContext.incrementRefreshAccountsProcessed()
+            })
+            ctx.mockLog.flushRefreshMetricsSummary.mockImplementation(() => runContext.flushRefreshMetricsSummary())
+            ctx.mockMappingService.mapAttributes.mockImplementation(() => undefined)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue(undefined)
+
+            const mockAccount = {
+                nativeIdentity: 'fusion-process-1',
+                attributes: {
+                    id: 'fusion-process-1',
+                    name: 'Process Fusion Account',
+                },
+            } as unknown as Account
+
+            await ctx.fusionService.processFusionAccount(mockAccount)
+
+            expect(ctx.mockLog.flushRefreshMetricsSummary()).toBeUndefined()
         })
 
         it('removes the correlated identity from the identity work queue after processing', async () => {
