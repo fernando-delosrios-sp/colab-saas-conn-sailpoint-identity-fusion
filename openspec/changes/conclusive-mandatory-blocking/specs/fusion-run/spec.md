@@ -22,3 +22,8 @@ FusionRun SHALL expose a run-scoped numeric field `fullScanFallbackCount` initia
 #### Scenario: Counter starts at zero
 - **WHEN** a new FusionRun is constructed for an operation
 - **THEN** `fullScanFallbackCount` SHALL be `0`
+
+#### Scenario: Counter accumulates across multiple accounts
+- **GIVEN** two managed accounts each triggering full-scan fallback because trigram blocking was unavailable in the same run
+- **WHEN** both are processed through `getCandidates`
+- **THEN** `fullScanFallbackCount` SHALL equal `2`

@@ -4,6 +4,20 @@
 
 `MatchOutcomeDispatcher` SHALL expose a single public method `runMatchSweep(accounts, batchSize, options?): MatchSweepResult` that scores the supplied accounts and dispatches each to its outcome. No other public method on `MatchOutcomeDispatcher` SHALL be required by callers to perform a managed-account matching sweep.
 
+#### Scenario: FusionService invokes one verb
+
+- **WHEN** `FusionService.processUncorrelatedManagedAccounts` drains the remaining work queue
+- **THEN** FusionService SHALL call `matchOutcomeDispatcher.runMatchSweep(accounts, batchSize)` exactly once with the full queue
+- **AND** MatchOutcomeDispatcher SHALL execute the identity scoring sweep and deferred drain inside that single invocation
+- **WHEN** `FusionService.processCorrelatedManagedAccounts` processes correlated managed accounts
+- **THEN** FusionService SHALL call `matchOutcomeDispatcher.runMatchSweep([account], 1)` for each correlated account
+- **AND** FusionService SHALL NOT batch all correlated accounts into one uncorrelated-style sweep call
+
+#### Scenario: MatchSweepResult reports outcomes
+
+- **WHEN** `runMatchSweep()` completes
+- **THEN** it SHALL return `MatchSweepResult` containing `processed`, `matchScoringMs`, counts by resolution, and a `ResolvedMatch[]` list
+
 #### Scenario: Identity candidate pool uses getCandidates result including empty set
 
 - **GIVEN** MatchingService.getCandidates returns a Set (including an empty Set)
