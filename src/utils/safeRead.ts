@@ -38,6 +38,16 @@ export const readUnknown = (source: unknown, key: string): unknown => {
     return record ? record[key] : undefined
 }
 
+export const readFirstUnknown = (source: unknown, keys: string[]): unknown => {
+    for (const key of keys) {
+        const value = readUnknown(source, key)
+        if (value !== undefined && value !== null) {
+            return value
+        }
+    }
+    return undefined
+}
+
 export const readPathUnknown = (source: unknown, path: string[]): unknown => {
     let current: unknown = source
     for (const segment of path) {
