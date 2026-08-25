@@ -5,6 +5,7 @@ import { FusionAccount } from '../../../model/account'
 import { MatchCandidateType } from '../types'
 import { FusionConfig } from '../../../model/config'
 import { FusionRun } from '../../../model/fusionRun'
+import * as scoringHelpers from '../scoringHelpers'
 
 vi.mock('double-metaphone', async (importOriginal) => {
     const actual = await importOriginal<typeof import('double-metaphone')>()
@@ -43,12 +44,11 @@ describe('MatchingService', () => {
             mandatory: false,
         }
 
-        it('stores no matches for non-matching accounts when captureBreakdown is false', async () => {
+        it('stores no matches for non-matching identity comparisons', async () => {
             const service = new MatchingService(
                 { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
                 mockLog
             )
-            service.configureScoring({ captureBreakdown: false })
 
             const managed = FusionAccount.fromManagedAccount({
                 sourceId: 'src-1',
@@ -65,12 +65,35 @@ describe('MatchingService', () => {
             expect(managed.fusionMatchesRaw).toHaveLength(0)
         })
 
+        it('allocates no per-rule ScoreReport on a failed identity comparison', async () => {
+            const reportSpy = vi.spyOn(scoringHelpers, 'makeScoreReport')
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
+                mockLog
+            )
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'A' },
+            } as any)
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { employeeId: 'B' },
+            } as any)
+
+            await service.scoreFusionAccount(managed, [identity], MatchCandidateType.Identity)
+
+            expect(managed.fusionMatchesRaw).toHaveLength(0)
+            expect(reportSpy).not.toHaveBeenCalled()
+            reportSpy.mockRestore()
+        })
+
         it('stores match with full scores breakdown when fast path passes threshold', async () => {
             const service = new MatchingService(
                 { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
                 mockLog
             )
-            service.configureScoring({ captureBreakdown: false })
 
             const managed = FusionAccount.fromManagedAccount({
                 sourceId: 'src-1',
@@ -98,7 +121,6 @@ describe('MatchingService', () => {
                 { matchingConfigs: [mandatoryRule], fusionManualReviewScore: 80 } as any,
                 mockLog
             )
-            service.configureScoring({ captureBreakdown: false })
 
             const managed = FusionAccount.fromManagedAccount({
                 sourceId: 'src-1',
@@ -115,12 +137,11 @@ describe('MatchingService', () => {
             expect(managed.fusionMatchesRaw).toHaveLength(0)
         })
 
-        it('uses fast path for identity sweep when captureBreakdown is false', async () => {
+        it('uses numeric fast path for identity sweep', async () => {
             const service = new MatchingService(
                 { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
                 mockLog
             )
-            service.configureScoring({ captureBreakdown: false })
             const fastPathSpy = vi.spyOn(service as any, 'evaluateCombinedScorePass')
 
             const managed = FusionAccount.fromManagedAccount({
@@ -138,35 +159,11 @@ describe('MatchingService', () => {
             expect(fastPathSpy).toHaveBeenCalledTimes(1)
         })
 
-        it('skips fast path when captureBreakdown is true', async () => {
+        it('skips fast path for deferred candidates', async () => {
             const service = new MatchingService(
                 { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
                 mockLog
             )
-            service.configureScoring({ captureBreakdown: true })
-            const fastPathSpy = vi.spyOn(service as any, 'evaluateCombinedScorePass')
-
-            const managed = FusionAccount.fromManagedAccount({
-                sourceId: 'src-1',
-                nativeIdentity: 'acc-1',
-                attributes: { employeeId: 'A' },
-            } as any)
-            const identity = FusionAccount.fromIdentity({
-                id: 'id-1',
-                attributes: { employeeId: 'B' },
-            } as any)
-
-            await service.scoreFusionAccount(managed, [identity], MatchCandidateType.Identity)
-
-            expect(fastPathSpy).not.toHaveBeenCalled()
-        })
-
-        it('skips fast path for deferred candidates even when captureBreakdown is false', async () => {
-            const service = new MatchingService(
-                { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
-                mockLog
-            )
-            service.configureScoring({ captureBreakdown: false })
             const fastPathSpy = vi.spyOn(service as any, 'evaluateCombinedScorePass')
 
             const managed = FusionAccount.fromManagedAccount({
@@ -182,6 +179,135 @@ describe('MatchingService', () => {
             await service.scoreFusionAccount(managed, [identity], MatchCandidateType.Deferred)
 
             expect(fastPathSpy).not.toHaveBeenCalled()
+        })
+
+        it('invokes each configured scorer once on a passing identity comparison', async () => {
+            const binarySpy = vi.spyOn(scoringHelpers, 'scoreBinaryNumeric')
+            const lig3Spy = vi.spyOn(scoringHelpers, 'scoreLIG3NormalizedNumeric')
+            const rules = [
+                { attribute: 'employeeId', algorithm: 'binary' as const, fusionScore: 100, mandatory: false },
+                {
+                    attribute: 'displayName',
+                    algorithm: 'lig3' as const,
+                    fusionScore: 50,
+                    mandatory: false,
+                },
+            ]
+            const service = new MatchingService(
+                { matchingConfigs: rules, fusionManualReviewScore: 50 } as any,
+                mockLog
+            )
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'E123', displayName: 'Jane Doe' },
+            } as any)
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                name: 'Jane Doe',
+                attributes: { employeeId: 'E123', displayName: 'Jane Doe' },
+            } as any)
+
+            await service.scoreFusionAccount(managed, [identity], MatchCandidateType.Identity)
+
+            expect(managed.fusionMatchesRaw).toHaveLength(1)
+            expect(binarySpy).toHaveBeenCalledTimes(1)
+            expect(lig3Spy).toHaveBeenCalledTimes(1)
+            binarySpy.mockRestore()
+            lig3Spy.mockRestore()
+        })
+
+        it('reconstructs golden scores for missing-value, below-threshold, and LIG3 upper-bound skips', async () => {
+            const rules = [
+                { attribute: 'email', algorithm: 'binary' as const, fusionScore: 80, mandatory: false },
+                {
+                    attribute: 'department',
+                    algorithm: 'binary' as const,
+                    fusionScore: 100,
+                    mandatory: false,
+                    skipMatchIfThresholdNotMet: true,
+                },
+                { attribute: 'displayName', algorithm: 'lig3' as const, fusionScore: 80, mandatory: false },
+                { attribute: 'employeeId', algorithm: 'binary' as const, fusionScore: 100, mandatory: false },
+            ]
+            const service = new MatchingService(
+                { matchingConfigs: rules, fusionManualReviewScore: 80 } as any,
+                mockLog
+            )
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { department: 'Eng', displayName: 'ab', employeeId: 'E123' },
+            } as any)
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                name: 'Jane Doe',
+                attributes: { email: 'jane@example.com', department: 'Sales', displayName: 'abcdefgh', employeeId: 'E123' },
+            } as any)
+
+            await service.scoreFusionAccount(managed, [identity], MatchCandidateType.Identity)
+
+            expect(managed.fusionMatchesRaw).toHaveLength(1)
+            expect(managed.fusionMatchesRaw[0].scores).toEqual([
+                {
+                    attribute: 'email',
+                    algorithm: 'binary',
+                    fusionScore: 80,
+                    mandatory: false,
+                    skipMatchIfMissing: undefined,
+                    skipMatchIfThresholdNotMet: undefined,
+                    score: 0,
+                    isMatch: false,
+                    skipped: true,
+                    comment: 'Rule skipped (missing value on one or both sides)',
+                },
+                {
+                    attribute: 'department',
+                    algorithm: 'binary',
+                    fusionScore: 100,
+                    mandatory: false,
+                    skipMatchIfMissing: undefined,
+                    skipMatchIfThresholdNotMet: true,
+                    score: 0,
+                    isMatch: false,
+                    skipped: true,
+                    comment: 'Rule skipped (score below threshold)',
+                },
+                {
+                    attribute: 'displayName',
+                    algorithm: 'lig3',
+                    fusionScore: 80,
+                    mandatory: false,
+                    skipMatchIfMissing: undefined,
+                    skipMatchIfThresholdNotMet: undefined,
+                    score: 0,
+                    isMatch: false,
+                    skipped: true,
+                    comment: 'Length ratio upper bound below threshold',
+                },
+                {
+                    attribute: 'employeeId',
+                    algorithm: 'binary',
+                    fusionScore: 100,
+                    mandatory: false,
+                    skipMatchIfMissing: undefined,
+                    skipMatchIfThresholdNotMet: undefined,
+                    score: 100,
+                    isMatch: true,
+                    weightedScore: 100,
+                },
+                {
+                    attribute: COMBINED_SCORE_ROW_ATTRIBUTE,
+                    algorithm: 'weighted-mean',
+                    fusionScore: 80,
+                    mandatory: true,
+                    score: 100,
+                    isMatch: true,
+                    comment: 'Combined score meets minimum threshold',
+                },
+            ])
         })
     })
 
@@ -305,7 +431,6 @@ describe('MatchingService', () => {
             vi.mocked(doubleMetaphone).mockClear()
             const run = new FusionRun(mockLog)
             const service = new MatchingService(nameMatcherConfig, mockLog, run)
-            service.configureScoring({ captureBreakdown: true })
 
             const managed = FusionAccount.fromManagedAccount({
                 sourceId: 'src-1',
@@ -325,14 +450,20 @@ describe('MatchingService', () => {
 
             const distinctTokens = new Set(['alice', 'smith', 'jones', 'brown'])
             expect(doubleMetaphone).toHaveBeenCalledTimes(distinctTokens.size)
+            expect(run.nameMatcherTokenCache.size).toBe(3)
+            expect(run.nameMatcherTokenCache.get('alice smith')).toEqual(['alice', 'smith'])
+            expect(run.nameMatcherTokenCache.get('alice jones')).toEqual(['alice', 'jones'])
+            expect(run.nameMatcherTokenCache.get('alice brown')).toEqual(['alice', 'brown'])
+
+            await service.scoreFusionAccount(managed, [identity1, identity2])
+            expect(run.nameMatcherTokenCache.size).toBe(3)
+            expect(doubleMetaphone).toHaveBeenCalledTimes(distinctTokens.size)
         })
 
         it('multi-identity sweep with name-matcher rule produces same scores as before caching', async () => {
             const cachedRun = new FusionRun(mockLog)
             const cachedService = new MatchingService(nameMatcherConfig, mockLog, cachedRun)
             const uncachedService = new MatchingService(nameMatcherConfig, mockLog)
-            cachedService.configureScoring({ captureBreakdown: true })
-            uncachedService.configureScoring({ captureBreakdown: true })
 
             const managedAttrs = { displayName: 'Alice Smith' }
             const identitySpecs = [

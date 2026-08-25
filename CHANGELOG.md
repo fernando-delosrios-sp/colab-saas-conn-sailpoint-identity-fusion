@@ -10,6 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### 🔧 Improvements
 
+- **Identity match scoring allocates less work on non-matches** — Comparing a managed account to existing identities no longer builds a per-rule score breakdown unless the pair meets the review threshold. Passing matches still store the same per-rule scores (including skipped rules). Aggregation configuration is unchanged.
 - **Name-matcher scoring reuses token splits and phonetic codes** — During an aggregation, each distinct name token is split and Double-Metaphone encoded once instead of once per identity comparison. Match scores and thresholds are unchanged.
 - **Always recalculate** replaces **Refresh on each aggregation?** — The Normal definition toggle label and help now state that the expression re-runs even when managed source data is unchanged. The stored `refresh` config key is unchanged.
 - **Refresh logs an aggregate workload summary** — After Refresh processes Fusion accounts, one `DETAIL refresh workload` line reports account count and millisecond totals for prelude, managed-account layer, unique registration, Map, Normal Define, correlation, and finalize, plus definition and queue-scan counters. Use it to compare before/after Refresh optimizations. Aggregation output is unchanged.

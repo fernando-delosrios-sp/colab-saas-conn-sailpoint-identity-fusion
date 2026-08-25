@@ -1324,7 +1324,6 @@ export class FusionService {
         this.matchingService.buildTrigramIndex(this.run.allFusionIdentities)
 
         this.buildLinkedAccountKeyIndex()
-        this.matchingService.configureScoring({ captureBreakdown: this.shouldCaptureManagedAccountReportData() })
     }
 
     /** Correlated account sweep: resolve linked/correlated managed accounts before uncorrelated scoring. */

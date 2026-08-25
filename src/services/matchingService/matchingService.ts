@@ -6,20 +6,29 @@ import { resolveFusionMaxCandidatesForForm } from '../../data/config'
 import {
     countIdentityCandidateFusionMatches,
 } from './matchingHelpers'
-import { FusionMatch, MatchCandidateType, ScoreReport, ScoringOptions } from './types'
+import { MatchCandidateType, RuleScoreNumeric, ScoreReport } from './types'
 import {
+    makeScoreReport,
     normalizeLIG3,
     lig3UpperBound,
     lig3UpperBoundSkipIfUnreachable,
     scoreBinary,
+    scoreBinaryNumeric,
     scoreCustomVelocity,
+    scoreCustomVelocityNumeric,
     scoreDice,
+    scoreDiceNumeric,
     scoreDoubleMetaphone,
+    scoreDoubleMetaphoneNumeric,
     scoreJaroWinkler,
+    scoreJaroWinklerNumeric,
     scoreLIG3,
     scoreLIG3Normalized,
+    scoreLIG3NormalizedNumeric,
     scoreNameMatcher,
+    scoreNameMatcherNumeric,
     scoreNameMatcherNormalized,
+    scoreNameMatcherNormalizedNumeric,
 } from './scoringHelpers'
 import { normalizeName as normalizeNameForMatcher } from './nameMatching'
 import { buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
@@ -46,6 +55,74 @@ function makeSkippedReport(matching: MatchingConfig, comment: string): ScoreRepo
     }
 }
 
+
+const MISSING_SKIP_COMMENT = 'Rule skipped (missing value on one or both sides)'
+const LIG3_BOUND_SKIP_COMMENT = 'Length ratio upper bound below threshold'
+const BELOW_THRESHOLD_SKIP_COMMENT = 'Rule skipped (score below threshold)'
+
+function skipCommentForNumeric(numeric: RuleScoreNumeric): string | undefined {
+    if (numeric.skipReason === 'missing') return MISSING_SKIP_COMMENT
+    if (numeric.skipReason === 'lig3-bound') return LIG3_BOUND_SKIP_COMMENT
+    if (numeric.skipReason === 'below-threshold') return BELOW_THRESHOLD_SKIP_COMMENT
+    return numeric.comment
+}
+
+/**
+ * Rebuild the full ScoreReport[] (per-rule rows + combined row) from numeric totals
+ * without re-invoking scorers. Used after an identity fast-path pass.
+ */
+function materializeScoreReportsFromNumeric(
+    ruleResults: readonly RuleScoreNumeric[],
+    matchingConfigs: MatchingConfig[],
+    fusionManualReviewScore: number
+): ScoreReport[] {
+    const scores: ScoreReport[] = []
+    let weightedSum = 0
+    let weightTotal = 0
+    let hasFailedMandatory = false
+
+    for (let i = 0; i < matchingConfigs.length; i++) {
+        const matching = matchingConfigs[i]
+        const numeric = ruleResults[i]
+        const comment = skipCommentForNumeric(numeric)
+        scores.push(
+            makeScoreReport(matching, numeric.score, numeric.isMatch, comment, numeric.skipped ? true : undefined)
+        )
+        if (!numeric.skipped) {
+            const w = MatchingService.blendWeight(matching.fusionScore)
+            weightedSum += w * numeric.score
+            weightTotal += w
+        }
+        if (matching.mandatory && !numeric.skipped && !numeric.isMatch) {
+            hasFailedMandatory = true
+        }
+    }
+
+    if (weightTotal > 0) {
+        for (const s of scores) {
+            if (s.skipped) continue
+            const w = MatchingService.blendWeight(s.fusionScore)
+            s.weightedScore = Math.round((w / weightTotal) * s.score * 100) / 100
+        }
+    }
+
+    const { combinedScore, hasContributing, combinedPasses } = evaluateCombinedScoreOutcome(
+        weightedSum,
+        weightTotal,
+        fusionManualReviewScore,
+        hasFailedMandatory
+    )
+    scores.push({
+        attribute: COMBINED_SCORE_ROW_ATTRIBUTE,
+        algorithm: WEIGHTED_MEAN_ALGORITHM,
+        fusionScore: fusionManualReviewScore,
+        mandatory: true,
+        score: Math.round(combinedScore * 100) / 100,
+        isMatch: combinedPasses,
+        comment: combinedScoreComment(combinedPasses, hasFailedMandatory, hasContributing),
+    })
+    return scores
+}
 
 const MANDATORY_FAIL_SKIP_COMMENT = 'Rule skipped (mandatory attribute failed)'
 const THRESHOLD_SKIP_COMMENT = 'Rule skipped (combined score cannot reach threshold)'
@@ -98,14 +175,6 @@ const SCORING_IDENTITY_YIELD_INTERVAL = 100
 /** Attribute label on the synthetic combined score row in reports and forms. */
 export const COMBINED_SCORE_ROW_ATTRIBUTE = 'Combined score'
 
-/** Minimal rule outcome for fast-path combined score evaluation (no ScoreReport retention). */
-type RuleScoreTotals = {
-    score: number
-    isMatch: boolean
-    skipped: boolean
-    fusionScore?: number
-}
-
 /**
  * Service for calculating and managing similarity scores for identity matching.
  * Handles score calculation, threshold checking, and score formatting.
@@ -116,7 +185,8 @@ export class MatchingService {
     private readonly fusionEnableAutoMerge: boolean
     private readonly fusionMaxIdentityMatchCandidates: number
     private readonly fusionScoreMap: Map<string, number>
-    private scoringOptions: ScoringOptions = {}
+    /** Reused per identity comparison so pass reconstruction does not allocate a new array each time. */
+    private readonly ruleNumericScratch: RuleScoreNumeric[] = []
 
     /**
      * @param config - Fusion configuration containing matching rules and score thresholds
@@ -129,15 +199,6 @@ export class MatchingService {
         this.fusionEnableAutoMerge = config.fusionEnableAutoMerge ?? false
         this.fusionMaxIdentityMatchCandidates = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
         this.fusionScoreMap = config.fusionScoreMap ?? new Map()
-    }
-
-    /**
-     * Run-scoped scoring options set once per aggregation run.
-     * Deferred candidates always use full breakdown regardless of `captureBreakdown`
-     * (`candidateType !== Identity` in `scoreFusionAccount`).
-     */
-    public configureScoring(options: ScoringOptions): void {
-        this.scoringOptions = options
     }
 
     /**
@@ -351,7 +412,7 @@ export class MatchingService {
                 ? (maxIdentityMatches ?? this.fusionMaxIdentityMatchCandidates)
                 : undefined
 
-        const captureBreakdown = Boolean(this.scoringOptions.captureBreakdown) || candidateType !== MatchCandidateType.Identity
+        const useFullBreakdown = candidateType !== MatchCandidateType.Identity
 
         let compared = 0
         // Counter-based yielding avoids modulo on every iteration; reset after each yield.
@@ -363,7 +424,7 @@ export class MatchingService {
             ) {
                 continue
             }
-            this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType, captureBreakdown)
+            this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType, useFullBreakdown)
             compared += 1
             if (earlyExitOnExactMatch) {
                 const matches = fusionAccount.fusionMatchesRaw
@@ -440,9 +501,9 @@ export class MatchingService {
      * Compares two fusion accounts across all configured matching rules and records
      * a match if the weighted combined score and mandatory rules pass.
      *
-     * When `captureBreakdown` is false (identity sweep, no report capture), uses a fast path
-     * that avoids ScoreReport[] allocation on non-matches. Matches are re-scored with full
-     * breakdown since they are rare compared to non-matches.
+     * Identity candidates use a numeric fast path (no per-rule ScoreReport on non-matches).
+     * Threshold passes reconstruct the stored `scores` breakdown without re-scoring.
+     * Deferred candidates always build a full ScoreReport[] breakdown.
      *
      * @param fusionAccount - The candidate account being evaluated
      * @param fusionIdentity - The existing identity to compare against
@@ -451,13 +512,18 @@ export class MatchingService {
         fusionAccount: FusionAccount,
         fusionIdentity: FusionAccount,
         candidateType: MatchCandidateType,
-        captureBreakdown: boolean
+        useFullBreakdown: boolean
     ): void {
-        if (!captureBreakdown) {
+        if (!useFullBreakdown) {
             if (!this.evaluateCombinedScorePass(fusionAccount, fusionIdentity)) {
                 return
             }
-            this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType, true)
+            const scores = materializeScoreReportsFromNumeric(
+                this.ruleNumericScratch,
+                this.matchingConfigs,
+                this.fusionManualReviewScore
+            )
+            this.storeThresholdPassingMatch(fusionAccount, fusionIdentity, candidateType, scores)
             return
         }
 
@@ -551,18 +617,24 @@ export class MatchingService {
         }
         scores.push(combinedReport)
 
-        const identityId = fusionIdentity.identityId ?? ''
-        const identityName = this.getIdentityDisplayLabel(fusionIdentity)
-        const fusionMatch: FusionMatch = {
+        if (combinedPasses) {
+            this.storeThresholdPassingMatch(fusionAccount, fusionIdentity, candidateType, scores)
+        }
+    }
+
+    private storeThresholdPassingMatch(
+        fusionAccount: FusionAccount,
+        fusionIdentity: FusionAccount,
+        candidateType: MatchCandidateType,
+        scores: ScoreReport[]
+    ): void {
+        fusionAccount.layers.addFusionMatch({
             fusionIdentity,
-            identityId,
-            identityName,
+            identityId: fusionIdentity.identityId ?? '',
+            identityName: this.getIdentityDisplayLabel(fusionIdentity),
             candidateType,
             scores,
-        }
-        if (combinedPasses) {
-            fusionAccount.layers.addFusionMatch(fusionMatch)
-        }
+        })
     }
 
     private evaluateCombinedScoreRuleAtIndex(
@@ -572,6 +644,7 @@ export class MatchingService {
         weightedSum: number,
         weightTotal: number
     ): {
+        numeric: RuleScoreNumeric
         skipped: boolean
         hasFailedMandatory: boolean
         shouldBreak: boolean
@@ -586,7 +659,14 @@ export class MatchingService {
             this.isMissingMatchValue(accountAttribute) || this.isMissingMatchValue(identityAttribute)
 
         if (skipForMissing && hasMissingValue) {
-            return { skipped: true, hasFailedMandatory: false, shouldBreak: false, weightedSum, weightTotal }
+            return {
+                numeric: { score: 0, isMatch: false, skipped: true, skipReason: 'missing' },
+                skipped: true,
+                hasFailedMandatory: false,
+                shouldBreak: false,
+                weightedSum,
+                weightTotal,
+            }
         }
 
         if (
@@ -598,10 +678,11 @@ export class MatchingService {
                 identityAttribute
             )
         ) {
+            const numeric: RuleScoreNumeric = { score: 0, isMatch: false, skipped: true, skipReason: 'lig3-bound' }
             if (matching.mandatory) {
-                return { skipped: false, hasFailedMandatory: true, shouldBreak: true, weightedSum, weightTotal }
+                return { numeric, skipped: false, hasFailedMandatory: true, shouldBreak: true, weightedSum, weightTotal }
             }
-            return { skipped: true, hasFailedMandatory: false, shouldBreak: false, weightedSum, weightTotal }
+            return { numeric, skipped: true, hasFailedMandatory: false, shouldBreak: false, weightedSum, weightTotal }
         }
 
         const ruleTotals = this.evaluateRuleTotals(
@@ -614,12 +695,13 @@ export class MatchingService {
         let nextWeightedSum = weightedSum
         let nextWeightTotal = weightTotal
         if (!ruleTotals.skipped) {
-            const w = MatchingService.blendWeight(ruleTotals.fusionScore)
+            const w = MatchingService.blendWeight(matching.fusionScore)
             nextWeightedSum += w * ruleTotals.score
             nextWeightTotal += w
         }
         if (matching.mandatory && !ruleTotals.isMatch) {
             return {
+                numeric: ruleTotals,
                 skipped: false,
                 hasFailedMandatory: true,
                 shouldBreak: true,
@@ -637,6 +719,7 @@ export class MatchingService {
             ) < this.fusionManualReviewScore
 
         return {
+            numeric: ruleTotals,
             skipped: false,
             hasFailedMandatory: false,
             shouldBreak,
@@ -647,8 +730,10 @@ export class MatchingService {
 
     /**
      * Fast-path combined score evaluation without allocating score breakdown arrays.
+     * On pass, `ruleNumericScratch` holds one numeric result per configured rule.
      */
     private evaluateCombinedScorePass(fusionAccount: FusionAccount, fusionIdentity: FusionAccount): boolean {
+        this.ruleNumericScratch.length = 0
         let hasFailedMandatory = false
         let weightedSum = 0
         let weightTotal = 0
@@ -661,6 +746,7 @@ export class MatchingService {
                 weightedSum,
                 weightTotal
             )
+            this.ruleNumericScratch.push(result.numeric)
             if (result.skipped) {
                 continue
             }
@@ -708,8 +794,8 @@ export class MatchingService {
     }
 
     /**
-     * Rule totals for fast-path combined score evaluation. Scorer functions may allocate transient
-     * ScoreReport objects; this path does not retain them or build breakdown arrays.
+     * Rule totals for fast-path combined score evaluation. Uses numeric scorers only
+     * (no ScoreReport allocation).
      */
     private evaluateRuleTotals(
         fusionAccount: FusionAccount,
@@ -717,26 +803,21 @@ export class MatchingService {
         matching: MatchingConfig,
         accountAttribute: unknown,
         identityAttribute: unknown
-    ): RuleScoreTotals {
-        const scoreReport = this.dispatchRuleScore(
+    ): RuleScoreNumeric {
+        const numeric = this.dispatchRuleScoreNumeric(
             fusionAccount,
             fusionIdentity,
             matching,
             accountAttribute,
             identityAttribute
         )
-        if (!scoreReport.skipped && effectiveSkipMatchIfThresholdNotMet(matching) && !scoreReport.isMatch) {
-            return { score: 0, isMatch: false, skipped: true, fusionScore: matching.fusionScore }
+        if (!numeric.skipped && effectiveSkipMatchIfThresholdNotMet(matching) && !numeric.isMatch) {
+            return { score: 0, isMatch: false, skipped: true, skipReason: 'below-threshold' }
         }
-        return {
-            score: scoreReport.score,
-            isMatch: scoreReport.isMatch,
-            skipped: scoreReport.skipped ?? false,
-            fusionScore: scoreReport.fusionScore,
-        }
+        return numeric
     }
 
-    /** Shared algorithm dispatch for full and fast comparison paths. */
+    /** Shared algorithm dispatch for the deferred (full breakdown) comparison path. */
     private dispatchRuleScore(
         fusionAccount: FusionAccount,
         fusionIdentity: FusionAccount,
@@ -772,12 +853,58 @@ export class MatchingService {
                 normAccount,
                 normIdentity,
                 matching,
-                this.run
-                    ? { tokenCache: this.run.nameMatcherTokenCache, phoneticCache: this.run.nameMatcherPhoneticCache }
-                    : undefined
+                this.run?.nameMatcherTokenCache,
+                this.run?.nameMatcherPhoneticCache
             )
         }
         return this.scoreAttribute(
+            (accountAttribute ?? '').toString(),
+            (identityAttribute ?? '').toString(),
+            matching
+        )
+    }
+
+    /** Numeric algorithm dispatch for the identity fast path. */
+    private dispatchRuleScoreNumeric(
+        fusionAccount: FusionAccount,
+        fusionIdentity: FusionAccount,
+        matching: MatchingConfig,
+        accountAttribute: unknown,
+        identityAttribute: unknown
+    ): RuleScoreNumeric {
+        if (matching.algorithm === 'lig3') {
+            const normAccount = this.getNormalized(
+                fusionAccount,
+                matching.attribute,
+                (accountAttribute ?? '').toString()
+            )
+            const normIdentity = this.getNormalized(
+                fusionIdentity,
+                matching.attribute,
+                (identityAttribute ?? '').toString()
+            )
+            return scoreLIG3NormalizedNumeric(normAccount, normIdentity, matching)
+        }
+        if (matching.algorithm === 'name-matcher') {
+            const normAccount = this.getNameNormalized(
+                fusionAccount,
+                matching.attribute,
+                (accountAttribute ?? '').toString()
+            )
+            const normIdentity = this.getNameNormalized(
+                fusionIdentity,
+                matching.attribute,
+                (identityAttribute ?? '').toString()
+            )
+            return scoreNameMatcherNormalizedNumeric(
+                normAccount,
+                normIdentity,
+                matching,
+                this.run?.nameMatcherTokenCache,
+                this.run?.nameMatcherPhoneticCache
+            )
+        }
+        return this.scoreAttributeNumeric(
             (accountAttribute ?? '').toString(),
             (identityAttribute ?? '').toString(),
             matching
@@ -867,6 +994,34 @@ export class MatchingService {
                 return scoreCustomVelocity(accountAttribute, identityAttribute, matchingConfig)
         }
         return makeSkippedReport(matchingConfig, 'Unknown algorithm')
+    }
+
+    private scoreAttributeNumeric(
+        accountAttribute: string,
+        identityAttribute: string,
+        matchingConfig: MatchingConfig
+    ): RuleScoreNumeric {
+        switch (matchingConfig.algorithm) {
+            case 'name-matcher':
+                return scoreNameMatcherNumeric(accountAttribute, identityAttribute, matchingConfig)
+            case 'jaro-winkler':
+                return scoreJaroWinklerNumeric(accountAttribute, identityAttribute, matchingConfig)
+            case 'dice':
+                return scoreDiceNumeric(accountAttribute, identityAttribute, matchingConfig)
+            case 'double-metaphone':
+                return scoreDoubleMetaphoneNumeric(accountAttribute, identityAttribute, matchingConfig)
+            case 'lig3':
+                return scoreLIG3NormalizedNumeric(
+                    normalizeLIG3(accountAttribute),
+                    normalizeLIG3(identityAttribute),
+                    matchingConfig
+                )
+            case 'binary':
+                return scoreBinaryNumeric(accountAttribute, identityAttribute, matchingConfig)
+            case 'custom':
+                return scoreCustomVelocityNumeric(accountAttribute, identityAttribute, matchingConfig)
+        }
+        return { score: 0, isMatch: false, skipped: true, comment: 'Unknown algorithm' }
     }
 
     /**

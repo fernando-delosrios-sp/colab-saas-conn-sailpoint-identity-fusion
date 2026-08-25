@@ -12,10 +12,13 @@ export enum MatchCandidateType {
     Deferred = 'deferred',
 }
 
-/** Run-scoped scoring behavior for identity-candidate comparisons. */
-export interface ScoringOptions {
-    /** When true, identity-sweep comparisons always build full score breakdowns (e.g. report capture). */
-    captureBreakdown?: boolean
+/** Numeric rule outcome for identity fast-path scoring (no ScoreReport allocation). */
+export type RuleScoreNumeric = {
+    score: number
+    isMatch: boolean
+    skipped: boolean
+    skipReason?: 'missing' | 'lig3-bound' | 'below-threshold'
+    comment?: string
 }
 
 /**
