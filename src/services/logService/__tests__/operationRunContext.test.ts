@@ -261,10 +261,14 @@ describe('LogService operation helpers', () => {
         log.phaseStart(4, 'Process')
         log.stepStart('uncorrelated-sweep', { accounts: 10 })
         log.setProgress(3, 10, 'analyzed')
+        log.setFetchPopulationProgress('managed-accounts', 4, 20)
 
         expect(mockLogger.info).toHaveBeenCalledWith('[accountList] PHASE 4 Process START')
         expect(mockLogger.info).toHaveBeenCalledWith('[accountList] STEP uncorrelated-sweep START accounts=10')
         expect(ctx.progress).toEqual({ done: 3, total: 10, unit: 'analyzed' })
+        expect(ctx.getFetchPopulationProgress()).toEqual({
+            'managed-accounts': { done: 4, total: 20 },
+        })
     })
 
     it('emits PHASE END with correlation detail suffix', () => {
@@ -295,10 +299,4 @@ describe('LogService operation helpers', () => {
         ctx.incrementRefreshAccountsProcessed()
         expect(log.flushRefreshMetricsSummary()).toEqual(expect.objectContaining({ accounts: 1, mapMs: 1 }))
     })
-
 })
-
-
-
-
-

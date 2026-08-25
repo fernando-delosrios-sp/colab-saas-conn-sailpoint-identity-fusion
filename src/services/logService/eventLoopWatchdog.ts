@@ -1,6 +1,6 @@
 import { writeSync } from 'fs'
 import type { LogService } from './logService'
-import type { OperationRunContext } from './operationRunContext'
+import { FETCH_POPULATIONS, type OperationRunContext } from './operationRunContext'
 
 /** Sampling cadence — bounds how precisely a blocked window can be attributed. */
 const SAMPLE_INTERVAL_MS = 1_000
@@ -30,14 +30,24 @@ function writeUnbuffered(line: string): void {
  * Summarizes where the pipeline stood when a sample was taken.
  *
  * @param runContext - Run context of the operation, or null before one is attached.
- * @returns Compact `phase`/`step`/`progress` label, or undefined when nothing is known.
+ * @returns Compact `phase`/`step`/population-or-progress label, or undefined when nothing is known.
  */
 export function formatRunContextLabel(runContext: OperationRunContext | null | undefined): string | undefined {
     if (!runContext) return undefined
     const parts: string[] = []
     if (runContext.phase) parts.push(`phase=${runContext.phase}`)
     if (runContext.step) parts.push(`step=${runContext.step}`)
-    if (runContext.progress) parts.push(`progress=${runContext.progress.done}/${runContext.progress.total}`)
+    if (runContext.phase === 'Fetch') {
+        const fetchProgress = runContext.getFetchPopulationProgress()
+        for (const population of FETCH_POPULATIONS) {
+            const progress = fetchProgress[population]
+            if (progress && (progress.done > 0 || progress.total > 0)) {
+                parts.push(`${population}=${progress.done}/${progress.total}`)
+            }
+        }
+    } else if (runContext.progress) {
+        parts.push(`progress=${runContext.progress.done}/${runContext.progress.total}`)
+    }
     return parts.length > 0 ? parts.join(' ') : undefined
 }
 
@@ -52,11 +62,7 @@ function formatBlockedSeconds(blockedMs: number): string {
  * @param before - Context recorded at the last healthy sample.
  * @param after - Context recorded once sampling resumed.
  */
-export function formatBlockedWarning(
-    blockedMs: number,
-    before: string | undefined,
-    after: string | undefined
-): string {
+export function formatBlockedWarning(blockedMs: number, before: string | undefined, after: string | undefined): string {
     const parts = [`WARN EVENT_LOOP blocked ${formatBlockedSeconds(blockedMs)}`]
     if (before) parts.push(`before=${before}`)
     if (after) parts.push(`now=${after}`)

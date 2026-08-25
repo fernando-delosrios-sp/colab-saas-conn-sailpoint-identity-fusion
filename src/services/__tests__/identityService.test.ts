@@ -29,7 +29,13 @@ function makeClient(searchResultsByQuery: Record<string, IdentityDocument[]> = {
             }
             return _fn({ search: { searchPost: vi.fn() } })
         }),
-        paginateSearchApiGenerator: vi.fn(async function* (search: any, _priority, _context, _abortSignal, onPageProgress) {
+        paginateSearchApiGenerator: vi.fn(async function* (
+            search: any,
+            _priority,
+            _context,
+            _abortSignal,
+            onPageProgress
+        ) {
             const items = searchResultsByQuery[search?.query?.query ?? ''] ?? []
             const pageSize = 250
             for (let start = 0; start < items.length; start += pageSize) {
@@ -49,6 +55,7 @@ function makeLog(): LogService {
         error: vi.fn(),
         detail: vi.fn(),
         setProgress: vi.fn(),
+        setFetchPopulationProgress: vi.fn(),
         assert: vi.fn(),
         getLogLevel: vi.fn().mockReturnValue('info'),
         recordCorrelationActivity: vi.fn(),
@@ -72,15 +79,23 @@ function makeConfig(overrides: Partial<FusionConfig> = {}): FusionConfig {
     } as unknown as FusionConfig
 }
 
-function makeService(overrides: {
-    config?: Partial<FusionConfig>
-    searchResultsByQuery?: Record<string, IdentityDocument[]>
-} = {}): { service: IdentityService; client: ClientServiceStub; log: LogService } {
+function makeService(
+    overrides: {
+        config?: Partial<FusionConfig>
+        searchResultsByQuery?: Record<string, IdentityDocument[]>
+    } = {}
+): { service: IdentityService; client: ClientServiceStub; log: LogService } {
     const log = makeLog()
     const client = makeClient(overrides.searchResultsByQuery)
     const sources = makeSources()
     const config = makeConfig(overrides.config)
-    const service = new IdentityService(config, log, client as unknown as ClientService, sources as unknown as SourceService, new FusionRun())
+    const service = new IdentityService(
+        config,
+        log,
+        client as unknown as ClientService,
+        sources as unknown as SourceService,
+        new FusionRun()
+    )
     return { service, client, log }
 }
 
@@ -98,30 +113,35 @@ describe('IdentityService.hasIdentityInScope', () => {
 })
 
 describe('IdentityService.fetchIdentities with identityScopeQuery', () => {
-    it('yields during large identity bulk ingest and reports ingested progress', async () => {
+    it('yields during large identity bulk ingest and reports identity population progress', async () => {
         const identities = Array.from({ length: 501 }, (_, index) => makeIdentity(`id-${index}`))
         const { service, log, client } = makeService({
             config: { identityScopeQuery: '*' },
             searchResultsByQuery: { '*': identities },
         })
-        ;(client.paginateSearchApiGenerator as Mock).mockImplementation(
-            async function* (_search: any, _priority: any, _context: any, _abortSignal: any, onPageProgress: any) {
-                onPageProgress?.(identities.length, identities.length)
-                yield identities
-            }
-        )
+        ;(client.paginateSearchApiGenerator as Mock).mockImplementation(async function* (
+            _search: any,
+            _priority: any,
+            _context: any,
+            _abortSignal: any,
+            onPageProgress: any
+        ) {
+            onPageProgress?.(identities.length, identities.length)
+            yield identities
+        })
         const setImmediateSpy = vi.spyOn(global, 'setImmediate')
 
         await service.fetchIdentities()
 
         expect(setImmediateSpy).toHaveBeenCalledTimes(3)
         expect(log.detail).toHaveBeenCalledWith({ action: 'ingesting identities', count: 501 })
-        expect(log.setProgress).toHaveBeenLastCalledWith(501, 501, 'ingested')
+        expect(log.setFetchPopulationProgress).toHaveBeenLastCalledWith('identities', 501, 501)
+        expect(log.setProgress).not.toHaveBeenCalled()
         expect(service.hasIdentityInScope('id-500')).toBe(true)
         setImmediateSpy.mockRestore()
     })
 
-    it('skips ingested progress for an empty identity result', async () => {
+    it('omits identity population progress for an empty result', async () => {
         const { service, log } = makeService({
             config: { identityScopeQuery: '*' },
             searchResultsByQuery: { '*': [] },
@@ -129,8 +149,23 @@ describe('IdentityService.fetchIdentities with identityScopeQuery', () => {
 
         await service.fetchIdentities()
 
-        expect(log.setProgress).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), 'ingested')
+        expect(log.setFetchPopulationProgress).not.toHaveBeenCalledWith(
+            'identities',
+            expect.anything(),
+            expect.anything()
+        )
         expect(log.detail).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'ingesting identities' }))
+    })
+
+    it('omits identity population progress when identity Fetch is skipped', async () => {
+        const { service, log } = makeService({
+            config: { includeIdentities: false },
+        })
+
+        await service.fetchIdentities()
+
+        expect(log.setFetchPopulationProgress).not.toHaveBeenCalled()
+        expect(log.info).toHaveBeenCalledWith('Skipping identity fetch.')
     })
 
     it('marks identities returned by the scope query as in-scope', async () => {
@@ -295,7 +330,6 @@ describe('IdentityService.resolveOriginIdentityInScope', () => {
     })
 })
 
-
 describe('IdentityService.ensureIdentityById', () => {
     it('returns cached identity without API calls', async () => {
         const owner = makeIdentity('owner-cached')
@@ -330,15 +364,16 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
     it('marks hydrated additional ids as in-scope for the current aggregation', async () => {
         const owner = makeIdentity('owner-1')
         const { service, client } = makeService()
-        ;(client.call as Mock).mockImplementation(
-            async (_fn: any, policy: any) => {
-                const context = policy?.context ?? ''
-                if (context === 'IdentityService>fetchIdentityById searchPost' || context === 'IdentityService>hydrateMissingIdentitiesById searchPost') {
-                    return [owner]
-                }
-                return []
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            const context = policy?.context ?? ''
+            if (
+                context === 'IdentityService>fetchIdentityById searchPost' ||
+                context === 'IdentityService>hydrateMissingIdentitiesById searchPost'
+            ) {
+                return [owner]
             }
-        )
+            return []
+        })
 
         await service.fetchIdentities(['owner-1'])
 
@@ -359,15 +394,16 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
     it('does not mark a protected additional id as in-scope', async () => {
         const protectedOwner = makeIdentity('owner-protected', { protected: true })
         const { service, client } = makeService()
-        ;(client.call as Mock).mockImplementation(
-            async (_fn: any, policy: any) => {
-                const context = policy?.context ?? ''
-                if (context === 'IdentityService>fetchIdentityById searchPost' || context === 'IdentityService>hydrateMissingIdentitiesById searchPost') {
-                    return [protectedOwner]
-                }
-                return []
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            const context = policy?.context ?? ''
+            if (
+                context === 'IdentityService>fetchIdentityById searchPost' ||
+                context === 'IdentityService>hydrateMissingIdentitiesById searchPost'
+            ) {
+                return [protectedOwner]
             }
-        )
+            return []
+        })
 
         await service.fetchIdentities(['owner-protected'])
 
@@ -384,16 +420,17 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
                 'source.name:Employees': [scoped],
             },
         })
-        ;(client.call as Mock).mockImplementation(
-            async (_fn: any, policy: any) => {
-                const context = policy?.context ?? ''
-                const queryStr = policy?.paginate?.search?.query?.query ?? ''
-                if (context === 'IdentityService>fetchIdentityById searchPost' || context === 'IdentityService>hydrateMissingIdentitiesById searchPost') {
-                    return [owner]
-                }
-                return queryStr === 'source.name:Employees' ? [scoped] : []
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            const context = policy?.context ?? ''
+            const queryStr = policy?.paginate?.search?.query?.query ?? ''
+            if (
+                context === 'IdentityService>fetchIdentityById searchPost' ||
+                context === 'IdentityService>hydrateMissingIdentitiesById searchPost'
+            ) {
+                return [owner]
             }
-        )
+            return queryStr === 'source.name:Employees' ? [scoped] : []
+        })
 
         await service.fetchIdentities(['owner-1'])
 
@@ -404,15 +441,16 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
     it('skips empty / falsy additional ids', async () => {
         const owner = makeIdentity('owner-1')
         const { service, client } = makeService()
-        ;(client.call as Mock).mockImplementation(
-            async (_fn: any, policy: any) => {
-                const context = policy?.context ?? ''
-                if (context === 'IdentityService>fetchIdentityById searchPost' || context === 'IdentityService>hydrateMissingIdentitiesById searchPost') {
-                    return [owner]
-                }
-                return []
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            const context = policy?.context ?? ''
+            if (
+                context === 'IdentityService>fetchIdentityById searchPost' ||
+                context === 'IdentityService>hydrateMissingIdentitiesById searchPost'
+            ) {
+                return [owner]
             }
-        )
+            return []
+        })
 
         await service.fetchIdentities(['', 'owner-1', undefined as unknown as string])
 
@@ -490,5 +528,3 @@ describe('IdentityService.correlateAccounts', () => {
         expect(log.recordCorrelationActivity).toHaveBeenCalledWith({ kind: 'link', accounts: 1 })
     })
 })
-
-

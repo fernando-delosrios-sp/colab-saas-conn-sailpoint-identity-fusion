@@ -5,19 +5,19 @@ Use this guide when you need to **know whether an aggregation is healthy** and *
 **Configuration reference:** [Advanced Settings — External Settings](../../configuration/advanced.md#external-settings) · **Log format reference:** [Observability and log format](../../reference/observability.md) · **Phase map:** [Config to account-list phases](../../reference/config-to-phases.md)
 
 !!! note "Didactic guide"
-    This page explains **how and when** to configure external logging and interpret key log lines. For full log segment formats, grep targets, and field definitions, see [Observability and log format](../../reference/observability.md).
+This page explains **how and when** to configure external logging and interpret key log lines. For full log segment formats, grep targets, and field definitions, see [Observability and log format](../../reference/observability.md).
 
 ---
 
 ## When you need this
 
-| Situation | What to do |
-| --- | --- |
-| Production aggregation running for hours | Enable external logging; watch `STATUS` heartbeats and `PHASE` boundaries |
-| Aggregation appears stuck | Check for `WARN STALL`; compare `api=` queue segment in consecutive `STATUS` lines |
-| Match or correlation counts look wrong | Grep `EVENT_SUMMARY` for interval deltas |
-| Proxy deployment | Enable disk logging on the proxy server; ISC client does not ship logs externally |
-| Splunk, Datadog, or custom HTTP receiver | Enable direct-mode HTTP POST logging from ISC |
+| Situation                                | What to do                                                                         |
+| ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| Production aggregation running for hours | Enable external logging; watch `STATUS` heartbeats and `PHASE` boundaries          |
+| Aggregation appears stuck                | Check for `WARN STALL`; compare `api=` queue segment in consecutive `STATUS` lines |
+| Match or correlation counts look wrong   | Grep `EVENT_SUMMARY` for interval deltas                                           |
+| Proxy deployment                         | Enable disk logging on the proxy server; ISC client does not ship logs externally  |
+| Splunk, Datadog, or custom HTTP receiver | Enable direct-mode HTTP POST logging from ISC                                      |
 
 ---
 
@@ -25,11 +25,11 @@ Use this guide when you need to **know whether an aggregation is healthy** and *
 
 External logging routing depends on connector role:
 
-| Role | Behavior |
-| --- | --- |
-| **Direct ISC processing** | HTTP POST plain-text lines to **External target URL** |
-| **Proxy client (ISC)** | No external logging — proxy server owns logs |
-| **Proxy server** | Append lines to `LOG_FILE` or `logs/<tenant>/fusion-{YYYYMMDD}.log` |
+| Role                      | Behavior                                                            |
+| ------------------------- | ------------------------------------------------------------------- |
+| **Direct ISC processing** | HTTP POST plain-text lines to **External target URL**               |
+| **Proxy client (ISC)**    | No external logging — proxy server owns logs                        |
+| **Proxy server**          | Append lines to `LOG_FILE` or `logs/<tenant>/fusion-{YYYYMMDD}.log` |
 
 ### Direct ISC processing (no proxy)
 
@@ -73,16 +73,22 @@ During long `accountList` aggregations, the connector emits standardized prefixe
 
 ### What to watch
 
-| Prefix | Level | Use for |
-| --- | --- | --- |
-| `STATUS` | Info | Periodic heartbeat: phase, step, progress, `api=` queue segment, elapsed time |
-| `EVENT_SUMMARY` | Info | Interval deltas for review/merge matches, decisions, correlations, emails (not emitted for non-matched-only ticks; use `STATUS`) |
-| `PHASE` / `STEP` | Info | Pipeline boundary markers (`START` / `END elapsed=…`) |
-| `DETAIL` | Info | Milestones as `key=value` pairs |
-| `WARN STALL` | Warn | API queue idle for two consecutive heartbeat ticks |
-| `EPILOGUE` | Info | Report epilogue start/end |
+| Prefix           | Level | Use for                                                                                                                          |
+| ---------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `STATUS`         | Info  | Periodic heartbeat: phase, step, progress, `api=` queue segment, elapsed time                                                    |
+| `EVENT_SUMMARY`  | Info  | Interval deltas for review/merge matches, decisions, correlations, emails (not emitted for non-matched-only ticks; use `STATUS`) |
+| `PHASE` / `STEP` | Info  | Pipeline boundary markers (`START` / `END elapsed=…`)                                                                            |
+| `DETAIL`         | Info  | Milestones as `key=value` pairs                                                                                                  |
+| `WARN STALL`     | Warn  | API queue idle for two consecutive heartbeat ticks                                                                               |
+| `EPILOGUE`       | Info  | Report epilogue start/end                                                                                                        |
 
-**Example line:**
+**Fetch example:** independent counters show which inventories are advancing concurrently. The `identities` segment is omitted when identity Fetch is skipped.
+
+```
+14:28:15 [INFO]  [accountList] STATUS phase=Fetch fusion-accounts=42500/102407(Δ+8000/10s) managed-accounts=94044/158951(Δ+5250/10s) api=20a/12q/584c elapsed=2M 0S
+```
+
+**Refresh example:**
 
 ```
 14:30:45 [INFO]  [accountList] STATUS phase=Refresh progress=19032/102407 refreshed(Δ+192/10s) mem=1992.07MB(96%) elapsed=22M 14S
@@ -106,34 +112,34 @@ For match segments (`matches(...)`), decision segments (`decisions(...)`), corre
 
 ## Log levels
 
-| Level | What gets logged | Use when |
-| --- | --- | --- |
-| **Error** | Critical errors only | Production; minimal volume |
-| **Warn** | Errors + warnings | Production; catch issues |
-| **Info** | Standard operational messages | Production monitoring (recommended) |
-| **Debug** | All logs including debug details | Troubleshooting; high volume |
+| Level     | What gets logged                 | Use when                            |
+| --------- | -------------------------------- | ----------------------------------- |
+| **Error** | Critical errors only             | Production; minimal volume          |
+| **Warn**  | Errors + warnings                | Production; catch issues            |
+| **Info**  | Standard operational messages    | Production monitoring (recommended) |
+| **Debug** | All logs including debug details | Troubleshooting; high volume        |
 
 !!! note
-    Debug level generates high log volume; use temporarily. ISC debug logging (`spConnDebugLoggingEnabled`) is separate and does not replace external delivery.
+Debug level generates high log volume; use temporarily. ISC debug logging (`spConnDebugLoggingEnabled`) is separate and does not replace external delivery.
 
 ---
 
 ## Troubleshooting
 
-| Symptom | Check |
-| --- | --- |
-| No external logs (direct mode) | External processing + logging enabled; proxy mode off; URL accepts POST |
-| No external logs (proxy mode) | Server disk path (`LOG_FILE` or `logs/<tenant>/`); client intentionally noop |
-| Heartbeats stop mid-run | Aggregation may have failed; check ISC aggregation history and Error-level logs |
-| `WARN STALL` repeating | API queue bottleneck — see [Tune API performance](tune-api-performance.md) |
-| Phases skip or end early | Compare `PHASE N … END` lines against [config-to-phases](../../reference/config-to-phases.md) |
+| Symptom                        | Check                                                                                         |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| No external logs (direct mode) | External processing + logging enabled; proxy mode off; URL accepts POST                       |
+| No external logs (proxy mode)  | Server disk path (`LOG_FILE` or `logs/<tenant>/`); client intentionally noop                  |
+| Heartbeats stop mid-run        | Aggregation may have failed; check ISC aggregation history and Error-level logs               |
+| `WARN STALL` repeating         | API queue bottleneck — see [Tune API performance](tune-api-performance.md)                    |
+| Phases skip or end early       | Compare `PHASE N … END` lines against [config-to-phases](../../reference/config-to-phases.md) |
 
 ---
 
 ## Related guides
 
-| Topic | Guide |
-| --- | --- |
-| Queue tuning, heartbeat interval, HTTP 429 | [Tune API performance](tune-api-performance.md) |
-| Proxy deployment | [Run the connector via proxy](run-via-proxy.md) |
-| Common issues and recovery | [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md) |
+| Topic                                      | Guide                                                                   |
+| ------------------------------------------ | ----------------------------------------------------------------------- |
+| Queue tuning, heartbeat interval, HTTP 429 | [Tune API performance](tune-api-performance.md)                         |
+| Proxy deployment                           | [Run the connector via proxy](run-via-proxy.md)                         |
+| Common issues and recovery                 | [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md) |

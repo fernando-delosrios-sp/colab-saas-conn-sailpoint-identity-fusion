@@ -1,4 +1,11 @@
-import { AccountV2025 as Account, AccountsApiListAccountsRequest, Source, SchemaV2025, SourcesV2025ApiGetSourceSchemasRequest, OwnerDto } from 'sailpoint-api-client'
+import {
+    AccountV2025 as Account,
+    AccountsApiListAccountsRequest,
+    Source,
+    SchemaV2025,
+    SourcesV2025ApiGetSourceSchemasRequest,
+    OwnerDto,
+} from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceConfig } from '../../model/config'
 import { ClientService, QueuePriority } from '../clientService'
@@ -98,7 +105,10 @@ export class SourceService {
     private readonly sources: SourceConfig[]
     private readonly spConnectorInstanceId: string
     private readonly concurrencyCheckEnabled: boolean
-    private readonly accountJmespathFiltersBySourceName = new Map<string, import('./accountFilters').CompiledAccountJmespathFilter>()
+    private readonly accountJmespathFiltersBySourceName = new Map<
+        string,
+        import('./accountFilters').CompiledAccountJmespathFilter
+    >()
 
     // Sources configured for batch mode (`accountLimit` defined)
     private readonly batchLimitedSourceNames: Set<string>
@@ -360,10 +370,11 @@ export class SourceService {
         }
 
         const ctx = `SourceService>fetchAccountsBySourceId ${sourceInfo.name}`
-        const accounts = await this.client.call<any>(
-            (api: any, params: any) => api.accounts.listAccounts(params),
-            { paginate: { mode: 'sequential', baseParams: requestParameters as any }, priority: QueuePriority.HIGH, context: ctx }
-        )
+        const accounts = await this.client.call<any>((api: any, params: any) => api.accounts.listAccounts(params), {
+            paginate: { mode: 'sequential', baseParams: requestParameters as any },
+            priority: QueuePriority.HIGH,
+            context: ctx,
+        })
         if (!sourceInfo.isManaged) {
             return accounts
         }
@@ -394,16 +405,13 @@ export class SourceService {
         }
 
         const ctx = `SourceService>fetchAccountsBySourceIdGenerator ${sourceInfo.name}`
-        yield* this.client.call<any>(
-            (api: any, params: any) => api.accounts.listAccounts(params),
-            {
-                paginate: { mode: 'parallel', baseParams: requestParameters as any, limit },
-                priority: QueuePriority.HIGH,
-                context: ctx,
-                abortSignal,
-                onPageProgress,
-            }
-        )
+        yield* this.client.call<any>((api: any, params: any) => api.accounts.listAccounts(params), {
+            paginate: { mode: 'parallel', baseParams: requestParameters as any, limit },
+            priority: QueuePriority.HIGH,
+            context: ctx,
+            abortSignal,
+            onPageProgress,
+        })
     }
 
     /**
@@ -421,9 +429,8 @@ export class SourceService {
                 this.fusionSourceId,
                 undefined,
                 undefined,
-                (loaded, total) => {
+                (_loaded, total) => {
                     knownTotal = total
-                    this.log.setProgress(loaded, total ?? loaded, 'fetched')
                 }
             )) {
                 if (!ingestDetailLogged && knownTotal && knownTotal > 0) {
@@ -440,7 +447,7 @@ export class SourceService {
                     {
                         onProgress: (pageDone) => {
                             const done = pageStart + pageDone
-                            this.log.setProgress(done, knownTotal ?? done, 'ingested')
+                            this.log.setFetchPopulationProgress('fusion-accounts', done, knownTotal ?? done)
                         },
                     }
                 )
@@ -532,7 +539,11 @@ export class SourceService {
             { priority: QueuePriority.HIGH, context: 'SourceService>fetchSourceAccountByNativeIdentity' }
         )
         const candidate = accounts?.[0]
-        if (sourceInfo.isManaged && candidate && !matchesManagedJmespathFilter(sourceInfo, candidate, this.accountJmespathFiltersBySourceName)) {
+        if (
+            sourceInfo.isManaged &&
+            candidate &&
+            !matchesManagedJmespathFilter(sourceInfo, candidate, this.accountJmespathFiltersBySourceName)
+        ) {
             this.log.warn(
                 `Discarded managed account for native identity "${nativeIdentity}" on source "${sourceInfo.name}" due to Accounts JMESPath filter`
             )
@@ -617,10 +628,10 @@ export class SourceService {
     ): Promise<Source | undefined> {
         const requestParameters = buildSourceConfigPatch(sourceId, path, value)
         const ctx = context ?? 'SourceService>patchSourceConfig'
-        return await this.client.call(
-            (api) => api.sources.updateSource(requestParameters).then((r) => r.data),
-            { priority: QueuePriority.HIGH, context: ctx }
-        )
+        return await this.client.call((api) => api.sources.updateSource(requestParameters).then((r) => r.data), {
+            priority: QueuePriority.HIGH,
+            context: ctx,
+        })
     }
 
     // ------------------------------------------------------------------------
@@ -646,7 +657,7 @@ export class SourceService {
             this.log.warn('Processing flag is active. Aborting this run.')
             throw new ConnectorError(
                 'An account aggregation is already in progress or the previous one did not finish cleanly. ' +
-                'Please verify no other aggregation is running and try again.',
+                    'Please verify no other aggregation is running and try again.',
                 ConnectorErrorType.Generic
             )
         }
@@ -746,15 +757,14 @@ export class SourceService {
             this.reverseCorrelationDeps,
             this.sources,
             schemaAttrNames,
-            (sourceConfig, schemaAttributeNames) => this.ensureReverseCorrelationSetup(sourceConfig, schemaAttributeNames)
+            (sourceConfig, schemaAttributeNames) =>
+                this.ensureReverseCorrelationSetup(sourceConfig, schemaAttributeNames)
         )
     }
 
     public async assertReverseCorrelationReady(sourceConfig: SourceConfig): Promise<void> {
-        return runAssertReverseCorrelationReady(
-            this.reverseCorrelationDeps,
-            sourceConfig,
-            (...args) => this.getReverseCorrelationSetupStatus(...args)
+        return runAssertReverseCorrelationReady(this.reverseCorrelationDeps, sourceConfig, (...args) =>
+            this.getReverseCorrelationSetupStatus(...args)
         )
     }
 
@@ -775,7 +785,7 @@ export class SourceService {
 
         this.log.info(
             `Reverse correlation for source "${sourceConfig.name}" (sourceType=${sourceConfig.sourceType}): ` +
-            'minimal setup — identity attribute and managed source correlation only (no fusion schema or identity profile changes).'
+                'minimal setup — identity attribute and managed source correlation only (no fusion schema or identity profile changes).'
         )
         await this.ensureIdentityAttribute(correlationAttribute, correlationDisplayName)
         await this.ensureManagedSourceCorrelation(correlationAttribute, managedSourceId)

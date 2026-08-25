@@ -19,19 +19,18 @@ flowchart TD
     Epilogue --> End([End])
 ```
 
-
 ## Architecture diagram
 
 ![Account List architecture diagram](../assets/images/operations/accountList.png)
 
-| Phase | Log prefix | Code | Summary |
-| ----- | ---------- | ---- | ------- |
-| 1 | `PHASE 1 Setup` | `setupPhase` | Sources, lock, reset flags, schema, reverse correlation |
-| 2 | `PHASE 2 Fetch` | `fetchPhase` | Parallel fetch of identities, accounts, forms |
-| 3 | `PHASE 3 Refresh` | `refreshPhase` | Existing fusion account processing |
-| 4 | `PHASE 4 Process` | `processPhase` | Identities, decisions, managed-account sweeps, forms |
-| 5 | `PHASE 5 Output` | `outputPhase` | Stream accounts, save state, schedule delayed aggregations |
-| — | `EPILOGUE report` | `reportEpilogue` | Aggregation report, dry-run artifacts (always runs) |
+| Phase | Log prefix        | Code             | Summary                                                    |
+| ----- | ----------------- | ---------------- | ---------------------------------------------------------- |
+| 1     | `PHASE 1 Setup`   | `setupPhase`     | Sources, lock, reset flags, schema, reverse correlation    |
+| 2     | `PHASE 2 Fetch`   | `fetchPhase`     | Parallel fetch of identities, accounts, forms              |
+| 3     | `PHASE 3 Refresh` | `refreshPhase`   | Existing fusion account processing                         |
+| 4     | `PHASE 4 Process` | `processPhase`   | Identities, decisions, managed-account sweeps, forms       |
+| 5     | `PHASE 5 Output`  | `outputPhase`    | Stream accounts, save state, schedule delayed aggregations |
+| —     | `EPILOGUE report` | `reportEpilogue` | Aggregation report, dry-run artifacts (always runs)        |
 
 Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identities` → `process-decisions` → `managed-account-init` → `orphan-identity-hydration` → `correlated-sweep` → `record-unique-registration` → `uncorrelated-sweep` → `await-disable-ops` → `form-reconcile`.
 
@@ -61,7 +60,8 @@ Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identit
     - A warning is logged with discarded machine-account counts (per source and total).
         - If `fusionReportOnAggregation` is enabled and the fusion owner identity was not loaded in the parallel fetch, it is fetched separately.
     - Identity documents and existing Fusion accounts are **bulk-ingested** into operation-run caches page by page. Registration yields to the event loop at least every 250 records so STATUS and platform keep-alive timers continue running.
-    - During this cache registration, STATUS reports `progress=done/total ingested`, distinct from HTTP `fetched` progress. When ISC provides a total count, a `DETAIL action=ingesting identities count=N` or `DETAIL action=ingesting fusion-accounts count=N` milestone marks the start.
+    - STATUS reports independent `fusion-accounts=done/total`, `managed-accounts=done/total`, and (when enabled) `identities=done/total` counters on the same line. Each counter advances as records enter the operation-run cache and keeps its own interval delta.
+    - When ISC provides a total count, a `DETAIL action=ingesting identities count=N` or `DETAIL action=ingesting fusion-accounts count=N` milestone marks bulk-ingest start. Per-source HTTP offsets remain visible under `queue-pending`.
 
 ### Phase 3 — Fusion Account Processing (Refresh)
 
@@ -126,7 +126,7 @@ flowchart TD
 - Reviewer identities are updated with their corresponding pending Fusion reviews URL.
 
 !!! warning "Upgrade note: Fusion review form definitions"
-    Candidate identities receive the `candidate` status from data stored on pending form instances. The connector declares a `candidates` field on the form definition so that value round-trips from ISC across aggregations. **Existing** form definitions that were created before that field existed are not updated automatically; they keep their old shape until removed. After upgrading the connector, delete stale fusion review form definitions (or use a reset that clears forms) so new definitions are created with the full input set, or candidate-related entitlements may not persist correctly for in-flight reviews until those forms are replaced.
+Candidate identities receive the `candidate` status from data stored on pending form instances. The connector declares a `candidates` field on the form definition so that value round-trips from ISC across aggregations. **Existing** form definitions that were created before that field existed are not updated automatically; they keep their old shape until removed. After upgrading the connector, delete stale fusion review form definitions (or use a reset that clears forms) so new definitions are created with the full input set, or candidate-related entitlements may not persist correctly for in-flight reviews until those forms are replaced.
 
 - Review form names include the account identifier suffix (`<pattern> - <name> [<source>] (<nativeIdentity>)`), so reviewers can disambiguate forms when several Fusion accounts share the same display name and source. Existing forms keep their original names until replaced.
 
@@ -217,12 +217,3 @@ Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion
 ### Preventing Fusion account creation (empty nativeIdentity skip pattern)
 
 One can purposely generate an empty `nativeIdentity` (by designing attribute definitions that produce an empty fusion identity attribute) in conjunction with the "Skip accounts with a missing identifier" processing option. When the fusion identity attribute evaluates to empty and the skip option is enabled, the account is omitted from the output, effectively preventing specific managed accounts or identities from generating Fusion accounts.
-
-
-
-
-
-
-
-
-

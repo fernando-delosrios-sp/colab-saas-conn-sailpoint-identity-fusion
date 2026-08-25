@@ -3,10 +3,7 @@ import { FusionRun } from '../../model/fusionRun'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { wrapConnectorError } from '../../utils/error'
 import { LogService } from '../logService'
-import {
-    CompiledAccountJmespathFilter,
-    compileAccountPageJmespathFilter,
-} from './accountFilters'
+import { CompiledAccountJmespathFilter, compileAccountPageJmespathFilter } from './accountFilters'
 import { SourceInfo } from './types'
 
 export interface ManagedAccountFetcherDeps {
@@ -110,20 +107,20 @@ export function filterManagedMachineAccounts(accounts: Account[]): {
     return { filteredAccounts, discardedMachineCount }
 }
 
-function computeAggregateFetchProgress(sourceProgress: Map<string, { loaded: number; total?: number }>): {
-    sumLoaded: number
+function computeAggregateFetchProgress(sourceProgress: Map<string, { registered: number; total?: number }>): {
+    sumRegistered: number
     sumTotal: number
     allTotalsKnown: boolean
 } {
-    let sumLoaded = 0
+    let sumRegistered = 0
     let sumTotal = 0
     let allTotalsKnown = true
-    for (const { loaded, total } of sourceProgress.values()) {
-        sumLoaded += loaded
+    for (const { registered, total } of sourceProgress.values()) {
+        sumRegistered += registered
         if (total !== undefined) sumTotal += total
         else allTotalsKnown = false
     }
-    return { sumLoaded, sumTotal, allTotalsKnown }
+    return { sumRegistered, sumTotal, allTotalsKnown }
 }
 
 function collectAccountsFromBatch(
@@ -158,7 +155,6 @@ function collectAccountsFromBatch(
     return { collectedCount: nextCollected, discardedMachineCount, reachedLimit }
 }
 
-
 /**
  * Fetch and cache managed accounts from all managed sources.
  *
@@ -169,11 +165,16 @@ function collectAccountsFromBatch(
  * After fetching, the actual number of accounts retrieved is stored as the
  * new cumulative count for that source.
  */
-export async function fetchManagedAccounts(
-    deps: ManagedAccountFetcherDeps,
-    abortSignal?: AbortSignal
-): Promise<void> {
-    const { log, run, managedSources, batchLimitedSourceNames, batchCumulativeCount, accountJmespathFiltersBySourceName, fetchAccountsBySourceIdGenerator } = deps
+export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abortSignal?: AbortSignal): Promise<void> {
+    const {
+        log,
+        run,
+        managedSources,
+        batchLimitedSourceNames,
+        batchCumulativeCount,
+        accountJmespathFiltersBySourceName,
+        fetchAccountsBySourceIdGenerator,
+    } = deps
     log.debug(`Fetching managed accounts from ${managedSources.length} source(s)`)
 
     const sourcesWithLimits = managedSources.map((s) => {
@@ -188,10 +189,12 @@ export async function fetchManagedAccounts(
     })
 
     await wrapConnectorError(async () => {
-        const sourceProgress = new Map<string, { loaded: number; total?: number }>()
+        const sourceProgress = new Map<string, { registered: number; total?: number }>(
+            managedSources.map((source) => [source.id, { registered: 0 }])
+        )
         const reportAggregateFetchProgress = () => {
-            const { sumLoaded, sumTotal, allTotalsKnown } = computeAggregateFetchProgress(sourceProgress)
-            log.setProgress(sumLoaded, allTotalsKnown ? sumTotal : sumLoaded, 'fetched')
+            const { sumRegistered, sumTotal, allTotalsKnown } = computeAggregateFetchProgress(sourceProgress)
+            log.setFetchPopulationProgress('managed-accounts', sumRegistered, allTotalsKnown ? sumTotal : sumRegistered)
         }
 
         await Promise.all(
@@ -204,20 +207,20 @@ export async function fetchManagedAccounts(
                     source.id,
                     abortSignal,
                     effectiveLimit,
-                    (loaded, total) => {
-                        sourceProgress.set(source.id, { loaded, total })
-                        reportAggregateFetchProgress()
+                    (_loaded, total) => {
+                        const current = sourceProgress.get(source.id) ?? { registered: collectedCount }
+                        sourceProgress.set(source.id, { ...current, total })
                     }
                 )) {
-                    const batchResult = collectAccountsFromBatch(
-                        source,
-                        batch,
-                        effectiveLimit,
-                        collectedCount,
-                        { run, accountJmespathFiltersBySourceName }
-                    )
+                    const batchResult = collectAccountsFromBatch(source, batch, effectiveLimit, collectedCount, {
+                        run,
+                        accountJmespathFiltersBySourceName,
+                    })
                     collectedCount = batchResult.collectedCount
                     discardedMachineCount += batchResult.discardedMachineCount
+                    const current = sourceProgress.get(source.id) ?? {}
+                    sourceProgress.set(source.id, { ...current, registered: collectedCount })
+                    reportAggregateFetchProgress()
                     if (batchResult.reachedLimit) {
                         log.info(`Source ${source.name}: reached effectiveLimit of ${effectiveLimit}, stopping`)
                         break
@@ -240,4 +243,3 @@ export async function fetchManagedAccounts(
         log.debug(`Total managed accounts loaded: ${run.managedAccountsById.size}`)
     }, 'Failed to fetch managed accounts')
 }
-
