@@ -285,14 +285,11 @@ export class DefinitionService {
             if (missing(value)) continue
 
             const valueStr = String(value)
-            const lockKey = `unique:${definition.name}`
-            await this.locks.withLock(lockKey, async () => {
-                assert(
-                    this.uniqueDefinitionByName.has(definition.name),
-                    `Attribute ${definition.name} not found in unique attribute definition config`
-                )
-                this.getUniqueValues(definition.name).add(valueStr)
-            })
+            assert(
+                this.uniqueDefinitionByName.has(definition.name),
+                `Attribute ${definition.name} not found in unique attribute definition config`
+            )
+            this.getUniqueValues(definition.name).add(valueStr)
         }
     }
 
