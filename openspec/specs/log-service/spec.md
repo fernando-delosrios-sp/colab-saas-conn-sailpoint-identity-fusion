@@ -20,15 +20,57 @@ The log service MUST expose a `LogService` interface with the standard levels (`
 - **WHEN** the operation heartbeat emits a STATUS line
 - **THEN** the message SHALL begin with `[accountList] STATUS`
 
+### Requirement: Fetch STATUS SHALL render independent population counters
+
+During account-list Fetch phase, the operation heartbeat SHALL render zero or more Fetch population counters on the STATUS line instead of a single `progress=` fraction. Each present counter SHALL use the token shape `{population}={done}/{total}` with optional per-counter delta suffix `(Δ±N/intervalSeconds)`. Allowed population tokens are `fusion-accounts`, `managed-accounts`, and `identities`. Segment order SHALL be fusion-accounts, then managed-accounts, then identities. A counter SHALL be omitted until that population has a known total or `done` greater than zero. The identities counter SHALL be omitted for the whole Fetch when identity Fetch is skipped. Fetch STATUS SHALL NOT include `progress=` with unit `fetched` or `ingested`. The heartbeat SHALL NOT emit a separate line kind for Fetch populations.
+
+Each population SHALL keep an independent delta baseline. The first STATUS tick that includes a given population SHALL omit that population's delta suffix. Appearance of a later population SHALL NOT reset other populations' baselines.
+
+#### Scenario: Concurrent Fusion and managed counters on one STATUS line
+
+- **GIVEN** Fetch phase has Fusion accounts registered 42500 of 102407
+- **AND** managed accounts registered 94044 of 158951
+- **AND** identity Fetch is skipped
+- **WHEN** the operation heartbeat interval fires
+- **THEN** the connector host SHALL receive an INFO STATUS line
+- **AND** the line SHALL include `fusion-accounts=42500/102407`
+- **AND** the line SHALL include `managed-accounts=94044/158951`
+- **AND** the line SHALL NOT include `identities=`
+- **AND** the line SHALL NOT include `progress=`
+
+#### Scenario: Identities counter appears without replacing Fusion or managed
+
+- **GIVEN** Fetch STATUS already includes fusion-accounts and managed-accounts
+- **AND** identity Fetch registers 2500 of 10000 documents
+- **WHEN** the next STATUS heartbeat fires
+- **THEN** the line SHALL include `identities=2500/10000`
+- **AND** the line SHALL still include both fusion-accounts and managed-accounts segments
+
+#### Scenario: Per-population delta does not reset when another counter appears
+
+- **GIVEN** the previous STATUS tick showed `managed-accounts=8500/158951`
+- **AND** the next tick shows `managed-accounts=16500/158951` and a new `fusion-accounts` segment
+- **WHEN** that tick is emitted
+- **THEN** the managed-accounts segment SHALL include a delta of `+8000` over the heartbeat interval
+- **AND** the fusion-accounts segment MAY omit its delta on that first appearance
+
+#### Scenario: Empty Fusion Fetch omits fusion-accounts
+
+- **GIVEN** Fusion-account Fetch completes with zero accounts registered and no known positive total
+- **WHEN** a STATUS tick fires during Fetch
+- **THEN** the line SHALL NOT include `fusion-accounts=`
+
 ### Requirement: Operation heartbeat emits periodic STATUS lines
 
-The log service SHALL provide an operation heartbeat that emits a `STATUS` text line at a configurable interval while an operation heartbeat is active. The interval SHALL be `statsLoggingIntervalMs` from Advanced Connection Settings (configured as `heartbeatInterval` in seconds in the connector UI; default 10 seconds). Each `STATUS` line SHALL include, when available: current phase, current step, pipeline progress (`done/total` with optional unit and delta since the previous tick), operation elapsed time, API queue statistics in compact form `api={active}a/{queued}q/{completed}c` with optional delta suffix, and process memory (RSS and heap used).
+The log service SHALL provide an operation heartbeat that emits a `STATUS` text line at a configurable interval while an operation heartbeat is active. The interval SHALL be `statsLoggingIntervalMs` from Advanced Connection Settings (configured as `heartbeatInterval` in seconds in the connector UI; default 10 seconds). Each `STATUS` line SHALL include, when available: current phase, current step, pipeline progress, operation elapsed time, API queue statistics in compact form `api={active}a/{queued}q/{completed}c` with optional delta suffix, and process memory (RSS and heap used).
+
+During Fetch phase, pipeline progress SHALL be Fetch population counters (`fusion-accounts`, `managed-accounts`, `identities`) as specified in **Fetch STATUS SHALL render independent population counters**. During other phases, pipeline progress SHALL be `done/total` with optional unit and delta since the previous tick (`progress=`).
 
 The `{queued}` value in the `api=` segment SHALL be the sum of `QueueStats.queueLength` and `QueueStats.rateLimitWaitCount` (treating absent `rateLimitWaitCount` as zero). This combined pending count SHALL represent all work not yet counted as active in-flight HTTP.
 
-Pipeline progress and API queue completion are independent metrics. The pipeline progress delta SHALL reflect change in `OperationRunContext.progress.done`. The api-queue completed delta SHALL reflect change in `QueueStats.totalProcessed`. Both deltas SHALL use the format `(Δ±N/intervalSeconds)` where `intervalSeconds` is the configured heartbeat interval. The first STATUS tick after heartbeat start SHALL omit delta suffixes until a baseline exists from the prior tick.
+Pipeline progress and API queue completion are independent metrics. Outside Fetch, the pipeline progress delta SHALL reflect change in `OperationRunContext.progress.done`. During Fetch, each population counter's delta SHALL reflect change in that counter's `done`. The api-queue completed delta SHALL reflect change in `QueueStats.totalProcessed`. Both delta styles SHALL use the format `(Δ±N/intervalSeconds)` where `intervalSeconds` is the configured heartbeat interval. The first STATUS tick after heartbeat start SHALL omit delta suffixes until a baseline exists from the prior tick.
 
-When `OperationRunContext.progress.unit` is set, the STATUS line SHALL render the unit immediately after the fraction before the delta suffix (for example `progress=450/800 analyzed(Δ+120/10s)`).
+When `OperationRunContext.progress.unit` is set outside Fetch, the STATUS line SHALL render the unit immediately after the fraction before the delta suffix (for example `progress=450/800 analyzed(Δ+120/10s)`).
 
 When correlation PATCH activity has occurred in the run and the API queue has pending `IdentityService>correlateAccounts` items, STATUS lines during Output or Epilogue phase SHALL include a correlation drain segment with cumulative `completed=` and snapshot `pending=` counts alongside existing link/merge segments when non-zero.
 
@@ -84,7 +126,7 @@ When correlation PATCH activity has occurred in the run and the API queue has pe
 
 ### Requirement: Refresh STATUS SHALL render refreshed progress the same way as fetched
 
-When `log.setProgress` is invoked with unit `refreshed` during Refresh phase, the operation heartbeat SHALL include that progress on the STATUS line in the same shape as Fetch `fetched`: `progress={done}/{total} refreshed` with an optional delta suffix after the first tick (or after a unit change). Refresh STATUS SHALL NOT append a separate cumulative `refreshed(N)` segment. The heartbeat SHALL NOT emit a distinct `REFRESH` line kind. The log service SHALL NOT expose `recordRefreshedAccount` or a `refreshedCount` field for STATUS.
+When `log.setProgress` is invoked with unit `refreshed` during Refresh phase, the operation heartbeat SHALL include that progress on the STATUS line in the same shape as other non-Fetch `progress=` units: `progress={done}/{total} refreshed` with an optional delta suffix after the first tick (or after a unit or phase change). Refresh STATUS SHALL NOT append a separate cumulative `refreshed(N)` segment. The heartbeat SHALL NOT emit a distinct `REFRESH` line kind. The log service SHALL NOT expose `recordRefreshedAccount` or a `refreshedCount` field for STATUS.
 
 #### Scenario: Refreshed unit appears on STATUS like Fetch fetched
 
@@ -105,6 +147,13 @@ When `log.setProgress` is invoked with unit `refreshed` during Refresh phase, th
 #### Scenario: Unit change from fetched to refreshed resets delta baseline
 
 - **GIVEN** the previous STATUS tick showed unit `fetched`
+- **WHEN** the next tick shows unit `refreshed`
+- **THEN** the refreshed progress delta suffix MAY be omitted on that first refreshed tick
+- **AND** subsequent refreshed ticks SHALL include deltas against the refreshed baseline
+
+#### Scenario: Phase change from Fetch to Refresh resets delta baseline
+
+- **GIVEN** the previous STATUS tick was Fetch with population counters
 - **WHEN** the next tick shows unit `refreshed`
 - **THEN** the refreshed progress delta suffix MAY be omitted on that first refreshed tick
 - **AND** subsequent refreshed ticks SHALL include deltas against the refreshed baseline
@@ -473,31 +522,6 @@ The connector MUST expose a shared helper that derives a filesystem-safe tenant 
 - **GIVEN** connection `baseurl` is empty or not a valid URL
 - **WHEN** the tenant slug helper is invoked
 - **THEN** it MUST return `unknown-tenant`
-
-### Requirement: STATUS SHALL render ingested progress the same way as fetched
-
-When `log.setProgress` is invoked with unit `ingested`, the operation heartbeat SHALL include that progress on the STATUS line in the same shape as other units: `progress={done}/{total} ingested` with an optional delta suffix after the first tick. The heartbeat SHALL NOT emit a separate `INGEST` line kind. A DETAIL line MAY accompany ingest start; per-chunk INFO progress lines SHALL NOT be required.
-
-#### Scenario: Ingested unit appears on STATUS like Fetch fetched
-
-- **GIVEN** Fetch phase bulk ingest has called `setProgress(2500, 10000, 'ingested')`
-- **WHEN** the operation heartbeat interval fires
-- **THEN** the connector host SHALL receive an INFO STATUS line
-- **AND** the line SHALL include `progress=2500/10000 ingested`
-
-#### Scenario: Ingested progress delta uses previous tick baseline
-
-- **GIVEN** progress was 2500/10000 ingested at the previous STATUS tick
-- **AND** a caller invokes `setProgress(4000, 10000, 'ingested')` before the next tick
-- **WHEN** the next STATUS heartbeat fires
-- **THEN** the STATUS line SHALL include a pipeline progress delta of `+1500` over the heartbeat interval
-
-#### Scenario: Unit change from fetched to ingested resets delta baseline
-
-- **GIVEN** the previous STATUS tick showed unit `fetched`
-- **WHEN** the next tick shows unit `ingested`
-- **THEN** the ingested progress delta suffix MAY be omitted on that first ingested tick
-- **AND** subsequent ingested ticks SHALL include deltas against the ingested baseline
 
 ### Requirement: Operation run context exposes Refresh phase metrics
 
