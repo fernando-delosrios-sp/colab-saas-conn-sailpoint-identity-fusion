@@ -349,6 +349,34 @@ describe('DefinitionService.refreshUniqueAttributes preservation', () => {
 
         expect(account.attributes.UID).not.toBe('old-value')
     })
+
+    it('Refresh unique register does not enter unique lock', async () => {
+        const uniqueLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
+        const config = {
+            normalAttributeDefinitions: [],
+            uniqueAttributeDefinitions: [
+                {
+                    name: 'UID',
+                    expression: 'WD$counter',
+                    useIncrementalCounter: true,
+                    digits: 6,
+                    counterStart: 1,
+                },
+            ],
+            attributeMaps: [],
+            skipAccountsWithMissingId: false,
+            forceAttributeRefresh: false,
+            maxAttempts: 20,
+        } as any
+        const service = new DefinitionService(config, mockSchemas, mockLog, uniqueLocks)
+        service.setStateWrapper({})
+
+        const existing = createFusionAccount({ UID: 'WD000015' })
+        await service.registerUniqueAttributes(existing)
+
+        expect(uniqueLocks.withLock.mock.calls.some(([key]: [string]) => key === 'unique:UID')).toBe(false)
+        expect((service as any).getUniqueValues('UID').has('WD000015')).toBe(true)
+    })
 })
 
 describe('DefinitionService.refreshNormalAttributes clearing', () => {

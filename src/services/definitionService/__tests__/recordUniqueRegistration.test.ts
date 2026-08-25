@@ -151,5 +151,40 @@ describe('DefinitionService record unique registration', () => {
         expect(registered.has('E-B')).toBe(true)
         expect(registered.size).toBe(2)
     })
+
+    it.each([
+        'existing-value registration does not take the unique registry lock',
+        'Unique-set writes remain lock-serialized per attribute name',
+    ])('%s', async () => {
+        const locks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
+        const definitionService = new DefinitionService(config, mockSchemas, mockLog, locks)
+        const mappingService = new MappingService(config, mockLog)
+        const run = new FusionRun()
+
+        await definitionService.registerUniqueValuesFromRecordManagedAccounts(
+            [
+                managedAccount({
+                    id: 'src-record::native-a',
+                    nativeIdentity: 'native-a',
+                    attributes: { emp_id: 'E-A' },
+                }),
+                managedAccount({
+                    id: 'src-record::native-b',
+                    nativeIdentity: 'native-b',
+                    attributes: { emp_id: 'E-B' },
+                }),
+            ],
+            mappingService,
+            run
+        )
+
+        const uniqueLockCalls = locks.withLock.mock.calls.filter(([key]: [string]) => /^unique:/.test(key))
+        expect(uniqueLockCalls).toHaveLength(0)
+
+        const registered = (definitionService as any).getUniqueValues('employeeId') as Set<string>
+        expect(registered.has('E-A')).toBe(true)
+        expect(registered.has('E-B')).toBe(true)
+        expect(registered.size).toBe(2)
+    })
 })
 
