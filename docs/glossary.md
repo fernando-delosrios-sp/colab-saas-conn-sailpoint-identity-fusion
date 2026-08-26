@@ -33,6 +33,8 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms do n
 | **Fusion account collaborators** | The three behavior-rich parts of a `FusionAccount`: **FusionCollections**, **FusionCorrelation**, and **FusionLayers**. Exposed as readonly `collections`, `correlation`, and `layers` on `FusionAccount`. |
 | **FusionCollections**            | The collaborator that owns account-id sets, missing-accounts, statuses, actions, reviews, sources, fusion matches, history, and related collection sync-to-bag behavior.                                   |
 | **FusionLayers**                 | The collaborator that owns identity / managed-account / fusion-decision enrichment methods and layer-related flags (for example needsRefresh, disabled, origin metadata).                                  |
+| **Source snapshot materialization** | Copying a managed source account's attributes onto the Fusion account's live source map during FusionLayers absorb so Map and Velocity `$accounts` / `$sources` can read this run's snapshots. |
+| **Claim-only absorb**            | Absorbing a work-queue managed account by claiming it and updating Fusion account bookkeeping (keys, uncorrelated status, managed-account info) without source snapshot materialization. Not the same as skipping Refresh or skipping Map merge. |
 | **FusionCorrelation**            | The collaborator that owns correlation promises and mark-correlated helpers on a single Fusion account. Distinct from business **correlation** (linking managed source accounts to an ISC identity).       |
 
 ## Operation structure

@@ -20,6 +20,9 @@ describe('AccountAssembly', () => {
             managedAccountInventory: new Map(),
             registerFusionAccount: vi.fn(),
             recordFusionBlend: vi.fn(),
+            getKeysForIdentity: vi.fn(),
+            get: vi.fn(),
+            claimAccount: vi.fn(),
         }
         mockSources = {}
         mockMappingService = {
@@ -139,6 +142,27 @@ describe('AccountAssembly', () => {
             expect(mapMs).toBeGreaterThan(0)
             expect(normalDefineMs).toBeGreaterThan(0)
             vi.mocked(performance.now).mockRestore()
+        })
+    })
+
+    describe('addManagedAccountLayer', () => {
+        it('passes force attribute refresh prelude flags to FusionAccount', async () => {
+            const fusionAccount = FusionAccount.fromIdentity({ id: 'id-1', name: 'Identity 1' })
+            const layerSpy = vi.spyOn(fusionAccount, 'addManagedAccountLayer')
+
+            await assembly.addManagedAccountLayer(fusionAccount, {
+                forceAttributeRefresh: true,
+                hasEligibleAlwaysRecalculate: true,
+            })
+
+            expect(layerSpy).toHaveBeenCalledWith(
+                mockRun,
+                expect.objectContaining({
+                    forceAttributeRefresh: true,
+                    hasEligibleAlwaysRecalculate: true,
+                })
+            )
+            layerSpy.mockRestore()
         })
     })
 

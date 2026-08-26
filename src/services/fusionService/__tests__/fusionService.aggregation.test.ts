@@ -2146,6 +2146,54 @@ describe('FusionService — aggregation', () => {
             expect(result.needsRefresh).toBe(true)
         })
 
+        it('force attribute refresh materializes source snapshots on a stale correlated row before Map', async () => {
+            ctx.mockConfig.forceAttributeRefresh = true
+            ctx.mockDefinitionService.hasEligibleAlwaysRecalculate.mockReturnValue(false)
+
+            const historicalAccount = {
+                nativeIdentity: 'fusion-force-snapshots',
+                identityId: 'identity-force-snapshots',
+                name: 'Fusion Force Snapshots',
+                sourceName: 'Identity Fusion NG',
+                modified: '2024-06-01T12:00:00.000Z',
+                uncorrelated: false,
+                attributes: {
+                    accounts: ['source-a-id::native-existing-1'],
+                    givenName: 'Already',
+                },
+            } as unknown as Account
+
+            const managedAccount = {
+                id: 'acct-existing-1',
+                nativeIdentity: 'native-existing-1',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                modified: '2024-01-01T00:00:00.000Z',
+                attributes: { employeeNumber: 'EMP-FORCE-1' },
+            } as unknown as Account
+
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(
+                new Map([['source-a-id::native-existing-1', managedAccount]])
+            )
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            seedRunInventory(ctx.run, new Map([['source-a-id::native-existing-1', managedAccount]]))
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+
+            let sourcesAtMap: unknown[] | undefined
+            ctx.mockMappingService.mapAttributes.mockImplementation((account: FusionAccount) => {
+                sourcesAtMap = account.attributeBag.sources.get('Source A')
+                return account
+            })
+
+            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
+
+            expect(result.needsRefresh).toBe(true)
+            expect(sourcesAtMap).toEqual(
+                expect.arrayContaining([expect.objectContaining({ employeeNumber: 'EMP-FORCE-1' })])
+            )
+        })
+
         it('should not clear reverse attribute when missing account source info is unresolved', async () => {
             ;(ctx.fusionService as any).config.sources = [
                 {

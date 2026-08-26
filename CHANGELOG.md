@@ -6,6 +6,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-08-26 · v2.2.1
+
+### 🔧 Improvements
+
+- **Unchanged Fusion accounts skip copying managed source attributes** — Quiet Refresh still visits every Fusion row and claims linked managed accounts so Process cannot rematch them, but it no longer copies those accounts' attributes onto the Fusion row when source data did not change. Always recalculate, force attribute refresh, new blends, deletions, and over-threshold managed `modified` still copy this run's snapshots so Map and Velocity `$accounts` / `$sources` can read them.
+
+### 📚 Documentation
+
+- **Glossary: source snapshot materialization and claim-only absorb** — Documents how Refresh can claim linked managed accounts without copying live source attributes, and that this is not skipping Refresh or Map merge.
+
+---
+
 ## 2026-08-25 · v2.2.0
 
 ### ⚠️ Breaking Changes

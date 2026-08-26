@@ -125,6 +125,17 @@ export class DefinitionService {
         this.ensureCoreSchemaAttributes(fusionAccount)
     }
 
+    /**
+     * True when this row has at least one Normal definition with Always recalculate
+     * (`definition.refresh`) that would not be skipped as static on an existing Fusion account.
+     * Same eligibility as {@link refreshNormalAttributes}.
+     */
+    public hasEligibleAlwaysRecalculate(fusionAccount: FusionAccount): boolean {
+        return this.normalDefinitions.some(
+            (definition) => definition.refresh && !this.shouldSkipStaticDefinition(definition, fusionAccount)
+        )
+    }
+
     public async refreshNormalAttributes(
         fusionAccount: FusionAccount,
         onStats?: (stats: { evaluated: number; skipped: number }) => void
@@ -136,9 +147,7 @@ export class DefinitionService {
 
         const shouldRefresh =
             fusionAccount.needsRefresh || fusionAccount.needsReset || this.forceAttributeRefresh
-        const hasRefreshableDefinitions = this.normalDefinitions.some(
-            (definition) => definition.refresh && !this.shouldSkipStaticDefinition(definition, fusionAccount)
-        )
+        const hasRefreshableDefinitions = this.hasEligibleAlwaysRecalculate(fusionAccount)
         if (!shouldRefresh && !hasRefreshableDefinitions) {
             onStats?.({ evaluated: 0, skipped: this.normalDefinitions.length })
             return

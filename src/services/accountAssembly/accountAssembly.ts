@@ -27,6 +27,12 @@ export interface AssembleAccountOptions {
     addBlendHistory?: boolean
     skipBlendHistoryForManagedKeys?: ReadonlySet<string>
     onQueueScan?: (entriesExamined: number) => void
+    forceAttributeRefresh?: boolean
+    refreshMapping?: boolean
+    refreshDefinition?: boolean
+    resetDefinition?: boolean
+    hasEligibleAlwaysRecalculate?: boolean
+    requireLiveSourceSnapshots?: boolean
 }
 
 export type AttributeProcessingOptions = {
@@ -96,6 +102,12 @@ export class AccountAssembly {
                 skipBlendHistoryForManagedKeys: options.skipBlendHistoryForManagedKeys,
                 onBlend: (account) => this.recordBlend(fusionAccount, account),
                 onQueueScan: options.onQueueScan,
+                forceAttributeRefresh: options.forceAttributeRefresh,
+                refreshMapping: options.refreshMapping,
+                refreshDefinition: options.refreshDefinition,
+                resetDefinition: options.resetDefinition,
+                hasEligibleAlwaysRecalculate: options.hasEligibleAlwaysRecalculate,
+                requireLiveSourceSnapshots: options.requireLiveSourceSnapshots,
             }
         )
         this.deps.log.debug(
