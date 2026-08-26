@@ -576,6 +576,20 @@ describe('ReportService', () => {
         expect(sendEmail).toHaveBeenCalledTimes(1)
     })
 
+    it('selects the aggregation title from reportType when override is omitted', () => {
+        const { service } = createService()
+        const html = service.renderFusionReportHtml({ accounts: [], matches: 0 } as any, 'aggregation')
+        expect(html).toContain('Identity Fusion Aggregation Report')
+        expect(html.includes('Identity Fusion Report')).toBe(false)
+    })
+
+    it('selects the Fusion report title from reportType when override is omitted', () => {
+        const { service } = createService()
+        const html = service.renderFusionReportHtml({ accounts: [], matches: 0 } as any, 'fusion')
+        expect(html).toContain('Identity Fusion Report')
+        expect(html).not.toContain('Identity Fusion Aggregation Report')
+    })
+
     it('renders Identity Fusion Aggregation Report as the aggregation title', () => {
         const { service } = createService()
         const html = service.renderFusionReportHtml(
@@ -707,6 +721,7 @@ describe('ReportService', () => {
             'es'
         )
         expect(html).toContain('Estadísticas de procesamiento')
+        expect(html).toContain('Reporte de agregación de Identity Fusion')
     })
 })
 

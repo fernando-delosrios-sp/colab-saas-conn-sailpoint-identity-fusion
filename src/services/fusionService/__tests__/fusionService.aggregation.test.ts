@@ -1785,7 +1785,12 @@ describe('FusionService — aggregation', () => {
             expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-ctx.run-def')).toBe(true)
         })
 
-        it('records deferred match report rows in dry-run mode when fusionReportOnAggregation is false', async () => {
+        it.each([
+            ['account-list dry-run', StandardCommand.StdAccountList, 'acct-dry-run-cap'],
+            ['Fusion report nested pipeline (account-update)', StandardCommand.StdAccountUpdate, 'acct-fusion-report-cap'],
+        ] as const)(
+            'records deferred match report rows in dry-run mode (%s) when fusionReportOnAggregation is false',
+            async (_label, commandType, accountId) => {
             ctx.run.isDryRunMode = true
             const dryRunFusion = new FusionService({
                 config: ctx.mockConfig,
@@ -1798,14 +1803,14 @@ describe('FusionService — aggregation', () => {
                 matchingService: ctx.mockMatchingService,
                 schemas: ctx.mockSchemas,
                 run: ctx.run,
-                commandType: StandardCommand.StdAccountList,
+                commandType,
             })
             dryRunFusion.matchOutcomeDispatcher = ctx.createDispatcherFor(dryRunFusion)
             dryRunFusion.setTracker(new AggregationTracker())
 
             const mockManagedAccount = {
-                id: 'acct-dry-run-cap',
-                nativeIdentity: 'native-dry-run-cap',
+                id: accountId,
+                nativeIdentity: `native-${accountId}`,
                 name: 'Dry Run Capture',
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
@@ -1821,8 +1826,8 @@ describe('FusionService — aggregation', () => {
             })
 
             const nonMatchedCandidate = FusionAccount.fromManagedAccount({
-                id: 'acct-prev-nonmatch-dry',
-                nativeIdentity: 'native-prev-nonmatch-dry',
+                id: `acct-prev-nonmatch-${accountId}`,
+                nativeIdentity: `native-prev-nonmatch-${accountId}`,
                 name: 'Non-matched Candidate Dry',
                 sourceId: 'source-a-id',
                 sourceName: 'Source A',
@@ -1854,8 +1859,9 @@ describe('FusionService — aggregation', () => {
             dryRunFusion.setTracker(tracker)
             await dryRunFusion.processManagedAccount(mockManagedAccount)
             const report = dryRunFusion.generateReport(tracker, true)
-            expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-run-cap')).toBe(true)
-        })
+            expect(report.accounts.some((a) => a.deferred && a.accountId === accountId)).toBe(true)
+            }
+        )
 
         it('records only non-match history when creating a new authoritative non-match fusion account', async () => {
             const mockManagedAccount = {
