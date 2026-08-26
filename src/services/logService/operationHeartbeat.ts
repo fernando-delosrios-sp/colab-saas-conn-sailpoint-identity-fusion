@@ -31,6 +31,8 @@ export type HeartbeatSnapshot = {
     correlationQueuePending?: number
     fusionPending?: FusionPendingSnapshot
     memory?: NodeJS.MemoryUsage
+    /** Process `cpuUsage` snapshot for the STATUS CPU segment — not host load or quota. */
+    cpu?: NodeJS.CpuUsage
     intervalMs: number
 }
 
@@ -38,6 +40,8 @@ export type StatusLineBaselines = {
     previousProcessed?: number
     previousProgressDone?: number
     previousFetchPopulationDone?: Partial<Record<FetchPopulation, number>>
+    previousCpu?: NodeJS.CpuUsage
+    previousCpuAt?: number
 }
 
 function formatMb(bytes: number): string {
@@ -202,13 +206,28 @@ function formatCorrelationDrainSegment(
     return `correlations ${parts.join(' ')}`
 }
 
+function formatCpuSegment(
+    cpu: NodeJS.CpuUsage | undefined,
+    previousCpu: NodeJS.CpuUsage | undefined,
+    previousCpuAt: number | undefined,
+    now: number
+): string | undefined {
+    if (!cpu || !previousCpu || previousCpuAt === undefined) return undefined
+    const wallMs = now - previousCpuAt
+    if (wallMs <= 0) return undefined
+    const deltaUs = cpu.user - previousCpu.user + (cpu.system - previousCpu.system)
+    const percent = Math.round((deltaUs / (wallMs * 1000)) * 100)
+    return `cpu=${percent}%`
+}
+
 export function formatStatusLine(
     snapshot: HeartbeatSnapshot,
     baselines: StatusLineBaselines,
     intervalMs: number
 ): string {
-    const { runContext, queueStats, memory, pendingItems, fusionPending, correlationQueuePending } = snapshot
-    const { previousProcessed, previousProgressDone, previousFetchPopulationDone } = baselines
+    const { runContext, queueStats, memory, cpu, pendingItems, fusionPending, correlationQueuePending } = snapshot
+    const { previousProcessed, previousProgressDone, previousFetchPopulationDone, previousCpu, previousCpuAt } =
+        baselines
     const parts: string[] = ['STATUS']
 
     if (runContext.phase) parts.push(`phase=${runContext.phase}`)
@@ -265,6 +284,9 @@ export function formatStatusLine(
         const heapPct = Math.round((memory.heapUsed / memory.rss) * 100)
         parts.push(`mem=${formatMb(memory.rss)}MB(${heapPct}%)`)
     }
+
+    const cpuSegment = formatCpuSegment(cpu, previousCpu, previousCpuAt, Date.now())
+    if (cpuSegment) parts.push(cpuSegment)
 
     parts.push(`elapsed=${PhaseTimer.formatElapsed(Date.now() - runContext.operationStartedAt)}`)
 
@@ -447,6 +469,8 @@ export class OperationHeartbeat {
     private previousPhase?: OperationPhase | null
     private previousProgressUnit?: string
     private previousFetchPopulationDone: Partial<Record<FetchPopulation, number>> = {}
+    private previousCpu?: NodeJS.CpuUsage
+    private previousCpuAt?: number
     private zeroDeltaTicks = 0
 
     constructor(
@@ -457,6 +481,8 @@ export class OperationHeartbeat {
     start(): void {
         if (this.interval) return
         const snapshot = this.getSnapshot()
+        this.previousCpu = snapshot.cpu
+        this.previousCpuAt = Date.now()
         this.interval = setInterval(() => this.tick(), snapshot.intervalMs)
     }
 
@@ -469,6 +495,8 @@ export class OperationHeartbeat {
         this.previousPhase = undefined
         this.previousProgressUnit = undefined
         this.previousFetchPopulationDone = {}
+        this.previousCpu = undefined
+        this.previousCpuAt = undefined
         this.zeroDeltaTicks = 0
     }
 
@@ -501,6 +529,8 @@ export class OperationHeartbeat {
                 previousProcessed: this.previousProcessed,
                 previousProgressDone: this.previousProgressDone,
                 previousFetchPopulationDone: this.previousFetchPopulationDone,
+                previousCpu: this.previousCpu,
+                previousCpuAt: this.previousCpuAt,
             },
             snapshot.intervalMs
         )
@@ -546,6 +576,10 @@ export class OperationHeartbeat {
         }
         this.previousPhase = runContext.phase
         this.previousProgressUnit = runContext.progress?.unit
+        if (snapshot.cpu) {
+            this.previousCpu = snapshot.cpu
+            this.previousCpuAt = Date.now()
+        }
         if (queueStats) {
             this.previousProcessed = queueStats.totalProcessed
         }

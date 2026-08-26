@@ -306,6 +306,7 @@ export class ServiceRegistry {
                 formInstancesCreated: run.formInstancesCreated,
             },
             memory: process.memoryUsage(),
+            cpu: process.cpuUsage(),
             intervalMs: this.config.statsLoggingIntervalMs,
         }
     }

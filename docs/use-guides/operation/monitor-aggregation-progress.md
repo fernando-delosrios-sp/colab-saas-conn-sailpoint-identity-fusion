@@ -75,7 +75,7 @@ During long `accountList` aggregations, the connector emits standardized prefixe
 
 | Prefix           | Level | Use for                                                                                                                          |
 | ---------------- | ----- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `STATUS`         | Info  | Periodic heartbeat: phase, step, progress, `api=` queue segment, elapsed time                                                    |
+| `STATUS`         | Info  | Periodic heartbeat: phase, step, progress, `api=` queue segment, `cpu=` (one-core percent over the sample window), elapsed time |
 | `EVENT_SUMMARY`  | Info  | Interval deltas for review/merge matches, decisions, correlations, emails (not emitted for non-matched-only ticks; use `STATUS`) |
 | `PHASE` / `STEP` | Info  | Pipeline boundary markers (`START` / `END elapsed=…`)                                                                            |
 | `DETAIL`         | Info  | Milestones as `key=value` pairs                                                                                                  |
@@ -91,8 +91,19 @@ During long `accountList` aggregations, the connector emits standardized prefixe
 **Refresh example:**
 
 ```
-14:30:45 [INFO]  [accountList] STATUS phase=Refresh progress=19032/102407 refreshed(Δ+192/10s) mem=1992.07MB(96%) elapsed=22M 14S
+14:30:45 [INFO]  [accountList] STATUS phase=Refresh progress=19032/102407 refreshed(Δ+192/10s) mem=1992.07MB(96%) cpu=87% elapsed=22M 14S
 ```
+
+### How to read `cpu=` with progress and `api=`
+
+`cpu=` is process CPU over the actual sample window (percent of one core; may exceed 100). It is not host load or container quota. Read it with progress Δ and `api=` — do **not** alert on high CPU alone.
+
+| `cpu=` | Progress Δ | `api=` | Likely meaning |
+| ------ | ---------- | ------ | -------------- |
+| High | Moving | Idle | Local work (healthy Refresh). Do not raise HTTP concurrency. |
+| Low | Moving | Moving | ISC-bound (typical Fetch). Queue tuning may help; CPU will look quiet. |
+| High | Flat | Idle or quiet | Spin or a hot code path — not an API stall. |
+| Missing (no `STATUS`) | — | — | Event loop or platform reset. Look for `WARN EVENT_LOOP`; `cpu=` cannot emit while the loop is blocked. |
 
 ### Quick grep targets
 

@@ -23,7 +23,7 @@ HH:MM:SS [LEVEL]  [operation] message body…
 **Example:**
 
 ```
-14:30:45 [INFO]  [accountList] STATUS phase=4 step=process progress=1200/5400 api=42/3/891 elapsed=183s
+14:30:45 [INFO]  [accountList] STATUS phase=4 step=process progress=1200/5400 api=42/3/891 mem=1992.07MB(96%) cpu=87% elapsed=183s
 14:30:45 [INFO]  [accountList] EVENT_SUMMARY matches non-match=+12/10s decisions merge=+1/10s
 14:30:55 [WARN]  [accountList] WARN STALL api-queue idle=20s active=GET /v3/accounts?…
 ```
@@ -51,7 +51,7 @@ During long `accountList` aggregations, the connector emits standardized text pr
 
 | Prefix            | Level | Purpose                                                                                                                                                                                                                                                     |
 | ----------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `STATUS`          | Info  | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, pipeline progress with delta, compact `api=Na/Nq/Nc` segment with delta (`q` = FIFO queue length plus requests waiting for a rate-limit slot), memory, elapsed time |
+| `STATUS`          | Info  | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, pipeline progress with delta, compact `api=Na/Nq/Nc` segment with delta (`q` = FIFO queue length plus requests waiting for a rate-limit slot), memory, `cpu={percent}%` (one-core process CPU over the sample window; may exceed 100), elapsed time |
 | `EVENT_SUMMARY`   | Info  | Interval deltas for review/merge matches, decisions, correlations, and emails. Omitted when the tick only recorded non-matched accounts — that work is already on `STATUS` as progress delta plus cumulative `matches(`                                     |
 | `PHASE` / `STEP`  | Info  | Pipeline boundary markers (`START` / `END elapsed=…`)                                                                                                                                                                                                       |
 | `DETAIL`          | Info  | Operational milestones as `key=value` pairs (sources loaded, emails sent, mode)                                                                                                                                                                             |
@@ -65,7 +65,7 @@ During long `accountList` aggregations, the connector emits standardized text pr
 Fetch reports independent population counters on the same STATUS line:
 
 ```text
-STATUS phase=Fetch fusion-accounts=42500/102407(Δ+8000/10s) managed-accounts=94044/158951(Δ+5250/10s) api=20a/12q/584c …
+STATUS phase=Fetch fusion-accounts=42500/102407(Δ+8000/10s) managed-accounts=94044/158951(Δ+5250/10s) api=20a/12q/584c mem=1992.07MB(96%) cpu=12% …
 ```
 
 - `fusion-accounts=done/total` — existing Fusion accounts registered into the run cache.
@@ -77,6 +77,8 @@ Each population has its own interval delta and does not overwrite the others. A 
 Identity and Fusion-account **bulk ingest** still yields so heartbeat and keep-alive timers can run. Optional milestones such as `DETAIL action=ingesting identities count=N` and `DETAIL action=ingesting fusion-accounts count=N` identify that work; Fetch STATUS no longer uses a single `progress=… fetched|ingested` fraction.
 
 Other phases retain `progress=done/total unit`. For example, Refresh uses `progress=19032/102407 refreshed(Δ+192/10s)`. Process and Output may use units such as `processed`, `analyzed`, or `sent`.
+
+When a previous sample exists, STATUS includes `cpu={percent}%` immediately after `mem=` and before `elapsed=`. The percent is one-core relative over the actual sample window (not the configured heartbeat interval) and may exceed 100 when the process uses more than one core. `cpu=` is omitted when there is no previous sample or wall-clock elapsed is zero. See [Monitor aggregation progress](../use-guides/operation/monitor-aggregation-progress.md) for how to read `cpu=` with progress Δ and `api=`.
 
 ## Correlation activity format
 
@@ -163,7 +165,7 @@ grep 'decisions(' connector.log
 
 ## Silent runs and platform resets
 
-When the platform resets an aggregation after a period with no log output, the cause is almost always a blocked event loop: keep-alive and `STATUS` are both timers, so neither can fire while synchronous work runs. Search the run for `WARN EVENT_LOOP` — the `before=` segment names the phase, step, and progress counter that was active when output stopped, which is the code path that needs to yield.
+When the platform resets an aggregation after a period with no log output, the cause is almost always a blocked event loop: keep-alive and `STATUS` are both timers, so neither can fire while synchronous work runs — including the `cpu=` sample, which cannot emit while the loop is blocked. Search the run for `WARN EVENT_LOOP` — the `before=` segment names the phase, step, and progress counter that was active when output stopped, which is the code path that needs to yield.
 
 ```bash
 grep 'WARN EVENT_LOOP' connector.log
