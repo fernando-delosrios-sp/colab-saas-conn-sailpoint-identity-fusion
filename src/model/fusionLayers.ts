@@ -253,10 +253,8 @@ export class FusionLayers {
             materializeSourceSnapshots
         )
 
-        const inventoryKeys = new Set(workQueue.managedAccountInventory.keys())
-
         if (pruneDeleted) {
-            this.pruneDeletedManagedAccounts(inventoryKeys)
+            this.pruneDeletedManagedAccounts(workQueue.managedAccountInventory)
         }
 
         this.preserveMissingAccountContext(workQueue.managedAccountInventory)
@@ -603,7 +601,7 @@ export class FusionLayers {
         }
     }
 
-    private pruneDeletedManagedAccounts(inventoryKeys: ReadonlySet<string>): void {
+    private pruneDeletedManagedAccounts(inventory: ReadonlyMap<string, ManagedAccountInfo>): void {
         const trackedIds = new Set<string>([
             ...this.collections.accountIds,
             ...this.collections.missingAccountIds,
@@ -612,7 +610,7 @@ export class FusionLayers {
         let removedAnyReference = false
 
         for (const accountId of trackedIds) {
-            if (inventoryKeys.has(accountId)) continue
+            if (inventory.has(accountId)) continue
 
             const removedFromAccounts = this.collections.accounts.remove(accountId)
             const removedFromMissing = this.collections.accounts.removeMissing(accountId)
