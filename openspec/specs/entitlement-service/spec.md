@@ -17,9 +17,13 @@ The connector MUST export a TypeScript `enum` named `StatusEntitlement` from `sr
 - **THEN** its value is the string `"baseline"`
 - **AND** the same is true for every other member of the enum
 
+#### Scenario: New member is the string new
+- **WHEN** a developer inspects `StatusEntitlement.New`
+- **THEN** its value is the string `"new"`
+
 #### Scenario: The enum contains the eleven current statuses
 - **WHEN** a developer iterates the enum members
-- **THEN** it contains exactly: `Authorized`, `Auto`, `Baseline`, `Manual`, `Orphan`, `NonMatched`, `Reviewer`, `Requested`, `Uncorrelated`, `ActiveReviews`, `Candidate`
+- **THEN** it contains exactly: `Authorized`, `Auto`, `Baseline`, `Manual`, `Orphan`, `NonMatched`, `Reviewer`, `Requested`, `Uncorrelated`, `ActiveReviews`, `Candidate`, `New`
 
 ### Requirement: Statuses data file is derived from the enum
 
@@ -37,7 +41,7 @@ Every internal call site that adds, removes, or tests a status entitlement on a 
 #### Scenario: Production code references the enum
 - **WHEN** the connector adds the `baseline` status to an account
 - **THEN** the call is `fusionAccount.addStatus(StatusEntitlement.Baseline)`
-- **AND** the same pattern is used for `Orphan`, `Uncorrelated`, `Reviewer`, `ActiveReviews`, `NonMatched`, `Manual`, `Auto`, `Authorized`, `Candidate`, and `Requested` at every site that currently uses a raw string
+- **AND** the same pattern is used for `Orphan`, `Uncorrelated`, `Reviewer`, `ActiveReviews`, `NonMatched`, `Manual`, `Auto`, `Authorized`, `Candidate`, `Requested`, and `New` at every site that currently uses a raw string
 
 #### Scenario: Test fixtures simulating persisted data still use string literals
 - **WHEN** a unit test constructs a persisted fusion account with a `statuses` array read from storage
@@ -58,7 +62,7 @@ A unit test in `src/model/__tests__/statusEntitlement.test.ts` MUST assert the c
 
 - Every enum member's string value MUST appear as an `id` in `statuses`.
 - Every `id` in `statuses` MUST equal exactly one enum member's string value.
-- The enum MUST have exactly eleven members (the current count).
+- The enum MUST have exactly twelve members (the current count).
 
 #### Scenario: An enum member is added without updating the data file
 - **WHEN** a developer adds a new `StatusEntitlement` member but forgets to add an entry in `data/status.ts`

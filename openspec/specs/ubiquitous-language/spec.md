@@ -390,6 +390,16 @@ The ubiquitous-language glossary MUST define **Fusion account collaborators** as
 - **THEN** **FusionCorrelation** MUST be defined as the collaborator that owns correlation promises and mark-correlated helpers on a single Fusion account
 - **AND** the entry MUST state that this is distinct from business **correlation** (linking managed source accounts to an ISC identity)
 
+### Requirement: Glossary defines New status entitlement
+
+The ubiquitous-language glossary SHALL define **New** as a status entitlement whose wire value is `new`. Documentation and specs SHALL use that wire value, not synonyms such as `created` or `fresh`.
+
+#### Scenario: New status entitlement entry
+- **GIVEN** a reader consults the ubiquitous-language status entitlements table
+- **WHEN** they look up the marker for a Fusion account created in the current operation run
+- **THEN** a **New** entry SHALL define wire value `new` as the status on a Fusion account created in this aggregation rather than reconstructed from a previous Fusion account
+- **AND** the entry SHALL state that reconstruction from a previous Fusion account removes `new`
+
 ### Requirement: Glossary defines source snapshot materialization and claim-only absorb
 
 The ubiquitous-language glossary SHALL define **Source snapshot materialization** and **Claim-only absorb** as FusionLayers managed-account layer terms. Documentation and specs SHALL NOT call claim-only absorb “skip Refresh” or “skip blend” when report fusionBlends or Map merge is meant.
@@ -587,6 +597,7 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 | **Requested** | `requested` | The account was requested (created via provisioning). |
 | **ActiveReviews** | `activeReviews` | The account has one or more pending Fusion review forms awaiting reviewer decision. |
 | **Candidate** | `candidate` | The identity is part of a pending Fusion review as a potential match candidate. |
+| **New** | `new` | The Fusion account was created in this aggregation rather than reconstructed from a previous Fusion account. Reconstruction from a previous Fusion account removes `new`. |
 
 ### Review and decision domain
 
