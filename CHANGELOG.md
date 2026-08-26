@@ -27,7 +27,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 ### ⚠️ Breaking Changes
 
 - **Fetch STATUS uses independent inventory counters** — Account-list Fetch heartbeats now report `fusion-accounts=done/total`, `managed-accounts=done/total`, and (when identity Fetch runs) `identities=done/total` on one STATUS line, each with its own interval delta. Fetch no longer uses a single last-writer `progress=` fraction with unit `fetched` or `ingested`. This is a log-contract change only: Map, Define, and aggregation output are unchanged. Refresh and Process still use `progress=` (`refreshed`, `analyzed`, and so on). DETAIL `action=ingesting identities|fusion-accounts` may still appear.
-  - Migration: Log scrapers that match Fetch `progress=`, `fetched`, or `ingested` must switch to the population tokens (`fusion-accounts=`, `managed-accounts=`, `identities=`). Do not require an `identities=` segment when identity Fetch is skipped.
+-  - Migration: Log scrapers that match Fetch `progress=`, `fetched`, or `ingested` must switch to the population tokens (`fusion-accounts=`, `managed-accounts=`, `identities=`). Do not require an `identities=` segment when identity Fetch is skipped.
 
 ### 🔧 Improvements
 
@@ -77,6 +77,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### ✨ New Features
 
+- **New Fusion accounts are searchable by status** — Fusion accounts created in the current aggregation now carry the read-only `new` status entitlement. The marker is removed when a later aggregation reconstructs the account from its previous Fusion account, making it a one-aggregation signal.
 - **Event-loop watchdog** — Operations that run a keep-alive now sample the event loop and emit `WARN EVENT_LOOP blocked <duration>` when timers are starved, naming the phase, step, and progress counter on both sides of the gap, plus a worst-block summary when the operation ends. Warnings are also written unbuffered to stdout, since a blocked loop stops the logger draining its own buffer. See the observability reference.
 - **Main and origin account attribute merging** — New Fusion configurations now default mapped attributes to the selected `mainAccount`, falling back to the immutable origin account only when no valid main account exists. Per-attribute mappings can also pin values to the origin account. Both modes select one account snapshot with no fallback to other accounts; existing configurations keep their stored merge strategy.
 

@@ -591,6 +591,43 @@ describe('FusionService — aggregation', () => {
             expect(result?.attributes.displayName).toBe('Jane Doe')
         })
 
+        it('does not add new when reusing a Fusion account reconstructed from a previous run', async () => {
+            const mockIdentity = {
+                id: 'identity-reused-1',
+                name: 'Reused Identity',
+                accounts: [],
+            } as unknown as IdentityDocument
+            const existing = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-reused-1',
+                sourceName: 'Identity Fusion NG',
+                attributes: { statuses: ['new'] },
+            } as Account)
+            vi.spyOn(ctx.run, 'findFusionAccountForIdentity').mockReturnValue(existing)
+
+            const result = await ctx.fusionService.processIdentity(mockIdentity)
+
+            expect(result).toBe(existing)
+            expect(result?.statuses).not.toContain('new')
+        })
+
+        it('preserves new when reusing a Fusion account created earlier in the same run', async () => {
+            const mockIdentity = {
+                id: 'identity-same-run-1',
+                name: 'Same Run Identity',
+                accounts: [],
+            } as unknown as IdentityDocument
+            const existing = FusionAccount.fromIdentity({
+                id: 'provisional-identity',
+                name: 'Provisional Identity',
+            } as IdentityDocument)
+            vi.spyOn(ctx.run, 'findFusionAccountForIdentity').mockReturnValue(existing)
+
+            const result = await ctx.fusionService.processIdentity(mockIdentity)
+
+            expect(result).toBe(existing)
+            expect(result?.statuses).toContain('new')
+        })
+
         it('should skip existing identities', async () => {
             const mockIdentity = {
                 id: 'identity-1',
@@ -842,13 +879,17 @@ describe('FusionService — aggregation', () => {
             ;(ctx.mockConfig as any).fusionEnableAutoMerge = false
             ;(ctx.mockConfig as any).fusionEnableManualReview = true
             ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = false
+            const infoSpy = vi.spyOn(ctx.mockLog, 'info')
             const errorSpy = vi.spyOn(ctx.mockLog, 'error')
 
             await ctx.fusionService.initializeSourceReviewers()
 
             ;(ctx.fusionService as any).validateManagedSourceReviewers()
             expect(ctx.run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(true)
-            expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Match scoring is not configured'))
+            expect(infoSpy).toHaveBeenCalledWith(
+                expect.stringContaining(`Match scoring is not configured for 1 managed source(s): "${SOURCE_NAME}"`)
+            )
+            expect(errorSpy).not.toHaveBeenCalledWith(expect.stringContaining('Match scoring is not configured'))
         })
 
         it('marks source non-scorable when both automatic merge and manual review are disabled', async () => {
@@ -864,6 +905,29 @@ describe('FusionService — aggregation', () => {
             expect(ctx.run.sourcesWithoutReviewers.has(SOURCE_NAME)).toBe(true)
             expect(infoSpy).toHaveBeenCalledWith(expect.stringContaining('Match scoring is not configured'))
             expect(errorSpy).not.toHaveBeenCalledWith(expect.stringContaining('Match scoring is not configured'))
+        })
+
+        it('logs Match scoring not configured once for the whole run across sources', async () => {
+            const secondSource = { ...managedSource(), id: 'second-id', name: 'Second Corporation' }
+            Object.defineProperty(ctx.mockSources, 'managedSources', {
+                get: vi.fn(() => [managedSource(), secondSource]),
+                configurable: true,
+            })
+            ;(ctx.mockConfig as any).fusionEnableAutoMerge = false
+            ;(ctx.mockConfig as any).fusionEnableManualReview = true
+            ;(ctx.fusionService as any).fusionOwnerIsGlobalReviewer = false
+            const infoSpy = vi.spyOn(ctx.mockLog, 'info')
+
+            await ctx.fusionService.initializeSourceReviewers()
+
+            ;(ctx.fusionService as any).validateManagedSourceReviewers()
+            const notConfiguredLogs = infoSpy.mock.calls.filter(
+                ([message]) => typeof message === 'string' && message.includes('Match scoring is not configured')
+            )
+            expect(notConfiguredLogs).toHaveLength(1)
+            expect(notConfiguredLogs[0][0]).toContain(`"${SOURCE_NAME}", "Second Corporation"`)
+            ;(ctx.mockConfig as any).fusionEnableAutoMerge = undefined
+            ;(ctx.mockConfig as any).fusionEnableManualReview = undefined
         })
     })
 

@@ -17,4 +17,9 @@ export const statuses: EntitlementSource[] = [
     { id: StatusEntitlement.Uncorrelated, name: 'Uncorrelated', description: 'Account has sources accounts pending correlation' },
     { id: StatusEntitlement.ActiveReviews, name: 'Active reviews', description: 'Account has active fusion reviews' },
     { id: StatusEntitlement.Candidate, name: 'Candidate', description: 'This identity is part of a pending Fusion review' },
+    {
+        id: StatusEntitlement.New,
+        name: 'New',
+        description: 'Fusion account created in this aggregation; removed when loaded in a later aggregation',
+    },
 ]

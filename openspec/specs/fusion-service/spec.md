@@ -558,7 +558,7 @@ When loading persisted `originAccount` metadata, the connector SHALL accept a pl
 
 ### Requirement: Managed source Match scoring eligibility uses automatic merge and manual review toggles
 
-During `initializeManagedAccountProcessing`, `FusionService.validateManagedSourceReviewers` SHALL evaluate each managed source for Match scoring eligibility. A source SHALL enter Match scoring when **`fusionEnableAutoMerge`** is true **or** when **`fusionEnableManualReview`** is true and the source has at least one reviewer in `run.reviewersBySourceId`. When neither condition holds, the source SHALL be added to `run.sourcesWithoutReviewers` and a log SHALL be emitted once per source stating accounts will be treated as non-matched: ERROR when **`fusionEnableManualReview`** is true (reviewers missing), INFO when **`fusionEnableManualReview`** is false (Match scoring intentionally disabled). When automatic merge is enabled and the source has zero reviewers, the source SHALL NOT be added to `run.sourcesWithoutReviewers`, and a WARN log SHALL state manual review is unavailable and borderline matches will register as non-match.
+During `initializeManagedAccountProcessing`, `FusionService.validateManagedSourceReviewers` SHALL evaluate each managed source for Match scoring eligibility. A source SHALL enter Match scoring when **`fusionEnableAutoMerge`** is true **or** when **`fusionEnableManualReview`** is true and the source has at least one reviewer in `run.reviewersBySourceId`. When neither condition holds, the source SHALL be added to `run.sourcesWithoutReviewers`. A single INFO log SHALL be emitted once per run — never once per source and never at ERROR level — listing every source added to `run.sourcesWithoutReviewers` and stating their accounts will be treated as non-matched. When automatic merge is enabled and a source has zero reviewers, the source SHALL NOT be added to `run.sourcesWithoutReviewers`, and a single WARN log SHALL be emitted once per run listing those sources and stating manual review is unavailable and borderline matches will register as non-match.
 
 #### Scenario: Manual review enabled without reviewers and automatic merge disabled skips scoring
 
@@ -567,7 +567,8 @@ During `initializeManagedAccountProcessing`, `FusionService.validateManagedSourc
 - **AND** managed source `"Source A"` has zero reviewers in `run.reviewersBySourceId`
 - **WHEN** `validateManagedSourceReviewers` runs during managed account initialization
 - **THEN** `"Source A"` SHALL be present in `run.sourcesWithoutReviewers`
-- **AND** an ERROR log SHALL mention that Match scoring is not configured
+- **AND** a single INFO log SHALL mention that Match scoring is not configured and list `"Source A"`
+- **AND** an ERROR log SHALL NOT mention that Match scoring is not configured
 
 #### Scenario: Automatic merge enabled without reviewers allows scoring
 
@@ -592,6 +593,13 @@ During `initializeManagedAccountProcessing`, `FusionService.validateManagedSourc
 - **THEN** `"Source A"` SHALL be present in `run.sourcesWithoutReviewers`
 - **AND** an INFO log SHALL mention that Match scoring is not configured
 - **AND** an ERROR log SHALL NOT mention that Match scoring is not configured
+
+#### Scenario: Multiple non-scorable sources log once for the run
+
+- **GIVEN** managed sources `"Source A"` and `"Source B"` are both ineligible for Match scoring
+- **WHEN** `validateManagedSourceReviewers` runs
+- **THEN** exactly one INFO log SHALL mention that Match scoring is not configured
+- **AND** that log SHALL list both `"Source A"` and `"Source B"`
 
 ### Requirement: Unique JIT on Output does not hold the unique registry lock during Velocity evaluation
 

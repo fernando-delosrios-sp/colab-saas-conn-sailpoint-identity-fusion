@@ -34,6 +34,7 @@ describe('FusionAccount', () => {
             expect(acc.type).toBe(FusionAccountKind.Identity)
             expect(acc.sourceName).toBe(IDENTITIES_SOURCE_NAME)
             expect(acc.statuses).toContain('baseline')
+            expect(acc.statuses).toContain('new')
             expect(acc.fromIdentity).toBe(true)
             expect(acc.managedKey).toBe(`${IDENTITIES_SOURCE_NAME}::id-1`)
         })
@@ -44,6 +45,7 @@ describe('FusionAccount', () => {
             expect(acc.type).toBe(FusionAccountKind.Managed)
             expect(acc.sourceName).toBe('Source A')
             expect(acc.statuses).toContain('uncorrelated')
+            expect(acc.statuses).toContain('new')
             expect(acc.needsReset).toBe(true)
             expect(acc.managedKey).toBe('src-a::nat-1')
         })
@@ -61,6 +63,28 @@ describe('FusionAccount', () => {
             expect(acc.type).toBe(FusionAccountKind.Decision)
             expect(acc.managedKey).toBe('src-a::native-1')
             expect(acc.statuses).toContain('uncorrelated')
+            expect(acc.statuses).toContain('new')
+        })
+
+        it('fromFusionAccount removes persisted new status', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                sourceName: 'Identity Fusion NG',
+                attributes: { statuses: ['new', 'uncorrelated'] },
+            } as Account)
+
+            expect(acc.statuses).not.toContain('new')
+            expect(acc.statuses).toContain('uncorrelated')
+        })
+
+        it('fromFusionAccount does not add new when it was not persisted', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-2',
+                sourceName: 'Identity Fusion NG',
+                attributes: { statuses: ['uncorrelated'] },
+            } as Account)
+
+            expect(acc.statuses).not.toContain('new')
         })
     })
 

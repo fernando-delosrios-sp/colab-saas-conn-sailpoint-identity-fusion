@@ -117,16 +117,18 @@ Optional: invoke a **git worktree skill** when present for naming/cleanup conven
 3. **`APPLY_REF`** — **worktree only:** `apply-<NAME>`. Create from `ORIGINAL_BRANCH` if missing; never reuse a stale `apply-<NAME>` with unrelated commits — delete and recreate when Change differs.
 4. Persist empty `base-branch` in `TRACKING` when inferred.
 
-**Bind** — requires Presets → `venue` and `parallelism`. Set `WORK_CHECKOUT`, then `ACTIVE_CHANGE_ROOT = WORK_CHECKOUT + "/" + CHANGE_ROOT_REL`:
+**Bind** — requires Presets → `venue` and `parallelism`.
+
+1. Set `WORK_CHECKOUT`, then `ACTIVE_CHANGE_ROOT = WORK_CHECKOUT + "/" + CHANGE_ROOT_REL`:
 
 | Venue | Bind |
 |---|---|
 | **`local`** | Checkout `ORIGINAL_BRANCH` on main → `WORK_CHECKOUT` = main repo |
 | **`worktree`** | Main on `ORIGINAL_BRANCH`. `git worktree add <path> -b APPLY_REF ORIGINAL_BRANCH` (or attach existing clean `APPLY_REF`) → `WORK_CHECKOUT` = worktree path |
-| **`remote`** | Main on `ORIGINAL_BRANCH`. Resolve `FEATURE_BRANCH` per step 2. Checkout `FEATURE_BRANCH` in worktree or runner checkout; push `-u origin FEATURE_BRANCH` when new. Create **Issue** when empty and `docs/agents/issue-tracker.md` exists. Dispatch cloud/CI runner when platform supports; else orchestrate on `FEATURE_BRANCH` locally |
+| **`remote`** | Main on `ORIGINAL_BRANCH`. Resolve `FEATURE_BRANCH` per **Branch resolution** step 2. Checkout `FEATURE_BRANCH` in worktree or runner checkout; push `-u origin FEATURE_BRANCH` when new. Create **Issue** when empty and `docs/agents/issue-tracker.md` exists. Dispatch cloud/CI runner when platform supports; else orchestrate on `FEATURE_BRANCH` locally |
 
-10. **Persist `tracking.md`** at `ACTIVE_CHANGE_ROOT` (reconcile; never wholesale Presets replace).
-11. **Re-read** planning artifacts from `ACTIVE_CHANGE_ROOT`.
+2. **Persist `tracking.md`** at `ACTIVE_CHANGE_ROOT` (reconcile; never wholesale Presets replace).
+3. **Re-read** planning artifacts from `ACTIVE_CHANGE_ROOT`.
 
 ### 3. Execute tasks
 
