@@ -65,8 +65,11 @@ When `input.changes` contains action entitlement Add or Remove operations, the a
 
 - **GIVEN** an existing Fusion account for a valid identity
 - **WHEN** the report action entitlement is added during account update
-- **THEN** the connector SHALL run the non-persistent report pipeline
-- **AND** SHALL deliver the aggregation-style report per report-service contract
+- **THEN** the connector SHALL run the non-persistent Fusion report pipeline
+- **AND** SHALL inhibit ISC write API calls for that nested pipeline
+- **AND** SHALL apply the same Match outcome tree as account-list dry-run (auto-merge, Fusion review, deferred, non-match) without persisting those outcomes
+- **AND** SHALL deliver the Fusion report per report-service contract
+- **AND** SHALL NOT stream the account-list output for that nested pipeline
 
 #### Scenario: Report action Remove is a no-op on update
 
