@@ -584,7 +584,7 @@ describe('FusionAccount', () => {
             const acc = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-1',
                 id: 'isc-1',
-                name: 'Fusion Row',
+                name: 'Fusion Account',
                 sourceName: 'Identity Fusion NG',
                 identityId: 'id-1',
                 attributes: { accounts: [managedKey] },
@@ -707,7 +707,7 @@ describe('FusionAccount', () => {
             expect(acc.statuses).not.toContain('orphan')
         })
 
-        it('treats baseline-only persisted rows as identity-origin for orphan detection', () => {
+        it('treats baseline-only persisted Fusion accounts as identity-origin for orphan detection', () => {
             const acc = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-1',
                 id: 'isc-1',
@@ -924,7 +924,7 @@ describe('FusionAccount', () => {
             expect(sourceHasDistinctSnapshot(acc, 'Source A')).toBe(false)
         })
 
-        it('new blend materializes snapshots for the row', () => {
+        it('new blend materializes snapshots for the Fusion account', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-new-blend' } as any)
             const run = new FusionRun()
             run.setManagedAccount(
@@ -940,7 +940,7 @@ describe('FusionAccount', () => {
             expect(run.managedAccountsById.has('src-a::native-1')).toBe(false)
         })
 
-        it('over-threshold modified materializes all live linked accounts on the row', () => {
+        it('over-threshold modified materializes all live linked accounts on the Fusion account', () => {
             const acc = persistedFusion(['src-a::keep-1', 'src-b::keep-2'])
             const run = new FusionRun()
             run.setManagedAccount(
@@ -1105,7 +1105,7 @@ describe('FusionAccount', () => {
             expect(acc.originAccountId).toBe('identity-uuid-123')
         })
 
-        it('retains originAccount from baseline-only persisted rows without originSource', () => {
+        it('retains originAccount from baseline-only persisted Fusion accounts without originSource', () => {
             const acc = FusionAccount.fromFusionAccount({
                 nativeIdentity: 'fusion-1',
                 id: 'isc-1',

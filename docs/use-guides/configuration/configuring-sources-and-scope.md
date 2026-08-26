@@ -39,7 +39,7 @@ flowchart LR
 !!! tip "Choosing a mode"
     - Need similarity Match with review forms and authoritative correlation → **umbrella** (Fusion authoritative).
     - Need generated usernames or merged attributes only → **side-car** (Fusion usually non-authoritative).
-    - Need orphan directory rows to improve Match but never create identities from that source → **side-car** + **Orphan** source type. See [Source types](source-types.md).
+    - Need orphan directory accounts to improve Match but never create identities from that source → **side-car** + **Orphan** source type. See [Source types](source-types.md).
 
 ## Scope: managed sources vs identity scope
 
@@ -103,7 +103,7 @@ When **Include identities in the scope?** is enabled:
 
 When disabled:
 
-- Baseline consists of managed accounts previously processed by Fusion that became identities, plus correlated managed accounts and existing Fusion account rows.
+- Baseline consists of managed source accounts previously processed by Fusion that became identities, plus correlated managed source accounts and existing Fusion accounts.
 - `$identity` is unavailable unless an identity is loaded through another path (for example a global reviewer).
 
 ## Configuring managed sources
@@ -178,8 +178,8 @@ Conditional PAT scopes apply: `idn:task-management:read` for **before** mode, `i
 | Field | Description | Default | Notes |
 | --- | --- | --- | --- |
 | **Maximum history messages** | Audit history entries per Fusion account | 10 | Older entries discarded |
-| **Delete accounts with no managed accounts left?** | Remove Fusion row when all source accounts gone | Off | Useful for leaver cleanup |
-| **Skip accounts with missing unique ID?** | Skip rows without fusion identity attribute | Off | Logged for review |
+| **Delete accounts with no managed accounts left?** | Remove Fusion account when all source accounts are gone | Off | Useful for leaver cleanup |
+| **Skip accounts with missing unique ID?** | Skip managed source accounts without the Fusion identity attribute | Off | Logged for review |
 
 **Force attribute refresh on next aggregation?** is under **Advanced Settings → Developer Settings**. It recalculates Normal-type attributes for one run only, then auto-disables. Unique attributes refresh only on account creation or activation.
 

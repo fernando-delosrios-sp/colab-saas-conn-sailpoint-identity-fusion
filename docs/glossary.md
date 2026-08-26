@@ -15,6 +15,7 @@ This page defines the canonical terms used throughout the connector, its configu
 | **Fusion identity**                | A Fusion account that has been correlated to an ISC identity and is treated as that identity's authoritative account.                                                                   |
 | **Identity-origin Fusion account** | A Fusion account seeded from an existing ISC identity during aggregation (for example when **Include identities in the scope?** is enabled), rather than from a managed source account. |
 | **Provisional Fusion account**     | A Fusion account created from a managed source account before its match fate has been decided.                                                                                          |
+| **StdAccountListOutput object**    | One Fusion account payload streamed via `res.send` during account-list (including dry-run). The summary field `rowsSent` counts these objects.                                          |
 
 ## Identity reference and Fusion account naming
 
@@ -123,7 +124,7 @@ These products share a Handlebars template family but are not interchangeable. *
 | Term | Definition |
 | --- | --- |
 | **Dry-run report** | HTML/email titled **Identity Fusion Dry Run Report** from account-list dry-run (`saveFile` / `sendEmail`). Same Match preview as a Fusion report; delivery is operator-controlled. |
-| **Fusion report** | HTML/email titled **Identity Fusion Report** from the `report` (**FusionReport**) action. Same Match preview as dry-run (writes inhibited); emailed to global owners. Does not stream account-list rows. |
+| **Fusion report** | HTML/email titled **Identity Fusion Report** from the `report` (**FusionReport**) action. Same Match preview as dry-run (writes inhibited); emailed to global owners. Does not stream Fusion accounts. |
 | **Aggregation report** | HTML/email titled **Identity Fusion Aggregation Report** sent to owners after persistent account-list when **Send report to owner on aggregation?** is enabled. |
 | **Fusion Review decision section** | A section of those HTML documents listing applied FusionDecision rows. Primarily meaningful on the aggregation report. Analysis reports may show in-memory decisions but must not persist new ones. |
 | **Fusion review** | The reviewer-facing review-required communication: email plus review form. Not a report. |
@@ -194,8 +195,8 @@ These products share a Handlebars template family but are not interchangeable. *
 | Term                       | Definition                                                                                                                                                         |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Authoritative accounts** | Managed source accounts that create new ISC identities when they do not match an existing identity. Fusion typically owns correlation decisions for these sources. |
-| **Records**                | Managed source accounts that run **Map** and **Define** and may register unique attributes, but do not create Fusion accounts for non-matched rows.                |
-| **Orphan accounts**        | Managed source accounts whose non-matched rows are dropped; optionally, stale orphan accounts can be disabled.                                                     |
+| **Records**                | Managed source accounts that run **Map** and **Define** and may register unique attributes, but do not create Fusion accounts when they do not match.             |
+| **Orphan accounts**        | Managed source accounts whose non-matched accounts are dropped; optionally, stale orphan accounts can be disabled.                                                 |
 
 ## Processing states and outcomes
 
@@ -215,7 +216,7 @@ These products share a Handlebars template family but are not interchangeable. *
 | **Unique attribute definition**    | A Define-step rule that generates a value guaranteed to be unique across all Fusion accounts. Uses collision-based disambiguation or an incremental counter. Runs after normal definitions.                                                                                                                              |
 | **Static attribute**               | A normal attribute evaluated only once — when the attribute has no value. Existing values are never recalculated. Overrides **Always recalculate**.                                                                                                                                                                      |
 | **Always recalculate**             | Per-definition toggle for Normal attribute definitions (`definition.refresh`), shown as **Always recalculate?**. When on, the expression runs every aggregation even if source data is unchanged. When off, existing values are kept unless source data changed, the account is reset, or force attribute refresh is on. |
-| **$account**                       | The origin account snapshot available in Velocity templates — the managed source account that triggered creation, or the identity-origin row when the origin is the Identities source.                                                                                                                                   |
+| **$account**                       | The origin account snapshot available in Velocity templates — the managed source account that triggered creation, or the identity-origin Fusion account's origin snapshot when the origin is the Identities source.                                                                                                         |
 | **$accounts**                      | An ordered list of all managed source account snapshots contributing to the Fusion account. Ordered by configured sources, then insertion order.                                                                                                                                                                         |
 | **$sources**                       | A Map keyed by source name containing per-source account snapshots. Accessible via dot notation (`$sources.Workday`).                                                                                                                                                                                                    |
 | **$identity**                      | The correlated ISC identity object, available when the Fusion account is linked to an identity.                                                                                                                                                                                                                          |
@@ -280,7 +281,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Umbrella mode**                 | Deployment pattern where the Fusion source is **authoritative** in ISC. Fusion owns correlation and identity-creation decisions for configured managed sources. Match is typically required. See [Configuring sources and scope](use-guides/configuration/configuring-sources-and-scope.md#deployment-modes-umbrella-vs-side-car).                 |
 | **Side-car mode**                 | Deployment pattern where the Fusion source is usually **non-authoritative**. Fusion runs Map and Define (and optional Orphan Match) alongside other authoritative sources without owning identity lifecycle. See [Configuring sources and scope](use-guides/configuration/configuring-sources-and-scope.md#deployment-modes-umbrella-vs-side-car). |
-| **Sources scope**                 | The set of managed accounts fetched from sources listed under **Authoritative account sources**, after per-source filters. Defines which account rows enter Map, Define, and Match. Distinct from identity scope.                                                                                                                                  |
+| **Sources scope**                 | The set of managed source accounts fetched from sources listed under **Authoritative account sources**, after per-source filters. Defines which accounts enter Map, Define, and Match. Distinct from identity scope.                                                                                                                            |
 | **Identity scope**                | The set of ISC identities included when **Include identities in the scope?** is enabled, filtered by **Identity Scope Query**. Optional; provides a Match baseline from identity profiles before managed accounts exist. When disabled, baseline comes from managed and Fusion accounts only.                                                      |
 | **Proxy mode**                    | A deployment option where connector logic runs on an external server and communicates with ISC via a lightweight proxy connector. Offloads processing from ISC infrastructure.                                                                                                                                                                     |
 | **External logging**              | Sending connector log output to an external endpoint (e.g., Splunk, Datadog) for centralized monitoring. Controlled by the external logging URL and level settings.                                                                                                                                                                                |
@@ -301,3 +302,17 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Golden artifact** | A pre-validated expected output file (e.g., `output.sweep1.expected.json`) used as the reference for automated test comparison. Generated artifacts are compared against golden artifacts to detect regressions. |
 | **Sweep** (testing) | A single aggregation run within a test scenario. Multi-sweep scenarios (sweep 1, sweep 2) validate stateful behavior across sequential aggregations.                                                             |
 | **Side effects**    | Non-account changes produced during an aggregation run (e.g., form creation, correlation API calls). Captured in side-effect files for test validation.                                                          |
+
+## Retired account synonyms
+
+Use the canonical account taxonomy instead of table language for entities:
+
+| Retired term | Canonical replacement |
+| --- | --- |
+| Fusion row / Fusion account row / persisted Fusion row | Fusion account |
+| identity-origin row / Identities row | identity-origin Fusion account or Identities snapshot |
+| managed row / directory row / AD row | managed source account |
+| non-matched row | non-matched managed source account |
+| account row | Fusion account or `StdAccountListOutput` object |
+| origin row | origin snapshot / `$account` |
+| this row (when referring to a Fusion account) | this Fusion account |

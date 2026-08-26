@@ -22,7 +22,7 @@ The system SHALL stream all available accounts when the account-list operation i
 - **GIVEN** a managed source configured with an Accounts API filter (`accountFilter`)
 - **WHEN** the account-list operation runs Fetch phase
 - **THEN** the source service SHALL apply the filter server-side when calling the ISC Accounts API
-- **AND** managed accounts excluded by the filter SHALL NOT enter the work queue, matching pipeline, or output as new rows from that source fetch
+- **AND** managed source accounts excluded by the filter SHALL NOT enter the work queue, matching pipeline, or output as new Fusion accounts from that source fetch
 - **AND** scope narrowing SHALL NOT rely on list-input filter criteria on the account-list invocation
 
 #### Scenario: Successful dry-run listing
@@ -60,40 +60,40 @@ The account-list operation SHALL accept an optional `dryRun` input object with f
 - **WHEN** the account-list operation is invoked with `{ dryRun: { saveFile: true } }` without `enabled: true`
 - **THEN** the system SHALL execute a normal persistent aggregation and ignore the `saveFile` option
 
-### Requirement: Dry-run mode streams 1-to-1 StdAccountListOutput rows
+### Requirement: Dry-run mode streams 1-to-1 StdAccountListOutput objects
 
-In dry-run mode, the account-list operation SHALL stream `StdAccountListOutput` rows via `res.send` that match persistent aggregation rows for the same ISC input state. Rows SHALL use the standard shape (`key`, `attributes`, `disabled`) and SHALL NOT carry legacy enrichment payloads (`matchingStatus`, `reportCategories`, `sourceStatus`, `correlationStatus`, `review`, synthetic `orphan-deferred:*` stubs).
+In dry-run mode, the account-list operation SHALL stream `StdAccountListOutput` objects via `res.send` that match persistent aggregation output for the same ISC input state. Objects SHALL use the standard shape (`key`, `attributes`, `disabled`) and SHALL NOT carry legacy enrichment payloads (`matchingStatus`, `reportCategories`, `sourceStatus`, `correlationStatus`, `review`, synthetic `orphan-deferred:*` stubs).
 
-#### Scenario: Dry-run row output shape matches aggregation output
+#### Scenario: Dry-run output shape matches aggregation output
 
 - **WHEN** the account-list operation runs in dry-run mode
-- **THEN** each streamed row SHALL contain only `key`, `attributes`, `disabled`, and standard `StdAccountListOutput` fields
+- **THEN** each streamed `StdAccountListOutput` object SHALL contain only `key`, `attributes`, `disabled`, and standard `StdAccountListOutput` fields
 
-#### Scenario: Dry-run rows include JIT unique attributes
+#### Scenario: Dry-run output includes JIT unique attributes
 
 - **GIVEN** Fusion accounts requiring unique attribute refresh during output
 - **WHEN** the account-list operation runs in dry-run mode
-- **THEN** streamed account rows SHALL include generated unique attribute values produced by the same JIT output path as persistent aggregation
+- **THEN** streamed Fusion accounts SHALL include generated unique attribute values produced by the same JIT output path as persistent aggregation
 
-### Requirement: Dry-run mode streams only account rows via res.send
+### Requirement: Dry-run mode streams only StdAccountListOutput objects via res.send
 
-In dry-run mode, `res.send` SHALL emit only `StdAccountListOutput` account rows, matching persistent aggregation for the same ISC input state. The operation SHALL NOT send a summary or other non-account payload via `res.send`.
+In dry-run mode, `res.send` SHALL emit only `StdAccountListOutput` objects, matching persistent aggregation for the same ISC input state. The operation SHALL NOT send a summary or other non-account payload via `res.send`.
 
 #### Scenario: Dry-run res.send matches persistent aggregation
 
-- **WHEN** the account-list operation completes row streaming in dry-run mode
-- **THEN** every `res.send` call SHALL be a standard account row
+- **WHEN** the account-list operation completes Fusion account streaming in dry-run mode
+- **THEN** every `res.send` call SHALL be a standard `StdAccountListOutput` object
 - **AND** no summary or metadata object SHALL be sent via `res.send`
 
 ### Requirement: Dry-run mode logs a run summary to console
 
-After the pipeline completes (and after any dry-run report artifacts are written when requested), the account-list operation in dry-run mode SHALL log a run summary object to `console.log` containing: total rows sent, identity/managed-account/fusion-account totals, issue summary (warnings/errors), total processing time, and report output paths (if applicable).
+After the pipeline completes (and after any dry-run report artifacts are written when requested), the account-list operation in dry-run mode SHALL log a run summary object to `console.log` containing: `rowsSent` (count of streamed Fusion accounts), identity/managed-account/fusion-account totals, issue summary (warnings/errors), total processing time, and report output paths (if applicable).
 
-#### Scenario: Run summary logged after row streaming
+#### Scenario: Run summary logged after streaming
 
 - **WHEN** the account-list operation completes in dry-run mode
 - **THEN** the system SHALL log a summary object to `console.log`
-- **AND** `rowsSent` in the summary SHALL equal the number of account rows sent via `res.send`
+- **AND** `rowsSent` in the summary SHALL equal the number of Fusion accounts sent via `res.send`
 
 ### Requirement: Dry-run report captures Match slices without aggregation-on-owner
 When account-list runs in dry-run mode, the connector SHALL populate Match report tracker slices (identity matches, deferred matches, analyzed non-matches, failed matching) even when **Send report to owner on aggregation?** is disabled. Capture SHALL NOT require the retired `custom:dryrun` operation context.
@@ -250,7 +250,7 @@ The account-list operation SHALL emit PHASE START and PHASE END lines at each ma
 
 #### Scenario: Process phase end reports bulk link enqueue on first run
 
-- **GIVEN** a first account-list run after reset with no existing fusion rows
+- **GIVEN** a first account-list run after reset with no existing Fusion accounts
 - **WHEN** Process phase completes after enqueuing link PATCHes for managed accounts
 - **THEN** a `PHASE 4 Process END` line SHALL include cumulative `link=` enqueue totals
 - **AND** the detail SHALL NOT include `correlated-action=`
@@ -351,7 +351,7 @@ During account-list execution, per-account match discovery (`MATCH FOUND`, `EXAC
 
 ### Requirement: Account-list process phase hydrates orphan correlated identities before correlated sweep
 
-The account-list Process phase SHALL hydrate out-of-scope identities for orphan correlated managed accounts (correlated on the source, unlinked from loaded Fusion rows, still on the work queue after refresh) after managed-account processing is initialized and immediately before the correlated managed-account sweep. The Fetch phase SHALL NOT perform this hydration pass.
+The account-list Process phase SHALL hydrate out-of-scope identities for orphan correlated managed accounts (correlated on the source, unlinked from loaded Fusion accounts, still on the work queue after refresh) after managed-account processing is initialized and immediately before the correlated managed-account sweep. The Fetch phase SHALL NOT perform this hydration pass.
 
 #### Scenario: Hydration runs in process phase not fetch phase
 
@@ -479,7 +479,7 @@ In dry-run mode, the account-list operation SHALL execute the same Setup, Fetch,
 - **GIVEN** a dry-run invocation with `{ dryRun: { enabled: true } }`
 - **WHEN** the pipeline reaches Phase 5 Output
 - **THEN** the system SHALL invoke `forEachISCAccount` and stream each account via `res.send`
-- **AND** `rowsSent` in the console run summary SHALL equal the number of account rows sent
+- **AND** `rowsSent` in the console run summary SHALL equal the number of Fusion accounts sent
 
 #### Scenario: Dry-run runs Match and Correlation logic
 
@@ -562,13 +562,13 @@ During the account-list Process-phase correlated sweep, skip-linked drops (corre
 
 ### Requirement: Unique attributes remain JIT on Output while generation may overlap within a batch
 
-The account-list Output phase SHALL still generate Unique attributes Just-In-Time immediately before serializing each Fusion account (`FusionService.forEachISCAccount` / `processOutputBatch`). The operation SHALL NOT generate Unique attributes during Process to bypass Output. Unique generation for accounts in the same fusion-parallel Output batch MAY overlap. Generated values SHALL remain unique per attribute across the run. Per-account skip-linked Process INFO rules in this change do not alter Output row shape.
+The account-list Output phase SHALL still generate Unique attributes Just-In-Time immediately before serializing each Fusion account (`FusionService.forEachISCAccount` / `processOutputBatch`). The operation SHALL NOT generate Unique attributes during Process to bypass Output. Unique generation for accounts in the same fusion-parallel Output batch MAY overlap. Generated values SHALL remain unique per attribute across the run. Per-account skip-linked Process INFO rules in this change do not alter the `StdAccountListOutput` object shape.
 
 #### Scenario: Unique generation stays on the Output send path
 
 - **GIVEN** Fusion accounts that need Unique attribute refresh
-- **WHEN** account-list Output streams rows
-- **THEN** Unique generation SHALL run immediately before each row is serialized
+- **WHEN** account-list Output streams Fusion accounts
+- **THEN** Unique generation SHALL run immediately before each Fusion account is serialized
 - **AND** Process phase SHALL NOT have already persisted newly generated Unique values for those accounts solely to speed Output
 
 #### Scenario: Output batch Unique generation may overlap
@@ -576,7 +576,7 @@ The account-list Output phase SHALL still generate Unique attributes Just-In-Tim
 - **GIVEN** a fusion-parallel Output batch of accounts that all need Unique generation
 - **WHEN** `processOutputBatch` runs with unique refresh enabled
 - **THEN** Unique generation for those accounts MAY proceed concurrently
-- **AND** streamed rows SHALL still contain distinct Unique attribute values for each account
+- **AND** streamed Fusion accounts SHALL still contain distinct Unique attribute values for each account
 
 ### Requirement: Refresh phase records aggregate sub-step workload metrics
 

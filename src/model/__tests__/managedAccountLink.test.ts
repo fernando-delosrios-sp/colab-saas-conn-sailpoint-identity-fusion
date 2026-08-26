@@ -14,7 +14,7 @@ describe('isManagedAccountLinkedInFusion', () => {
         const fusionAccount = FusionAccount.fromFusionAccount({
             nativeIdentity: 'fusion-managed-key',
             id: 'isc-fusion-1',
-            name: 'Existing Fusion Row',
+            name: 'Existing Fusion Account',
             sourceName: 'Identity Fusion NG',
             attributes: {
                 accounts: [MANAGED_KEY],

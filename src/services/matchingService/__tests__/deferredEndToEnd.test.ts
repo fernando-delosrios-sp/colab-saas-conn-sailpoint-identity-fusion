@@ -200,7 +200,7 @@ describe('deferred matching end-to-end (real MatchingService)', () => {
         expect(tracker.deferredMatchReportData.length).toBeGreaterThan(0)
     })
 
-    it('detects a deferred match against a persisted non-match fusion row from a prior run', async () => {
+    it('detects a deferred match against a persisted non-match Fusion account from a prior run', async () => {
         const { dispatcher, run, log, tracker } = build()
 
         const persisted = FusionAccount.fromFusionAccount({

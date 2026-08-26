@@ -10,7 +10,7 @@ For algorithm and threshold detail, see [Tuning matching algorithms](tuning-matc
 
 ## Cookbook 1: HR + AD deduplication (umbrella mode)
 
-**Goal:** Fusion is authoritative. Workday (HR) and Active Directory accounts merge into one Fusion profile; similarity Match deduplicates new AD rows against HR-backed identities.
+**Goal:** Fusion is authoritative. Workday (HR) and Active Directory accounts merge into one Fusion profile; similarity Match deduplicates new AD managed source accounts against HR-backed identities.
 
 ### Cookbook 1 — deployment settings
 
@@ -34,7 +34,7 @@ For algorithm and threshold detail, see [Tuning matching algorithms](tuning-matc
 ### Cookbook 1 — dry-run validation
 
 1. Enable dry-run on account-list with `saveFile: true` (see [Analyze changes with dry-run](../operation/analyze-with-dry-run.md)).
-2. Confirm HTML report shows identity matches for AD rows that overlap HR emails.
+2. Confirm HTML report shows identity matches for AD managed source accounts that overlap HR emails.
 3. Grep logs for `PHASE 4 Process` and `uncorrelated-sweep` — Match discovery lines should appear for partial name matches.
 
 **See also:** [Configuring sources and scope](configuring-sources-and-scope.md) · [Matching identities](matching-identities.md)
@@ -43,7 +43,7 @@ For algorithm and threshold detail, see [Tuning matching algorithms](tuning-matc
 
 ## Cookbook 2: Username pool (Records / side-car)
 
-**Goal:** Generate unique usernames from a Records source without creating Fusion accounts or ISC identities for non-matched rows. Fusion runs in [side-car mode](../../glossary.md#deployment-and-integration) (non-authoritative).
+**Goal:** Generate unique usernames from a Records source without creating Fusion accounts or ISC identities for non-matched managed source accounts. Fusion runs in [side-car mode](../../glossary.md#deployment-and-integration) (non-authoritative).
 
 ### Cookbook 2 — deployment settings
 
@@ -66,7 +66,7 @@ For algorithm and threshold detail, see [Tuning matching algorithms](tuning-matc
 
 1. Run dry-run aggregation with Records source populated.
 2. Verify `record-unique-registration` step in logs (`PHASE 4 Process`).
-3. Confirm no new Fusion account rows for non-matched Records entries; unique values registered in connector state.
+3. Confirm no new Fusion accounts for non-matched Records accounts; unique values registered in connector state.
 
 **See also:** [Source types — Records](source-types.md) · [Defining attributes](defining-attributes.md)
 
@@ -74,7 +74,7 @@ For algorithm and threshold detail, see [Tuning matching algorithms](tuning-matc
 
 ## Cookbook 3: Contractor orphan cleanup
 
-**Goal:** Supplemental contractor directory (Orphan source) improves Match against existing employees but never creates identities from contractor rows.
+**Goal:** Supplemental contractor directory (Orphan source) improves Match against existing employees but never creates identities from contractor managed source accounts.
 
 ### Cookbook 3 — deployment settings
 
@@ -96,7 +96,7 @@ For algorithm and threshold detail, see [Tuning matching algorithms](tuning-matc
 ### Cookbook 3 — dry-run validation
 
 1. Dry-run with contractor accounts that match and do not match employees.
-2. Confirm matched contractors layer onto existing Fusion identities; non-matched rows absent from output.
+2. Confirm matched contractors layer onto existing Fusion identities; non-matched managed source accounts are absent from output.
 3. Grep for `await-disable-ops` when **Disable non-matching accounts** triggers disable actions.
 
 **See also:** [Source types — Orphan](source-types.md) · [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md)

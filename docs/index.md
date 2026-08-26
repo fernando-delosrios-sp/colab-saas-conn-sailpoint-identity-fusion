@@ -30,8 +30,8 @@ flowchart LR
 | Step | Purpose | Authoritative accounts | Orphan accounts | Records |
 | --- | --- | --- | --- | --- |
 | **Map** | Align managed account attributes with your Fusion account schema and merge values from multiple sources. | Full Map feeds Define and Match for identity lifecycle decisions. | Map prepares supplemental attributes used during Match. | Map runs; attributes feed Define and optional Match. |
-| **Define** | Create derived attributes, unique identifiers, UUIDs, and Velocity-based transformations. | Normal and Unique definitions evaluated before Match scoring. | Define output used only when a match exists. | Unique values registered; non-matched rows do not emit Fusion accounts. |
-| **Match** | Compare Fusion accounts to identities in scope using similarity rules and optional manual review. | Outcomes: Fusion account, Fusion review, Fusion auto merge, or new identity when Fusion is authoritative. | Non-matched rows dropped (optional disable on managed source); never create identities. | Optional Match participation; non-matched rows register unique values and drop. |
+| **Define** | Create derived attributes, unique identifiers, UUIDs, and Velocity-based transformations. | Normal and Unique definitions evaluated before Match scoring. | Define output used only when a match exists. | Unique values registered; non-matched managed source accounts do not emit Fusion accounts. |
+| **Match** | Compare Fusion accounts to identities in scope using similarity rules and optional manual review. | Outcomes: Fusion account, Fusion review, Fusion auto merge, or new identity when Fusion is authoritative. | Non-matched managed source accounts are dropped (optional disable on managed source); never create identities. | Optional Match participation; non-matched managed source accounts register unique values and drop. |
 
 ### Map (Consolidation)
 
@@ -39,7 +39,7 @@ Align managed account attributes with your Fusion account schema and merge value
 
 - **Authoritative sources:** Map feeds Define and Match for full identity lifecycle decisions.
 - **Records sources:** Map and Define run; unique values are registered even when no Fusion account is emitted.
-- **Orphan sources:** Map prepares supplemental attributes used during Match; non-matched rows are dropped.
+- **Orphan sources:** Map prepares supplemental attributes used during Match; non-matched managed source accounts are dropped.
 
 See [Mapping attributes](./use-guides/configuration/mapping-attributes.md) and [Attribute Mapping Settings](./configuration/mapping.md).
 
@@ -48,7 +48,7 @@ See [Mapping attributes](./use-guides/configuration/mapping-attributes.md) and [
 Create derived attributes, unique identifiers, UUIDs, and Velocity-based transformations. Define runs after Map (when sources exist) and before Match scoring for normal attributes.
 
 - **Unique IDs and counters:** Generate usernames, employee numbers, or UUIDs with collision handling.
-- **Records mode:** Register unique attribute values globally without persisting a Fusion account row.
+- **Records mode:** Register unique attribute values globally without persisting a Fusion account.
 - **Normalization:** Format names, phones, addresses, and dates before Match scoring.
 
 See [Defining attributes](./use-guides/configuration/defining-attributes.md) and [Attribute Definition Settings](./configuration/definition.md).

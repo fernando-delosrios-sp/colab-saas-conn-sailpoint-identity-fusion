@@ -126,7 +126,7 @@ export class DefinitionService {
     }
 
     /**
-     * True when this row has at least one Normal definition with Always recalculate
+     * True when this Fusion account has at least one Normal definition with Always recalculate
      * (`definition.refresh`) that would not be skipped as static on an existing Fusion account.
      * Same eligibility as {@link refreshNormalAttributes}.
      */

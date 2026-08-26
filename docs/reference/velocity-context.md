@@ -53,7 +53,7 @@ Available when **Include identities in the scope** is enabled.
 | --- | --- |
 | `$identity.name` | Root identity name |
 | `$identity.<attr>` | Any identity attribute by name |
-| `$name` | Falls back to identity name for identity-origin rows when no mapped attribute named `name` exists |
+| `$name` | Falls back to identity name for identity-origin Fusion accounts when no mapped attribute named `name` exists |
 
 ```velocity
 $identity.name
@@ -67,7 +67,7 @@ Each list entry is a snapshot containing:
 | Part | Fields | Notes |
 | --- | --- | --- |
 | Attributes | All managed account attributes | Same names as on the source |
-| `source` | `id`, `name` | `id` is absent for Identities rows |
+| `source` | `id`, `name` | `id` is absent for Identities snapshots |
 | `schema` | `id`, `name` | Native identity and display name |
 | Flags | `IIQDisabled` | Present when the source exposes it |
 
@@ -95,7 +95,7 @@ Map keyed by source name. Values are lists of the same snapshot shape as `$accou
 ## First Workday account's title
 $sources.Workday[0].jobTitle
 
-## Count AD accounts linked to this Fusion row
+## Count AD accounts linked to this Fusion account
 $sources.ActiveDirectory.size()
 ```
 
@@ -110,11 +110,11 @@ $sources.ActiveDirectory.size()
 
 Same shape as a `$accounts[]` entry for managed origins.
 
-For **Identities** origin rows:
+For **Identities** origin snapshots:
 
 - `source.name` = `Identities` (no `source.id`)
 - `schema.name` / `schema.id` = display name and id
-- `$account.name` is available for identity-origin rows
+- `$account.name` is available for identity-origin Fusion accounts
 
 Use `$originAccount` when you need the key string; use `$account` when you need origin attribute values.
 

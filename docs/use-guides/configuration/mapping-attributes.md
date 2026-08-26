@@ -27,7 +27,7 @@ The **Default attribute merge from multiple sources** setting applies globally t
 | Merge strategy                   | Behavior                                                     | Result format         | Use when                                            |
 | -------------------------------- | ------------------------------------------------------------ | --------------------- | --------------------------------------------------- |
 | **Main account**                 | Uses `mainAccount` when found; otherwise uses the origin     | Single value (string) | Attributes should follow one representative account |
-| **Origin account**               | Uses only the account that originally created the Fusion row | Single value (string) | Attributes must remain pinned to provenance         |
+| **Origin account**               | Uses only the account that originally created the Fusion account | Single value (string) | Attributes must remain pinned to provenance         |
 | **First found**                  | Uses first non-null value by source order                    | Single value (string) | One source is preferred/authoritative               |
 | **Keep a list of values**        | Array of all distinct non-null values                        | Array of strings      | Need all values (roles, groups, entitlements)       |
 | **Concatenate different values** | Distinct values in brackets, space-separated                 | Single string         | Human-readable combined view                        |

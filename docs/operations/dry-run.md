@@ -14,7 +14,7 @@ Dry-run mode cannot be combined with recording mode (`recording.mode: record` or
 
 | Use case | Why dry-run |
 | -------- | ----------- |
-| Tune Match thresholds and algorithms | See potential matches, score breakdowns, and streamed account rows without mutating the tenant |
+| Tune Match thresholds and algorithms | See potential matches, score breakdowns, and streamed Fusion accounts without mutating the tenant |
 | Validate source ordering and attribute mapping | Confirm Map/Define output, JIT unique attributes, and `originSource` behavior before a production aggregation |
 | Review correlation and matching context | Inspect managed-account counts, issue summaries, and phase timing with the same account stream ISC would receive |
 | Large-tenant analysis | Use `saveFile: true` to write the HTML report to disk when the HTTP response is not the primary deliverable |
@@ -89,7 +89,7 @@ flowchart TD
 
 ### Account stream
 
-Dry-run emits the same `StdAccountListOutput` rows as a persistent aggregation for the same ISC input state, including JIT unique attributes refreshed during Phase 5. No summary or metadata object is sent via `res.send`.
+Dry-run emits the same `StdAccountListOutput` objects as a persistent aggregation for the same ISC input state, including JIT unique attributes refreshed during Phase 5. No summary or metadata object is sent via `res.send`.
 
 ### Console run summary
 
@@ -97,7 +97,7 @@ After the pipeline completes, the connector logs a JSON run summary to `console.
 
 | Field | Description |
 | ----- | ----------- |
-| `rowsSent` | Number of account rows streamed via `res.send` |
+| `rowsSent` | Number of Fusion accounts streamed via `res.send` |
 | `identitiesFound` | Identities loaded during the run (scope fetch plus supplemental loads such as global reviewer or report-target owners) |
 | `managedAccountsFound` | Managed accounts loaded during fetch |
 | `fusionAccountsFound` | Fusion accounts loaded from the Fusion source |

@@ -157,7 +157,7 @@ export const countIdentityCandidateFusionMatches = (matches: readonly FusionMatc
 
 /**
  * Managed source name used to bucket deferred-match candidates.
- * Persisted fusion rows use the Fusion connector as `sourceName`; the managed source is `originSource`.
+ * Persisted Fusion accounts use the Fusion connector as `sourceName`; the managed source is `originSource`.
  */
 export function deferredMatchSourceName(fusionAccount: FusionAccount): string | undefined {
     const originSource = fusionAccount.originSource?.trim()

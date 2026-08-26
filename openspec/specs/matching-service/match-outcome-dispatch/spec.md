@@ -312,14 +312,14 @@ When `resolveAccountBeforeScoring` drops a correlated managed account already li
 
 #### Scenario: Skip-linked does not log INFO per account
 
-- **GIVEN** a correlated managed account whose key is already linked on a loaded Fusion row
+- **GIVEN** a correlated managed account whose key is already linked on a loaded Fusion account
 - **WHEN** `resolveAccountBeforeScoring` runs
 - **THEN** the account SHALL be claimed and returned as skip-linked
 - **AND** no INFO line SHALL include the managed account name for that drop
 
 #### Scenario: Correlated-orphan does not log INFO per account
 
-- **GIVEN** a correlated managed account that is not linked to any loaded Fusion row
+- **GIVEN** a correlated managed account that is not linked to any loaded Fusion account
 - **WHEN** `resolveAccountBeforeScoring` runs
 - **THEN** the account SHALL follow the existing correlated-orphan non-match path
 - **AND** no INFO line SHALL include the managed account name for that non-match

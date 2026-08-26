@@ -2024,7 +2024,7 @@ describe('FusionService — aggregation', () => {
             expect(ctx.fusionService.getFusionAccountByManagedKey('source-a-id::native-corr-orphan-1')).toBe(result)
         })
 
-        it('drops correlated managed accounts when their identity already has a fusion identity row', async () => {
+        it('drops correlated managed accounts when their identity already has a Fusion identity account', async () => {
             const identityId = 'identity-linked-1'
             const existing = FusionAccount.fromIdentity({
                 id: identityId,
@@ -2288,7 +2288,7 @@ describe('FusionService — aggregation', () => {
             expect(result.needsRefresh).toBe(true)
         })
 
-        it('force attribute refresh materializes source snapshots on a stale correlated row before Map', async () => {
+        it('force attribute refresh materializes source snapshots on a stale correlated Fusion account before Map', async () => {
             ctx.mockConfig.forceAttributeRefresh = true
             ctx.mockDefinitionService.hasEligibleAlwaysRecalculate.mockReturnValue(false)
 

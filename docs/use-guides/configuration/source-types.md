@@ -18,7 +18,7 @@ flowchart TD
     C --> D{Match outcome?}
     D -- Match / auto-merge --> E[Link to identity]
     D -- No match + Fusion authoritative --> F[Create identity]
-    D -- No match + Fusion not authoritative --> G[NonMatched Fusion row]
+    D -- No match + Fusion not authoritative --> G[Non-matched Fusion account]
     B -- Records --> H[Map → Define → register unique values]
     H --> I{Include in Match?}
     I -- Yes --> C
@@ -67,12 +67,12 @@ The default type for managed sources that contribute to identity lifecycle decis
 
 ## Records
 
-Register unique attribute values **without** emitting Fusion accounts for non-matched rows.
+Register unique attribute values **without** emitting Fusion accounts for non-matched managed source accounts.
 
 **Processing when Include record accounts in Match is on (default):**
 
 - Full Map, Define, and Match run.
-- Non-matched rows register unique values globally but do not create Fusion account rows or identities.
+- Non-matched managed source accounts register unique values globally but do not create Fusion accounts or identities.
 
 **Processing when Include record accounts in Match is off:**
 
@@ -92,7 +92,7 @@ Register unique attribute values **without** emitting Fusion accounts for non-ma
 
 ## Orphan accounts
 
-Supplemental data used **only** to improve Match — never to create identities from non-matched rows.
+Supplemental data used **only** to improve Match — never to create identities from non-matched managed source accounts.
 
 **Processing:**
 
@@ -103,7 +103,7 @@ Supplemental data used **only** to improve Match — never to create identities 
 
 **Optional: Disable non-matching accounts**
 
-When enabled, triggers a background `POST /accounts/{id}/disable` on the managed source for orphan rows that fail to match. Requires `idn:accounts-state:manage` on the connector PAT.
+When enabled, triggers a background `POST /accounts/{id}/disable` on the managed source for orphan accounts that fail to match. Requires `idn:accounts-state:manage` on the connector PAT.
 
 **Typical use cases:**
 

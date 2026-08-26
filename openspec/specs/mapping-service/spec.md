@@ -168,7 +168,7 @@ On a full `mapAttributes` invocation (`onlyTargets` omitted), after explicit map
 
 ### Requirement: MappingService registers the Identities snapshot when the identity bag is present
 
-When identity scope is enabled and `attributeBag.identity` is non-empty, MappingService SHALL register that bag as source `Identities` in `sourceAttributeMap`, include `Identities` in source order if missing, and index it in the per-invocation snapshot-key index under the identity id. Origin and main snapshot resolution SHALL use that index for both managed keys and the identity id. MappingService SHALL NOT use a separate merge algebra for identity-origin Fusion accounts. When identity scope is disabled, MappingService SHALL exclude the identity bag from managed-origin rows and remove any stale `Identities` snapshot before mapping. Identity-origin rows explicitly created for required support identities, such as global reviewers, SHALL retain their own identity snapshot.
+When identity scope is enabled and `attributeBag.identity` is non-empty, MappingService SHALL register that bag as source `Identities` in `sourceAttributeMap`, include `Identities` in source order if missing, and index it in the per-invocation snapshot-key index under the identity id. Origin and main snapshot resolution SHALL use that index for both managed keys and the identity id. MappingService SHALL NOT use a separate merge algebra for identity-origin Fusion accounts. When identity scope is disabled, MappingService SHALL exclude the identity bag from managed-origin Fusion accounts and remove any stale `Identities` snapshot before mapping. Identity-origin Fusion accounts explicitly created for required support identities, such as global reviewers, SHALL retain their own identity snapshot.
 
 #### Scenario: Disabled identity scope excludes the Identities snapshot
 
@@ -197,7 +197,7 @@ When identity scope is enabled and `attributeBag.identity` is non-empty, Mapping
 - **WHEN** `mapAttributes` runs
 - **THEN** `department` SHALL come from the identity bag
 
-#### Scenario: Managed-origin row indexes Identities when the bag is present
+#### Scenario: Managed-origin Fusion account indexes Identities when the bag is present
 
 - **GIVEN** a managed-origin Fusion account
 - **AND** a non-empty identity bag

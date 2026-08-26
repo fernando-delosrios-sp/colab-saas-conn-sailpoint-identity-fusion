@@ -14,7 +14,7 @@ export { hydrateCorrelatedManagedAccountIdentities } from './helpers/accountList
  *   { dryRun: { enabled: true, saveFile?: boolean, sendEmail?: string | string[] } }
  *
  * When dry-run mode is active, the operation runs the full account-list pipeline
- * with write inhibition via DryRunApiAdapter, streams account rows identical to
+ * with write inhibition via DryRunApiAdapter, streams `StdAccountListOutput` objects identical to
  * persistent aggregation, emits optional report artifacts (file and/or email),
  * and logs a run summary to the console.
  *

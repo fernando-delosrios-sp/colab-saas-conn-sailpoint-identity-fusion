@@ -430,7 +430,7 @@ describe('MappingService selective targets', () => {
         expect(fusionAccount.attributeBag.current.department).toBe('HR')
     })
 
-    it('Managed-origin row indexes Identities when the bag is present', () => {
+    it('Managed-origin Fusion account indexes Identities when the bag is present', () => {
         const mainConfig = { ...config, attributeMaps: [], attributeMerge: AttributeMergeMode.MainAccount } as any
         const service = new MappingService(mainConfig, mockLog)
         const fusionAccount = buildManagedAccount()

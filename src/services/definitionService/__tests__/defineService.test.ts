@@ -151,7 +151,7 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
         expect(acc.attributeBag.current['name']).toBe('Definition Display Name')
     })
 
-    it('keeps persisted fusion display values immutable for existing fusion rows', async () => {
+    it('keeps persisted fusion display values immutable for existing Fusion accounts', async () => {
         const service = new DefinitionService(
             {
                 normalAttributeDefinitions: [{ name: 'name', expression: 'New Definition Value' }],
@@ -209,7 +209,7 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
         expect(acc.attributeBag.current['name']).toBe('Definition Display Name')
     })
 
-    it('skips the override for persisted uncorrelated fusion rows after addIdentityLayer', () => {
+    it('skips the override for persisted uncorrelated Fusion accounts after addIdentityLayer', () => {
         const service = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
         const acc = FusionAccount.fromFusionAccount({
             nativeIdentity: 'fusion-native-1',
@@ -493,7 +493,7 @@ describe('DefinitionService.refreshNormalAttributes clearing', () => {
         )
     })
 
-    it('static definition with existing value skips evaluation on existing fusion rows', async () => {
+    it('static definition with existing value skips evaluation on existing Fusion accounts', async () => {
         const service = createService([
             { name: 'department', expression: 'New Value', static: true },
         ])

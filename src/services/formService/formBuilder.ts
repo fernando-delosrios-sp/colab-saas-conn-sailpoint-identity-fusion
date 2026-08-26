@@ -321,7 +321,7 @@ export const buildFormInput = (
     //
     // Priority for the human-friendly account label used in reports and decision history:
     // 1. identityDisplayName — identity display name chain
-    // 2. name / displayName — fusion row title (ISC Account.name; displayName aliases name)
+    // 2. name / displayName — Fusion account title (ISC Account.name; displayName aliases name)
     // 3. managedAccountIdentifier — managed account key when labels are unavailable
     const preferredAccountLabel =
         fusionAccount.identityDisplayName ||

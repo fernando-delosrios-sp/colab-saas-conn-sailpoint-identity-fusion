@@ -19,6 +19,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### 📚 Documentation
 
+- **Account terminology distinguishes accounts from table rows** — Operator documentation and living specifications now call Fusion accounts, managed source accounts, identity-origin Fusion accounts, and origin snapshots by their canonical names. **Row** remains valid for real tables such as mappings, scores, and HTML reports; the `rowsSent` summary field is unchanged and counts streamed Fusion accounts.
 - **Glossary: source snapshot materialization and claim-only absorb** — Documents how Refresh can claim linked managed accounts without copying live source attributes, and that this is not skipping Refresh or Map merge.
 - **Glossary: dry-run report, Fusion report, aggregation report, Fusion Review decision section, Fusion review** — Distinguishes analysis emails from the post-aggregation owner email and from Fusion review (the review-required form), and aligns the FusionReport entitlement with Fusion report.
 
