@@ -40,7 +40,7 @@ flowchart TD
         - `activeReviews`
         - `candidate`
 
-    !!! note
+    !!! note "Static status entitlements"
 
         Status entitlements are static and **not** requestable.
 
@@ -56,7 +56,7 @@ flowchart TD
         - Can be requested to generate a report of the potential aggregated results without actually aggregating the source.
         - This entitlement must be made available to users through an access profile. The connector deliberately omits this entitlement from the target account so it can be requested multiple times.
 
-    !!! note
+    !!! note "Requestable action entitlements"
 
         Actions are modeled as entitlements so they can be requested via access requests in ISC. All Action entitlements are requestable. The `correlate` and `correlated` wire tokens are both accepted by the action dispatcher on create/update and map to the same handler; the entitlement id exposed here is `correlated`.
 

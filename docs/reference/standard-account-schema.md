@@ -17,7 +17,7 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
 | **originSource**     | string               | No    | Name of the source that originally created this account. Set once at creation and never modified. Equals the managed account source name when the account originates from a source account, or `Identities` when it originates from an identity. Useful for auditing and tracing account provenance. |
 | **originAccount**    | string               | No    | Identity ID or managed account key (`sourceId::nativeIdentity`) that originally created this Fusion account. Set once at creation and never modified. Pairs with **`$account`** in Velocity for the origin snapshot object.      |
 
-!!! note
+!!! note "Dynamic attributes"
     In addition to these standard attributes, the discovered schema includes any attributes defined via **Attribute Mapping** and **Attribute Definition** settings.
 
 !!! tip "Schema hygiene"
