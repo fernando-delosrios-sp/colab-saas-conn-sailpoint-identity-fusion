@@ -60,9 +60,54 @@ Each population SHALL keep an independent delta baseline. The first STATUS tick 
 - **WHEN** a STATUS tick fires during Fetch
 - **THEN** the line SHALL NOT include `fusion-accounts=`
 
+### Requirement: STATUS includes process CPU percent
+
+When a previous process CPU sample exists, each `STATUS` line SHALL include a **STATUS CPU segment** `cpu={percent}%` immediately after the memory segment and before `elapsed=`. `{percent}` SHALL be a rounded integer. The percent SHALL be one-core relative: `(user + system)` microseconds from `process.cpuUsage` since the previous sample, divided by actual wall-clock microseconds since that sample, times 100. The heartbeat SHALL seed `process.cpuUsage()` when it starts so the first STATUS tick MAY include `cpu=`. The heartbeat SHALL omit `cpu=` when no previous sample exists or wall-clock elapsed is zero. The CPU baseline SHALL NOT reset on phase or progress-unit change. The percent SHALL NOT be clamped at 100. `STATUS` SHALL NOT include user/system split, CPU-seconds, load average, or cgroup quota. `EVENT_SUMMARY`, `METRIC`, email reports, and `WARN STALL` SHALL NOT gain CPU fields from this requirement.
+
+#### Scenario: STATUS includes cpu after mem
+
+- **GIVEN** an account-list operation heartbeat with a previous CPU sample
+- **AND** user+system CPU time since that sample is 87% of one core over the actual wall-clock elapsed
+- **WHEN** the next STATUS line is formatted
+- **THEN** the line SHALL include `cpu=87%`
+- **AND** `cpu=` SHALL appear after `mem=` and before `elapsed=`
+
+#### Scenario: First STATUS after heartbeat start includes cpu
+
+- **GIVEN** the operation heartbeat recorded `process.cpuUsage()` at start
+- **WHEN** the first STATUS tick fires with non-zero wall-clock elapsed
+- **THEN** the STATUS line SHALL include `cpu=`
+
+#### Scenario: STATUS omits cpu without a previous sample
+
+- **GIVEN** no previous process CPU sample exists
+- **WHEN** a STATUS line is formatted
+- **THEN** the line SHALL NOT include `cpu=`
+
+#### Scenario: CPU percent uses actual wall time not the configured interval
+
+- **GIVEN** the previous CPU sample was taken 25 seconds ago
+- **AND** user+system CPU time since that sample equals 25 seconds of one core
+- **AND** the configured heartbeat interval is 10 seconds
+- **WHEN** the next STATUS line is formatted
+- **THEN** the line SHALL include `cpu=100%`
+- **AND** the line SHALL NOT include `cpu=250%`
+
+#### Scenario: CPU percent may exceed 100
+
+- **GIVEN** user+system CPU time since the previous sample is 150% of one core over the actual wall-clock elapsed
+- **WHEN** the next STATUS line is formatted
+- **THEN** the line SHALL include `cpu=150%`
+
+#### Scenario: Phase change does not drop cpu
+
+- **GIVEN** a previous CPU sample from Fetch phase
+- **WHEN** the next STATUS tick is Refresh
+- **THEN** the STATUS line SHALL still include `cpu=` when wall-clock elapsed is non-zero
+
 ### Requirement: Operation heartbeat emits periodic STATUS lines
 
-The log service SHALL provide an operation heartbeat that emits a `STATUS` text line at a configurable interval while an operation heartbeat is active. The interval SHALL be `statsLoggingIntervalMs` from Advanced Connection Settings (configured as `heartbeatInterval` in seconds in the connector UI; default 10 seconds). Each `STATUS` line SHALL include, when available: current phase, current step, pipeline progress, operation elapsed time, API queue statistics in compact form `api={active}a/{queued}q/{completed}c` with optional delta suffix, and process memory (RSS and heap used).
+The log service SHALL provide an operation heartbeat that emits a `STATUS` text line at a configurable interval while an operation heartbeat is active. The interval SHALL be `statsLoggingIntervalMs` from Advanced Connection Settings (configured as `heartbeatInterval` in seconds in the connector UI; default 10 seconds). Each `STATUS` line SHALL include, when available: current phase, current step, pipeline progress, operation elapsed time, API queue statistics in compact form `api={active}a/{queued}q/{completed}c` with optional delta suffix, process memory (RSS and heap used), and process CPU percent (`cpu={percent}%`) as specified in **STATUS includes process CPU percent**.
 
 During Fetch phase, pipeline progress SHALL be Fetch population counters (`fusion-accounts`, `managed-accounts`, `identities`) as specified in **Fetch STATUS SHALL render independent population counters**. During other phases, pipeline progress SHALL be `done/total` with optional unit and delta since the previous tick (`progress=`).
 
