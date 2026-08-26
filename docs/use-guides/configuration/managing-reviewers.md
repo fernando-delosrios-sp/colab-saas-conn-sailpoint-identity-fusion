@@ -22,7 +22,7 @@ Identity Fusion NG supports two reviewer assignment models. Pick one — or comb
 | --- | --- | --- |
 | **Global reviewer** | All managed sources | **Owners are global reviewers?** in Attribute Matching Settings → Review, plus Fusion **source owner** and/or **governance group** on the Fusion source in ISC |
 | **Per-source reviewer entitlement** | One managed source | `<Source Name> reviewer` entitlement on the Fusion source, assigned via access profiles |
-| **Fusion report** | Read-only match visibility | `Fusion report` entitlement (no review permission) |
+| **Fusion report** | Read-only Match preview (HTML email) | `FusionReport` (`report`) entitlement — generates a **Fusion report**, not an aggregation report |
 
 When **Owners are global reviewers?** is enabled, the connector resolves reviewer identities from the Fusion source **owner** (a single identity, or all members when the owner is a governance group) and from the source **governance group** (management workgroup) when configured. See [Governance group](../../glossary.md#deployment-and-integration) in the glossary.
 
@@ -72,9 +72,9 @@ Create a separate profile for stakeholders who need match visibility without rev
 
 | Access profile | Entitlement | Purpose |
 | --- | --- | --- |
-| **Fusion Report** | Fusion report | Auditors, governance leads — view potential matches without deciding |
+| **Fusion Report** | Fusion report (`report`) | Auditors, governance leads — same Match preview as dry-run, without deciding on a review form |
 
-Enable **Send report to owner on aggregation?** in Review Settings to email aggregation summaries to configured report recipients.
+Enable **Send report to owner on aggregation?** in Review Settings to email an **aggregation report** (title **Identity Fusion Aggregation Report**) to configured report recipients. That email is not a Fusion report. **Fusion review** (review-required form/email) is a separate product.
 
 ## Localization and reviewer experience
 

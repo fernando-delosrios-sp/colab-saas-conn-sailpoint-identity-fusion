@@ -122,7 +122,7 @@ export class FusionService {
     private globalOwnerIdentityIdsCache: string[] | undefined
     public readonly fusionReportOnAggregation: boolean
     public readonly commandType?: StandardCommand
-    /** When true, report data should be captured even during aggregation (e.g. custom:dryrun). */
+    /** When true, report data should be captured even during aggregation (legacy constructor flag). */
     private readonly shouldCaptureReportData: boolean
     /** Runtime flag set by setupPhase — when false, correlation-on-aggregation is suppressed. */
     // ------------------------------------------------------------------------
@@ -232,11 +232,12 @@ export class FusionService {
 
     /**
      * Populate match / deferred / non-match report slices during managed-account analysis.
-     * SDKs may report `commandType` as account list for custom commands; `custom:dryrun` must still capture slices.
+     * Dry-run and Fusion report capture via `run.isDryRunMode` without `fusionReportOnAggregation`.
      */
     private shouldCaptureManagedAccountReportData(): boolean {
         return (
             this.run.isRecordMode ||
+            this.run.isDryRunMode ||
             this.fusionReportOnAggregation ||
             !this.accountAssembly.isAggregationAccountListMode() ||
             this.shouldCaptureReportData
@@ -1478,7 +1479,7 @@ export class FusionService {
      * After generating the report, this method clears the tracker to free memory.
      *
      * @param tracker - The AggregationTracker instance to build the report from
-     * @param includeNonMatches - When true, append per-account rows for managed non-matches (e.g. custom:dryrun). Email reports omit these.
+     * @param includeNonMatches - When true, append per-account rows for managed non-matches. Email reports omit these.
      * @param stats - Optional processing statistics to include in the report
      * @returns Complete fusion report with match/non-match accounts
      */

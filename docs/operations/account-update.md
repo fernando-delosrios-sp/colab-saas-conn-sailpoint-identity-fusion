@@ -59,7 +59,7 @@ flowchart TD
 
 | Action | Add (create or update) | Remove (create or update) |
 |--------|------------------------|---------------------------|
-| `report` | Runs the non-persistent report pipeline | No-op |
+| `report` | Runs the non-persistent **Fusion report** pipeline (dry-run Match preview, email to global owners, no account-list stream) | No-op |
 | `fusion` | Adds the `fusion` action entitlement | Removes the `fusion` action entitlement |
 | `correlate` / `correlated` | Runs the **correlate action**: direct ISC PATCH for missing managed source accounts on provisioning paths. No reverse-correlation writes on this path. | On **update only**: skips correlation-status recompute on output. Does **not** undo established correlation links. |
 | `reviewer:<sourceId>` | Records the source as a reviewer scope on the Fusion account | Clears the reviewer scope for that source |

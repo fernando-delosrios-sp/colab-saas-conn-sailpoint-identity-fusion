@@ -1785,6 +1785,78 @@ describe('FusionService — aggregation', () => {
             expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-ctx.run-def')).toBe(true)
         })
 
+        it('records deferred match report rows in dry-run mode when fusionReportOnAggregation is false', async () => {
+            ctx.run.isDryRunMode = true
+            const dryRunFusion = new FusionService({
+                config: ctx.mockConfig,
+                log: ctx.mockLog,
+                identities: ctx.mockIdentities,
+                sources: ctx.mockSources,
+                forms: ctx.mockForms,
+                mappingService: ctx.mockMappingService,
+                definitionService: ctx.mockDefinitionService,
+                matchingService: ctx.mockMatchingService,
+                schemas: ctx.mockSchemas,
+                run: ctx.run,
+                commandType: StandardCommand.StdAccountList,
+            })
+            dryRunFusion.matchOutcomeDispatcher = ctx.createDispatcherFor(dryRunFusion)
+            dryRunFusion.setTracker(new AggregationTracker())
+
+            const mockManagedAccount = {
+                id: 'acct-dry-run-cap',
+                nativeIdentity: 'native-dry-run-cap',
+                name: 'Dry Run Capture',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+
+            ;(dryRunFusion as any).run.sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: { deferredMatching: true },
+            })
+
+            const nonMatchedCandidate = FusionAccount.fromManagedAccount({
+                id: 'acct-prev-nonmatch-dry',
+                nativeIdentity: 'native-prev-nonmatch-dry',
+                name: 'Non-matched Candidate Dry',
+                sourceId: 'source-a-id',
+                sourceName: 'Source A',
+                attributes: {},
+            } as any)
+            nonMatchedCandidate.collections.statuses.setNonMatched(
+                nonMatchedCandidate.name,
+                nonMatchedCandidate.sourceName
+            )
+            dryRunFusion.setFusionAccount(nonMatchedCandidate)
+
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+
+            ctx.mockMatchingService.scoreFusionAccount.mockImplementation(async (account, _candidates, candidateType) => {
+                const n = Array.from(_candidates).length
+                if (candidateType === 'deferred') {
+                    account.layers.addFusionMatch({
+                        identityId: '',
+                        identityName: 'Non-matched Candidate Dry',
+                        candidateType: 'deferred',
+                        scores: [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true } as any],
+                    } as any)
+                }
+                return n
+            })
+
+            const tracker = new AggregationTracker()
+            dryRunFusion.setTracker(tracker)
+            await dryRunFusion.processManagedAccount(mockManagedAccount)
+            const report = dryRunFusion.generateReport(tracker, true)
+            expect(report.accounts.some((a) => a.deferred && a.accountId === 'acct-dry-run-cap')).toBe(true)
+        })
+
         it('records only non-match history when creating a new authoritative non-match fusion account', async () => {
             const mockManagedAccount = {
                 id: 'acct-nonmatch-1',

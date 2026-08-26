@@ -48,7 +48,7 @@ flowchart TD
 5.  **Action Execution**:
     - Checks for any actions specified in `input.attributes.actions` (normalized via `normalizeActionTokens`).
     - For each action token, the dispatcher in `operations/actions/index.ts` routes to the matching handler:
-        - **Report** — Generates a fusion report (if configured). Remove is a no-op on create.
+        - **Report** — Generates a **Fusion report** (Match preview, email to global owners, no account-list stream). Remove is a no-op on create.
         - **Fusion** — Adds the `fusion` action entitlement on the Fusion account.
         - **Correlate / Correlated** — Runs the **correlate action** on this provisioning path: direct identity correlation (ISC PATCH) for missing managed source accounts. Both wire tokens map to the same handler. Reverse-correlation attribute writes are not applied on this path.
         - **Reviewer** — Assigns the source-specific reviewer entitlement. See [Action entitlements reference](account-update.md#action-entitlements-reference).

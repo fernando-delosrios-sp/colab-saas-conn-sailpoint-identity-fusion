@@ -576,6 +576,124 @@ describe('ReportService', () => {
         expect(sendEmail).toHaveBeenCalledTimes(1)
     })
 
+    it('renders Identity Fusion Aggregation Report as the aggregation title', () => {
+        const { service } = createService()
+        const html = service.renderFusionReportHtml(
+            { accounts: [], matches: 0 } as any,
+            'aggregation',
+            ReportService.AGGREGATION_REPORT_TITLE
+        )
+        expect(html).toContain('Identity Fusion Aggregation Report')
+        expect(html).not.toContain('Identity Fusion Dry Run Report')
+        expect(html.includes('Identity Fusion Report')).toBe(false)
+    })
+
+    it('renders Identity Fusion Report as the Fusion report title', () => {
+        const { service } = createService()
+        const html = service.renderFusionReportHtml(
+            { accounts: [], matches: 0 } as any,
+            'fusion',
+            ReportService.FUSION_REPORT_EMAIL_TITLE
+        )
+        expect(html).toContain('Identity Fusion Report')
+        expect(html).not.toContain('Identity Fusion Aggregation Report')
+        expect(html).not.toContain('Identity Fusion Dry Run Report')
+    })
+
+    it('renders Identity Fusion Dry Run Report as the dry-run title', () => {
+        const { service } = createService()
+        const html = service.renderFusionReportHtml(
+            { accounts: [], matches: 0 } as any,
+            'aggregation',
+            ReportService.DRY_RUN_REPORT_TITLE
+        )
+        expect(html).toContain('Identity Fusion Dry Run Report')
+        expect(html).not.toContain('Identity Fusion Aggregation Report')
+    })
+
+    it('emails the aggregation report title to global owners', async () => {
+        const sendEmail = vi.fn(async () => undefined)
+        const { service } = createService({
+            sources: { fetchGlobalOwnerIdentityIds: vi.fn(async () => ['owner-1']) },
+            identities: {
+                hydrateMissingIdentitiesById: vi.fn(async () => undefined),
+                getIdentityById: vi.fn(() => undefined),
+            },
+            email: {
+                sendEmail,
+                getRecipientEmails: vi.fn(async () => ['owner@example.com']),
+            },
+        })
+
+        await service.sendReport({ accounts: [], matches: 0 } as any, 'aggregation')
+
+        expect(sendEmail).toHaveBeenCalledWith(
+            ['owner@example.com'],
+            expect.stringContaining('Identity Fusion Aggregation Report'),
+            expect.any(String),
+            expect.anything()
+        )
+    })
+
+    it('emails the Fusion report title to global owners', async () => {
+        const sendEmail = vi.fn(async () => undefined)
+        const { service } = createService({
+            sources: { fetchGlobalOwnerIdentityIds: vi.fn(async () => ['owner-1']) },
+            identities: {
+                hydrateMissingIdentitiesById: vi.fn(async () => undefined),
+                getIdentityById: vi.fn(() => undefined),
+            },
+            email: {
+                sendEmail,
+                getRecipientEmails: vi.fn(async () => ['owner@example.com']),
+            },
+        })
+
+        await service.sendReport({ accounts: [], matches: 0 } as any, 'fusion')
+
+        expect(sendEmail).toHaveBeenCalledWith(
+            ['owner@example.com'],
+            expect.stringContaining('Identity Fusion Report'),
+            expect.any(String),
+            expect.anything()
+        )
+        expect(sendEmail.mock.calls[0][1]).not.toContain('Identity Fusion Aggregation Report')
+    })
+
+    it('renders the same potential-match cards for Fusion report and dry-run report from one tracker', () => {
+        const { service } = createService()
+        const report = {
+            accounts: [
+                {
+                    accountName: 'Pat Candidate',
+                    accountSource: 'HR',
+                    matches: [{ identityName: 'Pat Identity', scores: [] }],
+                },
+            ],
+            matches: 1,
+            nonMatchedAccounts: 4,
+        } as any
+
+        const fusionHtml = service.renderFusionReportHtml(
+            report,
+            'fusion',
+            ReportService.FUSION_REPORT_EMAIL_TITLE
+        )
+        const dryRunHtml = service.renderFusionReportHtml(
+            report,
+            'aggregation',
+            ReportService.DRY_RUN_REPORT_TITLE
+        )
+
+        expect(fusionHtml).toContain('Pat Candidate')
+        expect(dryRunHtml).toContain('Pat Candidate')
+        expect(fusionHtml).toContain('Pat Identity')
+        expect(dryRunHtml).toContain('Pat Identity')
+        const stripTitle = (html: string) =>
+            html.replace(/Identity Fusion (Dry Run |Aggregation )?Report/g, '')
+        expect(stripTitle(fusionHtml)).toBe(stripTitle(dryRunHtml))
+    })
+
     it('renders Spanish report HTML when locale is es', () => {
         const { service } = createService()
         const html = service.renderFusionReportHtml(

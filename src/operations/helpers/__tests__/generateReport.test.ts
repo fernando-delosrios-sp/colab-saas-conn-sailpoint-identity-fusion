@@ -35,7 +35,7 @@ describe('generateReport helpers', () => {
             await generateReport()
 
             expect(ServiceRegistry.getCurrent).toHaveBeenCalled()
-            expect(mockReportsService.generateAndSendFusionReport).toHaveBeenCalledWith(false, undefined)
+            expect(mockReportsService.generateAndSendFusionReport).toHaveBeenCalledWith(false, undefined, 'aggregation')
         })
 
         it('should use provided serviceRegistry and call generateAndSendFusionReport with all args', async () => {
@@ -46,7 +46,13 @@ describe('generateReport helpers', () => {
             await generateReport(true, mockServiceRegistry as ServiceRegistry, mockStats)
 
             expect(ServiceRegistry.getCurrent).not.toHaveBeenCalled()
-            expect(mockReportsService.generateAndSendFusionReport).toHaveBeenCalledWith(true, mockStats)
+            expect(mockReportsService.generateAndSendFusionReport).toHaveBeenCalledWith(true, mockStats, 'aggregation')
+        })
+
+        it('passes fusion report kind for the report action', async () => {
+            const mockStats = {} as AggregationStats
+            await generateReport(false, mockServiceRegistry as ServiceRegistry, mockStats, 'fusion')
+            expect(mockReportsService.generateAndSendFusionReport).toHaveBeenCalledWith(false, mockStats, 'fusion')
         })
     })
 })

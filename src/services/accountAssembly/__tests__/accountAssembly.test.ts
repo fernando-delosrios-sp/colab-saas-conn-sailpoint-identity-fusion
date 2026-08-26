@@ -63,10 +63,14 @@ describe('AccountAssembly', () => {
             expect(listAssembly.isAggregationAccountListMode()).toBe(true)
         })
 
-        it('returns false for other commands', () => {
-            const readDeps = { ...deps, commandType: StandardCommand.StdAccountRead }
-            const readAssembly = new AccountAssembly(readDeps)
-            expect(readAssembly.isAggregationAccountListMode()).toBe(false)
+        it('returns true when run is in dry-run mode even for update commands', () => {
+            const dryRunDeps = {
+                ...deps,
+                commandType: StandardCommand.StdAccountUpdate,
+                run: { ...mockRun, isDryRunMode: true },
+            }
+            const dryRunAssembly = new AccountAssembly(dryRunDeps)
+            expect(dryRunAssembly.isAggregationAccountListMode()).toBe(true)
         })
     })
 

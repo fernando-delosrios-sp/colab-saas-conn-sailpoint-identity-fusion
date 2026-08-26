@@ -93,7 +93,7 @@ Fusion accounts carry two kinds of entitlements, distinguished by how they are a
 
 | Term                       | Wire value                       | Definition                                                                                                                                                                                                                                                                                                                           |
 | -------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **FusionReport**           | `report`                         | Assign to trigger generation of a Fusion report for this account.                                                                                                                                                                                                                                                                    |
+| **FusionReport**           | `report`                         | Assign to trigger generation of a **Fusion report** (Match preview email to global owners). Not an aggregation report. |
 | **Fusion**                 | `fusion`                         | Assign to mark this as a Fusion account.                                                                                                                                                                                                                                                                                             |
 | **Correlated entitlement** | `correlated`                     | The action entitlement present on a Fusion account when all managed source accounts for that Fusion identity are correlated with the Fusion identity. Evaluated on every Fusion account build; absent when any managed source account remains in `missing-accounts`.                                                                 |
 | **Correlate action**       | `correlate` / `correlated` (Add) | When the platform assigns the correlated entitlement to a Fusion account that lacks it, the connector runs the correlate action: direct identity correlation (ISC PATCH) for missing managed source accounts on provisioning paths. Remove on account update skips status recompute and does not undo established correlation links. |
@@ -115,6 +115,18 @@ Fusion accounts carry two kinds of entitlements, distinguished by how they are a
 | **ActiveReviews** | `activeReviews` | The account has one or more pending Fusion review forms awaiting reviewer decision.                                                       |
 | **Candidate**     | `candidate`     | The identity is part of a pending Fusion review as a potential match candidate.                                                           |
 | **New**           | `new`           | The Fusion account was created in this aggregation rather than reconstructed from a previous Fusion account. Reconstruction removes it.   |
+
+## Report and review communications
+
+These products share a Handlebars template family but are not interchangeable. **Fusion review** is not a report.
+
+| Term | Definition |
+| --- | --- |
+| **Dry-run report** | HTML/email titled **Identity Fusion Dry Run Report** from account-list dry-run (`saveFile` / `sendEmail`). Same Match preview as a Fusion report; delivery is operator-controlled. |
+| **Fusion report** | HTML/email titled **Identity Fusion Report** from the `report` (**FusionReport**) action. Same Match preview as dry-run (writes inhibited); emailed to global owners. Does not stream account-list rows. |
+| **Aggregation report** | HTML/email titled **Identity Fusion Aggregation Report** sent to owners after persistent account-list when **Send report to owner on aggregation?** is enabled. |
+| **Fusion Review decision section** | A section of those HTML documents listing applied FusionDecision rows. Primarily meaningful on the aggregation report. Analysis reports may show in-memory decisions but must not persist new ones. |
+| **Fusion review** | The reviewer-facing review-required communication: email plus review form. Not a report. |
 
 ## Review and decision domain
 

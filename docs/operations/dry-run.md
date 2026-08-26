@@ -109,7 +109,7 @@ After the pipeline completes, the connector logs a JSON run summary to `console.
 
 ### HTML report (`saveFile` or `sendEmail`)
 
-When `saveFile` and/or `sendEmail` is set, the connector generates a report using the **same Handlebars template and section layout** as the aggregation report-on-aggregation email. The title is **Identity Fusion Dry Run Report** to distinguish analysis from persisted results.
+When `saveFile` and/or `sendEmail` is set, the connector generates a **dry-run report** using the **same Handlebars template and section layout** as the aggregation report. The title is **Identity Fusion Dry Run Report** (distinct from **Identity Fusion Report** and **Identity Fusion Aggregation Report**).
 
 Report contents align with the [Account list report section](account-list.md#report-contents-what-is-included):
 

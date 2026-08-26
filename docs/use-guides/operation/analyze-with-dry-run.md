@@ -66,7 +66,7 @@ Full field reference: [Dry-run mode — Input options](../../operations/dry-run.
 
 ### 3. Review the HTML report
 
-When `saveFile` or `sendEmail` is set, the connector generates **Identity Fusion Dry Run Report** using the same template as the aggregation report:
+When `saveFile` or `sendEmail` is set, the connector generates a **dry-run report** titled **Identity Fusion Dry Run Report** using the same template as the aggregation report (not the Fusion report title):
 
 - Header summary and processing statistics
 - Potential match details with candidate score breakdowns
