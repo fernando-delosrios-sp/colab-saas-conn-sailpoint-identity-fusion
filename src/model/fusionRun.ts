@@ -72,8 +72,6 @@ export interface RunStateSnapshot {
     simulatedTimeMs?: number
 }
 
-
-
 /**
  * Run-scoped managed account state:
  * - `managedAccountsById`: mutable work queue; entries removed via `claimAccount()`
@@ -106,6 +104,8 @@ export class FusionRun {
     matchScoringMs = 0
     fullScanFallbackCount = 0
     mandatoryMissingBlockCount = 0
+    identityComparisonCount = 0
+    identityCandidateSetSizeSum = 0
     analysisRecorder?: ManagedAccountAnalysisRecording
     phaseTimings: { phase: string; elapsed: string }[] = []
     private pendingDisableOperations = new Set<Promise<void>>()
@@ -116,6 +116,10 @@ export class FusionRun {
     private managedAccountProcessingStartedAt: number = 0
     private managedAccountProcessingBatchSizeValue: number = 0
     trigramIndexByAttribute: Map<string, Map<string, Set<FusionAccount>>> = new Map()
+    /** Compact-id roster for Binary/LIG3 blocking indexes (index = compact identity id). */
+    blockingIdentityRoster: FusionAccount[] = []
+    binaryIndexByAttribute: Map<string, Map<string, number[]>> = new Map()
+    lig3LengthIndexByAttribute: Map<string, Map<number, number[]>> = new Map()
     normalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
     nameNormalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
     /** Run-scoped name-matcher token arrays keyed by already-normalized name string. */
@@ -223,7 +227,10 @@ export class FusionRun {
         return this.identityMapValue
     }
 
-    constructor(public log?: LogService, config?: FusionConfig) {
+    constructor(
+        public log?: LogService,
+        config?: FusionConfig
+    ) {
         this.isRecordMode = config?.recording?.mode === 'record'
         this.candidateRegistry = new CandidateRegistry({
             getFusionAccount: (key: string) => this.getFusionAccountByManagedKey(key),
@@ -379,10 +386,7 @@ export class FusionRun {
             }
             this.fusionIdentityMapValue.set(identityId!, fusionAccount)
         } else {
-            assert(
-                fusionAccount.managedKey,
-                'Fusion account must have a managedKey to be added to fusion account map'
-            )
+            assert(fusionAccount.managedKey, 'Fusion account must have a managedKey to be added to fusion account map')
             this.fusionAccountMapValue.set(fusionAccount.managedKey, fusionAccount)
         }
     }
@@ -489,10 +493,7 @@ export class FusionRun {
         }
     }
 
-    findFusionAccountForIdentity(
-        identity: IdentityDocument,
-        sourceNames: Set<string>
-    ): FusionAccount | undefined {
+    findFusionAccountForIdentity(identity: IdentityDocument, sourceNames: Set<string>): FusionAccount | undefined {
         const identityAccountIds = new Set<string>(
             (identity.accounts ?? [])
                 .filter((a) => sourceNames.has(a.source?.name ?? ''))
@@ -616,10 +617,7 @@ export class FusionRun {
         this.currentRunNonMatchedKeysBySource.clear()
     }
 
-    private hasIntersectingManagedAccounts(
-        account: FusionAccount,
-        identityAccountIds: Set<string>
-    ): boolean {
+    private hasIntersectingManagedAccounts(account: FusionAccount, identityAccountIds: Set<string>): boolean {
         for (const id of account.accountIdsSet) {
             if (identityAccountIds.has(id)) return true
         }
@@ -650,9 +648,7 @@ export class FusionRun {
         accounts.set(existingKey, resolveFusionAccountNameOrDisplayName(existingAccount, existingKey))
         accounts.set(incomingKey, resolveFusionAccountNameOrDisplayName(newAccount, incomingKey))
 
-        const accountLabels = Array.from(accounts.entries()).map(
-            ([managedKey, name]) => `${name} (${managedKey})`
-        )
+        const accountLabels = Array.from(accounts.entries()).map(([managedKey, name]) => `${name} (${managedKey})`)
         this.log.warn(
             `More than one Fusion account was found for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
                 'This is generally caused by non-unique account names. Please review the configuration and consider using a unique attribute for the account name.'
@@ -788,7 +784,6 @@ export class FusionRun {
         return this.simulatedTimeMsValue ?? Date.now()
     }
 
-
     snapshot(): RunStateSnapshot {
         return {
             managedAccounts: Array.from(this.managedAccountsById.values()),
@@ -837,7 +832,10 @@ export class FusionRun {
         }
         this.fusionAccountMapValue.clear()
         for (const account of snapshot.fusionAccounts) {
-            this.fusionAccountMapValue.set((account as any).managedKey ?? (account as any).name, account as FusionAccount)
+            this.fusionAccountMapValue.set(
+                (account as any).managedKey ?? (account as any).name,
+                account as FusionAccount
+            )
         }
         this.fusionIdentityMapValue.clear()
         for (const account of snapshot.fusionIdentityAccounts ?? []) {
@@ -874,9 +872,9 @@ export class FusionRun {
         const inventoryRecord =
             snapshot.managedAccountInventory ??
             Object.fromEntries(
-                Object.entries((snapshot as { managedAccountsAllById?: Record<string, Account> }).managedAccountsAllById ?? {}).map(
-                    ([key, account]) => [key, toManagedAccountInfo(account as Account)]
-                )
+                Object.entries(
+                    (snapshot as { managedAccountsAllById?: Record<string, Account> }).managedAccountsAllById ?? {}
+                ).map(([key, account]) => [key, toManagedAccountInfo(account as Account)])
             )
         for (const [key, info] of Object.entries(inventoryRecord)) {
             this.managedAccountInventory.set(key, info as ManagedAccountInfo)
@@ -898,4 +896,3 @@ export class FusionRun {
         this.simulatedTimeMsValue = snapshot.simulatedTimeMs
     }
 }
-

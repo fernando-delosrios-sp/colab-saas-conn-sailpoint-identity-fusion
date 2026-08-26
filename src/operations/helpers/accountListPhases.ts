@@ -1,16 +1,15 @@
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { PhaseTimer } from '../../services/logService'
-import { formatDecisionOutcomesSegment, formatFormOutcomesSegment, formatMatchOutcomesSegment } from '../../services/logService/operationHeartbeat'
+import {
+    formatDecisionOutcomesSegment,
+    formatFormOutcomesSegment,
+    formatMatchOutcomesSegment,
+} from '../../services/logService/operationHeartbeat'
 import { formatCorrelationSummaryValue } from '../../services/logService/operationRunContext'
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
 import { generateReport } from './generateReport'
-import {
-    buildReportAggregationStats,
-    buildTerminalSummary,
-    DryRunInput,
-    type FetchResult,
-} from './accountListHelpers'
+import { buildReportAggregationStats, buildTerminalSummary, DryRunInput, type FetchResult } from './accountListHelpers'
 
 export type { FetchResult } from './accountListHelpers'
 
@@ -148,8 +147,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
     const { isPersistent } = options
     // Global reviewers must be hydrated during dry-run too so reviewer validation succeeds.
     // Report-on-aggregation owners are only needed for persistent runs (email delivery).
-    const ownerIncluded =
-        fusion.fusionOwnerIsGlobalReviewer || (isPersistent && fusion.fusionReportOnAggregation)
+    const ownerIncluded = fusion.fusionOwnerIsGlobalReviewer || (isPersistent && fusion.fusionReportOnAggregation)
 
     log.detail({ action: 'fetching identities, managed accounts, and dependencies' })
 
@@ -264,19 +262,15 @@ export async function processPhase(serviceRegistry: ServiceRegistry, _options: P
     })
 
     const uncorrelatedCount = sources.run.managedAccountsById.size
-    await log.runStep(
-        'uncorrelated-sweep',
-        () => fusion.processUncorrelatedManagedAccounts(),
-        {
-            startDetail: { accounts: uncorrelatedCount },
-            track: 'FusionService.processManagedAccounts',
-            trackDone: ({ processed, matchScoringMs }) => ({
-                analyzed: processed,
-                matchScoring: PhaseTimer.formatElapsed(matchScoringMs),
-            }),
-            endDetail: ({ processed }) => ({ analyzed: processed }),
-        }
-    )
+    await log.runStep('uncorrelated-sweep', () => fusion.processUncorrelatedManagedAccounts(), {
+        startDetail: { accounts: uncorrelatedCount },
+        track: 'FusionService.processManagedAccounts',
+        trackDone: ({ processed, matchScoringMs }) => ({
+            analyzed: processed,
+            matchScoring: PhaseTimer.formatElapsed(matchScoringMs),
+        }),
+        endDetail: ({ processed }) => ({ analyzed: processed }),
+    })
 
     if (sources.run.mandatoryMissingBlockCount > 0) {
         log.warn(
@@ -285,15 +279,20 @@ export async function processPhase(serviceRegistry: ServiceRegistry, _options: P
     }
     if (sources.run.fullScanFallbackCount > 0) {
         log.warn(
-            `Full identity scan fallback: ${sources.run.fullScanFallbackCount} account(s) — trigram blocking was ineffective`
+            `Full identity scan fallback: ${sources.run.fullScanFallbackCount} account(s) — ` +
+                'candidate blocking unavailable; scored the Fusion identity baseline'
+        )
+    }
+    if (sources.run.identityComparisonCount > 0 || sources.run.identityCandidateSetSizeSum > 0) {
+        log.info(
+            `Identity comparison summary: identityComparisonCount=${sources.run.identityComparisonCount} ` +
+                `identityCandidateSetSizeSum=${sources.run.identityCandidateSetSizeSum}`
         )
     }
 
-    await log.runStep(
-        'await-disable-ops',
-        () => fusion.awaitPendingDisableOperations(),
-        { startDetail: { pending: fusion.run.pendingDisableOperationsCount } }
-    )
+    await log.runStep('await-disable-ops', () => fusion.awaitPendingDisableOperations(), {
+        startDetail: { pending: fusion.run.pendingDisableOperationsCount },
+    })
 
     await log.runStep('form-reconcile', async () => fusion.reconcilePendingFormState(), {
         endDetail: {
@@ -471,12 +470,7 @@ async function generateDryRunReportEpilogue(
     try {
         const reportPhaseStartedAt = Date.now()
         const { reportHtmlOutputPath } = await reports.generateDryRunReport({
-            aggregationStats: buildReportAggregationStats(
-                fetchResult,
-                timer,
-                serviceRegistry.identities,
-                outputCount
-            ),
+            aggregationStats: buildReportAggregationStats(fetchResult, timer, serviceRegistry.identities, outputCount),
             reportPhaseStartedAt,
             saveFile: dryRun.saveFile,
             sendEmail: dryRun.sendEmail,
@@ -499,7 +493,12 @@ function logDryRunRunSummary(
     outputCount: number | undefined,
     reportHtmlOutputPath?: string
 ): void {
-    const summary = buildTerminalSummary(serviceRegistry, { outputCount, fetchResult, timer }, dryRun, reportHtmlOutputPath)
+    const summary = buildTerminalSummary(
+        serviceRegistry,
+        { outputCount, fetchResult, timer },
+        dryRun,
+        reportHtmlOutputPath
+    )
     console.log(JSON.stringify(summary, null, 2))
 }
 
@@ -534,11 +533,3 @@ export async function reportEpilogue(
     log.epilogueEnd('report')
     return undefined
 }
-
-
-
-
-
-
-
-

@@ -6,6 +6,7 @@ import { MatchCandidateType } from '../types'
 import { FusionConfig } from '../../../model/config'
 import { FusionRun } from '../../../model/fusionRun'
 import * as scoringHelpers from '../scoringHelpers'
+import { extractTrigrams } from '../trigramIndex'
 
 vi.mock('double-metaphone', async (importOriginal) => {
     const actual = await importOriginal<typeof import('double-metaphone')>()
@@ -200,10 +201,7 @@ describe('MatchingService', () => {
                     mandatory: false,
                 },
             ]
-            const service = new MatchingService(
-                { matchingConfigs: rules, fusionManualReviewScore: 50 } as any,
-                mockLog
-            )
+            const service = new MatchingService({ matchingConfigs: rules, fusionManualReviewScore: 50 } as any, mockLog)
 
             const managed = FusionAccount.fromManagedAccount({
                 sourceId: 'src-1',
@@ -238,10 +236,7 @@ describe('MatchingService', () => {
                 { attribute: 'displayName', algorithm: 'lig3' as const, fusionScore: 80, mandatory: false },
                 { attribute: 'employeeId', algorithm: 'binary' as const, fusionScore: 100, mandatory: false },
             ]
-            const service = new MatchingService(
-                { matchingConfigs: rules, fusionManualReviewScore: 80 } as any,
-                mockLog
-            )
+            const service = new MatchingService({ matchingConfigs: rules, fusionManualReviewScore: 80 } as any, mockLog)
 
             const managed = FusionAccount.fromManagedAccount({
                 sourceId: 'src-1',
@@ -251,7 +246,12 @@ describe('MatchingService', () => {
             const identity = FusionAccount.fromIdentity({
                 id: 'id-1',
                 name: 'Jane Doe',
-                attributes: { email: 'jane@example.com', department: 'Sales', displayName: 'abcdefgh', employeeId: 'E123' },
+                attributes: {
+                    email: 'jane@example.com',
+                    department: 'Sales',
+                    displayName: 'abcdefgh',
+                    employeeId: 'E123',
+                },
             } as any)
 
             await service.scoreFusionAccount(managed, [identity], MatchCandidateType.Identity)
@@ -408,7 +408,7 @@ describe('MatchingService', () => {
 
             expect(service.getCandidates(managed, mockLog)).toBeUndefined()
             expect(run.mandatoryMissingBlockCount).toBe(0)
-            expect(run.fullScanFallbackCount).toBe(0)
+            expect(run.fullScanFallbackCount).toBe(1)
         })
 
         it('accumulates mandatoryMissingBlockCount across multiple accounts', () => {
@@ -492,6 +492,463 @@ describe('MatchingService', () => {
 
             const comparisons = await service.scoreFusionAccount(managed, candidates ?? [])
             expect(comparisons).toBe(0)
+        })
+    })
+
+    describe('getCandidates full-scan fallback', () => {
+        const jaroWinklerRule = {
+            attribute: 'displayName',
+            algorithm: 'jaro-winkler' as const,
+            fusionScore: 80,
+            mandatory: true,
+        }
+
+        const buildService = (run: FusionRun) =>
+            new MatchingService(
+                { matchingConfigs: [jaroWinklerRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+
+        it('returns undefined and increments fullScanFallbackCount when the only mandatory rule is Jaro-Winkler', () => {
+            const run = new FusionRun(mockLog)
+            const service = buildService(run)
+            service.buildTrigramIndex([
+                FusionAccount.fromIdentity({ id: 'id-1', attributes: { displayName: 'Alice Smith' } } as any),
+            ])
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { displayName: 'Alice Smith' },
+            } as any)
+
+            expect(service.getCandidates(managed, mockLog)).toBeUndefined()
+            expect(run.fullScanFallbackCount).toBe(1)
+            expect(run.mandatoryMissingBlockCount).toBe(0)
+        })
+
+        it('accumulates fullScanFallbackCount across multiple accounts', () => {
+            const run = new FusionRun(mockLog)
+            const service = buildService(run)
+            service.buildTrigramIndex([
+                FusionAccount.fromIdentity({ id: 'id-1', attributes: { displayName: 'Alice Smith' } } as any),
+            ])
+
+            const managed1 = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { displayName: 'Alice Smith' },
+            } as any)
+            const managed2 = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-2',
+                attributes: { displayName: 'Bob Jones' },
+            } as any)
+
+            service.getCandidates(managed1, mockLog)
+            service.getCandidates(managed2, mockLog)
+
+            expect(run.fullScanFallbackCount).toBe(2)
+        })
+    })
+
+    describe('algorithm-aware candidate blocking', () => {
+        const binaryRule = {
+            attribute: 'employeeId',
+            algorithm: 'binary' as const,
+            fusionScore: 100,
+            mandatory: true,
+        }
+        const lig3Rule = {
+            attribute: 'lastName',
+            algorithm: 'lig3' as const,
+            fusionScore: 80,
+            mandatory: true,
+        }
+        const jaroWinklerRule = {
+            attribute: 'displayName',
+            algorithm: 'jaro-winkler' as const,
+            fusionScore: 80,
+            mandatory: true,
+        }
+
+        it('returns only the exact-value identity for a mandatory Binary rule', () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const exactIdentity = FusionAccount.fromIdentity({
+                id: 'id-exact',
+                attributes: { employeeId: 'E123' },
+            } as any)
+            const otherIdentity = FusionAccount.fromIdentity({
+                id: 'id-other',
+                attributes: { employeeId: 'E999' },
+            } as any)
+            const prefixIdentity = FusionAccount.fromIdentity({
+                id: 'id-prefix',
+                attributes: { employeeId: 'E123X' },
+            } as any)
+            service.buildTrigramIndex([exactIdentity, otherIdentity, prefixIdentity])
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'E123' },
+            } as any)
+
+            const candidates = service.getCandidates(managed, mockLog)
+
+            expect(candidates && [...candidates]).toEqual([exactIdentity])
+            expect(run.fullScanFallbackCount).toBe(0)
+        })
+
+        it('excludes an identity whose length is outside the LIG3 length bound', () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [lig3Rule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const withinBound = FusionAccount.fromIdentity({
+                id: 'id-within',
+                attributes: { lastName: 'Andersen' },
+            } as any)
+            const outsideBound = FusionAccount.fromIdentity({
+                id: 'id-outside',
+                attributes: { lastName: 'And' },
+            } as any)
+            service.buildTrigramIndex([withinBound, outsideBound])
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { lastName: 'Anderson' },
+            } as any)
+
+            const candidates = service.getCandidates(managed, mockLog)
+
+            expect(candidates?.has(withinBound)).toBe(true)
+            expect(candidates?.has(outsideBound)).toBe(false)
+        })
+
+        it('keeps a Jaro-Winkler near-miss with no shared padded trigram reachable', async () => {
+            const accountValue = 'aqbrcs'
+            const identityValue = 'qarbsc'
+            const identityTrigrams = extractTrigrams(scoringHelpers.normalizeLIG3(identityValue))
+            const sharedTrigrams = [...extractTrigrams(scoringHelpers.normalizeLIG3(accountValue))].filter((trigram) =>
+                identityTrigrams.has(trigram)
+            )
+            expect(sharedTrigrams).toEqual([])
+
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [jaroWinklerRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const nearMiss = FusionAccount.fromIdentity({
+                id: 'id-near-miss',
+                attributes: { displayName: identityValue },
+            } as any)
+            service.buildTrigramIndex([nearMiss])
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { displayName: accountValue },
+            } as any)
+
+            expect(service.getCandidates(managed, mockLog)).toBeUndefined()
+
+            await service.scoreFusionAccount(managed, [nearMiss], MatchCandidateType.Identity)
+
+            expect(managed.fusionMatchesRaw.map((match) => match.identityId)).toContain('id-near-miss')
+        })
+
+        it('uses Binary hits only when Binary and Jaro-Winkler mandatory rules are combined', () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule, jaroWinklerRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const binaryHitSimilarName = FusionAccount.fromIdentity({
+                id: 'id-binary-similar',
+                attributes: { employeeId: 'E123', displayName: 'Alice Smith' },
+            } as any)
+            const binaryHitUnrelatedName = FusionAccount.fromIdentity({
+                id: 'id-binary-unrelated',
+                attributes: { employeeId: 'E123', displayName: 'Zoltan Kovacs' },
+            } as any)
+            const otherEmployee = FusionAccount.fromIdentity({
+                id: 'id-other-employee',
+                attributes: { employeeId: 'E999', displayName: 'Alice Smith' },
+            } as any)
+            service.buildTrigramIndex([binaryHitSimilarName, binaryHitUnrelatedName, otherEmployee])
+
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'E123', displayName: 'Alice Smith' },
+            } as any)
+
+            const candidates = service.getCandidates(managed, mockLog)
+
+            expect(candidates?.size).toBe(2)
+            expect(candidates?.has(binaryHitSimilarName)).toBe(true)
+            expect(candidates?.has(binaryHitUnrelatedName)).toBe(true)
+            expect(candidates?.has(otherEmployee)).toBe(false)
+            expect(run.fullScanFallbackCount).toBe(0)
+        })
+
+        it('builds Binary and LIG3 blocking indexes on FusionRun and not on MatchingService', () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule, lig3Rule, jaroWinklerRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const identity = FusionAccount.fromIdentity({
+                id: 'id-1',
+                attributes: { employeeId: 'E123', lastName: 'Anderson', displayName: 'Alice Anderson' },
+            } as any)
+
+            service.buildTrigramIndex([identity])
+
+            expect(run.trigramIndexBuilt).toBe(true)
+            expect(run.binaryIndexByAttribute.has('employeeId')).toBe(true)
+            expect(run.lig3LengthIndexByAttribute.has('lastName')).toBe(true)
+            expect(run.binaryIndexByAttribute.has('displayName')).toBe(false)
+            expect(run.lig3LengthIndexByAttribute.has('displayName')).toBe(false)
+            expect(run.indexedMandatoryAttributes).toEqual(['employeeId', 'lastName'])
+            expect(run.blockingIdentityRoster).toContain(identity)
+
+            const serviceFields = Object.keys(service as unknown as Record<string, unknown>)
+            expect(serviceFields.filter((field) => /index|roster|blocking/i.test(field))).toEqual([])
+        })
+    })
+
+    describe('identityComparisonCount', () => {
+        const binaryRule = {
+            attribute: 'employeeId',
+            algorithm: 'binary' as const,
+            fusionScore: 100,
+            mandatory: false,
+        }
+
+        it('accumulates identity-phase comparisons only and ignores deferred comparisons', async () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'E123' },
+            } as any)
+            const identities = ['id-1', 'id-2', 'id-3'].map((id) =>
+                FusionAccount.fromIdentity({ id, attributes: { employeeId: id } } as any)
+            )
+
+            await service.scoreFusionAccount(managed, identities, MatchCandidateType.Identity)
+
+            expect(run.identityComparisonCount).toBe(3)
+
+            const deferredCandidate = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-2',
+                attributes: { employeeId: 'E123' },
+            } as any)
+            const deferredComparisons = await service.scoreFusionAccount(
+                managed,
+                [deferredCandidate],
+                MatchCandidateType.Deferred
+            )
+
+            expect(deferredComparisons).toBe(1)
+            expect(run.identityComparisonCount).toBe(3)
+        })
+    })
+
+    describe('identity-phase top-K retention', () => {
+        // Rule weights sum to 100, so an identity's combined score equals the summed weight of the
+        // rules it matches: 70 / 71 / 72 / 95 for the fixture identities below.
+        const weightedRules = [
+            { attribute: 'w70', algorithm: 'binary' as const, fusionScore: 70, mandatory: false },
+            { attribute: 'w1a', algorithm: 'binary' as const, fusionScore: 1, mandatory: false },
+            { attribute: 'w1b', algorithm: 'binary' as const, fusionScore: 1, mandatory: false },
+            { attribute: 'w23', algorithm: 'binary' as const, fusionScore: 23, mandatory: false },
+            { attribute: 'w5', algorithm: 'binary' as const, fusionScore: 5, mandatory: false },
+        ]
+
+        const attributesMatching = (matched: readonly string[]) =>
+            Object.fromEntries(
+                weightedRules.map((rule) => [rule.attribute, matched.includes(rule.attribute) ? 'same' : 'other'])
+            )
+
+        const managedAccountForWeightedRules = () =>
+            FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: attributesMatching(weightedRules.map((rule) => rule.attribute)),
+            } as any)
+
+        /** Pool ordered weakest first: 70, 71, 72, then the strongest identity at 95. */
+        const firstKTrapPool = () => [
+            FusionAccount.fromIdentity({
+                id: 'id-score-70',
+                attributes: attributesMatching(['w70']),
+            } as any),
+            FusionAccount.fromIdentity({
+                id: 'id-score-71',
+                attributes: attributesMatching(['w70', 'w1a']),
+            } as any),
+            FusionAccount.fromIdentity({
+                id: 'id-score-72',
+                attributes: attributesMatching(['w70', 'w1a', 'w1b']),
+            } as any),
+            FusionAccount.fromIdentity({
+                id: 'id-score-95',
+                attributes: attributesMatching(['w70', 'w1a', 'w1b', 'w23']),
+            } as any),
+        ]
+
+        const buildService = (run: FusionRun, maxCandidatesForForm: number) =>
+            new MatchingService(
+                {
+                    matchingConfigs: weightedRules,
+                    fusionManualReviewScore: 70,
+                    fusionMaxCandidatesForForm: maxCandidatesForForm,
+                } as any,
+                mockLog,
+                run
+            )
+
+        const combinedScoreOf = (match: { scores: { attribute: string; score: number }[] }) =>
+            match.scores.find((score) => score.attribute === COMBINED_SCORE_ROW_ATTRIBUTE)?.score
+
+        it('retains a stronger identity that appears after three weaker passers', async () => {
+            const run = new FusionRun(mockLog)
+            const service = buildService(run, 3)
+            const managed = managedAccountForWeightedRules()
+
+            const compared = await service.scoreFusionAccount(managed, firstKTrapPool(), MatchCandidateType.Identity, 3)
+
+            expect(compared).toBe(4)
+            expect(managed.fusionMatchesRaw.map((match) => match.identityId)).toEqual([
+                'id-score-95',
+                'id-score-72',
+                'id-score-71',
+            ])
+            expect(managed.fusionMatchesRaw.map(combinedScoreOf)).toEqual([95, 72, 71])
+        })
+
+        it('applies maxIdentityMatches as top-K retention rather than a first-K stop', async () => {
+            const run = new FusionRun(mockLog)
+            const service = buildService(run, 3)
+            const comparisonSpy = vi.spyOn(service as any, 'compareFusionAccounts')
+            const managed = managedAccountForWeightedRules()
+
+            await service.scoreFusionAccount(managed, firstKTrapPool(), MatchCandidateType.Identity, 3)
+
+            expect(comparisonSpy).toHaveBeenCalledTimes(4)
+            expect(run.identityComparisonCount).toBe(4)
+            expect(managed.fusionMatchesRaw).toHaveLength(3)
+            expect(managed.fusionMatchesRaw.map((match) => match.identityId)).not.toContain('id-score-70')
+        })
+
+        it('falls back to the configured candidate cap when maxIdentityMatches is not supplied', async () => {
+            const run = new FusionRun(mockLog)
+            const service = buildService(run, 2)
+            const managed = managedAccountForWeightedRules()
+
+            await service.scoreFusionAccount(managed, firstKTrapPool(), MatchCandidateType.Identity)
+
+            expect(managed.fusionMatchesRaw.map((match) => match.identityId)).toEqual(['id-score-95', 'id-score-72'])
+        })
+
+        it('does not stop identity scoring at the first exact match', async () => {
+            const exactRule = {
+                attribute: 'employeeId',
+                algorithm: 'binary' as const,
+                fusionScore: 100,
+                mandatory: false,
+            }
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                {
+                    matchingConfigs: [exactRule],
+                    fusionManualReviewScore: 100,
+                    fusionMaxCandidatesForForm: 3,
+                } as any,
+                mockLog,
+                run
+            )
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'E123' },
+            } as any)
+            // First pool entry is exact; the later exact identity has the smaller identity id.
+            const firstExact = FusionAccount.fromIdentity({
+                id: 'id-exact-b',
+                attributes: { employeeId: 'E123' },
+            } as any)
+            const laterExact = FusionAccount.fromIdentity({
+                id: 'id-exact-a',
+                attributes: { employeeId: 'E123' },
+            } as any)
+
+            const compared = await service.scoreFusionAccount(
+                managed,
+                [firstExact, laterExact],
+                MatchCandidateType.Identity
+            )
+
+            expect(compared).toBe(2)
+            expect(managed.fusionMatchesRaw.map((match) => match.identityId)).toEqual(['id-exact-a', 'id-exact-b'])
+        })
+
+        it('leaves deferred scoring uncapped', async () => {
+            const deferredRule = {
+                attribute: 'employeeId',
+                algorithm: 'binary' as const,
+                fusionScore: 100,
+                mandatory: false,
+            }
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                {
+                    matchingConfigs: [deferredRule],
+                    fusionManualReviewScore: 100,
+                    fusionMaxCandidatesForForm: 1,
+                } as any,
+                mockLog,
+                run
+            )
+            const managed = FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes: { employeeId: 'E123' },
+            } as any)
+            const deferredPool = ['acc-2', 'acc-3', 'acc-4', 'acc-5'].map((nativeIdentity) =>
+                FusionAccount.fromManagedAccount({
+                    sourceId: 'src-1',
+                    nativeIdentity,
+                    attributes: { employeeId: 'E123' },
+                } as any)
+            )
+
+            const compared = await service.scoreFusionAccount(managed, deferredPool, MatchCandidateType.Deferred)
+
+            expect(compared).toBe(4)
+            expect(managed.fusionMatchesRaw).toHaveLength(4)
         })
     })
 
@@ -579,6 +1036,3 @@ describe('MatchingService', () => {
         })
     })
 })
-
-
-

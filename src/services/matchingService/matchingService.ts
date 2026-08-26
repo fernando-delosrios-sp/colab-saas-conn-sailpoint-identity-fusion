@@ -1,12 +1,15 @@
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { assert } from '../../utils/assert'
-import { MatchingConfig, FusionConfig, effectiveSkipMatchIfMissing, effectiveSkipMatchIfThresholdNotMet } from '../../model/config'
-import { resolveFusionMaxCandidatesForForm } from '../../data/config'
 import {
-    countIdentityCandidateFusionMatches,
-} from './matchingHelpers'
-import { MatchCandidateType, RuleScoreNumeric, ScoreReport } from './types'
+    MatchingConfig,
+    FusionConfig,
+    effectiveSkipMatchIfMissing,
+    effectiveSkipMatchIfThresholdNotMet,
+} from '../../model/config'
+import { resolveFusionMaxCandidatesForForm } from '../../data/config'
+import { compareMatchesForForm } from './matchingHelpers'
+import { FusionMatch, MatchCandidateType, RuleScoreNumeric, ScoreReport } from './types'
 import {
     makeScoreReport,
     normalizeLIG3,
@@ -31,8 +34,15 @@ import {
     scoreNameMatcherNormalizedNumeric,
 } from './scoringHelpers'
 import { normalizeName as normalizeNameForMatcher } from './nameMatching'
-import { buildAttributeIndex, queryAttributeIndex } from './trigramIndex'
-import { isExactAttributeMatchScores } from './exactMatch'
+import {
+    buildExactValueIndex,
+    buildLig3LengthIndex,
+    compactIdsToIdentities,
+    intersectCompactIds,
+    queryExactValueIndex,
+    queryLig3LengthIndex,
+    type CompactIdentityId,
+} from './blockingIndexes'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { LogService } from '../logService'
 import { FusionRun } from '../../model/fusionRun'
@@ -54,7 +64,6 @@ function makeSkippedReport(matching: MatchingConfig, comment: string): ScoreRepo
         comment,
     }
 }
-
 
 const MISSING_SKIP_COMMENT = 'Rule skipped (missing value on one or both sides)'
 const LIG3_BOUND_SKIP_COMMENT = 'Length ratio upper bound below threshold'
@@ -138,7 +147,6 @@ function appendSkippedRemainingRules(
     }
 }
 
-
 function evaluateCombinedScoreOutcome(
     weightedSum: number,
     weightTotal: number,
@@ -151,11 +159,7 @@ function evaluateCombinedScoreOutcome(
     return { combinedScore, hasContributing, combinedPasses }
 }
 
-function combinedScoreComment(
-    combinedPasses: boolean,
-    hasFailedMandatory: boolean,
-    hasContributing: boolean
-): string {
+function combinedScoreComment(combinedPasses: boolean, hasFailedMandatory: boolean, hasContributing: boolean): string {
     if (combinedPasses) return 'Combined score meets minimum threshold'
     if (hasFailedMandatory) return 'Combined score invalidated by failed mandatory attribute'
     if (!hasContributing) return 'No rules contributed to combined score'
@@ -182,7 +186,6 @@ export const COMBINED_SCORE_ROW_ATTRIBUTE = 'Combined score'
 export class MatchingService {
     private readonly matchingConfigs: MatchingConfig[]
     private readonly fusionManualReviewScore: number
-    private readonly fusionEnableAutoMerge: boolean
     private readonly fusionMaxIdentityMatchCandidates: number
     private readonly fusionScoreMap: Map<string, number>
     /** Reused per identity comparison so pass reconstruction does not allocate a new array each time. */
@@ -191,12 +194,15 @@ export class MatchingService {
     /**
      * @param config - Fusion configuration containing matching rules and score thresholds
      * @param log - Logger instance
-     * @param run - Per-run state container for trigram index and normalization caches
+     * @param run - Per-run state container for candidate-blocking indexes and normalization caches
      */
-    constructor(config: FusionConfig, _log: LogService, private run?: FusionRun) {
+    constructor(
+        config: FusionConfig,
+        _log: LogService,
+        private run?: FusionRun
+    ) {
         this.matchingConfigs = config.matchingConfigs ?? []
         this.fusionManualReviewScore = config.fusionManualReviewScore ?? 0
-        this.fusionEnableAutoMerge = config.fusionEnableAutoMerge ?? false
         this.fusionMaxIdentityMatchCandidates = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
         this.fusionScoreMap = config.fusionScoreMap ?? new Map()
     }
@@ -280,48 +286,57 @@ export class MatchingService {
     }
 
     /**
-     * Build the trigram blocking index over all fusion identities for their mandatory matching attributes.
-     * Must be called once before {@link getCandidates} is used.
+     * Build all identity-side candidate-blocking indexes on FusionRun.
      *
-     * The index maps each indexable mandatory attribute to an inverted trigram map so that a managed account
-     * can retrieve only the identity candidates that share at least one trigram with its attribute value,
-     * reducing the scoring candidate pool from O(m) to O(k) where k << m.
+     * The historical method name remains the sole public scoring-preparation entry point. Only mandatory
+     * positive-threshold rules with recall-safe blockers contribute: Binary exact values and LIG3 length bounds.
+     * Algorithms without a proven blocker do not filter candidates.
      *
-     * Only mandatory attributes with a strictly positive `fusionScore` are indexed. Threshold-zero or unset
-     * mandatory rules cannot safely eliminate candidates. Non-mandatory attributes also cannot be used to
-     * eliminate candidates, since a missing or non-matching non-mandatory attribute does not disqualify a pair.
-     *
-     * @param identities - All fusion identities to index (pass `allFusionIdentities` — collected
-     *   internally into an array so generators can be reused across multiple attribute sweeps)
+     * @param identities - All Fusion identities to index
      */
     public buildTrigramIndex(identities: Iterable<FusionAccount>): void {
         if (!this.run) return
         this.run.trigramIndexByAttribute.clear()
+        this.run.binaryIndexByAttribute.clear()
+        this.run.lig3LengthIndexByAttribute.clear()
+        this.run.blockingIdentityRoster = []
         this.run.indexedMandatoryAttributes = []
         this.run.trigramIndexBuilt = false
 
         const indexableMandatory = this.matchingConfigs.filter(
-            (c) => c.mandatory === true && (c.fusionScore ?? 0) > 0
+            (config) =>
+                config.mandatory === true &&
+                (config.fusionScore ?? 0) > 0 &&
+                (config.algorithm === 'binary' || config.algorithm === 'lig3')
         )
         if (indexableMandatory.length === 0) return
 
-        // Collect once; generators can only be iterated once but we need one sweep per attribute.
         const identityArray = Array.from(identities)
+        this.run.blockingIdentityRoster = identityArray
         for (const config of indexableMandatory) {
-            const idx = buildAttributeIndex(identityArray, config.attribute)
-            this.run.trigramIndexByAttribute.set(config.attribute, idx)
-            this.run.indexedMandatoryAttributes.push(config.attribute)
+            if (config.algorithm === 'binary') {
+                this.run.binaryIndexByAttribute.set(
+                    config.attribute,
+                    buildExactValueIndex(identityArray, config.attribute)
+                )
+            } else {
+                this.run.lig3LengthIndexByAttribute.set(
+                    config.attribute,
+                    buildLig3LengthIndex(identityArray, config.attribute)
+                )
+            }
+            if (!this.run.indexedMandatoryAttributes.includes(config.attribute)) {
+                this.run.indexedMandatoryAttributes.push(config.attribute)
+            }
         }
         this.run.trigramIndexBuilt = true
     }
 
     /**
-     * Return a pre-filtered candidate set for `account` using the trigram blocking index,
-     * an empty Set when the account has no value for any indexed mandatory attribute, or
-     * `undefined` if no filtering was possible (index not built or no indexable mandatory attributes).
+     * Return the intersection of recall-safe per-rule candidate sets.
      *
-     * When `undefined` is returned the caller must fall back to a full identity scan.
-     * An empty Set means zero candidates: the caller must not full-scan.
+     * Returns an empty Set when every indexable mandatory attribute is missing. Returns `undefined` and increments
+     * `fullScanFallbackCount` when no recall-safe blocker can filter, requiring the caller to score the baseline.
      *
      * The returned Set already has `excludeIds` applied, so the caller can iterate it directly.
      *
@@ -334,32 +349,41 @@ export class MatchingService {
         log?: LogService,
         excludeIds?: ReadonlySet<string>
     ): Set<FusionAccount> | undefined {
-        if (!this.run || !this.run.trigramIndexBuilt || this.run.indexedMandatoryAttributes.length === 0) return undefined
-
-        let resultSet: Set<FusionAccount> | undefined
-
-        for (const attrName of this.run.indexedMandatoryAttributes) {
-            const raw = account.attributes[attrName]
-            if (missing(raw)) {
-                // Account has no value for this mandatory attribute — cannot filter by it.
-                continue
-            }
-            const idx = this.run.trigramIndexByAttribute.get(attrName)!
-            const attrCandidates = queryAttributeIndex(idx, String(raw))
-
-            if (resultSet === undefined) {
-                resultSet = attrCandidates
-            } else {
-                // Intersection: keep only identities present in BOTH sets.
-                for (const identity of resultSet) {
-                    if (!attrCandidates.has(identity)) resultSet.delete(identity)
-                }
-            }
+        if (!this.run) return undefined
+        if (!this.run.trigramIndexBuilt || this.run.indexedMandatoryAttributes.length === 0) {
+            this.run.fullScanFallbackCount += 1
+            return undefined
         }
 
-        if (resultSet === undefined) {
-            // All indexed mandatory attributes were missing — no identity can pass those rules.
-            this.run.mandatoryMissingBlockCount = (this.run.mandatoryMissingBlockCount ?? 0) + 1
+        let compactResult: Set<CompactIdentityId> | undefined
+
+        const blockingRules = this.matchingConfigs.filter(
+            (config) =>
+                config.mandatory === true &&
+                (config.fusionScore ?? 0) > 0 &&
+                (config.algorithm === 'binary' || config.algorithm === 'lig3')
+        )
+        for (const config of blockingRules) {
+            const raw = account.attributes[config.attribute]
+            if (missing(raw)) {
+                continue
+            }
+            let ruleCandidates: CompactIdentityId[]
+            if (config.algorithm === 'binary') {
+                const index = this.run.binaryIndexByAttribute.get(config.attribute)
+                ruleCandidates = index ? queryExactValueIndex(index, String(raw)) : []
+            } else {
+                const index = this.run.lig3LengthIndexByAttribute.get(config.attribute)
+                ruleCandidates = index ? queryLig3LengthIndex(index, String(raw), config.fusionScore ?? 0) : []
+            }
+            compactResult =
+                compactResult === undefined
+                    ? new Set(ruleCandidates)
+                    : intersectCompactIds(compactResult, ruleCandidates)
+        }
+
+        if (compactResult === undefined) {
+            this.run.mandatoryMissingBlockCount += 1
             const blockCount = this.run.mandatoryMissingBlockCount
             if (log && (blockCount <= 5 || blockCount % 100 === 0)) {
                 log.warn(
@@ -369,7 +393,7 @@ export class MatchingService {
             return new Set()
         }
 
-        // Apply auto-assigned exclusions within the candidate set.
+        const resultSet = compactIdsToIdentities(compactResult, this.run.blockingIdentityRoster)
         if (excludeIds && excludeIds.size > 0) {
             for (const identity of resultSet) {
                 if (identity.identityId && excludeIds.has(identity.identityId)) {
@@ -382,17 +406,16 @@ export class MatchingService {
     }
 
     /**
-     * Scores a fusion account against all existing fusion identities to find matches.
-     * For each identity that meets the matching threshold, a {@link FusionMatch} is
-     * added to the fusion account via {@link FusionAccount#addFusionMatch}.
+     * Scores a Fusion account against the supplied candidate pool.
+     * Identity scoring compares the whole pool, then retains the highest-ranked K identity matches.
+     * Deferred scoring remains uncapped.
      *
      * Yields periodically so heavy Match scoring does not block the Node event loop.
      *
      * @param fusionAccount - The account to score (typically a provisional Fusion account)
      * @param fusionIdentities - The set of existing fusion identities to compare against
-     * @param maxIdentityMatches - When set, stop scoring against further identities once this many
-     *   threshold-passing identity-origin matches are recorded (same cap as the review form).
-     *   Omitted or undefined disables this early exit (e.g. tests).
+     * @param maxIdentityMatches - Identity-origin retention cap applied after scoring the whole pool.
+     *   Deferred scoring is uncapped.
      */
     public async scoreFusionAccount(
         fusionAccount: FusionAccount,
@@ -404,11 +427,6 @@ export class MatchingService {
         // false positives (empty scores would otherwise mark every identity as a match).
         if (this.matchingConfigs.length === 0) return 0
 
-        // When exact-match automatic merge is enabled, there is no benefit in
-        // continuing to score after a perfect match is found: the first exact match
-        // wins and all subsequent comparisons would be discarded. Early exit here
-        // avoids O(n) identity comparisons for every exact-match account.
-        const earlyExitOnExactMatch = this.fusionEnableAutoMerge && candidateType === MatchCandidateType.Identity
         const maxIdentity =
             candidateType === MatchCandidateType.Identity
                 ? (maxIdentityMatches ?? this.fusionMaxIdentityMatchCandidates)
@@ -428,23 +446,27 @@ export class MatchingService {
             }
             this.compareFusionAccounts(fusionAccount, fusionIdentity, candidateType, useFullBreakdown)
             compared += 1
-            if (earlyExitOnExactMatch) {
-                const matches = fusionAccount.fusionMatchesRaw
-                if (matches.length > 0 && isExactAttributeMatchScores(matches[matches.length - 1].scores)) {
-                    break
-                }
-            }
-            if (
-                maxIdentity !== undefined &&
-                countIdentityCandidateFusionMatches(fusionAccount.fusionMatchesRaw) >= maxIdentity
-            ) {
-                break
-            }
             yieldCounter += 1
             if (yieldCounter >= SCORING_IDENTITY_YIELD_INTERVAL) {
                 yieldCounter = 0
                 await new Promise<void>((resolve) => setImmediate(resolve))
             }
+        }
+        if (candidateType === MatchCandidateType.Identity) {
+            if (this.run) {
+                this.run.identityComparisonCount += compared
+            }
+            const identityMatches: FusionMatch[] = []
+            const otherMatches: FusionMatch[] = []
+            for (const match of fusionAccount.fusionMatchesRaw) {
+                if ((match.candidateType ?? MatchCandidateType.Identity) === MatchCandidateType.Identity) {
+                    identityMatches.push(match)
+                } else {
+                    otherMatches.push(match)
+                }
+            }
+            identityMatches.sort(compareMatchesForForm)
+            fusionAccount.layers.replaceFusionMatches([...otherMatches, ...identityMatches.slice(0, maxIdentity)])
         }
         return compared
     }
@@ -682,7 +704,14 @@ export class MatchingService {
         ) {
             const numeric: RuleScoreNumeric = { score: 0, isMatch: false, skipped: true, skipReason: 'lig3-bound' }
             if (matching.mandatory) {
-                return { numeric, skipped: false, hasFailedMandatory: true, shouldBreak: true, weightedSum, weightTotal }
+                return {
+                    numeric,
+                    skipped: false,
+                    hasFailedMandatory: true,
+                    shouldBreak: true,
+                    weightedSum,
+                    weightTotal,
+                }
             }
             return { numeric, skipped: true, hasFailedMandatory: false, shouldBreak: false, weightedSum, weightTotal }
         }
@@ -763,12 +792,8 @@ export class MatchingService {
             }
         }
 
-        return evaluateCombinedScoreOutcome(
-            weightedSum,
-            weightTotal,
-            this.fusionManualReviewScore,
-            hasFailedMandatory
-        ).combinedPasses
+        return evaluateCombinedScoreOutcome(weightedSum, weightTotal, this.fusionManualReviewScore, hasFailedMandatory)
+            .combinedPasses
     }
 
     /**
@@ -859,11 +884,7 @@ export class MatchingService {
                 this.run?.nameMatcherPhoneticCache
             )
         }
-        return this.scoreAttribute(
-            (accountAttribute ?? '').toString(),
-            (identityAttribute ?? '').toString(),
-            matching
-        )
+        return this.scoreAttribute((accountAttribute ?? '').toString(), (identityAttribute ?? '').toString(), matching)
     }
 
     /** Numeric algorithm dispatch for the identity fast path. */
@@ -1034,4 +1055,3 @@ export class MatchingService {
         return missing(value)
     }
 }
-

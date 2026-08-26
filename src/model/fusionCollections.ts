@@ -212,12 +212,7 @@ export class FusionCollections {
         return `${accountLabel} [${sourceLabel}]`
     }
 
-    private resolveHistoryActorLabel(
-        name: unknown,
-        email: unknown,
-        id: string | undefined,
-        fallback: string
-    ): string {
+    private resolveHistoryActorLabel(name: unknown, email: unknown, id: string | undefined, fallback: string): string {
         const normalizedName = trimStr(name)
         const normalizedEmail = trimStr(email)
         if (normalizedName && normalizedName !== id) {
@@ -230,12 +225,7 @@ export class FusionCollections {
     }
 
     private formatMergeTargetLabel(decision: FusionDecision): string {
-        return this.resolveHistoryActorLabel(
-            decision.identityName,
-            undefined,
-            decision.identityId,
-            'existing identity'
-        )
+        return this.resolveHistoryActorLabel(decision.identityName, undefined, decision.identityId, 'existing identity')
     }
 
     private createDecisionHistoryMessage(decision: FusionDecision, action: string): string {
@@ -340,9 +330,7 @@ export class FusionCollections {
         },
         setNonMatched: (actorName?: string, sourceName?: string): void => {
             this.statusesValue.add(StatusEntitlement.NonMatched)
-            this.addHistory(
-                `Set ${this.formatHistoryAccountInfo(actorName, sourceName)} as NonMatched`
-            )
+            this.addHistory(`Set ${this.formatHistoryAccountInfo(actorName, sourceName)} as NonMatched`)
         },
         setUncorrelatedAccount: (accountId: string): void => {
             if (!accountId) return
@@ -470,6 +458,10 @@ export class FusionCollections {
                 }
             }
         },
+        /** Replace the match collection after identity top-K retention. */
+        replaceAll: (fusionMatches: FusionMatch[]): void => {
+            this.fusionMatchesValue = fusionMatches
+        },
     }
 
     readonly historyOps = {
@@ -507,9 +499,3 @@ export class FusionCollections {
         if (identityId) bag[FusionAttribute.IdentityId] = identityId
     }
 }
-
-
-
-
-
-

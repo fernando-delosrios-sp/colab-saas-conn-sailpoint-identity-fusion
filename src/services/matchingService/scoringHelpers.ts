@@ -76,11 +76,8 @@ export const scoreDiceNumeric = (
     return matchedNumeric(score, score >= threshold)
 }
 
-export const scoreDice = (
-    accountAttribute: string,
-    identityAttribute: string,
-    matching: MatchingConfig
-): ScoreReport => reportFromNumeric(matching, scoreDiceNumeric(accountAttribute, identityAttribute, matching))
+export const scoreDice = (accountAttribute: string, identityAttribute: string, matching: MatchingConfig): ScoreReport =>
+    reportFromNumeric(matching, scoreDiceNumeric(accountAttribute, identityAttribute, matching))
 
 export const scoreDoubleMetaphoneNumeric = (
     accountAttribute: string,
@@ -236,11 +233,14 @@ export function scoreNameMatcherNormalized(
  * LIG3 gap penalties (0.8–0.9) mean the similarity can never exceed `min(len1,len2)/max(len1,len2)*100`.
  * If this bound is below the required threshold, the full DP can be skipped entirely.
  */
-export function lig3UpperBound(normA: string, normB: string): number {
-    const lenA = normA.length
-    const lenB = normB.length
+export function lig3LengthUpperBound(lenA: number, lenB: number): number {
     if (lenA === 0 || lenB === 0) return 0
     return (Math.min(lenA, lenB) / Math.max(lenA, lenB)) * 100
+}
+
+/** Conservative LIG3 upper bound for two already-normalized strings. */
+export function lig3UpperBound(normA: string, normB: string): number {
+    return lig3LengthUpperBound(normA.length, normB.length)
 }
 
 /**
@@ -308,13 +308,6 @@ export function scoreLIG3NormalizedNumeric(normA: string, normB: string, matchin
 export function scoreLIG3Normalized(normA: string, normB: string, matching: MatchingConfig): ScoreReport {
     return reportFromNumeric(matching, scoreLIG3NormalizedNumeric(normA, normB, matching))
 }
-
-/** Public entry point: normalizes both sides then delegates to {@link scoreLIG3Normalized}. */
-export const scoreLIG3Numeric = (
-    accountAttribute: string,
-    identityAttribute: string,
-    matching: MatchingConfig
-): RuleScoreNumeric => scoreLIG3NormalizedNumeric(normalizeLIG3(accountAttribute), normalizeLIG3(identityAttribute), matching)
 
 export const scoreLIG3 = (accountAttribute: string, identityAttribute: string, matching: MatchingConfig): ScoreReport =>
     scoreLIG3Normalized(normalizeLIG3(accountAttribute), normalizeLIG3(identityAttribute), matching)
@@ -426,7 +419,12 @@ export const scoreCustomVelocityNumeric = (
     const rendered = evaluateVelocityTemplate(expression, context)
     if (missing(rendered)) {
         if (effectiveSkipMatchIfMissing(matching)) {
-            return { score: 0, isMatch: false, skipped: true, comment: 'Rule skipped (custom Velocity returned no value)' }
+            return {
+                score: 0,
+                isMatch: false,
+                skipped: true,
+                comment: 'Rule skipped (custom Velocity returned no value)',
+            }
         }
         return matchedNumeric(0, false, 'Custom Velocity returned no value')
     }

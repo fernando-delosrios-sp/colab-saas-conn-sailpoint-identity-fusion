@@ -7,7 +7,7 @@ import { assert } from '../../utils/assert'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { isReportableIscAccountId } from '../fusionService/reportAccountResolver'
 import { getFusionReportAccountLabel } from '../fusionService/helpers'
-import { FusionMatch } from '../matchingService/types'
+import { compareMatchesForForm } from '../matchingService/matchingHelpers'
 import { Candidate } from './types'
 import { internalConfig } from '../../data/config'
 import { readString, trimStr } from '../../utils/safeRead'
@@ -107,31 +107,6 @@ export const resolveCandidateDisplayName = (
 }
 
 /**
- * Sort key for ranking match candidates on review forms: combined match score when present,
- * otherwise the best non-skipped rule score.
- */
-const rankScoreForMatch = (match: FusionMatch): number => {
-    const combined = match.scores?.find(
-        (s) =>
-            s.algorithm === 'weighted-mean' ||
-            s.attribute === 'Combined score' ||
-            s.attribute === 'Combined match score'
-    )
-    if (combined) return combined.score
-    const scored = match.scores?.filter((s) => !s.skipped) ?? []
-    if (scored.length === 0) return 0
-    return Math.max(...scored.map((s) => s.score))
-}
-
-const compareMatchesForForm = (a: FusionMatch, b: FusionMatch): number => {
-    const delta = rankScoreForMatch(b) - rankScoreForMatch(a)
-    if (delta !== 0) return delta
-    const ida = String(a.fusionIdentity?.identityId ?? a.identityId ?? '')
-    const idb = String(b.fusionIdentity?.identityId ?? b.identityId ?? '')
-    return ida.localeCompare(idb)
-}
-
-/**
  * Build the ordered candidate list for a fusion review form (highest combined score first),
  * capped at `maxCandidates` (configured via `fusionMaxCandidatesForForm`).
  */
@@ -177,8 +152,7 @@ export const buildFormName = (
 ): string => {
     const accountName = fusionAccount.name || fusionAccount.displayName || 'Unknown'
     const source = `[${fusionAccount.sourceName}]`
-    const accountIdentifier =
-        trimStr(fusionAccount.managedKey) || trimStr(fusionAccount.managedAccountId) || 'unknown'
+    const accountIdentifier = trimStr(fusionAccount.managedKey) || trimStr(fusionAccount.managedAccountId) || 'unknown'
     const base = `${fusionFormNamePattern} - ${accountName} ${source} (${accountIdentifier})`
     if (options?.enableLocalization && options.locale) {
         return `${base} [${options.locale}]`
@@ -203,8 +177,3 @@ export const getFormOwner = (sources: SourceService): OwnerDto => {
     assert(owner, 'Fusion source owner not found')
     return owner
 }
-
-
-
-
-

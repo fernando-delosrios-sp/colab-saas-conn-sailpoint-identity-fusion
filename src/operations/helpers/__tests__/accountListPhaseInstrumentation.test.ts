@@ -85,6 +85,33 @@ describe('accountListPhases step instrumentation', () => {
         )
     })
 
+    it('logs the full-scan fallback summary when candidate blocking is unavailable', async () => {
+        const registry = createRegistry()
+        const log = registry.log
+        registry.sources.run.fullScanFallbackCount = 2
+        vi.spyOn(log, 'warn')
+
+        await processPhase(registry, { isPersistent: false })
+
+        expect(log.warn).toHaveBeenCalledWith(
+            'Full identity scan fallback: 2 account(s) — candidate blocking unavailable; scored the Fusion identity baseline'
+        )
+    })
+
+    it('logs the identity comparison and candidate-set size summary', async () => {
+        const registry = createRegistry()
+        const log = registry.log
+        registry.sources.run.identityComparisonCount = 17
+        registry.sources.run.identityCandidateSetSizeSum = 21
+        vi.spyOn(log, 'info')
+
+        await processPhase(registry, { isPersistent: false })
+
+        expect(log.info).toHaveBeenCalledWith(
+            'Identity comparison summary: identityComparisonCount=17 identityCandidateSetSizeSum=21'
+        )
+    })
+
     it('processPhase completion DETAIL includes correlation segment when activity recorded', async () => {
         const registry = createRegistry()
         const log = registry.log
@@ -194,9 +221,7 @@ describe('refreshPhase workload summary', () => {
         await refreshPhase(registry)
 
         expect(log.track).toHaveBeenCalledWith('refreshPhase.processFusionAccounts')
-        expect(vi.mocked(log.track).mock.calls.map(([name]) => name)).toEqual([
-            'refreshPhase.processFusionAccounts',
-        ])
+        expect(vi.mocked(log.track).mock.calls.map(([name]) => name)).toEqual(['refreshPhase.processFusionAccounts'])
         expect(log.detail).toHaveBeenCalledWith(
             expect.objectContaining({
                 action: 'refresh workload',
@@ -207,7 +232,9 @@ describe('refreshPhase workload summary', () => {
                 normalDefineMs: 4,
             })
         )
-        const workloadCalls = vi.mocked(log.detail).mock.calls.filter(([payload]) => payload.action === 'refresh workload')
+        const workloadCalls = vi
+            .mocked(log.detail)
+            .mock.calls.filter(([payload]) => payload.action === 'refresh workload')
         expect(workloadCalls).toHaveLength(1)
     })
 
@@ -226,5 +253,3 @@ describe('refreshPhase workload summary', () => {
         expect(log.detail).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'refresh workload' }))
     })
 })
-
-

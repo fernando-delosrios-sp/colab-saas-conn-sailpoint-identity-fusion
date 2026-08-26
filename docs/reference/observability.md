@@ -49,16 +49,16 @@ Point **External target URL** (with proxy mode off) at `http://your-host:3000/`.
 
 During long `accountList` aggregations, the connector emits standardized text prefixes in log messages (prefixed with `[accountList]`). Config bootstrap messages use `[config]`. Use these for monitoring and alerting instead of legacy patterns.
 
-| Prefix            | Level | Purpose                                                                                                                                                                                                                                                     |
-| ----------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prefix            | Level | Purpose                                                                                                                                                                                                                                                                                                                                     |
+| ----------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `STATUS`          | Info  | Periodic heartbeat (default 10s, configurable via **Heartbeat interval**): phase, step, pipeline progress with delta, compact `api=Na/Nq/Nc` segment with delta (`q` = FIFO queue length plus requests waiting for a rate-limit slot), memory, `cpu={percent}%` (one-core process CPU over the sample window; may exceed 100), elapsed time |
-| `EVENT_SUMMARY`   | Info  | Interval deltas for review/merge matches, decisions, correlations, and emails. Omitted when the tick only recorded non-matched accounts — that work is already on `STATUS` as progress delta plus cumulative `matches(`                                     |
-| `PHASE` / `STEP`  | Info  | Pipeline boundary markers (`START` / `END elapsed=…`)                                                                                                                                                                                                       |
-| `DETAIL`          | Info  | Operational milestones as `key=value` pairs (sources loaded, emails sent, mode)                                                                                                                                                                             |
-| `WARN STALL`      | Warn  | API queue stopped completing requests for two consecutive heartbeat ticks; includes active request labels                                                                                                                                                   |
-| `WARN EVENT_LOOP` | Warn  | The event loop was blocked long enough to starve keep-alive and heartbeat timers; reports the blocked duration plus the phase/step on both sides of the gap, and a worst-block summary when the operation ends                                              |
-| `EPILOGUE`        | Info  | Report epilogue (`START` / `END elapsed=…`; not a numbered phase)                                                                                                                                                                                           |
-| `METRIC`          | Info  | Phase/step timing metrics                                                                                                                                                                                                                                   |
+| `EVENT_SUMMARY`   | Info  | Interval deltas for review/merge matches, decisions, correlations, and emails. Omitted when the tick only recorded non-matched accounts — that work is already on `STATUS` as progress delta plus cumulative `matches(`                                                                                                                     |
+| `PHASE` / `STEP`  | Info  | Pipeline boundary markers (`START` / `END elapsed=…`)                                                                                                                                                                                                                                                                                       |
+| `DETAIL`          | Info  | Operational milestones as `key=value` pairs (sources loaded, emails sent, mode)                                                                                                                                                                                                                                                             |
+| `WARN STALL`      | Warn  | API queue stopped completing requests for two consecutive heartbeat ticks; includes active request labels                                                                                                                                                                                                                                   |
+| `WARN EVENT_LOOP` | Warn  | The event loop was blocked long enough to starve keep-alive and heartbeat timers; reports the blocked duration plus the phase/step on both sides of the gap, and a worst-block summary when the operation ends                                                                                                                              |
+| `EPILOGUE`        | Info  | Report epilogue (`START` / `END elapsed=…`; not a numbered phase)                                                                                                                                                                                                                                                                           |
+| `METRIC`          | Info  | Phase/step timing metrics                                                                                                                                                                                                                                                                                                                   |
 
 ### STATUS pipeline progress
 
@@ -175,21 +175,26 @@ Because samples cannot run during the block, each warning appears only once the 
 
 `WARN EVENT_LOOP` is written twice: once through the normal logger, and once straight to stdout as plain text. A blocked loop also stops the logger draining its buffer, so the plain-text copy can be the only one that survives. A line present in raw form but missing from the structured log points at the logging pipeline rather than the loop.
 
-## Trigram blocking counters (`accountList` Process)
+## Candidate blocking counters (`accountList` Process)
 
-After managed-account matching, Process may emit warnings for run-scoped trigram counters. They are not interchangeable:
+After managed-account matching, Process may emit run-scoped candidate-blocking and comparison summaries. Candidate
+blocking is algorithm-aware: Binary rules use exact-value indexes and LIG3 rules use proven length bounds. Rules without
+a recall-safe blocker, including Jaro-Winkler-only rules, use the full identity baseline.
 
-| Counter | When it increments | Meaning |
-| --- | --- | --- |
-| `mandatoryMissingBlockCount` | Built trigram index with at least one indexable mandatory attribute, and the managed account has no value for any of those attributes | Scoring used an **empty** identity candidate set. No full identity scan ran. |
-| `fullScanFallbackCount` | `getCandidates` returned `undefined` because trigram blocking was unavailable (index not built or no indexable mandatory attributes) | Caller scored the **full** identity corpus. |
+| Counter                       | When it increments                                                                                                               | Meaning                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `mandatoryMissingBlockCount`  | A built blocker has at least one indexable mandatory attribute, and the managed account has no value for any of those attributes | Scoring used an **empty** identity candidate set. No full identity scan ran.                                  |
+| `fullScanFallbackCount`       | `getCandidates` returned `undefined` because no recall-safe candidate blocker was available                                      | Caller scored the **full** Fusion identity baseline.                                                          |
+| `identityComparisonCount`     | `compareFusionAccounts` runs during identity-phase scoring                                                                       | Total identity comparisons; deferred comparisons are excluded.                                                |
+| `identityCandidateSetSizeSum` | An account enters identity-phase scoring                                                                                         | Sum of candidate-set sizes actually scored; full-scan accounts add the baseline size and empty sets add zero. |
 
-Indexable mandatory attributes are rules with `mandatory === true` and `(fusionScore ?? 0) > 0`. Threshold-zero or unset mandatory rules are not indexed.
+Indexable mandatory attributes are Binary or LIG3 rules with `mandatory === true` and
+`(fusionScore ?? 0) > 0`. Threshold-zero or unset mandatory rules are not indexed.
 
 **Example grep targets:**
 
 ```bash
 grep 'Mandatory missing block' connector.log
 grep 'Full identity scan fallback' connector.log
+grep 'Identity comparison summary' connector.log
 ```
-
