@@ -53,6 +53,20 @@ import { FusionRun } from '../../model/fusionRun'
 // FusionService Class
 // ============================================================================
 
+const MAX_LOGGED_SOURCE_NAMES = 20
+
+/**
+ * Formats managed source names for a single aggregated log line.
+ *
+ * @param names - Managed source names to list
+ * @returns Quoted, comma-separated names, truncated with a remainder count when long
+ */
+function formatSourceNameList(names: string[]): string {
+    const shown = names.slice(0, MAX_LOGGED_SOURCE_NAMES).map((name) => `"${name}"`)
+    const remaining = names.length - shown.length
+    return remaining > 0 ? `${shown.join(', ')} (+${remaining} more)` : shown.join(', ')
+}
+
 export interface FusionServiceDeps {
     readonly config: FusionConfig
     readonly log: LogService
@@ -746,25 +760,33 @@ export class FusionService {
 
     private validateManagedSourceReviewers(): void {
         this.run.sourcesWithoutReviewers.clear()
+        const withoutMatchScoring: string[] = []
+        const withoutReviewers: string[] = []
         for (const source of this.sources.managedSources) {
             const sourceInfo = { id: source.id, name: source.name } as import('../sourceService').SourceInfo
             if (!sourceShouldEnterMatchScoring(this.config, sourceInfo, this.run)) {
                 this.run.sourcesWithoutReviewers.add(source.name)
-                const message =
-                    `Match scoring is not configured for source "${source.name}" ` +
-                    `(enable automatic merge and/or manual review with valid reviewers). ` +
-                    `Managed accounts from this source will be treated as NonMatched.`
-                if (this.config.fusionEnableManualReview !== false) {
-                    this.log.error(message)
-                } else {
-                    this.log.info(message)
-                }
+                withoutMatchScoring.push(source.name)
             } else if (this.config.fusionEnableAutoMerge && !sourceHasReviewers(sourceInfo, this.run)) {
-                this.log.warn(
-                    `No reviewers configured for source "${source.name}" with automatic merge enabled. ` +
-                    `Manual review is unavailable; borderline matches will register as non-match.`
-                )
+                withoutReviewers.push(source.name)
             }
+        }
+
+        if (withoutMatchScoring.length > 0) {
+            this.log.info(
+                `Match scoring is not configured for ${withoutMatchScoring.length} managed source(s): ` +
+                    `${formatSourceNameList(withoutMatchScoring)} ` +
+                    `(enable automatic merge and/or manual review with valid reviewers). ` +
+                    `Managed accounts from these sources will be treated as NonMatched.`
+            )
+        }
+
+        if (withoutReviewers.length > 0) {
+            this.log.warn(
+                `No reviewers configured for ${withoutReviewers.length} managed source(s) with automatic merge enabled: ` +
+                    `${formatSourceNameList(withoutReviewers)}. ` +
+                    `Manual review is unavailable; borderline matches will register as non-match.`
+            )
         }
     }
 

@@ -125,6 +125,7 @@ export function buildFromFusionAccount(account: Account): FusionAccount {
         applyAttributeCollections(fa, account)
         applyOriginMetadata(fa, account, identityInfo)
     }
+    fa.collections.statuses.remove(StatusEntitlement.New)
 
     fa.layers.isIdentity = fa.fromIdentity
 
@@ -171,7 +172,7 @@ export function buildFromIdentity(identity: IdentityDocument): FusionAccount {
     fa.layers.originSource = IDENTITIES_SOURCE_NAME
     fa.layers.originAccount = identity.id ?? undefined
     fa.collections.hydratePersisted({
-        statuses: [StatusEntitlement.Baseline],
+        statuses: [StatusEntitlement.Baseline, StatusEntitlement.New],
     })
     fa.setIdentityIdAttribute(identity.id)
     fa.collections.addHistoryMessage(
@@ -234,7 +235,7 @@ export function buildFromManagedAccount(account: Account): FusionAccount {
     fa.collections.hydratePersisted({
         accountIds: [managedAccountKey],
         missingAccountIds: [managedAccountKey],
-        statuses: [StatusEntitlement.Uncorrelated],
+        statuses: [StatusEntitlement.Uncorrelated, StatusEntitlement.New],
     })
     fa.layers.uncorrelated = true
     fa.collections.removeActionSilent(FusionAction.Correlated)
@@ -279,7 +280,7 @@ export function buildFromFusionDecision(decision: FusionDecision): FusionAccount
     fa.collections.hydratePersisted({
         accountIds: [managedAccountKey],
         missingAccountIds: [managedAccountKey],
-        statuses: [StatusEntitlement.Uncorrelated],
+        statuses: [StatusEntitlement.Uncorrelated, StatusEntitlement.New],
     })
     fa.layers.uncorrelated = true
     fa.collections.removeActionSilent(FusionAction.Correlated)

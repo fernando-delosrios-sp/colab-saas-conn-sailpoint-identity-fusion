@@ -22,4 +22,5 @@ export enum StatusEntitlement {
     Uncorrelated = 'uncorrelated',
     ActiveReviews = 'activeReviews',
     Candidate = 'candidate',
+    New = 'new',
 }

@@ -24,7 +24,7 @@ Every Identity Fusion NG account exposes the following built-in attributes. Thes
     Do not include attributes you don't need in your schema, and do not remove internal attributes.
 
 !!! tip "Status entitlements in search"
-    You can use status entitlements in search to find identities in different situations, such as those included in a pending Fusion review, your Fusion reviewers, identities with uncorrelated managed accounts, baseline-only identities, NonMatched identities, identities with manual assignments, etc.
+    You can use status entitlements in search to find identities in different situations, such as Fusion accounts created in the current aggregation (`new`), identities included in a pending Fusion review, your Fusion reviewers, identities with uncorrelated managed accounts, baseline-only identities, NonMatched identities, identities with manual assignments, etc. The `new` status is removed when the account is reconstructed from a previous Fusion account in a later aggregation.
 
 !!! tip "Baseline account names"
     Account name definition is ignored for baseline Fusion accounts to ensure the Fusion account is automatically correlated with the identity that originated it.
