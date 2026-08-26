@@ -189,9 +189,20 @@ The term **Epilogue** SHALL denote the terminal block of the account-list operat
 - **THEN** it SHALL contain an **Epilogue** entry defined as the always-runs terminal report block
 - **AND** the **Phase** entry SHALL NOT list the report step as an example phase
 
+### Requirement: Glossary defines STATUS CPU segment
+
+The ubiquitous-language glossary SHALL define **STATUS CPU segment** as the `cpu={percent}%` token on a **STATUS line**: integer percent of one core for the connector process over the sample window (`process.cpuUsage` user+system versus wall time). It SHALL NOT mean host load average, container CPU quota, or CPU-seconds.
+
+#### Scenario: Glossary entry for STATUS CPU segment
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **STATUS CPU segment** entry
+- **AND** the entry SHALL state that the token is `cpu={percent}%` on a STATUS line
+- **AND** the entry SHALL NOT define the term as host load average or container quota
+
 ### Requirement: Glossary defines operation heartbeat terms
 
-The ubiquitous-language glossary SHALL define **Operation heartbeat**, **STATUS line**, and **EVENT_SUMMARY line** as canonical terms for periodic operation visibility logging.
+The ubiquitous-language glossary SHALL define **Operation heartbeat**, **STATUS line**, and **EVENT_SUMMARY line** as canonical terms for periodic operation visibility logging. The **STATUS line** entry SHALL include process CPU (`cpu=`) alongside phase, step, progress, queue, memory, and elapsed.
 
 #### Scenario: Glossary entry for Operation heartbeat
 
@@ -201,7 +212,7 @@ The ubiquitous-language glossary SHALL define **Operation heartbeat**, **STATUS 
 #### Scenario: Glossary entry for STATUS line
 
 - **WHEN** a reader consults the ubiquitous-language spec glossary
-- **THEN** it SHALL contain a **STATUS line** entry describing the primary situational text line (phase, step, progress, queue, memory, elapsed)
+- **THEN** it SHALL contain a **STATUS line** entry describing the primary situational text line (phase, step, progress, queue, memory, CPU, elapsed)
 
 #### Scenario: Glossary entry for EVENT_SUMMARY line
 
@@ -473,7 +484,8 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **Phase** | A major stage of an operation pipeline (for example the identity documents phase, the Fusion accounts phase, or the managed accounts phase). The report step is not a phase; see **Epilogue**. |
 | **Epilogue** | The always-runs terminal block of the account-list operation that emits reports and summaries after the pipeline phases complete, regardless of pipeline success. Ordered most-durable-first (report file, report email, summary send). |
 | **Operation heartbeat** | A periodic logging interval (default 30s) during long-running operations that emits **STATUS line** and **EVENT_SUMMARY line** text to explain phase, step, progress, queue state, and aggregated account activity. |
-| **STATUS line** | The primary situational text line emitted by the operation heartbeat: phase, step, Fetch population counters or pipeline `progress=`, compact `api=Na/Nq/Nc` (with delta), memory, and elapsed time (grep prefix `STATUS`). |
+| **STATUS line** | The primary situational text line emitted by the operation heartbeat: phase, step, Fetch population counters or pipeline `progress=`, compact `api=Na/Nq/Nc` (with delta), memory, **STATUS CPU segment**, and elapsed time (grep prefix `STATUS`). |
+| **STATUS CPU segment** | The `cpu={percent}%` token on a **STATUS line**. Integer percent of one core for the connector process over the sample window (`process.cpuUsage` user+system versus wall time). Not host load average, container CPU quota, or CPU-seconds. |
 | **EVENT_SUMMARY line** | A heartbeat text line aggregating account-level activity (review/merge matches, correlations, decisions) recorded since the previous tick. Not emitted when the only match activity is non-matched accounts already shown on STATUS (grep prefix `EVENT_SUMMARY`). |
 | **Bulk ingest** | CPU-bound registration of already-fetched pages into operation-run caches during Fetch. Distinct from HTTP retrieval and from identity hydration, which performs follow-up API lookups for missing identities. |
 | **Fetch population counter** | A Fetch STATUS segment for one inventory: `fusion-accounts`, `managed-accounts`, or `identities`. Counters are independent; Fetch STATUS MUST NOT use a single `fetched` or `ingested` `progress=` fraction for parallel inventories. |
