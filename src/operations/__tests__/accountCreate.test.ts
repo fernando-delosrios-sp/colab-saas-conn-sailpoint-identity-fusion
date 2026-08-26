@@ -176,7 +176,7 @@ describe('accountCreate', () => {
         expect(registry.res.send).not.toHaveBeenCalled()
     })
 
-    it('runs Fusion report pipeline on report Add without streaming account-list rows', async () => {
+    it('dispatches Fusion report pipeline on report Add without streaming extra StdAccountListOutput objects', async () => {
         const registry = createRegistry()
         const { executeActions: realExecuteActions } = await vi.importActual<typeof import('../actions')>(
             '../actions'

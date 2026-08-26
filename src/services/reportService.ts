@@ -187,6 +187,26 @@ export class ReportService {
         private run: FusionRun
     ) {}
 
+    /**
+     * Title for HTML/email: override, else locale key for the report kind, else English constant.
+     */
+    private resolveHtmlReportTitle(
+        reportType: FusionHtmlReportKind,
+        locale?: string,
+        reportTitleOverride?: string
+    ): string {
+        if (reportTitleOverride) return reportTitleOverride
+        if (locale) {
+            return translate(
+                reportType === 'aggregation' ? 'aggregation_report_title' : 'fusion_report_title',
+                locale
+            )
+        }
+        return reportType === 'aggregation'
+            ? ReportService.AGGREGATION_REPORT_TITLE
+            : ReportService.FUSION_REPORT_EMAIL_TITLE
+    }
+
     /** Ensure the local report output directory exists and return its absolute path. */
     public async ensureReportOutputDirectoryExists(subdir: string = ReportService.REPORT_DISK_SUBDIR): Promise<string> {
         const dir = path.join(process.cwd(), subdir)
@@ -197,14 +217,14 @@ export class ReportService {
     /** Build fusion report HTML without sending (used by dry-run disk persistence and report delivery). */
     public renderFusionReportHtml(
         report: FusionReport,
-        _reportType: 'aggregation' | 'fusion' = 'aggregation',
+        reportType: FusionHtmlReportKind = 'aggregation',
         reportTitleOverride?: string,
         locale?: string
     ): string {
         registerHandlebarsHelpers()
         const totalAccounts = report.totalAccounts ?? report.accounts.length
         const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
-        const reportTitle = reportTitleOverride || ReportService.FUSION_REPORT_EMAIL_TITLE
+        const reportTitle = this.resolveHtmlReportTitle(reportType, locale, reportTitleOverride)
         const emailData: FusionReportEmailData = {
             ...report,
             totalAccounts,
@@ -237,11 +257,7 @@ export class ReportService {
     ): Promise<void> {
         const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
         const locale = args.locale ?? this.email?.getDefaultEffectiveLocale?.() ?? 'en'
-        const reportTitle =
-            args.reportTitle ||
-            (args.reportType === 'aggregation'
-                ? translate('aggregation_report_title', locale)
-                : translate('fusion_report_title', locale))
+        const reportTitle = this.resolveHtmlReportTitle(args.reportType, locale, args.reportTitle)
         const subject = translateWithParams('report_email_subject', locale, {
             reportTitle,
             matchCount: matchAccountCount,
@@ -444,7 +460,7 @@ export class ReportService {
         return { reportHtmlOutputPath, statsWithPhaseTiming: statsForRender }
     }
 
-    /** Initialize report for dry-run row streaming. */
+    /** Initialize report for dry-run Fusion account streaming. */
     public initializeDryRunReport(args: {
         fetchResult?: FetchResultLike
         totalProcessingTime?: string
