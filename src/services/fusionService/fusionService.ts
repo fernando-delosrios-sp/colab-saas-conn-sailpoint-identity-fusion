@@ -481,7 +481,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${fusionAccount.managedKey}), ` +
-                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.run.managedAccountsById, 'Managed accounts have not been loaded')
@@ -500,12 +500,25 @@ export class FusionService {
         this.log.recordRefreshSubStep('prelude', preludeMs)
 
         const managedLayerMs = await measureMs(async () => {
+            const hasEligibleAlwaysRecalculate =
+                this.definitionService.hasEligibleAlwaysRecalculate(fusionAccount)
             await this.accountAssembly.addManagedAccountLayer(fusionAccount, {
                 addBlendHistory: true,
                 skipBlendHistoryForManagedKeys,
                 onQueueScan: (entriesExamined) => {
                     queueEntriesScanned += entriesExamined
                 },
+                forceAttributeRefresh: this.config.forceAttributeRefresh,
+                refreshMapping,
+                refreshDefinition,
+                resetDefinition,
+                hasEligibleAlwaysRecalculate,
+                requireLiveSourceSnapshots:
+                    this.config.forceAttributeRefresh ||
+                    refreshMapping ||
+                    refreshDefinition ||
+                    resetDefinition ||
+                    hasEligibleAlwaysRecalculate,
             })
         })
         this.log.recordRefreshSubStep('managedLayer', managedLayerMs, {
@@ -523,7 +536,7 @@ export class FusionService {
         this.log.recordRefreshSubStep('uniqueRegister', uniqueRegisterMs)
 
         fusionAccount.setNeedsRefresh(
-            fusionAccount.needsRefresh || refreshDefinition || refreshMapping || this.config.forceAttributeRefresh
+            fusionAccount.needsRefresh || resetDefinition || refreshDefinition || refreshMapping || this.config.forceAttributeRefresh
         )
         fusionAccount.setNeedsReset(resetDefinition)
 
@@ -599,9 +612,9 @@ export class FusionService {
             originIdentityInScope !== undefined
                 ? originIdentityInScope
                 : await this.identities.resolveOriginIdentityInScope(
-                      originIdentityId,
-                      this.identities.getIdentityById(originIdentityId)
-                  )
+                    originIdentityId,
+                    this.identities.getIdentityById(originIdentityId)
+                )
         fusionAccount.setOriginIdentityInScope(inScope)
     }
 
@@ -615,7 +628,7 @@ export class FusionService {
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
-                `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
+            `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
         )
 
         this.accountAssembly.registerFusionAccount(fusionAccount)
@@ -749,7 +762,7 @@ export class FusionService {
             } else if (this.config.fusionEnableAutoMerge && !sourceHasReviewers(sourceInfo, this.run)) {
                 this.log.warn(
                     `No reviewers configured for source "${source.name}" with automatic merge enabled. ` +
-                        `Manual review is unavailable; borderline matches will register as non-match.`
+                    `Manual review is unavailable; borderline matches will register as non-match.`
                 )
             }
         }
@@ -1246,7 +1259,7 @@ export class FusionService {
         if (globalOwnerIds.length === 0) {
             this.log.warn(
                 'Owners are global reviewers is enabled but no Fusion source owner identity IDs were resolved. ' +
-                    'Configure a Fusion source owner (or governance group) or assign per-source reviewer entitlements.'
+                'Configure a Fusion source owner (or governance group) or assign per-source reviewer entitlements.'
             )
             return
         }
@@ -1256,7 +1269,7 @@ export class FusionService {
             if (!reviewer) {
                 this.log.warn(
                     `Global reviewer identity ${reviewerId} is not available as a Fusion identity; ` +
-                        'skipping global reviewer registration for this identity.'
+                    'skipping global reviewer registration for this identity.'
                 )
                 continue
             }

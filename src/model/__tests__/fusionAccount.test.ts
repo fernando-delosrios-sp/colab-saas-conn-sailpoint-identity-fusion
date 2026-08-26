@@ -843,6 +843,155 @@ describe('FusionAccount', () => {
         })
     })
 
+    describe('claim-only vs source snapshot materialization', () => {
+        const fusionModified = '2024-06-01T12:00:00.000Z'
+        const distinctAttributeName = 'employeeNumber'
+        const distinctAttributeValue = 'EMP-CLAIM-ONLY-999'
+
+        const queueManaged = (
+            sourceId: string,
+            nativeIdentity: string,
+            extras: Record<string, unknown> = {}
+        ): Account =>
+            ({
+                id: `isc-${sourceId}-${nativeIdentity}`,
+                sourceId,
+                nativeIdentity,
+                sourceName: sourceId === 'src-a' ? 'Source A' : 'Source B',
+                attributes: { [distinctAttributeName]: distinctAttributeValue, ...((extras.attributes as object) ?? {}) },
+                ...Object.fromEntries(Object.entries(extras).filter(([key]) => key !== 'attributes')),
+            }) as Account
+
+        const persistedFusion = (accountKeys: string[], extras: Record<string, unknown> = {}) =>
+            FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-claim-only',
+                id: 'isc-claim-only',
+                name: 'Persisted Account',
+                sourceName: 'Identity Fusion NG',
+                modified: fusionModified,
+                attributes: {
+                    accounts: accountKeys,
+                    givenName: 'Already',
+                    ...((extras.attributes as object) ?? {}),
+                },
+                ...Object.fromEntries(Object.entries(extras).filter(([key]) => key !== 'attributes')),
+            } as unknown as Account)
+
+        const sourceHasDistinctSnapshot = (acc: FusionAccount, sourceName: string): boolean => {
+            const snapshots = acc.attributeBag.sources.get(sourceName) ?? []
+            return snapshots.some((snapshot) => snapshot[distinctAttributeName] === distinctAttributeValue)
+        }
+
+        it('stale previously correlated accounts are claim-only', () => {
+            const acc = persistedFusion(['src-a::keep-1'])
+            expect(acc.previousAccountIdsSet.has('src-a::keep-1')).toBe(true)
+            expect(acc.attributeBag.current[distinctAttributeName]).toBeUndefined()
+
+            const run = new FusionRun()
+            run.setManagedAccount(
+                'src-a::keep-1',
+                queueManaged('src-a', 'keep-1', { modified: '2024-01-01T00:00:00.000Z' })
+            )
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.needsRefresh).toBe(false)
+            expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
+            expect(sourceHasDistinctSnapshot(acc, 'Source A')).toBe(false)
+        })
+
+        it('new blend materializes snapshots for the row', () => {
+            const acc = FusionAccount.fromIdentity({ id: 'id-new-blend' } as any)
+            const run = new FusionRun()
+            run.setManagedAccount(
+                'src-a::native-1',
+                queueManaged('src-a', 'native-1', { modified: '2020-01-01T00:00:00.000Z' })
+            )
+            run.managedAccountsByIdentityId.set('id-new-blend', new Set(['src-a::native-1']))
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.needsRefresh).toBe(true)
+            expect(sourceHasDistinctSnapshot(acc, 'Source A')).toBe(true)
+            expect(run.managedAccountsById.has('src-a::native-1')).toBe(false)
+        })
+
+        it('over-threshold modified materializes all live linked accounts on the row', () => {
+            const acc = persistedFusion(['src-a::keep-1', 'src-b::keep-2'])
+            const run = new FusionRun()
+            run.setManagedAccount(
+                'src-a::keep-1',
+                queueManaged('src-a', 'keep-1', {
+                    modified: '2024-06-01T14:00:00.000Z',
+                    attributes: { [distinctAttributeName]: distinctAttributeValue, sibling: 'a' },
+                })
+            )
+            run.setManagedAccount(
+                'src-b::keep-2',
+                queueManaged('src-b', 'keep-2', {
+                    modified: '2024-01-01T00:00:00.000Z',
+                    attributes: { [distinctAttributeName]: distinctAttributeValue, sibling: 'b' },
+                })
+            )
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.needsRefresh).toBe(true)
+            expect(sourceHasDistinctSnapshot(acc, 'Source A')).toBe(true)
+            expect(sourceHasDistinctSnapshot(acc, 'Source B')).toBe(true)
+        })
+
+        it('prune-deleted requires materializing remaining live accounts', () => {
+            const acc = persistedFusion(['src-a::keep-1'], {
+                attributes: {
+                    accounts: ['src-a::keep-1'],
+                    'missing-accounts': ['src-a::gone-1'],
+                    givenName: 'Already',
+                },
+            })
+            const run = new FusionRun()
+            run.setManagedAccount(
+                'src-a::keep-1',
+                queueManaged('src-a', 'keep-1', { modified: '2024-01-01T00:00:00.000Z' })
+            )
+
+            acc.addManagedAccountLayer(run, { pruneDeleted: true })
+
+            expect(acc.needsRefresh).toBe(true)
+            expect(acc.accountIds).not.toContain('src-a::gone-1')
+            expect(sourceHasDistinctSnapshot(acc, 'Source A')).toBe(true)
+            expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
+        })
+
+        it('force attribute refresh materializes before Map', () => {
+            const acc = persistedFusion(['src-a::keep-1'])
+            const run = new FusionRun()
+            run.setManagedAccount(
+                'src-a::keep-1',
+                queueManaged('src-a', 'keep-1', { modified: '2024-01-01T00:00:00.000Z' })
+            )
+
+            acc.addManagedAccountLayer(run, { forceAttributeRefresh: true })
+
+            expect(sourceHasDistinctSnapshot(acc, 'Source A')).toBe(true)
+            expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
+        })
+
+        it('eligible Always recalculate materializes when timestamps are stale', () => {
+            const acc = persistedFusion(['src-a::keep-1'])
+            const run = new FusionRun()
+            run.setManagedAccount(
+                'src-a::keep-1',
+                queueManaged('src-a', 'keep-1', { modified: '2024-01-01T00:00:00.000Z' })
+            )
+
+            acc.addManagedAccountLayer(run, { hasEligibleAlwaysRecalculate: true })
+
+            expect(sourceHasDistinctSnapshot(acc, 'Source A')).toBe(true)
+            expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
+        })
+    })
+
     describe('attribute-bag setters', () => {
         it('addAccountId adds to correlated set and sync reflects it', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)

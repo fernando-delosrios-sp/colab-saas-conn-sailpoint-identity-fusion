@@ -248,7 +248,7 @@ Each entry includes source attributes plus nested metadata:
 | `schema.id` / `schema.name` | Native identity and display name |
 | `IIQDisabled` | Disabled flag when present |
 
-**Order:** configured sources → insertion order within each source → unknown sources last. When `mainAccount` is set, that account moves to index `0`.
+**Order:** configured sources → insertion order within each source → unknown sources last. When `mainAccount` is set, that account moves to index `0`. Always recalculate and `needsRefresh` still read this run's managed snapshots (`$accounts` / `$sources`); unchanged Fusion rows may not copy those snapshots during Refresh.
 
 !!! tip "$accounts[0] is not always the origin"
     `$accounts[0]` follows **source configuration order**. `$account` is always the **origin** row. When `mainAccount` differs from the origin, use `$account` for origin-specific logic.

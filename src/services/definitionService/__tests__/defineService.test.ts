@@ -834,18 +834,31 @@ describe('refresh flag semantics', () => {
         expect(acc.attributeBag.current.department).toBe('Engineering')
     })
 
-    it('refresh true runs every aggregation', async () => {
-        const evaluateSpy = vi.spyOn(templateEvaluator, 'evaluateAttributeTemplate')
-        const service = createService([
-            { name: 'department', expression: 'refreshed-value', refresh: true },
-        ])
-        const acc = createPersistedAccount({ department: 'Engineering' })
+        it('refresh true runs every aggregation', async () => {
+            const evaluateSpy = vi.spyOn(templateEvaluator, 'evaluateAttributeTemplate')
+            const service = createService([
+                { name: 'department', expression: 'refreshed-value', refresh: true },
+            ])
+            const acc = createPersistedAccount({ department: 'Engineering' })
 
-        await service.refreshNormalAttributes(acc)
+            await service.refreshNormalAttributes(acc)
 
-        expect(evaluateSpy).toHaveBeenCalled()
-        expect(acc.attributeBag.current.department).toBe('refreshed-value')
-    })
+            expect(evaluateSpy).toHaveBeenCalled()
+            expect(acc.attributeBag.current.department).toBe('refreshed-value')
+        })
+
+        it('hasEligibleAlwaysRecalculate matches Always recalculate eligibility', () => {
+            const refreshService = createService([
+                { name: 'department', expression: 'refreshed-value', refresh: true },
+            ])
+            const skipService = createService([
+                { name: 'department', expression: 'should-not-run', refresh: false },
+            ])
+            const acc = createPersistedAccount({ department: 'Engineering' })
+
+            expect(refreshService.hasEligibleAlwaysRecalculate(acc)).toBe(true)
+            expect(skipService.hasEligibleAlwaysRecalculate(acc)).toBe(false)
+        })
 
     it('needsRefresh triggers refresh false definitions', async () => {
         const evaluateSpy = vi.spyOn(templateEvaluator, 'evaluateAttributeTemplate')

@@ -20,12 +20,37 @@ import type { FusionCollections } from './fusionCollections'
 import type { FusionRun, ManagedAccountInfo } from './fusionRun'
 import type { IdentityInfo } from './fusionAccountTypes'
 
+/**
+ * Options for {@link FusionLayers.addManagedAccountLayer}.
+ *
+ * **Source snapshot materialization** copies managed account attributes onto
+ * `attributeBag.sources` so Map and Velocity `$accounts` / `$sources` can read this run.
+ * **Claim-only absorb** still claims the work-queue key and updates bookkeeping
+ * (`managedAccountInfo`, uncorrelated/status, source names) without that copy.
+ * Prelude flags below are ORed with row-local new-blend, over-threshold `modified`,
+ * and prune-deleted before any `claimAccount`.
+ */
 export interface AddManagedAccountOptions {
     pruneDeleted?: boolean
     addBlendHistory?: boolean
     skipBlendHistoryForManagedKeys?: ReadonlySet<string>
     onBlend?: (account: Account) => void
     onQueueScan?: (entriesExamined: number) => void
+    /** Prelude: force attribute refresh so Map/Define will read this run's live sources. */
+    forceAttributeRefresh?: boolean
+    /** Prelude: rebuild asked for mapping refresh. */
+    refreshMapping?: boolean
+    /** Prelude: rebuild asked for definition refresh. */
+    refreshDefinition?: boolean
+    /** Prelude: rebuild asked to reset definitions. */
+    resetDefinition?: boolean
+    /**
+     * Prelude: at least one Normal definition has Always recalculate and is eligible
+     * on this row (`definition.refresh` and not skipped static).
+     */
+    hasEligibleAlwaysRecalculate?: boolean
+    /** Caller-computed prelude bit: live source snapshots are required before this layer runs. */
+    requireLiveSourceSnapshots?: boolean
 }
 
 /**
@@ -191,6 +216,13 @@ export class FusionLayers {
             normalizeManagedAccountKeySet(new Set(this.collections.accountIds))
         )
 
+        const materializeSourceSnapshots = this.computeRequireLiveSourceSnapshots(
+            workQueue,
+            options,
+            identityInfo?.id,
+            modified
+        )
+
         this.processIdentityMatchedAccounts(
             workQueue,
             attributeBag,
@@ -198,7 +230,8 @@ export class FusionLayers {
             skipBlendHistoryForManagedKeys,
             onBlend,
             identityInfo?.id,
-            modified
+            modified,
+            materializeSourceSnapshots
         )
         this.processDeclaredAccountIds(
             workQueue,
@@ -206,7 +239,8 @@ export class FusionLayers {
             addBlendHistory,
             skipBlendHistoryForManagedKeys,
             onBlend,
-            modified
+            modified,
+            materializeSourceSnapshots
         )
         this.processPreviousRunMatchedAccounts(
             workQueue,
@@ -215,7 +249,8 @@ export class FusionLayers {
             skipBlendHistoryForManagedKeys,
             onBlend,
             onQueueScan,
-            modified
+            modified,
+            materializeSourceSnapshots
         )
 
         const inventoryKeys = new Set(workQueue.managedAccountInventory.keys())
@@ -298,12 +333,19 @@ export class FusionLayers {
     // Private: setManagedAccount
     // ============================================================================
 
+    /**
+     * Absorbs a work-queue managed account: bookkeeping always, and **source snapshot
+     * materialization** when `materializeSourceSnapshots` is true. Claim-only absorb
+     * updates keys / uncorrelated / `managedAccountInfo` / source names without copying
+     * `account.attributes` onto `attributeBag.sources`.
+     */
     setManagedAccount(
         account: Account,
         addBlendHistory: boolean = true,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
         attributeBag?: { sources: Map<string, Attributes[]> },
-        fusionModified?: string
+        fusionModified?: string,
+        materializeSourceSnapshots: boolean = true
     ) {
         const accountId = getManagedAccountKeyFromAccount(account)
         if (!accountId) {
@@ -343,26 +385,28 @@ export class FusionLayers {
                 source: { name: account.sourceName },
                 schema: { id: schemaNative },
             })
-
-            const contextAttributes = {
-                ...(account.attributes ?? {}),
-                name: trimStr(account.name ?? account.nativeIdentity) || accountId,
-                source: {
-                    id: trimStr(readString(account, 'sourceId', '')) ?? '',
-                    name: account.sourceName ?? '',
-                },
-                schema: {
-                    name: trimStr(account.name ?? account.nativeIdentity) || accountId,
-                    id: schemaNative,
-                },
-                IIQDisabled: Boolean(account.disabled),
-            } as unknown as Attributes
-
-            const existingSourceAccounts = attributeBag.sources.get(account.sourceName) || []
-            existingSourceAccounts.push(contextAttributes)
             this.collections.sources.remove(IDENTITIES_SOURCE_NAME)
             this.collections.sources.add(account.sourceName)
-            attributeBag.sources.set(account.sourceName, existingSourceAccounts)
+
+            if (materializeSourceSnapshots) {
+                const contextAttributes = {
+                    ...(account.attributes ?? {}),
+                    name: trimStr(account.name ?? account.nativeIdentity) || accountId,
+                    source: {
+                        id: trimStr(readString(account, 'sourceId', '')) ?? '',
+                        name: account.sourceName ?? '',
+                    },
+                    schema: {
+                        name: trimStr(account.name ?? account.nativeIdentity) || accountId,
+                        id: schemaNative,
+                    },
+                    IIQDisabled: Boolean(account.disabled),
+                } as unknown as Attributes
+
+                const existingSourceAccounts = attributeBag.sources.get(account.sourceName) || []
+                existingSourceAccounts.push(contextAttributes)
+                attributeBag.sources.set(account.sourceName, existingSourceAccounts)
+            }
         }
         return recordBlendHistory && isNewAccount
     }
@@ -378,7 +422,8 @@ export class FusionLayers {
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
         onBlend?: (account: Account) => void,
         identityId?: string,
-        fusionModified?: string
+        fusionModified?: string,
+        materializeSourceSnapshots: boolean = true
     ): void {
         if (identityId === undefined) return
 
@@ -395,7 +440,8 @@ export class FusionLayers {
                     addBlendHistory,
                     skipBlendHistoryForManagedKeys,
                     attributeBag,
-                    fusionModified
+                    fusionModified,
+                    materializeSourceSnapshots
                 )
                 if (blended && onBlend) onBlend(account)
                 queue.claimAccount(id, account.identityId)
@@ -415,7 +461,8 @@ export class FusionLayers {
         addBlendHistory: boolean,
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
         onBlend?: (account: Account) => void,
-        fusionModified?: string
+        fusionModified?: string,
+        materializeSourceSnapshots: boolean = true
     ): void {
         if (this.collections.accountIds.size === 0) return
 
@@ -432,7 +479,8 @@ export class FusionLayers {
                 addBlendHistory,
                 skipBlendHistoryForManagedKeys,
                 attributeBag,
-                fusionModified
+                fusionModified,
+                materializeSourceSnapshots
             )
             if (blended && onBlend) onBlend(account)
             queue.claimAccount(accountId, account.identityId)
@@ -457,7 +505,8 @@ export class FusionLayers {
         skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
         onBlend?: (account: Account) => void,
         onQueueScan?: (entriesExamined: number) => void,
-        fusionModified?: string
+        fusionModified?: string,
+        materializeSourceSnapshots: boolean = true
     ): void {
         if (this.collections.previousAccountIds.size === 0 && this.collections.missingAccountIds.size === 0) return
 
@@ -480,11 +529,64 @@ export class FusionLayers {
                 addBlendHistory,
                 skipBlendHistoryForManagedKeys,
                 attributeBag,
-                fusionModified
+                fusionModified,
+                materializeSourceSnapshots
             )
             if (blended && onBlend) onBlend(account)
             queue.claimAccount(id, account.identityId)
         }
+    }
+
+    /**
+     * Whole-row decide-before-claim: live sources are required when any prelude flag
+     * is set, `needsRefresh` is already true, any linked queue key is a new blend or
+     * over-threshold newer, or prune-deleted would drop a tracked key.
+     */
+    private computeRequireLiveSourceSnapshots(
+        queue: FusionRun,
+        options: AddManagedAccountOptions,
+        identityId?: string,
+        fusionModified?: string
+    ): boolean {
+        if (this.needsRefreshValue) return true
+        if (options.requireLiveSourceSnapshots) return true
+        if (options.forceAttributeRefresh) return true
+        if (options.refreshMapping || options.refreshDefinition || options.resetDefinition) return true
+        if (options.hasEligibleAlwaysRecalculate) return true
+
+        const linkedKeys = new Set<string>()
+        if (identityId !== undefined) {
+            for (const key of queue.getKeysForIdentity(identityId) ?? []) {
+                linkedKeys.add(key)
+            }
+        }
+        for (const key of this.collections.accountIds) linkedKeys.add(key)
+        for (const key of this.collections.previousAccountIds) linkedKeys.add(key)
+        for (const key of this.collections.missingAccountIds) linkedKeys.add(key)
+
+        const thresholdMs = this.fusionAccountRefreshThresholdInSeconds * 1000
+        for (const key of linkedKeys) {
+            const account = queue.get(key)
+            if (!account) continue
+            if (!this.collections.previousAccountIds.has(key)) return true
+            if (fusionModified && isNewerThan(account.modified, fusionModified, thresholdMs)) {
+                return true
+            }
+        }
+
+        if (options.pruneDeleted) {
+            const inventoryKeys = queue.managedAccountInventory
+            const trackedIds = new Set<string>([
+                ...this.collections.accountIds,
+                ...this.collections.missingAccountIds,
+                ...this.collections.previousAccountIds,
+            ])
+            for (const accountId of trackedIds) {
+                if (!inventoryKeys.has(accountId)) return true
+            }
+        }
+
+        return false
     }
 
     private preserveMissingAccountContext(inventory: ReadonlyMap<string, ManagedAccountInfo>): void {
