@@ -14,11 +14,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### 🔧 Improvements
 
+- **Fusion report is the same Match preview as dry-run** — Requesting the `report` entitlement now runs dry-run Match analysis (writes inhibited, no account-list stream) and emails **Identity Fusion Report** to global owners. The post-aggregation owner email is now **Identity Fusion Aggregation Report**. Dry-run remains **Identity Fusion Dry Run Report**. Match cards are captured even when **Send report to owner on aggregation?** is off.
 - **Unchanged Fusion accounts skip copying managed source attributes** — Quiet Refresh still visits every Fusion row and claims linked managed accounts so Process cannot rematch them, but it no longer copies those accounts' attributes onto the Fusion row when source data did not change. Always recalculate, force attribute refresh, new blends, deletions, and over-threshold managed `modified` still copy this run's snapshots so Map and Velocity `$accounts` / `$sources` can read them.
 
 ### 📚 Documentation
 
 - **Glossary: source snapshot materialization and claim-only absorb** — Documents how Refresh can claim linked managed accounts without copying live source attributes, and that this is not skipping Refresh or Map merge.
+- **Glossary: dry-run report, Fusion report, aggregation report, Fusion Review decision section, Fusion review** — Distinguishes analysis emails from the post-aggregation owner email and from Fusion review (the review-required form), and aligns the FusionReport entitlement with Fusion report.
 
 ---
 

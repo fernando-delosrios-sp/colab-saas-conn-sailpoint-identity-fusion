@@ -7,7 +7,12 @@ vi.mock('../actions', () => ({
     executeActions: vi.fn(),
 }))
 
+vi.mock('../../services/reportPipeline', () => ({
+    runReportPipeline: vi.fn(),
+}))
+
 import { createTestRegistry } from './harness/testRegistry'
+import { runReportPipeline } from '../../services/reportPipeline'
 
 function createRegistry() {
     const registry = createTestRegistry({
@@ -34,6 +39,7 @@ function createRegistry() {
     fusion.getFusionIdentity = vi.fn().mockReturnValue({ managedKey: 'fusion-id-1', collections: { statuses: { add: vi.fn() } } })
     fusion.normalizePendingFormStateForOutput = vi.fn().mockResolvedValue(undefined)
     fusion.getISCAccount = vi.fn().mockResolvedValue({ id: 'isc-created' })
+    fusion.forEachISCAccount = vi.fn()
 
     const identities = registry.identities as any
     identities.fetchIdentityByName = vi.fn().mockResolvedValue({ id: 'id-1', name: 'Alice Doe' })
@@ -168,6 +174,26 @@ describe('accountCreate', () => {
         ).rejects.toMatchObject({ message: 'Unsupported action: unknown-action' })
 
         expect(registry.res.send).not.toHaveBeenCalled()
+    })
+
+    it('runs Fusion report pipeline on report Add without streaming account-list rows', async () => {
+        const registry = createRegistry()
+        const { executeActions: realExecuteActions } = await vi.importActual<typeof import('../actions')>(
+            '../actions'
+        )
+        vi.mocked(executeActions).mockImplementation(realExecuteActions)
+        vi.mocked(runReportPipeline).mockResolvedValue(undefined)
+
+        await accountCreate(registry, {
+            identity: 'Alice Doe',
+            schema: { attributes: [] },
+            attributes: { name: 'Alice Doe', actions: ['report'] },
+        } as any)
+
+        expect(runReportPipeline).toHaveBeenCalledWith(registry, false)
+        expect(registry.res.send).toHaveBeenCalledTimes(1)
+        expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-created' })
+        expect(registry.fusion.forEachISCAccount).not.toHaveBeenCalled()
     })
 })
 

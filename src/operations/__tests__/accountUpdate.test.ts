@@ -13,7 +13,12 @@ vi.mock('../actions', () => ({
     executeActions: vi.fn(),
 }))
 
+vi.mock('../../services/reportPipeline', () => ({
+    runReportPipeline: vi.fn(),
+}))
+
 import { createTestRegistry } from './harness/testRegistry'
+import { runReportPipeline } from '../../services/reportPipeline'
 
 function createRegistry() {
     const registry = createTestRegistry({
@@ -34,6 +39,7 @@ function createRegistry() {
     const fusion = registry.fusion as any
     fusion.normalizePendingFormStateForOutput = vi.fn().mockResolvedValue(undefined)
     fusion.getISCAccount = vi.fn().mockResolvedValue({ id: 'isc-updated' })
+    fusion.forEachISCAccount = vi.fn()
 
     const log = registry.log as any
     log.crash = vi.fn()
@@ -208,6 +214,27 @@ describe('accountUpdate', () => {
         ).rejects.toMatchObject({ message: 'Fusion account not found for identity: missing-fusion' })
 
         expect(registry.res.send).not.toHaveBeenCalled()
+    })
+
+    it('runs Fusion report pipeline on report Add without streaming account-list rows', async () => {
+        const registry = createRegistry()
+        const { executeActions: realExecuteActions } = await vi.importActual<typeof import('../actions')>(
+            '../actions'
+        )
+        vi.mocked(executeActions).mockImplementation(realExecuteActions)
+        vi.mocked(runReportPipeline).mockResolvedValue(undefined)
+        ;(rebuildFusionAccount as Mock).mockResolvedValue({ managedKey: 'fusion-1', name: 'Fusion User' })
+
+        await accountUpdate(registry, {
+            identity: 'fusion-1',
+            schema: { attributes: [] },
+            changes: [{ attribute: 'actions', op: 'Add', value: 'report' }],
+        } as any)
+
+        expect(runReportPipeline).toHaveBeenCalledWith(registry, false)
+        expect(registry.res.send).toHaveBeenCalledTimes(1)
+        expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-updated' })
+        expect(registry.fusion.forEachISCAccount).not.toHaveBeenCalled()
     })
 })
 

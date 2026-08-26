@@ -57,6 +57,7 @@ describe('ServiceRegistry.activateDryRunMode', () => {
 
         registry.activateDryRunMode()
 
+        expect(registry.run.isDryRunMode).toBe(true)
         expect(wrapSpy).not.toHaveBeenCalled()
     })
 

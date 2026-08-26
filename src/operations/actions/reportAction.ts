@@ -5,9 +5,9 @@ import { runReportPipeline } from '../../services/reportPipeline'
 import { ActionChange } from './types'
 
 /**
- * Report action handler - generates and sends a fusion report.
- * Runs the full dry-run pipeline (setup → fetch → process) to collect data,
- * then renders and sends the email report.
+ * Report action handler — generates and sends a Fusion report (Match preview, no persist).
+ * Nested `runReportPipeline` activates dry-run, runs setup → fetch → process (no Output stream),
+ * then emails the Fusion report to global owners.
  */
 export const reportAction = async (
     _fusionAccount: FusionAccount,

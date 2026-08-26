@@ -163,11 +163,18 @@ class FusionReviewDecisionResolver {
 }
 
 
+/** HTML/email product: aggregation report vs Fusion report (`report` action). */
+export type FusionHtmlReportKind = 'aggregation' | 'fusion'
+
 export class ReportService {
     public static readonly REPORT_DISK_SUBDIR = 'reports'
     public static readonly DRY_RUN_REPORT_TYPE = 'aggregation' as const
+    /** Title for the dry-run report HTML/email (`Identity Fusion Dry Run Report`). */
     public static readonly DRY_RUN_REPORT_TITLE = 'Identity Fusion Dry Run Report'
+    /** Title for the Fusion report HTML/email from the `report` action (`Identity Fusion Report`). */
     public static readonly FUSION_REPORT_EMAIL_TITLE = 'Identity Fusion Report'
+    /** Title for the aggregation report HTML/email after persistent account-list (`Identity Fusion Aggregation Report`). */
+    public static readonly AGGREGATION_REPORT_TITLE = 'Identity Fusion Aggregation Report'
 
     constructor(
         private baseurl: string,
@@ -230,7 +237,11 @@ export class ReportService {
     ): Promise<void> {
         const matchAccountCount = report.matches ?? report.accounts.filter((a) => a.matches.length > 0).length
         const locale = args.locale ?? this.email?.getDefaultEffectiveLocale?.() ?? 'en'
-        const reportTitle = args.reportTitle || translate('fusion_report_title', locale)
+        const reportTitle =
+            args.reportTitle ||
+            (args.reportType === 'aggregation'
+                ? translate('aggregation_report_title', locale)
+                : translate('fusion_report_title', locale))
         const subject = translateWithParams('report_email_subject', locale, {
             reportTitle,
             matchCount: matchAccountCount,
@@ -503,11 +514,14 @@ export class ReportService {
     }
 
     /**
-     * Generate and send the standard fusion report for aggregation or ad-hoc fusion runs.
+     * Generate and send an aggregation report or Fusion report to global owners.
+     *
+     * @param reportKind - `'aggregation'` (post-aggregation epilogue) or `'fusion'` (`report` action)
      */
     public async generateAndSendFusionReport(
         includeNonMatches: boolean,
-        aggregationStats?: AggregationStats
+        aggregationStats?: AggregationStats,
+        reportKind: FusionHtmlReportKind = 'aggregation'
     ): Promise<void> {
         await this.hydrateIdentitiesForReportDecisions()
 
@@ -527,7 +541,7 @@ export class ReportService {
             const priorPhases = aggregationStats.phaseTiming ?? []
             stats.phaseTiming = [...priorPhases, ...reportPhaseTimer.getPhaseBreakdown()]
             report.stats = stats
-            await this.sendReport(report, 'aggregation', locale)
+            await this.sendReport(report, reportKind, locale)
             return
         }
 
@@ -539,7 +553,7 @@ export class ReportService {
                 ? await this.email.getRecipientLocale(globalOwnerIds[0])
                 : this.email?.getDefaultEffectiveLocale?.() ?? 'en'
         report.fusionReviewDecisions = this.buildFusionReviewDecisions(locale)
-        await this.sendReport(report, 'fusion', locale)
+        await this.sendReport(report, reportKind, locale)
         this.identities.clear()
     }
 

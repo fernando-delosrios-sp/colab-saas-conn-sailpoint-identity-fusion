@@ -146,11 +146,11 @@ After Phase 5, fusion account caches are cleared from memory and the process loc
 
 Runs as `EPILOGUE report` after phases complete (including on pipeline failure):
 
-- If `fusionReportOnAggregation` is enabled, generates a fusion report for the fusion owner.
+- If `fusionReportOnAggregation` is enabled, generates an **aggregation report** for the fusion owner (title **Identity Fusion Aggregation Report**). This is not a Fusion report.
 
 ### Report contents (what is included)
 
-When report-on-aggregation is enabled, the generated Fusion report can include:
+When report-on-aggregation is enabled, the generated aggregation report can include:
 
 - **Header summary**
     - Report date

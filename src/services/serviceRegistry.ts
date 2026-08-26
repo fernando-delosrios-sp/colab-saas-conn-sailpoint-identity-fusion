@@ -246,10 +246,10 @@ export class ServiceRegistry {
      * Must be called after parsing dry-run input and before any account-list phase API calls.
      */
     activateDryRunMode(): void {
+        this.run.isDryRunMode = true
         if (this.clientUsesInjection) {
             return
         }
-        this.run.isDryRunMode = true
         this.client.wrapAdapter((inner) => new DryRunApiAdapter(inner))
         this.log.info('DryRunApiAdapter enabled — ISC write calls inhibited for this run')
     }

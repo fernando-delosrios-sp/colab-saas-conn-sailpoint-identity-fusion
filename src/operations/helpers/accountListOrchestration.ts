@@ -95,9 +95,9 @@ export async function runAccountListPhases(
 }
 
 /**
- * Self-contained setup + fetch + process for report triggers (e.g. reportAction).
- * Runs phases 1-4 non-persistently so that all fusion accounts, identities, and
- * managed accounts are in memory for report building.
+ * Self-contained setup + fetch + process for Fusion report (`report` action).
+ * Runs phases 1–4 (`throughPhase: 4`) so Output does not stream account-list rows.
+ * Callers activate dry-run before this so Match uses the account-list outcome tree.
  */
 export async function buildReportContext(serviceRegistry: ServiceRegistry): Promise<{
     fetchResult: FetchResult

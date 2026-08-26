@@ -19,7 +19,7 @@ For reviewer assignment and access profiles, see [Managing reviewers](managing-r
 | **Manual review expiration days** | Form expiration | 7 (default); adjust based on SLA |
 | **Maximum candidates per review form** | Limit of potential matches shown on form | 3 (default); valid range 1–15 |
 | **Owners are global reviewers?** | Add Fusion source owner and governance group to all review forms | Yes for pilots |
-| **Send report to owner on aggregation?** | Email report after each aggregation | Yes (useful for monitoring) |
+| **Send report to owner on aggregation?** | Email an **aggregation report** after each aggregation | Yes (useful for monitoring) |
 
 !!! note
     When the candidate limit is exceeded, only the highest-scoring potential matches are included.
@@ -28,7 +28,7 @@ For localization (**Default Language**, **Identity Language Attribute**, form lo
 
 ### Aggregation report contents
 
-When **Send report to owner on aggregation?** is enabled, reports include:
+When **Send report to owner on aggregation?** is enabled, the **aggregation report** includes:
 
 - High-level summary (date, total analyzed accounts, potential matches)
 - Processing statistics (managed/fusion/review metrics, processing time, memory usage)
@@ -37,7 +37,7 @@ When **Send report to owner on aggregation?** is enabled, reports include:
 - Warning block when more than one Fusion account is found for the same identity
 - Compact aggregation issues summary with warning/error counts and short sampled messages
 
-To preview report content without persisting changes, see [Analyze changes with dry-run](../operation/analyze-with-dry-run.md).
+To preview Match outcomes without persisting changes, use a **dry-run report** ([Analyze changes with dry-run](../operation/analyze-with-dry-run.md)) or request a **Fusion report** via the `report` entitlement. Neither is an aggregation report.
 
 ---
 

@@ -52,7 +52,8 @@ export class AccountAssembly {
     public isAggregationAccountListMode(): boolean {
         return (
             this.deps.commandType === StandardCommand.StdAccountList ||
-            this.deps.isAggregationMode === true
+            this.deps.isAggregationMode === true ||
+            this.deps.run.isDryRunMode === true
         )
     }
 
