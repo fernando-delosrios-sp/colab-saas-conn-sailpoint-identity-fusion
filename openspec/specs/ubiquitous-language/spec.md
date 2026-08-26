@@ -189,6 +189,23 @@ The term **Epilogue** SHALL denote the terminal block of the account-list operat
 - **THEN** it SHALL contain an **Epilogue** entry defined as the always-runs terminal report block
 - **AND** the **Phase** entry SHALL NOT list the report step as an example phase
 
+### Requirement: Glossary distinguishes report products from Fusion review
+The ubiquitous-language glossary SHALL define **dry-run report**, **Fusion report**, **aggregation report**, **Fusion Review decision section**, and **Fusion review** as distinct terms. Documentation, specs, email titles, and entitlement copy SHALL use these terms. **Fusion review** SHALL NOT be called a report.
+
+#### Scenario: Glossary lists the five communication terms
+- **WHEN** the glossary is consulted for report or review communications
+- **THEN** it SHALL contain **dry-run report**, **Fusion report**, **aggregation report**, **Fusion Review decision section**, and **Fusion review**
+- **AND** **Fusion review** SHALL be defined as the reviewer-facing review-required communication (email and review form), not a report
+
+#### Scenario: FusionReport entitlement names the Fusion report
+- **WHEN** the action entitlement table is consulted
+- **THEN** **FusionReport** (`report`) SHALL be defined as the action that triggers generation of a **Fusion report**
+- **AND** it SHALL NOT be defined as triggering an aggregation report
+
+#### Scenario: Agents and docs use the canonical report names
+- **WHEN** documentation or new code refers to the HTML/email produced after persistent account-list
+- **THEN** the term SHALL be **aggregation report**, not **Fusion report**
+
 ### Requirement: Glossary defines STATUS CPU segment
 
 The ubiquitous-language glossary SHALL define **STATUS CPU segment** as the `cpu={percent}%` token on a **STATUS line**: integer percent of one core for the connector process over the sample window (`process.cpuUsage` user+system versus wall time). It SHALL NOT mean host load average, container CPU quota, or CPU-seconds.
@@ -505,6 +522,14 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **Correlated account sweep** | A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts. |
 | **Aggregation** | The ISC source-refresh operation. Use **managed source aggregation** or **Fusion source aggregation** when the source matters. |
 
+### Report and review communications
+
+| Term | Definition |
+|------|------------|
+| **dry-run report** | The HTML/email Match preview produced after account-list in dry-run mode. Writes are inhibited. Title: Identity Fusion Dry Run Report. |
+| **Fusion report** | The HTML/email Match preview produced by the `report` action. Same Match slices as a dry-run report; writes inhibited; no account-list stream. Title: Identity Fusion Report. Not an aggregation report. |
+| **aggregation report** | The HTML/email produced after a persistent account-list (aggregation) when owner reporting is enabled. Title: Identity Fusion Aggregation Report. |
+
 ### Framework steps
 
 | Term | Definition |
@@ -576,7 +601,7 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 
 | Term | Wire value | Definition |
 |---|---|---|
-| **FusionReport** | `report` | Assign to trigger generation of a Fusion report for this account. |
+| **FusionReport** | `report` | Assign to trigger generation of a **Fusion report** (Match preview). Not an aggregation report. |
 | **Fusion** | `fusion` | Assign to mark this as a Fusion account. |
 | **Correlated entitlement** | `correlated` | The action entitlement present on a Fusion account when all managed source accounts for that Fusion identity are correlated with the Fusion identity. Evaluated on every Fusion account build; absent when any managed source account remains in `missing-accounts`. |
 | **Correlate action** | `correlate` / `correlated` (Add) | When the platform assigns the correlated entitlement to a Fusion account that lacks it, the connector runs the correlate action: direct identity correlation (ISC PATCH) for missing managed source accounts on provisioning paths until the correlated entitlement outcome is achieved or missing accounts remain. |
@@ -603,6 +628,8 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 
 | Term | Definition |
 |---|---|
+| **Fusion review** | The reviewer-facing review-required communication: email plus review form. Not a report. |
+| **Fusion Review decision section** | The decision-oriented portion of Fusion review communications (form fields and related email copy), distinct from Match preview report HTML. |
 | **Reviewer** | A person who reviews identity candidates presented in a Fusion review form and decides whether a Fusion account should link to an existing identity or create a new one. A reviewer's Fusion identity carries the `reviewer` status entitlement and one or more `reviewer:<sourceId>` action entitlements. |
 | **Review form** | An ISC form instance presented to reviewers showing identity candidates and their attribute values, with options to link to an existing identity or create a new one. |
 | **FusionDecision** | A reviewer's decision on a review form. Contains the chosen outcome (link to existing identity or create new identity), the submitter, comments, and whether the decision is finished. |

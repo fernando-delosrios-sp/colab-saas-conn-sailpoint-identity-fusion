@@ -56,8 +56,11 @@ When `input.attributes.actions` contains one or more action tokens, the account-
 
 - **GIVEN** a Fusion account being created for a valid identity
 - **WHEN** the report action entitlement is assigned during account create
-- **THEN** the connector SHALL run the non-persistent report pipeline
-- **AND** SHALL deliver the aggregation-style report per report-service contract
+- **THEN** the connector SHALL run the non-persistent Fusion report pipeline
+- **AND** SHALL inhibit ISC write API calls for that nested pipeline
+- **AND** SHALL apply the same Match outcome tree as account-list dry-run without persisting those outcomes
+- **AND** SHALL deliver the Fusion report per report-service contract
+- **AND** SHALL NOT stream the account-list output for that nested pipeline
 
 #### Scenario: Report action Remove is a no-op on create
 
