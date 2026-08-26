@@ -10,7 +10,6 @@ import { FusionMatch, MatchCandidateType } from './types'
 import { LogService } from '../logService'
 import { resolveFusionMaxCandidatesForForm } from '../../data/config'
 
-
 /**
  * Builds info-log headline and "- N candidate(s), M partial(s)" suffix from match scores.
  * "candidate(s)" counts exact (all rules 100, none skipped); "partial(s)" are other matches in the set.
@@ -40,7 +39,12 @@ function formatFusionMatchDiscoveryLog(
     }
 }
 
-export { anchorDeferredMatches, anchorDeferredMatchesForReview, identityMatchesForReview, isPersistedOrFinalizedDeferredTier } from './matchPresentation'
+export {
+    anchorDeferredMatches,
+    anchorDeferredMatchesForReview,
+    identityMatchesForReview,
+    isPersistedOrFinalizedDeferredTier,
+} from './matchPresentation'
 
 export interface LogMatchDiscoveryOptions {
     /** Appended to the debug line after the summary (e.g. "; skipping account for now"). */
@@ -78,6 +82,32 @@ export function logDeferredMatchDiscoveryForReview(
     const maxCandidates = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
     const deferredMatches = anchorDeferredMatchesForReview(fusionAccount, run, maxCandidates)
     logFusionMatchDiscovery(log, deferredMatches, true, accountName, sourceName, options)
+}
+
+/**
+ * Sort key for ranking match candidates on review forms: combined match score when present,
+ * otherwise the best non-skipped rule score.
+ */
+const rankScoreForMatch = (match: FusionMatch): number => {
+    const combined = match.scores?.find(
+        (s) =>
+            s.algorithm === 'weighted-mean' ||
+            s.attribute === 'Combined score' ||
+            s.attribute === 'Combined match score'
+    )
+    if (combined) return combined.score
+    const scored = match.scores?.filter((s) => !s.skipped) ?? []
+    if (scored.length === 0) return 0
+    return Math.max(...scored.map((s) => s.score))
+}
+
+/** Review-form candidate order: higher combined score first, then ascending identity id. */
+export const compareMatchesForForm = (a: FusionMatch, b: FusionMatch): number => {
+    const delta = rankScoreForMatch(b) - rankScoreForMatch(a)
+    if (delta !== 0) return delta
+    const ida = String(a.fusionIdentity?.identityId ?? a.identityId ?? '')
+    const idb = String(b.fusionIdentity?.identityId ?? b.identityId ?? '')
+    return ida.localeCompare(idb)
 }
 
 export function hasIdentityCandidateMatches(fusionAccount: FusionAccount): boolean {
@@ -125,7 +155,6 @@ export const countIdentityCandidateFusionMatches = (matches: readonly FusionMatc
     return n
 }
 
-
 /**
  * Managed source name used to bucket deferred-match candidates.
  * Persisted fusion rows use the Fusion connector as `sourceName`; the managed source is `originSource`.
@@ -163,7 +192,3 @@ export function isRecordMatchingEnabledForSource(
     }
     return coerceBoolean(info?.config?.includeRecordAccountsForMatching) ?? true
 }
-
-
-
-

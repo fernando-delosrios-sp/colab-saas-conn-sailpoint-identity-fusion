@@ -8,16 +8,16 @@ For configuration, see the [configuration guides](../use-guides/configuration/in
 
 ## Flow overview
 
-| Step | Actor | Action | Output |
-| --- | --- | --- | --- |
-| 1 | **Connector** | Account aggregation (manual or scheduled) | Reads accounts from configured sources |
-| 2 | **Connector** | Merges source account data into Fusion accounts | Consolidated accounts per person |
-| 3 | **Connector** | Compares each Fusion account to identities in scope | Similarity scores per identity + attribute |
-| 4 | **Connector** | If similarity threshold met and automatic merge does not apply | Creates review form |
-| 5 | **ISC** | Sends email notification to reviewers | Reviewers notified |
-| 6 | **Reviewer** | Reviews form: link to existing identity or create new | Decision recorded |
-| 7 | **Connector** | On next aggregation, applies reviewer decision | Account correlated or new identity created |
-| 8 | **Connector** | Updates account history | Audit trail maintained |
+| Step | Actor         | Action                                                         | Output                                     |
+| ---- | ------------- | -------------------------------------------------------------- | ------------------------------------------ |
+| 1    | **Connector** | Account aggregation (manual or scheduled)                      | Reads accounts from configured sources     |
+| 2    | **Connector** | Merges source account data into Fusion accounts                | Consolidated accounts per person           |
+| 3    | **Connector** | Compares each Fusion account to identities in scope            | Similarity scores per identity + attribute |
+| 4    | **Connector** | If similarity threshold met and automatic merge does not apply | Creates review form                        |
+| 5    | **ISC**       | Sends email notification to reviewers                          | Reviewers notified                         |
+| 6    | **Reviewer**  | Reviews form: link to existing identity or create new          | Decision recorded                          |
+| 7    | **Connector** | On next aggregation, applies reviewer decision                 | Account correlated or new identity created |
+| 8    | **Connector** | Updates account history                                        | Audit trail maintained                     |
 
 ![Match flow — aggregation through reviewer decision](../assets/images/match-flow.png)
 
@@ -53,7 +53,13 @@ For each Fusion account (new or updated):
     - If combined score ≥ **manual review match score** and mandatory rules pass → potential match.
 3. Sort identities by similarity score (highest first).
 
-Before full similarity scoring, **trigram blocking** may pre-filter identity candidates using mandatory rules whose minimum similarity is greater than zero. If a managed account has no value for any of those indexed attributes, the candidate set is empty and no identity comparisons run (`mandatoryMissingBlockCount`). A full identity scan happens only when blocking is unavailable (`getCandidates` returns undefined). See [Observability — trigram blocking counters](observability.md#trigram-blocking-counters-accountlist-process).
+Before full similarity scoring, **algorithm-aware candidate blocking** pre-filters identities only when a mandatory
+rule has a recall-safe predicate: Binary uses exact values and LIG3 uses its proven length bound. Algorithms such as
+Jaro-Winkler do not use generic trigram intersection, so a configuration with no safe blocker scores the full baseline
+(`getCandidates` returns `undefined`). After scoring the whole candidate pool, Match retains the globally highest
+**top-K identity matches** using review-form order; it does not stop at the first K passing identities. If a managed
+account has no value for any indexed mandatory attribute, the candidate set is empty and no identity comparisons run
+(`mandatoryMissingBlockCount`). See [Observability — candidate blocking counters](observability.md#candidate-blocking-counters-accountlist-process).
 
 Rule and threshold configuration: [Matching identities](../use-guides/configuration/matching-identities.md) · [Tuning matching algorithms](../use-guides/configuration/tuning-matching-algorithms.md).
 
@@ -61,10 +67,10 @@ Rule and threshold configuration: [Matching identities](../use-guides/configurat
 
 ## Decision point
 
-| Condition | Action |
-| --- | --- |
-| **Enable automatic merge** = Yes, and **combined score** ≥ **Automatic merge match score** | Skip review form; merge and apply |
-| Else | Create review form; notify reviewers |
+| Condition                                                                                  | Action                               |
+| ------------------------------------------------------------------------------------------ | ------------------------------------ |
+| **Enable automatic merge** = Yes, and **combined score** ≥ **Automatic merge match score** | Skip review form; merge and apply    |
+| Else                                                                                       | Create review form; notify reviewers |
 
 ---
 
@@ -96,9 +102,9 @@ Correlation behavior: [Managing correlation](../use-guides/configuration/managin
 
 ## Related guides
 
-| Topic | Guide |
-| --- | --- |
-| Match rules and thresholds | [Matching identities](../use-guides/configuration/matching-identities.md) |
-| Review form settings | [Review forms and reviewers](../use-guides/configuration/review-forms-and-reviewers.md) |
-| Tuning worked examples | [Match tuning cookbooks](../use-guides/configuration/match-tuning-cookbooks.md) |
-| Non-persistent validation | [Analyze changes with dry-run](../use-guides/operation/analyze-with-dry-run.md) |
+| Topic                      | Guide                                                                                   |
+| -------------------------- | --------------------------------------------------------------------------------------- |
+| Match rules and thresholds | [Matching identities](../use-guides/configuration/matching-identities.md)               |
+| Review form settings       | [Review forms and reviewers](../use-guides/configuration/review-forms-and-reviewers.md) |
+| Tuning worked examples     | [Match tuning cookbooks](../use-guides/configuration/match-tuning-cookbooks.md)         |
+| Non-persistent validation  | [Analyze changes with dry-run](../use-guides/operation/analyze-with-dry-run.md)         |

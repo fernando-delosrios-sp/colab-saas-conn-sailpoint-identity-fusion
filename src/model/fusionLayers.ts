@@ -212,9 +212,7 @@ export class FusionLayers {
         this.collections.replaceMissingAccountIds(
             normalizeManagedAccountKeySet(new Set(this.collections.missingAccountIds))
         )
-        this.collections.replaceAccountIds(
-            normalizeManagedAccountKeySet(new Set(this.collections.accountIds))
-        )
+        this.collections.replaceAccountIds(normalizeManagedAccountKeySet(new Set(this.collections.accountIds)))
 
         const materializeSourceSnapshots = this.computeRequireLiveSourceSnapshots(
             workQueue,
@@ -325,6 +323,14 @@ export class FusionLayers {
 
     removeDeferredFusionMatches(): void {
         this.collections.matches.removeDeferred()
+    }
+
+    /** Replace stored matches after identity top-K retention. */
+    replaceFusionMatches(fusionMatches: FusionMatch[]): void {
+        this.collections.matches.replaceAll(fusionMatches)
+        if (fusionMatches.length > 0) {
+            this.isMatchValue = true
+        }
     }
 
     // ============================================================================
@@ -508,10 +514,7 @@ export class FusionLayers {
     ): void {
         if (this.collections.previousAccountIds.size === 0 && this.collections.missingAccountIds.size === 0) return
 
-        const candidateIds = new Set([
-            ...this.collections.previousAccountIds,
-            ...this.collections.missingAccountIds,
-        ])
+        const candidateIds = new Set([...this.collections.previousAccountIds, ...this.collections.missingAccountIds])
         onQueueScan?.(candidateIds.size)
 
         for (const id of candidateIds) {
@@ -628,7 +631,3 @@ export class FusionLayers {
         }
     }
 }
-
-
-
-

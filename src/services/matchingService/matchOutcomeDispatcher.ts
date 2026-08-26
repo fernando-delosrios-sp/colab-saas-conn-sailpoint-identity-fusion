@@ -10,6 +10,7 @@ import { FormService } from '../formService'
 import { MatchingService, COMBINED_SCORE_ROW_ATTRIBUTE } from './matchingService'
 import {
     anchorDeferredMatches,
+    compareMatchesForForm,
     hasActionableDeferredAnchorMatch,
     hasDeferredCandidateMatches,
     hasIdentityCandidateMatches,
@@ -36,10 +37,7 @@ import {
 } from '../fusionService/collections'
 import { resolveAccountBeforeScoring } from './preScoreGate'
 import { resolveIdentityMatchOutcome } from './identityMatchResolution'
-import {
-    resolveLiveDeferredMatchOutcome,
-    tryAutoMergeFromMatches,
-} from './deferredMatchResolution'
+import { resolveLiveDeferredMatchOutcome, tryAutoMergeFromMatches } from './deferredMatchResolution'
 import {
     applyResolutionToSweepResult,
     recordNonMatchOutcome,
@@ -112,9 +110,7 @@ interface IdentityPhaseResult {
 }
 
 export type PreScoreOutcome =
-    | { action: 'enqueue' }
-    | { action: 'skip-linked' }
-    | { action: 'non-match'; resolved: ResolvedMatch }
+    { action: 'enqueue' } | { action: 'skip-linked' } | { action: 'non-match'; resolved: ResolvedMatch }
 
 export interface DeferredMatchDrainContext {
     remainingInQueue: Map<string, ManagedAccountAnalysisContext>
@@ -239,6 +235,11 @@ async function scoreIdentityCandidates(
         const candidateSet = matchingService.getCandidates(fusionAccount, log, excludeIds)
         const identityPool: Iterable<FusionAccount> =
             candidateSet ?? (excludeIds ? run.fusionIdentitiesExcluding(excludeIds) : run.allFusionIdentities)
+        if (candidateSet) {
+            run.identityCandidateSetSizeSum += candidateSet.size
+        } else {
+            run.identityCandidateSetSizeSum += run.fusionIdentityMap.size
+        }
         const scoringStarted = Date.now()
         fusionIdentityComparisons = await matchingService.scoreFusionAccount(
             fusionAccount,
@@ -254,7 +255,6 @@ async function scoreIdentityCandidates(
                 `(includeRecordAccountsForMatching=false)`
         )
     }
-
 
     return {
         account,
@@ -301,7 +301,6 @@ async function scoreDeferredForAccount(
         MatchCandidateType.Deferred
     )
     run.matchScoringMs += Date.now() - scoringStarted
-
 }
 
 /** Deterministic order within a single source: managedKey sort. */
@@ -446,13 +445,7 @@ export class MatchOutcomeDispatcher {
             tryAutoMergeIntoDeferredAnchor: (fusionAccount, account) =>
                 this.tryAutoMergeIntoDeferredAnchor(fusionAccount, account),
             handleDeferredMatch: (fusionAccount, account, remainingInQueue, materializedEarly, sweepResult) =>
-                this.handleDeferredMatch(
-                    fusionAccount,
-                    account,
-                    remainingInQueue,
-                    materializedEarly,
-                    sweepResult
-                ),
+                this.handleDeferredMatch(fusionAccount, account, remainingInQueue, materializedEarly, sweepResult),
             handleAuthoritativeNonMatch: (fusionAccount, account, sourceInfo) =>
                 this.handleAuthoritativeNonMatch(fusionAccount, account, sourceInfo),
         }
@@ -520,7 +513,11 @@ export class MatchOutcomeDispatcher {
                     analysis.account,
                     this.deferredResolutionCallbacks(),
                     { remainingInQueue, materializedEarly, sweepResult: options?.sweepResult },
-                    { sourceInfo: analysis.sourceInfo, run: this.deps.run, fusionEnableManualReview: this.deps.config.fusionEnableManualReview !== false }
+                    {
+                        sourceInfo: analysis.sourceInfo,
+                        run: this.deps.run,
+                        fusionEnableManualReview: this.deps.config.fusionEnableManualReview !== false,
+                    }
                 )
                 promotedNonMatches = outcome.promotedNonMatches
                 resolved.push(outcome.resolved)
@@ -564,9 +561,7 @@ export class MatchOutcomeDispatcher {
 
         const bySource = groupPendingBySource(pending)
         const sourceResults = await Promise.all(
-            Array.from(bySource.values()).map((sourcePending) =>
-                this.runDeferredDrainForSource(sourcePending, options)
-            )
+            Array.from(bySource.values()).map((sourcePending) => this.runDeferredDrainForSource(sourcePending, options))
         )
 
         const scored = sourceResults.flatMap((result) => result.scored)
@@ -787,7 +782,11 @@ export class MatchOutcomeDispatcher {
                 account,
                 this.deferredResolutionCallbacks(),
                 undefined,
-                { sourceInfo, run: this.deps.run, fusionEnableManualReview: this.deps.config.fusionEnableManualReview !== false }
+                {
+                    sourceInfo,
+                    run: this.deps.run,
+                    fusionEnableManualReview: this.deps.config.fusionEnableManualReview !== false,
+                }
             )
             if (outcome.resolved.resolution === 'exact-match') {
                 return {
@@ -822,10 +821,7 @@ export class MatchOutcomeDispatcher {
      * Score persisted fusion anchors for identity-match accounts so automatic merge can
      * prefer a prior-run anchor (e.g. run-1 id=10) even when ISC identity candidates exist.
      */
-    private async scorePersistedAnchorsForAutoMerge(
-        fusionAccount: FusionAccount,
-        account: Account
-    ): Promise<void> {
+    private async scorePersistedAnchorsForAutoMerge(fusionAccount: FusionAccount, account: Account): Promise<void> {
         const selfKey = fusionAccount.managedKey
         const pool: FusionAccount[] = []
         for (const candidate of this.deps.run.currentRunDeferredCandidatesForSource(account.sourceName)) {
@@ -994,21 +990,14 @@ export class MatchOutcomeDispatcher {
         recordNonMatchOutcome(this.deps.log, sweepResult)
     }
 
-    private getBestAutoAssignMatch(
-        matches: FusionMatch[]
-    ): FusionMatch | undefined {
+    private getBestAutoAssignMatch(matches: FusionMatch[]): FusionMatch | undefined {
         if (this.deps.config.fusionAutoMergeScore === undefined) return undefined
-        let bestMatch: FusionMatch | undefined
-        let highestScore = -1
-        for (const m of matches) {
-            const combinedReport = m.scores.find((s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE)
-            const score = combinedReport?.score ?? 0
-            if (score >= this.deps.config.fusionAutoMergeScore && score > highestScore) {
-                highestScore = score
-                bestMatch = m
-            }
-        }
-        return bestMatch
+        return matches
+            .filter((match) => {
+                const combinedReport = match.scores.find((score) => score.attribute === COMBINED_SCORE_ROW_ATTRIBUTE)
+                return (combinedReport?.score ?? 0) >= this.deps.config.fusionAutoMergeScore!
+            })
+            .sort(compareMatchesForForm)[0]
     }
 
     /** ISC identity id, Fusion native id, or persisted anchor origin account key for automatic merge. */
@@ -1023,4 +1012,3 @@ export class MatchOutcomeDispatcher {
         return trimStr(bestMatch.fusionIdentity?.originAccountId)
     }
 }
-

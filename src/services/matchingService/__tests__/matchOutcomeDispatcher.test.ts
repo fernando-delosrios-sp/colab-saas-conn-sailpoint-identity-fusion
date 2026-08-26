@@ -26,12 +26,14 @@ describe('MatchOutcomeDispatcher', () => {
         }
     }
 
-    function createDispatcher(options: {
-        commandType?: StandardCommand
-        isAggregationMode?: boolean
-        configOverrides?: Partial<FusionConfig>
-        tracker?: AggregationTracker
-    } = {}) {
+    function createDispatcher(
+        options: {
+            commandType?: StandardCommand
+            isAggregationMode?: boolean
+            configOverrides?: Partial<FusionConfig>
+            tracker?: AggregationTracker
+        } = {}
+    ) {
         const config = {
             sources: [],
             fusionFormAttributes: ['email', 'firstName', 'lastName'],
@@ -129,7 +131,10 @@ describe('MatchOutcomeDispatcher', () => {
             identityId: 'identity-1',
             identityName: 'Identity One',
             candidateType: 'identity',
-            scores: scores.length > 0 ? scores : [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }],
+            scores:
+                scores.length > 0
+                    ? scores
+                    : [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }],
         }
     }
 
@@ -138,7 +143,10 @@ describe('MatchOutcomeDispatcher', () => {
             identityId: '',
             identityName: 'Current operation non-match',
             candidateType: 'deferred',
-            scores: scores.length > 0 ? scores : [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true }],
+            scores:
+                scores.length > 0
+                    ? scores
+                    : [{ attribute: 'name', algorithm: 'jaro-winkler', score: 92, isMatch: true }],
             ...overrides,
         }
     }
@@ -174,17 +182,19 @@ describe('MatchOutcomeDispatcher', () => {
     }
 
     function stubPartialIdentityMatches(matchingService: MatchingService) {
-        vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-            if (candidateType === 'identity') {
-                fusionAccount.layers.addFusionMatch({
-                    identityId: 'identity-1',
-                    identityName: 'Identity One',
-                    candidateType: 'identity',
-                    scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
-                })
+        vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+            async (fusionAccount, _pool, candidateType) => {
+                if (candidateType === 'identity') {
+                    fusionAccount.layers.addFusionMatch({
+                        identityId: 'identity-1',
+                        identityName: 'Identity One',
+                        candidateType: 'identity',
+                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
+                    })
+                }
+                return 1
             }
-            return 1
-        })
+        )
     }
 
     function partialMatchAccounts(count: number): Account[] {
@@ -269,16 +279,133 @@ describe('MatchOutcomeDispatcher', () => {
 
             vi.spyOn(matchingService, 'getCandidates').mockReturnValue(new Set())
             const identityPools: FusionAccount[][] = []
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (_account, pool, candidateType) => {
-                if (candidateType === MatchCandidateType.Identity) {
-                    identityPools.push(Array.from(pool))
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (_account, pool, candidateType) => {
+                    if (candidateType === MatchCandidateType.Identity) {
+                        identityPools.push(Array.from(pool))
+                    }
+                    return 0
                 }
-                return 0
-            })
+            )
 
             await dispatcher.runMatchSweep([managedAccount()], 1)
 
             expect(identityPools).toEqual([[]])
+            expect(run.identityCandidateSetSizeSum).toBe(0)
+        })
+
+        it('scores the getCandidates set and adds its size to identityCandidateSetSizeSum', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+
+            const candidateOne = FusionAccount.fromIdentity({ id: 'id-candidate-1', attributes: {} } as any)
+            const candidateTwo = FusionAccount.fromIdentity({ id: 'id-candidate-2', attributes: {} } as any)
+            const unrelatedIdentity = FusionAccount.fromIdentity({ id: 'id-unrelated', attributes: {} } as any)
+            for (const identity of [candidateOne, candidateTwo, unrelatedIdentity]) {
+                run.registerFusionAccount(identity)
+            }
+
+            vi.spyOn(matchingService, 'getCandidates').mockReturnValue(new Set([candidateOne, candidateTwo]))
+            const identityPools: FusionAccount[][] = []
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (_account, pool, candidateType) => {
+                    if (candidateType === MatchCandidateType.Identity) {
+                        identityPools.push(Array.from(pool))
+                    }
+                    return 0
+                }
+            )
+
+            await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(identityPools).toEqual([[candidateOne, candidateTwo]])
+            expect(run.identityCandidateSetSizeSum).toBe(2)
+        })
+
+        it('scores the full identity baseline and adds the baseline size when getCandidates returns undefined', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+
+            const identities = ['id-1', 'id-2', 'id-3'].map((id) =>
+                FusionAccount.fromIdentity({ id, attributes: {} } as any)
+            )
+            for (const identity of identities) {
+                run.registerFusionAccount(identity)
+            }
+
+            vi.spyOn(matchingService, 'getCandidates').mockReturnValue(undefined)
+            const identityPools: FusionAccount[][] = []
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (_account, pool, candidateType) => {
+                    if (candidateType === MatchCandidateType.Identity) {
+                        identityPools.push(Array.from(pool))
+                    }
+                    return 0
+                }
+            )
+
+            await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(identityPools).toEqual([identities])
+            expect(run.identityCandidateSetSizeSum).toBe(3)
+        })
+
+        it('adds the baseline size for full-scan accounting even when auto-merged identities are excluded', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { fusionEnableAutoMerge: true },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+
+            const identities = ['id-1', 'id-2', 'id-3'].map((id) =>
+                FusionAccount.fromIdentity({ id, attributes: {} } as any)
+            )
+            for (const identity of identities) {
+                run.registerFusionAccount(identity)
+            }
+            run.markAutoMerged('id-2')
+
+            vi.spyOn(matchingService, 'getCandidates').mockReturnValue(undefined)
+            const identityPools: FusionAccount[][] = []
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (_account, pool, candidateType) => {
+                    if (candidateType === MatchCandidateType.Identity) {
+                        identityPools.push(Array.from(pool))
+                    }
+                    return 0
+                }
+            )
+
+            await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(identityPools).toEqual([[identities[0], identities[2]]])
+            expect(run.identityCandidateSetSizeSum).toBe(3)
+        })
+
+        it('passes fusionMaxCandidatesForForm to identity scoring as the retention cap', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { fusionMaxCandidatesForForm: 4 },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+
+            const identityCaps: (number | undefined)[] = []
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (_account, _pool, candidateType, maxIdentityMatches) => {
+                    if (candidateType === MatchCandidateType.Identity) {
+                        identityCaps.push(maxIdentityMatches)
+                    }
+                    return 0
+                }
+            )
+
+            await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(identityCaps).toEqual([4])
         })
 
         it('dispatches an exact match to automatic merge when the combined score meets the threshold', async () => {
@@ -287,18 +414,28 @@ describe('MatchOutcomeDispatcher', () => {
                 configOverrides: { fusionEnableAutoMerge: true, fusionAutoMergeScore: 100 },
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
-            const identity = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Identity One', attributes: {} } as any)
+            const identity = FusionAccount.fromIdentity({
+                id: 'identity-1',
+                name: 'Identity One',
+                attributes: {},
+            } as any)
             run.registerFusionAccount(identity)
 
-            const assigned = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Identity One', attributes: {} } as any)
+            const assigned = FusionAccount.fromIdentity({
+                id: 'identity-1',
+                name: 'Identity One',
+                attributes: {},
+            } as any)
             decisionProcessor.processFusionIdentityDecision.mockResolvedValue(assigned)
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch(identityMatch())
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch(identityMatch())
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const account = managedAccount()
             const result = await dispatcher.runMatchSweep([account], 1)
@@ -319,6 +456,58 @@ describe('MatchOutcomeDispatcher', () => {
             )
             expect(decisionProcessor.processFusionIdentityDecision).toHaveBeenCalled()
             expect(run.autoMergedIdentityIds.has('identity-1')).toBe(true)
+        })
+
+        it('auto-merges the rank-1 identity when two identities are exact matches', async () => {
+            const { dispatcher, matchingService, forms, decisionProcessor, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+                configOverrides: { fusionEnableAutoMerge: true, fusionAutoMergeScore: 100 },
+            })
+            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
+            for (const id of ['identity-9', 'identity-2']) {
+                run.registerFusionAccount(FusionAccount.fromIdentity({ id, name: id, attributes: {} } as any))
+            }
+
+            decisionProcessor.processFusionIdentityDecision.mockImplementation(
+                async (decision: { identityId?: string }) =>
+                    FusionAccount.fromIdentity({
+                        id: decision.identityId,
+                        name: decision.identityId,
+                        attributes: {},
+                    } as any)
+            )
+
+            // Compared first, but ranks second: form order breaks the score tie on ascending identity id.
+            const exactScores = [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }]
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: 'identity-9',
+                            identityName: 'Identity Nine',
+                            candidateType: 'identity',
+                            scores: exactScores,
+                        })
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: 'identity-2',
+                            identityName: 'Identity Two',
+                            candidateType: 'identity',
+                            scores: exactScores,
+                        })
+                    }
+                    return 2
+                }
+            )
+
+            const result = await dispatcher.runMatchSweep([managedAccount()], 1)
+
+            expect(result.exact).toBe(1)
+            expect(result.resolved[0].identityId).toBe('identity-2')
+            expect(forms.registerFinishedDecision).toHaveBeenCalledWith(
+                expect.objectContaining({ identityId: 'identity-2', automaticMerge: true })
+            )
+            expect(run.autoMergedIdentityIds.has('identity-2')).toBe(true)
+            expect(run.autoMergedIdentityIds.has('identity-9')).toBe(false)
         })
 
         it('auto-merges into a persisted anchor when it outscores an ISC identity candidate', async () => {
@@ -358,26 +547,32 @@ describe('MatchOutcomeDispatcher', () => {
             } as unknown as Account)
             decisionProcessor.processFusionIdentityDecision.mockResolvedValue(assigned)
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch({
-                        identityId: 'isc-identity-1',
-                        identityName: 'ISC Identity',
-                        candidateType: 'identity',
-                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 90, isMatch: true }],
-                    })
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: 'isc-identity-1',
+                            identityName: 'ISC Identity',
+                            candidateType: 'identity',
+                            scores: [
+                                { attribute: 'Combined score', algorithm: 'weighted-mean', score: 90, isMatch: true },
+                            ],
+                        })
+                    }
+                    if (candidateType === 'deferred') {
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: '',
+                            identityName: 'Persisted anchor',
+                            candidateType: 'deferred',
+                            fusionIdentity: anchor,
+                            scores: [
+                                { attribute: 'Combined score', algorithm: 'weighted-mean', score: 95, isMatch: true },
+                            ],
+                        })
+                    }
+                    return 1
                 }
-                if (candidateType === 'deferred') {
-                    fusionAccount.layers.addFusionMatch({
-                        identityId: '',
-                        identityName: 'Persisted anchor',
-                        candidateType: 'deferred',
-                        fusionIdentity: anchor,
-                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 95, isMatch: true }],
-                    })
-                }
-                return 1
-            })
+            )
 
             const account = managedAccount({ nativeIdentity: '12' })
             const result = await dispatcher.runMatchSweep([account], 1)
@@ -395,19 +590,26 @@ describe('MatchOutcomeDispatcher', () => {
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
-            run.reviewersBySourceId.set(SOURCE_ID, new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)]))
+            run.reviewersBySourceId.set(
+                SOURCE_ID,
+                new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+            )
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch({
-                        identityId: 'identity-1',
-                        identityName: 'Identity One',
-                        candidateType: 'identity',
-                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
-                    })
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: 'identity-1',
+                            identityName: 'Identity One',
+                            candidateType: 'identity',
+                            scores: [
+                                { attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true },
+                            ],
+                        })
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const account = managedAccount()
             run.managedAccountsById.set('source-a-id::native-1', account)
@@ -420,13 +622,15 @@ describe('MatchOutcomeDispatcher', () => {
             expect(run.managedAccountsById.has('source-a-id::native-1')).toBe(false)
         })
 
-
         it('does not claim the account when partial-match form creation fails', async () => {
             const { dispatcher, matchingService, forms, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
-            run.reviewersBySourceId.set(SOURCE_ID, new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)]))
+            run.reviewersBySourceId.set(
+                SOURCE_ID,
+                new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+            )
             const account = managedAccount()
             run.managedAccountsById.set('source-a-id::native-1', account)
 
@@ -435,17 +639,21 @@ describe('MatchOutcomeDispatcher', () => {
                 newReviewInstancesQueued: 0,
             })
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch({
-                        identityId: 'identity-1',
-                        identityName: 'Identity One',
-                        candidateType: 'identity',
-                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
-                    })
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: 'identity-1',
+                            identityName: 'Identity One',
+                            candidateType: 'identity',
+                            scores: [
+                                { attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true },
+                            ],
+                        })
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             await dispatcher.runMatchSweep([account], 1)
 
@@ -457,23 +665,30 @@ describe('MatchOutcomeDispatcher', () => {
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
-            run.reviewersBySourceId.set(SOURCE_ID, new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)]))
+            run.reviewersBySourceId.set(
+                SOURCE_ID,
+                new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+            )
             const account = managedAccount()
             run.managedAccountsById.set('source-a-id::native-1', account)
 
             forms.createFusionForm.mockRejectedValueOnce(new Error('Form creation failed'))
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch({
-                        identityId: 'identity-1',
-                        identityName: 'Identity One',
-                        candidateType: 'identity',
-                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
-                    })
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: 'identity-1',
+                            identityName: 'Identity One',
+                            candidateType: 'identity',
+                            scores: [
+                                { attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true },
+                            ],
+                        })
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             await dispatcher.runMatchSweep([account], 1)
 
@@ -484,7 +699,10 @@ describe('MatchOutcomeDispatcher', () => {
             const { dispatcher, matchingService, log, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
-            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } }))
+            run.sourcesByName.set(
+                SOURCE_NAME,
+                sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
+            )
             seedReviewers(run)
             const previousNonMatch = FusionAccount.fromManagedAccount({
                 id: 'acct-prev',
@@ -498,13 +716,15 @@ describe('MatchOutcomeDispatcher', () => {
             run.registerFusionAccount(previousNonMatch)
             run.registerFinalizedDeferredCandidate(previousNonMatch)
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') return 0
-                if (candidateType === 'deferred') {
-                    fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: previousNonMatch }))
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') return 0
+                    if (candidateType === 'deferred') {
+                        fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: previousNonMatch }))
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const account = managedAccount({ id: 'acct-new', nativeIdentity: 'native-new', name: 'New Account' })
             run.managedAccountsById.set('source-a-id::native-new', account)
@@ -520,29 +740,39 @@ describe('MatchOutcomeDispatcher', () => {
             const { dispatcher, matchingService, log, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
-            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } }))
+            run.sourcesByName.set(
+                SOURCE_NAME,
+                sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
+            )
             seedReviewers(run)
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, candidates, candidateType) => {
-                if (candidateType === 'identity') return 0
-                const candidateList = Array.from(candidates)
-                const hasPriorNonMatch = candidateList.some(
-                    (candidate) => candidate.managedAccountId === 'source-a-id::native-first'
-                )
-                if (
-                    hasPriorNonMatch &&
-                    fusionAccount.managedAccountId === 'source-a-id::native-second'
-                ) {
-                    const anchor = candidateList.find(
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, candidates, candidateType) => {
+                    if (candidateType === 'identity') return 0
+                    const candidateList = Array.from(candidates)
+                    const hasPriorNonMatch = candidateList.some(
                         (candidate) => candidate.managedAccountId === 'source-a-id::native-first'
                     )
-                    fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: anchor }))
+                    if (hasPriorNonMatch && fusionAccount.managedAccountId === 'source-a-id::native-second') {
+                        const anchor = candidateList.find(
+                            (candidate) => candidate.managedAccountId === 'source-a-id::native-first'
+                        )
+                        fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: anchor }))
+                    }
+                    return candidateList.length
                 }
-                return candidateList.length
-            })
+            )
 
-            const firstAccount = managedAccount({ id: 'acct-first', nativeIdentity: 'native-first', name: 'Taylor Jordan' })
-            const secondAccount = managedAccount({ id: 'acct-second', nativeIdentity: 'native-second', name: 'Taylor Jordan' })
+            const firstAccount = managedAccount({
+                id: 'acct-first',
+                nativeIdentity: 'native-first',
+                name: 'Taylor Jordan',
+            })
+            const secondAccount = managedAccount({
+                id: 'acct-second',
+                nativeIdentity: 'native-second',
+                name: 'Taylor Jordan',
+            })
             run.managedAccountsById.set('source-a-id::native-first', firstAccount)
             run.managedAccountsById.set('source-a-id::native-second', secondAccount)
 
@@ -557,7 +787,10 @@ describe('MatchOutcomeDispatcher', () => {
             const { dispatcher, matchingService, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
-            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } }))
+            run.sourcesByName.set(
+                SOURCE_NAME,
+                sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
+            )
             seedReviewers(run)
 
             const firstAccount = managedAccount({ id: 'acct-a', nativeIdentity: 'nat-a', name: 'Peer A' })
@@ -567,17 +800,19 @@ describe('MatchOutcomeDispatcher', () => {
             run.managedAccountsById.set('source-a-id::nat-b', secondAccount)
             run.managedAccountsById.set('source-a-id::nat-c', thirdAccount)
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, pool, candidateType) => {
-                if (candidateType !== 'deferred') return 0
-                const candidateList = Array.from(pool)
-                if (fusionAccount.managedAccountId !== 'source-a-id::nat-b') return candidateList.length
-                for (const candidate of candidateList) {
-                    if (run.getDeferredCandidateTier(candidate) === 'finalized') {
-                        fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: candidate }))
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, pool, candidateType) => {
+                    if (candidateType !== 'deferred') return 0
+                    const candidateList = Array.from(pool)
+                    if (fusionAccount.managedAccountId !== 'source-a-id::nat-b') return candidateList.length
+                    for (const candidate of candidateList) {
+                        if (run.getDeferredCandidateTier(candidate) === 'finalized') {
+                            fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: candidate }))
+                        }
                     }
+                    return candidateList.length
                 }
-                return candidateList.length
-            })
+            )
 
             const result = await dispatcher.runMatchSweep([firstAccount, secondAccount, thirdAccount], 3)
 
@@ -592,29 +827,46 @@ describe('MatchOutcomeDispatcher', () => {
             const { dispatcher, matchingService, log, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
-            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } }))
+            run.sourcesByName.set(
+                SOURCE_NAME,
+                sourceInfo({ sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
+            )
             seedReviewers(run)
 
-            const firstAccount = managedAccount({ id: 'acct-first', nativeIdentity: 'native-first', name: 'Taylor Jordan' })
-            const secondAccount = managedAccount({ id: 'acct-second', nativeIdentity: 'native-second', name: 'Taylor Jordan' })
-            const thirdAccount = managedAccount({ id: 'acct-third', nativeIdentity: 'native-third', name: 'Taylor Jordan' })
+            const firstAccount = managedAccount({
+                id: 'acct-first',
+                nativeIdentity: 'native-first',
+                name: 'Taylor Jordan',
+            })
+            const secondAccount = managedAccount({
+                id: 'acct-second',
+                nativeIdentity: 'native-second',
+                name: 'Taylor Jordan',
+            })
+            const thirdAccount = managedAccount({
+                id: 'acct-third',
+                nativeIdentity: 'native-third',
+                name: 'Taylor Jordan',
+            })
             run.managedAccountsById.set('source-a-id::native-first', firstAccount)
             run.managedAccountsById.set('source-a-id::native-second', secondAccount)
             run.managedAccountsById.set('source-a-id::native-third', thirdAccount)
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, pool, candidateType) => {
-                if (candidateType !== 'deferred') return 0
-                const candidateList = Array.from(pool)
-                if (fusionAccount.managedAccountId === 'source-a-id::native-second') {
-                    const peer = candidateList.find(
-                        (candidate) => candidate.managedAccountId === 'source-a-id::native-third'
-                    )
-                    if (peer) {
-                        fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: peer }))
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, pool, candidateType) => {
+                    if (candidateType !== 'deferred') return 0
+                    const candidateList = Array.from(pool)
+                    if (fusionAccount.managedAccountId === 'source-a-id::native-second') {
+                        const peer = candidateList.find(
+                            (candidate) => candidate.managedAccountId === 'source-a-id::native-third'
+                        )
+                        if (peer) {
+                            fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: peer }))
+                        }
                     }
+                    return candidateList.length
                 }
-                return candidateList.length
-            })
+            )
 
             const result = await dispatcher.runMatchSweep([firstAccount, secondAccount, thirdAccount], 3)
 
@@ -625,7 +877,6 @@ describe('MatchOutcomeDispatcher', () => {
             expect(run.getFusionAccountByManagedKey('source-a-id::native-third')).toBeDefined()
             expect(run.managedAccountsById.has('source-a-id::native-second')).toBe(false)
         })
-
 
         it('dispatches a non-match by registering an authoritative fusion account', async () => {
             const { dispatcher, matchingService, log, run } = createDispatcher({
@@ -687,17 +938,21 @@ describe('MatchOutcomeDispatcher', () => {
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch({
-                        identityId: 'identity-1',
-                        identityName: 'Identity One',
-                        candidateType: 'identity',
-                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
-                    })
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: 'identity-1',
+                            identityName: 'Identity One',
+                            candidateType: 'identity',
+                            scores: [
+                                { attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true },
+                            ],
+                        })
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const result = await dispatcher.runMatchSweep([managedAccount()], 1)
 
@@ -719,17 +974,21 @@ describe('MatchOutcomeDispatcher', () => {
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch({
-                        identityId: 'identity-1',
-                        identityName: 'Identity One',
-                        candidateType: 'identity',
-                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
-                    })
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: 'identity-1',
+                            identityName: 'Identity One',
+                            candidateType: 'identity',
+                            scores: [
+                                { attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true },
+                            ],
+                        })
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const result = await dispatcher.runMatchSweep([managedAccount()], 1)
 
@@ -755,17 +1014,21 @@ describe('MatchOutcomeDispatcher', () => {
                 new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
             )
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch({
-                        identityId: 'identity-1',
-                        identityName: 'Identity One',
-                        candidateType: 'identity',
-                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
-                    })
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: 'identity-1',
+                            identityName: 'Identity One',
+                            candidateType: 'identity',
+                            scores: [
+                                { attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true },
+                            ],
+                        })
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const result = await dispatcher.runMatchSweep([managedAccount()], 1)
 
@@ -791,17 +1054,21 @@ describe('MatchOutcomeDispatcher', () => {
                 new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
             )
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch({
-                        identityId: 'identity-1',
-                        identityName: 'Identity One',
-                        candidateType: 'identity',
-                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true }],
-                    })
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: 'identity-1',
+                            identityName: 'Identity One',
+                            candidateType: 'identity',
+                            scores: [
+                                { attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, isMatch: true },
+                            ],
+                        })
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const result = await dispatcher.runMatchSweep([managedAccount()], 1)
 
@@ -817,18 +1084,28 @@ describe('MatchOutcomeDispatcher', () => {
                 configOverrides: { fusionEnableAutoMerge: true, fusionAutoMergeScore: 100 },
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
-            const identity = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Identity One', attributes: {} } as any)
+            const identity = FusionAccount.fromIdentity({
+                id: 'identity-1',
+                name: 'Identity One',
+                attributes: {},
+            } as any)
             run.registerFusionAccount(identity)
 
-            const assigned = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Identity One', attributes: {} } as any)
+            const assigned = FusionAccount.fromIdentity({
+                id: 'identity-1',
+                name: 'Identity One',
+                attributes: {},
+            } as any)
             decisionProcessor.processFusionIdentityDecision.mockResolvedValue(assigned)
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch(identityMatch())
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch(identityMatch())
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const result = await dispatcher.runMatchSweep([managedAccount()], 1)
 
@@ -857,13 +1134,15 @@ describe('MatchOutcomeDispatcher', () => {
             run.registerFusionAccount(previousNonMatch)
             run.registerFinalizedDeferredCandidate(previousNonMatch)
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') return 0
-                if (candidateType === 'deferred') {
-                    fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: previousNonMatch }))
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') return 0
+                    if (candidateType === 'deferred') {
+                        fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: previousNonMatch }))
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const result = await dispatcher.runMatchSweep([managedAccount()], 1)
 
@@ -897,7 +1176,10 @@ describe('MatchOutcomeDispatcher', () => {
             const { dispatcher, matchingService, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
-            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Orphan, config: { disableNonMatchingAccounts: true } }))
+            run.sourcesByName.set(
+                SOURCE_NAME,
+                sourceInfo({ sourceType: SourceType.Orphan, config: { disableNonMatchingAccounts: true } })
+            )
 
             const disableSpy = vi.fn().mockResolvedValue(undefined)
             run.setDisableOperationFactory(async (account) => disableSpy(account))
@@ -1120,13 +1402,14 @@ describe('MatchOutcomeDispatcher', () => {
             expect(result.resolved[0].fusionAccount.identityDisplayName).not.toBe('Alice Anderson')
         })
 
-
-
         it('skips identity scoring for record sources when matching is disabled', async () => {
             const { dispatcher, matchingService, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
-            run.sourcesByName.set(SOURCE_NAME, sourceInfo({ sourceType: SourceType.Record, config: { includeRecordAccountsForMatching: false } }))
+            run.sourcesByName.set(
+                SOURCE_NAME,
+                sourceInfo({ sourceType: SourceType.Record, config: { includeRecordAccountsForMatching: false } })
+            )
 
             const scoreSpy = vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)
 
@@ -1141,22 +1424,27 @@ describe('MatchOutcomeDispatcher', () => {
                 configOverrides: { fusionEnableAutoMerge: true, fusionAutoMergeScore: 100 },
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
-            run.reviewersBySourceId.set(SOURCE_ID, new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)]))
+            run.reviewersBySourceId.set(
+                SOURCE_ID,
+                new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+            )
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch({
-                        identityId: 'identity-1',
-                        identityName: 'Identity One',
-                        candidateType: 'identity',
-                        scores: [
-                            { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
-                            { attribute: 'email', algorithm: 'jaro-winkler', score: 0, skipped: true } as any,
-                        ],
-                    })
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch({
+                            identityId: 'identity-1',
+                            identityName: 'Identity One',
+                            candidateType: 'identity',
+                            scores: [
+                                { attribute: 'firstname', algorithm: 'name', score: 100, fusionScore: '100' } as any,
+                                { attribute: 'email', algorithm: 'jaro-winkler', score: 0, skipped: true } as any,
+                            ],
+                        })
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const result = await dispatcher.runMatchSweep([managedAccount()], 1)
 
@@ -1167,14 +1455,19 @@ describe('MatchOutcomeDispatcher', () => {
         it('treats identity matches outside account-list mode as partial matches', async () => {
             const { dispatcher, matchingService, forms, run } = createDispatcher()
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
-            run.reviewersBySourceId.set(SOURCE_ID, new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)]))
+            run.reviewersBySourceId.set(
+                SOURCE_ID,
+                new Set([FusionAccount.fromIdentity({ id: 'rev-1', name: 'Reviewer', attributes: {} } as any)])
+            )
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    fusionAccount.layers.addFusionMatch(identityMatch())
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        fusionAccount.layers.addFusionMatch(identityMatch())
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const result = await dispatcher.runMatchSweep([managedAccount()], 1)
 
@@ -1189,13 +1482,19 @@ describe('MatchOutcomeDispatcher', () => {
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo())
 
-            const assigned = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Identity One', attributes: {} } as any)
+            const assigned = FusionAccount.fromIdentity({
+                id: 'identity-1',
+                name: 'Identity One',
+                attributes: {},
+            } as any)
             decisionProcessor.processFusionIdentityDecision.mockResolvedValue(assigned)
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') fusionAccount.layers.addFusionMatch(identityMatch())
-                return 1
-            })
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') fusionAccount.layers.addFusionMatch(identityMatch())
+                    return 1
+                }
+            )
 
             const result = await dispatcher.runMatchSweep([managedAccount()], 1)
 
@@ -1334,27 +1633,33 @@ describe('MatchOutcomeDispatcher', () => {
 
             let inFlight = 0
             let maxInFlight = 0
-            decisionProcessor.processFusionIdentityDecision.mockImplementation(async (decision: { identityId?: string }) => {
-                inFlight += 1
-                maxInFlight = Math.max(maxInFlight, inFlight)
-                await new Promise<void>((resolve) => setImmediate(resolve))
-                inFlight -= 1
-                const identityId = decision.identityId ?? 'identity-1'
-                return FusionAccount.fromIdentity({ id: identityId, name: identityId, attributes: {} } as any)
-            })
-
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'identity') {
-                    const identityId = fusionAccount.nativeIdentity === 'native-0' ? 'identity-1' : 'identity-2'
-                    fusionAccount.layers.addFusionMatch({
-                        identityId,
-                        identityName: identityId === 'identity-1' ? 'Identity One' : 'Identity Two',
-                        candidateType: 'identity',
-                        scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }],
-                    })
+            decisionProcessor.processFusionIdentityDecision.mockImplementation(
+                async (decision: { identityId?: string }) => {
+                    inFlight += 1
+                    maxInFlight = Math.max(maxInFlight, inFlight)
+                    await new Promise<void>((resolve) => setImmediate(resolve))
+                    inFlight -= 1
+                    const identityId = decision.identityId ?? 'identity-1'
+                    return FusionAccount.fromIdentity({ id: identityId, name: identityId, attributes: {} } as any)
                 }
-                return 1
-            })
+            )
+
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'identity') {
+                        const identityId = fusionAccount.nativeIdentity === 'native-0' ? 'identity-1' : 'identity-2'
+                        fusionAccount.layers.addFusionMatch({
+                            identityId,
+                            identityName: identityId === 'identity-1' ? 'Identity One' : 'Identity Two',
+                            candidateType: 'identity',
+                            scores: [
+                                { attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true },
+                            ],
+                        })
+                    }
+                    return 1
+                }
+            )
 
             const accounts = [
                 managedAccount({ id: 'acct-0', nativeIdentity: 'native-0', name: 'Managed Account 0' }),
@@ -1393,33 +1698,53 @@ describe('MatchOutcomeDispatcher', () => {
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: true } }))
-            run.sourcesByName.set('Source B', sourceInfo({ id: 'source-b-id', name: 'Source B', config: { deferredMatching: true } }))
+            run.sourcesByName.set(
+                'Source B',
+                sourceInfo({ id: 'source-b-id', name: 'Source B', config: { deferredMatching: true } })
+            )
 
             const inFlightBySource = new Map<string, number>()
             const maxInFlightBySource = new Map<string, number>()
             let totalDeferredInFlight = 0
             let maxTotalDeferredInFlight = 0
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType !== 'deferred') return 0
-                const source = fusionAccount.sourceName ?? ''
-                inFlightBySource.set(source, (inFlightBySource.get(source) ?? 0) + 1)
-                maxInFlightBySource.set(source, Math.max(maxInFlightBySource.get(source) ?? 0, inFlightBySource.get(source)!))
-                totalDeferredInFlight += 1
-                maxTotalDeferredInFlight = Math.max(maxTotalDeferredInFlight, totalDeferredInFlight)
-                await new Promise((resolve) => setTimeout(resolve, 10))
-                inFlightBySource.set(source, (inFlightBySource.get(source) ?? 1) - 1)
-                totalDeferredInFlight -= 1
-                return 0
-            })
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType !== 'deferred') return 0
+                    const source = fusionAccount.sourceName ?? ''
+                    inFlightBySource.set(source, (inFlightBySource.get(source) ?? 0) + 1)
+                    maxInFlightBySource.set(
+                        source,
+                        Math.max(maxInFlightBySource.get(source) ?? 0, inFlightBySource.get(source)!)
+                    )
+                    totalDeferredInFlight += 1
+                    maxTotalDeferredInFlight = Math.max(maxTotalDeferredInFlight, totalDeferredInFlight)
+                    await new Promise((resolve) => setTimeout(resolve, 10))
+                    inFlightBySource.set(source, (inFlightBySource.get(source) ?? 1) - 1)
+                    totalDeferredInFlight -= 1
+                    return 0
+                }
+            )
 
             const sourceAAccounts = [
                 managedAccount({ id: 'a1', nativeIdentity: 'a1', name: 'A1' }),
                 managedAccount({ id: 'a2', nativeIdentity: 'a2', name: 'A2' }),
             ]
             const sourceBAccounts = [
-                managedAccount({ sourceId: 'source-b-id', sourceName: 'Source B', id: 'b1', nativeIdentity: 'b1', name: 'B1' }),
-                managedAccount({ sourceId: 'source-b-id', sourceName: 'Source B', id: 'b2', nativeIdentity: 'b2', name: 'B2' }),
+                managedAccount({
+                    sourceId: 'source-b-id',
+                    sourceName: 'Source B',
+                    id: 'b1',
+                    nativeIdentity: 'b1',
+                    name: 'B1',
+                }),
+                managedAccount({
+                    sourceId: 'source-b-id',
+                    sourceName: 'Source B',
+                    id: 'b2',
+                    nativeIdentity: 'b2',
+                    name: 'B2',
+                }),
             ]
 
             await dispatcher.runMatchSweep([...sourceAAccounts, ...sourceBAccounts], 4)
@@ -1434,7 +1759,10 @@ describe('MatchOutcomeDispatcher', () => {
                 commandType: StandardCommand.StdAccountList,
             })
             run.sourcesByName.set(SOURCE_NAME, sourceInfo({ config: { deferredMatching: true } }))
-            run.sourcesByName.set('Source B', sourceInfo({ id: 'source-b-id', name: 'Source B', config: { deferredMatching: true } }))
+            run.sourcesByName.set(
+                'Source B',
+                sourceInfo({ id: 'source-b-id', name: 'Source B', config: { deferredMatching: true } })
+            )
 
             const sourceACandidate = FusionAccount.fromManagedAccount({
                 id: 'acct-a',
@@ -1461,17 +1789,27 @@ describe('MatchOutcomeDispatcher', () => {
             run.registerFinalizedDeferredCandidate(sourceBCandidate)
 
             const deferredCandidateSources: string[][] = []
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (_account, candidates, candidateType) => {
-                if (candidateType === 'deferred') {
-                    deferredCandidateSources.push(
-                        Array.from(candidates).map((candidate) => candidate.sourceName ?? '')
-                    )
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (_account, candidates, candidateType) => {
+                    if (candidateType === 'deferred') {
+                        deferredCandidateSources.push(
+                            Array.from(candidates).map((candidate) => candidate.sourceName ?? '')
+                        )
+                    }
+                    return Array.from(candidates).length
                 }
-                return Array.from(candidates).length
-            })
+            )
 
             await dispatcher.runMatchSweep(
-                [managedAccount({ sourceId: 'source-b-id', sourceName: 'Source B', id: 'acct-b', nativeIdentity: 'native-b', name: 'Source B Account' })],
+                [
+                    managedAccount({
+                        sourceId: 'source-b-id',
+                        sourceName: 'Source B',
+                        id: 'acct-b',
+                        nativeIdentity: 'native-b',
+                        name: 'Source B Account',
+                    }),
+                ],
                 1
             )
 
@@ -1498,12 +1836,14 @@ describe('MatchOutcomeDispatcher', () => {
             run.registerFusionAccount(previousNonMatch)
             run.registerFinalizedDeferredCandidate(previousNonMatch)
 
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, candidateType) => {
-                if (candidateType === 'deferred') {
-                    fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: previousNonMatch }))
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
+                async (fusionAccount, _pool, candidateType) => {
+                    if (candidateType === 'deferred') {
+                        fusionAccount.layers.addFusionMatch(deferredMatch({ fusionIdentity: previousNonMatch }))
+                    }
+                    return 1
                 }
-                return 1
-            })
+            )
 
             const account = managedAccount()
             const result = await dispatcher.runMatchSweep([account], 1, { mode: MatchSweepMode.AnalysisOnly })
@@ -1515,7 +1855,3 @@ describe('MatchOutcomeDispatcher', () => {
         })
     })
 })
-
-
-
-
