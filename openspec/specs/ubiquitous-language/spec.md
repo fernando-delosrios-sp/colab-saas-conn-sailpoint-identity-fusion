@@ -379,6 +379,22 @@ The ubiquitous-language glossary MUST define **Fusion account collaborators** as
 - **THEN** **FusionCorrelation** MUST be defined as the collaborator that owns correlation promises and mark-correlated helpers on a single Fusion account
 - **AND** the entry MUST state that this is distinct from business **correlation** (linking managed source accounts to an ISC identity)
 
+### Requirement: Glossary defines source snapshot materialization and claim-only absorb
+
+The ubiquitous-language glossary SHALL define **Source snapshot materialization** and **Claim-only absorb** as FusionLayers managed-account layer terms. Documentation and specs SHALL NOT call claim-only absorb “skip Refresh” or “skip blend” when report fusionBlends or Map merge is meant.
+
+#### Scenario: Source snapshot materialization entry
+
+- **GIVEN** a reader consults the ubiquitous-language glossary
+- **WHEN** they look up copying managed source attributes onto the Fusion account for Map and Velocity
+- **THEN** a **Source snapshot materialization** entry SHALL define it as copying a managed source account’s attributes onto `attributeBag.sources` during FusionLayers absorb so Map and Velocity `$accounts` / `$sources` can read this run’s live snapshots
+
+#### Scenario: Claim-only absorb entry
+
+- **GIVEN** a reader consults the glossary
+- **WHEN** they look up Refresh work-queue depletion without copying attributes
+- **THEN** a **Claim-only absorb** entry SHALL define it as absorbing a work-queue managed account by claiming it and updating Fusion account bookkeeping without source snapshot materialization
+
 ### Requirement: Structural correlation MUST NOT be confused with business correlation
 
 Documentation, specs, and agent-generated text MUST use **correlation** (unqualified) for the business process of linking managed source accounts to an ISC identity, and MUST use **FusionCorrelation** (or “Fusion account correlation collaborator”) when referring to the `FusionAccount.correlation` object.
@@ -444,6 +460,8 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **Fusion account collaborators** | The three behavior-rich parts of a `FusionAccount`: **FusionCollections**, **FusionCorrelation**, and **FusionLayers**. Exposed as readonly `collections`, `correlation`, and `layers` on `FusionAccount`. |
 | **FusionCollections** | The collaborator that owns account-id sets, missing-accounts, statuses, actions, reviews, sources, fusion matches, history, and related collection sync-to-bag behavior. |
 | **FusionLayers** | The collaborator that owns identity / managed-account / fusion-decision enrichment methods and layer-related flags (for example needsRefresh, disabled, origin metadata). |
+| **Source snapshot materialization** | Copying a managed source account’s attributes onto `attributeBag.sources` during FusionLayers absorb so Map and Velocity `$accounts` / `$sources` can read this run’s live snapshots. |
+| **Claim-only absorb** | Absorbing a work-queue managed account by claiming it and updating Fusion account bookkeeping (keys, uncorrelated, `managedAccountInfo`) without source snapshot materialization. Not skip Refresh, skip blend, or skip Map merge. |
 | **FusionCorrelation** | The collaborator that owns correlation promises and mark-correlated helpers on a single Fusion account. Distinct from business **correlation** (linking managed source accounts to an ISC identity). |
 
 ### Operations, phases, and sweeps
