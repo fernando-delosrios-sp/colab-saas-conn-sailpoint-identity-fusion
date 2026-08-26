@@ -1,13 +1,18 @@
 import fs from 'fs/promises'
+import os from 'os'
+import path from 'path'
 import { LogService } from '../logService'
+import { resolveLogFilePath } from '../fileLogSink'
 
 describe('LogService external logging routing', () => {
     const originalFetch = global.fetch
     const originalProxyPassword = process.env.PROXY_PASSWORD
     const originalLogFile = process.env.LOG_FILE
+    let sandboxDir: string
 
-    beforeEach(() => {
+    beforeEach(async () => {
         vi.restoreAllMocks()
+        sandboxDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fusion-log-routing-'))
     })
 
     afterEach(async () => {
@@ -22,7 +27,7 @@ describe('LogService external logging routing', () => {
         } else {
             process.env.LOG_FILE = originalLogFile
         }
-        await fs.rm('logs', { recursive: true, force: true }).catch(() => {})
+        await fs.rm(sandboxDir, { recursive: true, force: true }).catch(() => {})
     })
 
     it('HTTP POSTs to external target URL for direct ISC processing', async () => {
@@ -75,6 +80,7 @@ describe('LogService external logging routing', () => {
         delete process.env.LOG_FILE
         const fetchMock = vi.fn().mockResolvedValue({ ok: true })
         global.fetch = fetchMock
+        const appendSpy = vi.spyOn(await import('../fileLogSink'), 'appendLogLine').mockResolvedValue(undefined)
 
         const log = new LogService({
             spConnDebugLoggingEnabled: false,
@@ -90,9 +96,13 @@ describe('LogService external logging routing', () => {
         await log.flush()
 
         expect(fetchMock).not.toHaveBeenCalled()
-        const tenantLogDir = 'logs/acme'
-        const files = await fs.readdir(tenantLogDir)
-        expect(files.some((f) => f.startsWith('fusion-') && f.endsWith('.log'))).toBe(true)
+        expect(appendSpy).toHaveBeenCalledWith(
+            expect.stringContaining('proxy server log'),
+            'https://acme.api.identitynow.com'
+        )
+        expect(resolveLogFilePath('https://acme.api.identitynow.com', new Date(2026, 7, 26))).toBe(
+            path.join('logs', 'acme', 'fusion-20260826.log')
+        )
     })
 
     it('uses unknown-tenant when baseurl is missing on proxy server', async () => {
@@ -100,6 +110,7 @@ describe('LogService external logging routing', () => {
         delete process.env.LOG_FILE
         const fetchMock = vi.fn().mockResolvedValue({ ok: true })
         global.fetch = fetchMock
+        const appendSpy = vi.spyOn(await import('../fileLogSink'), 'appendLogLine').mockResolvedValue(undefined)
 
         const log = new LogService({
             spConnDebugLoggingEnabled: false,
@@ -113,14 +124,16 @@ describe('LogService external logging routing', () => {
         log.info('fallback tenant log')
         await log.flush()
 
-        const tenantLogDir = 'logs/unknown-tenant'
-        const files = await fs.readdir(tenantLogDir)
-        expect(files.some((f) => f.startsWith('fusion-') && f.endsWith('.log'))).toBe(true)
+        expect(appendSpy).toHaveBeenCalledWith(expect.stringContaining('fallback tenant log'), undefined)
+        expect(resolveLogFilePath(undefined, new Date(2026, 7, 26))).toBe(
+            path.join('logs', 'unknown-tenant', 'fusion-20260826.log')
+        )
     })
 
     it('honors LOG_FILE on proxy server', async () => {
         process.env.PROXY_PASSWORD = 'secret'
-        process.env.LOG_FILE = 'logs/custom-server.log'
+        const logFile = path.join(sandboxDir, 'nested', 'custom-server.log')
+        process.env.LOG_FILE = logFile
         const fetchMock = vi.fn().mockResolvedValue({ ok: true })
         global.fetch = fetchMock
 
@@ -136,15 +149,16 @@ describe('LogService external logging routing', () => {
         log.info('custom path log')
         await log.flush()
 
-        const content = await fs.readFile('logs/custom-server.log', 'utf8')
+        const content = await fs.readFile(logFile, 'utf8')
         expect(content).toContain('custom path log')
     })
 
     it('ignores deprecated LOG_FILE=logs/proxy-ingest.log on proxy server', async () => {
         process.env.PROXY_PASSWORD = 'secret'
-        process.env.LOG_FILE = 'logs/proxy-ingest.log'
+        process.env.LOG_FILE = path.join(sandboxDir, 'logs', 'proxy-ingest.log')
         const fetchMock = vi.fn().mockResolvedValue({ ok: true })
         global.fetch = fetchMock
+        const appendSpy = vi.spyOn(await import('../fileLogSink'), 'appendLogLine').mockResolvedValue(undefined)
 
         const log = new LogService({
             spConnDebugLoggingEnabled: false,
@@ -160,9 +174,13 @@ describe('LogService external logging routing', () => {
         await log.flush()
 
         expect(fetchMock).not.toHaveBeenCalled()
-        const tenantLogDir = 'logs/acme'
-        const files = await fs.readdir(tenantLogDir)
-        expect(files.some((f) => f.startsWith('fusion-') && f.endsWith('.log'))).toBe(true)
+        expect(appendSpy).toHaveBeenCalledWith(
+            expect.stringContaining('tenant disk log'),
+            'https://acme.api.identitynow.com'
+        )
+        expect(resolveLogFilePath('https://acme.api.identitynow.com', new Date(2026, 7, 26))).toBe(
+            path.join('logs', 'acme', 'fusion-20260826.log')
+        )
     })
 
     it('noop on proxy server host when proxy sub-option is off (never HTTP POST to self)', async () => {
@@ -204,5 +222,3 @@ describe('LogService external logging routing', () => {
         expect(fetchMock).not.toHaveBeenCalled()
     })
 })
-
-
