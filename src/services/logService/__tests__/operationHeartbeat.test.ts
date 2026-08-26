@@ -107,7 +107,81 @@ describe('operation heartbeat formatters', () => {
         expect(line).toContain('matches(2n/1m/1a/0d)')
         expect(line).toContain('api=10a/97q/537c(Δ+0/30s)')
         expect(line).toContain('mem=482.00MB(100%)')
+        expect(line).not.toContain('cpu=')
         expect(line.endsWith(' elapsed=5.0S')).toBe(true)
+        vi.useRealTimers()
+    })
+
+    it('STATUS includes cpu after mem', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:10.000Z'))
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Refresh'
+        const line = formatStatusLine(
+            {
+                runContext,
+                memory: { rss: 505413632, heapUsed: 503316480, heapTotal: 523239424 } as NodeJS.MemoryUsage,
+                cpu: { user: 8_700_000, system: 0 },
+                intervalMs: 10_000,
+            },
+            { previousCpu: { user: 0, system: 0 }, previousCpuAt: Date.parse('2020-01-01T00:00:00.000Z') },
+            10_000
+        )
+        expect(line).toMatch(/mem=482\.00MB\(100%\) cpu=87% elapsed=/)
+        vi.useRealTimers()
+    })
+
+    it('STATUS omits cpu without a previous sample', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:10.000Z'))
+        const runContext = new OperationRunContext()
+        const line = formatStatusLine(
+            {
+                runContext,
+                memory: { rss: 505413632, heapUsed: 503316480, heapTotal: 523239424 } as NodeJS.MemoryUsage,
+                cpu: { user: 8_700_000, system: 0 },
+                intervalMs: 10_000,
+            },
+            {},
+            10_000
+        )
+        expect(line).not.toContain('cpu=')
+        expect(line).toContain('mem=482.00MB(100%)')
+        vi.useRealTimers()
+    })
+
+    it('CPU percent uses actual wall time not the configured interval', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:25.000Z'))
+        const runContext = new OperationRunContext()
+        const line = formatStatusLine(
+            {
+                runContext,
+                cpu: { user: 25_000_000, system: 0 },
+                intervalMs: 10_000,
+            },
+            { previousCpu: { user: 0, system: 0 }, previousCpuAt: Date.parse('2020-01-01T00:00:00.000Z') },
+            10_000
+        )
+        expect(line).toContain('cpu=100%')
+        expect(line).not.toContain('cpu=250%')
+        vi.useRealTimers()
+    })
+
+    it('CPU percent may exceed 100', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:10.000Z'))
+        const runContext = new OperationRunContext()
+        const line = formatStatusLine(
+            {
+                runContext,
+                cpu: { user: 10_000_000, system: 5_000_000 },
+                intervalMs: 10_000,
+            },
+            { previousCpu: { user: 0, system: 0 }, previousCpuAt: Date.parse('2020-01-01T00:00:00.000Z') },
+            10_000
+        )
+        expect(line).toContain('cpu=150%')
         vi.useRealTimers()
     })
 
@@ -573,6 +647,67 @@ describe('OperationHeartbeat timing', () => {
         expect(info.mock.calls[0][0]).toContain('STATUS')
 
         heartbeat.stop()
+        vi.useRealTimers()
+    })
+
+    it('First STATUS after heartbeat start includes cpu', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const info = vi.fn()
+        const log = { info } as unknown as LogService
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Process'
+        let cpu: NodeJS.CpuUsage = { user: 0, system: 0 }
+        const heartbeat = new OperationHeartbeat(log, () => ({
+            runContext,
+            intervalMs: 10_000,
+            memory: { rss: 505413632, heapUsed: 503316480, heapTotal: 523239424 } as NodeJS.MemoryUsage,
+            cpu,
+        }))
+
+        heartbeat.start()
+        cpu = { user: 8_700_000, system: 0 }
+        vi.advanceTimersByTime(10_000)
+
+        expect(info.mock.calls[0][0]).toMatch(/mem=482\.00MB\(100%\) cpu=87% elapsed=/)
+
+        heartbeat.stop()
+        vi.useRealTimers()
+    })
+
+    it('Phase change does not drop cpu', () => {
+        vi.useFakeTimers()
+        vi.setSystemTime(new Date('2020-01-01T00:00:00.000Z'))
+        const info = vi.fn()
+        const log = { info } as unknown as LogService
+        const runContext = new OperationRunContext()
+        runContext.phase = 'Fetch'
+        let cpu: NodeJS.CpuUsage = { user: 0, system: 0 }
+        const heartbeat = new OperationHeartbeat(log, () => ({
+            runContext,
+            intervalMs: 10_000,
+            cpu,
+        }))
+
+        heartbeat.start()
+        cpu = { user: 1_000_000, system: 0 }
+        vi.advanceTimersByTime(10_000)
+        runContext.phase = 'Refresh'
+        runContext.progress = { done: 1, total: 10, unit: 'refreshed' }
+        cpu = { user: 2_000_000, system: 0 }
+        vi.advanceTimersByTime(10_000)
+
+        expect(info.mock.calls[0][0]).toContain('cpu=')
+        expect(info.mock.calls[1][0]).toContain('phase=Refresh')
+        expect(info.mock.calls[1][0]).toContain('cpu=')
+
+        heartbeat.stop()
+        const afterStop = formatStatusLine(
+            { runContext, cpu: { user: 3_000_000, system: 0 }, intervalMs: 10_000 },
+            {},
+            10_000
+        )
+        expect(afterStop).not.toContain('cpu=')
         vi.useRealTimers()
     })
 

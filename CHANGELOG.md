@@ -8,6 +8,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ## 2026-08-26 · v2.2.1
 
+### ✨ New Features
+
+- **STATUS heartbeats include process CPU** — Account-list `STATUS` lines now emit optional `cpu={percent}%` after `mem=` (integer percent of one core over the actual sample window; may exceed 100). The token is omitted when no previous sample exists. Do not alert on high CPU alone — read it with progress Δ and `api=` (healthy Refresh is often CPU-hot and API-idle). Log scrapers that treat STATUS as a fixed field list should allow optional `cpu=` after `mem=`.
+
 ### 🔧 Improvements
 
 - **Unchanged Fusion accounts skip copying managed source attributes** — Quiet Refresh still visits every Fusion row and claims linked managed accounts so Process cannot rematch them, but it no longer copies those accounts' attributes onto the Fusion row when source data did not change. Always recalculate, force attribute refresh, new blends, deletions, and over-threshold managed `modified` still copy this run's snapshots so Map and Velocity `$accounts` / `$sources` can read them.
