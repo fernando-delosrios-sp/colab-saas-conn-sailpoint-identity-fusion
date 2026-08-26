@@ -23,7 +23,7 @@ export class CorrelationManager {
 
     /**
      * Correlation-on-aggregation (link) applies only to established Fusion identities —
-     * persisted fusion rows and identity-origin baselines — not provisional managed-origin
+     * persisted Fusion accounts and identity-origin baselines — not provisional managed-origin
      * non-match accounts created during the current run.
      */
     private isLinkCorrelationEligible(fusionAccount: FusionAccount): boolean {
@@ -45,7 +45,7 @@ export class CorrelationManager {
      * `mergeDecision` (link-to-existing form outcome): when managed-account metadata is
      * missing for the assigned account id, `decision.account.sourceName` supplies the source for
      * the correlate check so aggregation still PATCHes when that source is `correlationMode: correlate`.
-     * All other missing rows still follow `collections.managedAccountInfo` + per-source mode only.
+     * All other missing managed source accounts still follow `collections.managedAccountInfo` + per-source mode only.
      */
     private async correlatePerSource(
         fusionAccount: FusionAccount,

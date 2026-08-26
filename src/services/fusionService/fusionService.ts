@@ -792,7 +792,7 @@ export class FusionService {
     }
 
     private buildLinkedAccountKeyIndex(): void {
-        // Build a one-shot flat index of every account key already linked in a loaded Fusion row.
+        // Build a one-shot flat index of every account key already linked in a loaded Fusion account.
         // isManagedAccountLinkedInFusion uses this for O(1) per-account lookups instead
         // of scanning fusionAccountMap + identity-linked Fusion account map (O(A+I)) for every correlated account.
         this.run.initLinkedAccountIndex()
@@ -806,7 +806,7 @@ export class FusionService {
 
     private async runCorrelatedAccountSweep(map: Map<string, Account>): Promise<void> {
         // Correlated account sweep: resolve all correlated managed accounts before uncorrelated scoring begins.
-        // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion row)
+        // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion account)
         // are registered as non-matches in the identity-linked Fusion account map here, so they are immediately visible
         // as deferred-match candidates when uncorrelated accounts are scored in the uncorrelated scoring sweep.
         const correlatedAccounts = [...map.values()].filter((a) => a.uncorrelated === false)
@@ -872,7 +872,7 @@ export class FusionService {
     /**
      * Processes a single managed account through the Match workflow (or a correlated
      * orphan shortcut when the account is correlated on the source but not linked to
-     * any loaded Fusion row).
+     * any loaded Fusion account).
      * After scoring, the account is either assigned automatically to the matched identity
      * (perfect scores when enabled), sent for manual review (partial match), or handled
      * based on the source type:
@@ -1059,7 +1059,7 @@ export class FusionService {
                     : () => this.log.recordCorrelatedActionGranted()
             )
         }
-        // Match forms: ensure this exact row reflects FormService pending state at output time.
+        // Match forms: ensure this exact Fusion account reflects FormService pending state at output time.
         // Global reconcile runs during aggregation, but accountRead and edge paths only guarantee
         // correctness if we re-apply pending candidate + reviewer URLs here (mirrors reviewer
         // handling in processFusionAccount via populateReviewerFusionReviewsFromPending).
@@ -1133,7 +1133,7 @@ export class FusionService {
 
     /**
      * True when this managed account is already represented on a loaded Fusion account
-     * (platform Fusion row or identity-origin Fusion row), or when its identityId matches
+     * (platform Fusion account or identity-origin Fusion account), or when its identityId matches
      * a loaded identity-origin Fusion account.
      *
      * Uses _linkedAccountKeyIndex (O(1)) when available (set by the correlated account sweep),
@@ -1236,7 +1236,7 @@ export class FusionService {
 
     /**
      * Hydrate fusion source owners and mark them in aggregation scope before persisted
-     * identity-origin fusion accounts are processed. Without this, a global reviewer row
+     * identity-origin Fusion accounts are processed. Without this, a global reviewer Fusion account
      * from a prior run can be marked orphan when the owner sits outside identityScopeQuery.
      */
     public cacheGlobalOwnerIdentityIds(ids: string[]): void {

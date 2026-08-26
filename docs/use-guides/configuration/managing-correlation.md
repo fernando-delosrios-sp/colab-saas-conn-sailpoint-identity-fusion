@@ -9,7 +9,7 @@ This guide explains how Identity Fusion NG correlates managed source accounts to
 
 ## Correlation in the Map → Define → Match pipeline
 
-Correlation links a managed account on an authoritative source to an ISC identity (or Fusion account row). It is distinct from **Match scoring**, which finds candidate identities — correlation is the ISC-side link that makes a managed account "owned" by an identity.
+Correlation links a managed source account on an authoritative source to an ISC identity (or Fusion account). It is distinct from **Match scoring**, which finds candidate identities — correlation is the ISC-side link that makes a managed source account "owned" by an identity.
 
 ```mermaid
 flowchart TD

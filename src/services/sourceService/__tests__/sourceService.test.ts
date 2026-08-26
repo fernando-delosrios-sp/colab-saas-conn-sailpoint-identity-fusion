@@ -408,7 +408,7 @@ describe('SourceService fetchManagedAccount (sourceId + nativeIdentity)', () => 
         expect(service.run.managedAccountsByIdentityId.get('id-1')?.has('managed-source-id::user-1')).toBe(true)
     })
 
-    it('leaves inventory empty when listAccounts returns no rows (e.g. accountFilter mismatch)', async () => {
+    it('leaves inventory empty when listAccounts returns no accounts (e.g. accountFilter mismatch)', async () => {
         const { service, client } = createService({ accountFilter: 'nativeIdentity sw "ad_"' })
         client.accountsApi.listAccounts.mockResolvedValue({ data: [] })
 

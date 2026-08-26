@@ -36,7 +36,7 @@ describe('CandidateRegistry', () => {
         expect([...registry.queryForSource('Source A')]).toEqual([account])
     })
 
-    it('indexes persisted fusion rows by originSource instead of fusion connector sourceName', () => {
+    it('indexes persisted Fusion accounts by originSource instead of fusion connector sourceName', () => {
         const sources = new Map()
         sources.set('Source A', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
         const registry = makeRegistry({ sourcesByName: sources })
@@ -146,7 +146,7 @@ describe('CandidateRegistry', () => {
         expect(registry.getCandidateTier(persisted)).toBe('persisted')
     })
 
-    it('indexes persisted fusion rows by originAccount when present', () => {
+    it('indexes persisted Fusion accounts by originAccount when present', () => {
         const sources = new Map()
         sources.set('Source A', { sourceType: SourceType.Authoritative, config: { deferredMatching: true } })
         const registry = makeRegistry({ sourcesByName: sources })

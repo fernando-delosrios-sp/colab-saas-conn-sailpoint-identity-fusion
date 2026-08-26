@@ -27,7 +27,7 @@ import type { IdentityInfo } from './fusionAccountTypes'
  * `attributeBag.sources` so Map and Velocity `$accounts` / `$sources` can read this run.
  * **Claim-only absorb** still claims the work-queue key and updates bookkeeping
  * (`managedAccountInfo`, uncorrelated/status, source names) without that copy.
- * Prelude flags below are ORed with row-local new-blend, over-threshold `modified`,
+ * Prelude flags below are ORed with Fusion-account-local new-blend, over-threshold `modified`,
  * and prune-deleted before any `claimAccount`.
  */
 export interface AddManagedAccountOptions {
@@ -46,7 +46,7 @@ export interface AddManagedAccountOptions {
     resetDefinition?: boolean
     /**
      * Prelude: at least one Normal definition has Always recalculate and is eligible
-     * on this row (`definition.refresh` and not skipped static).
+     * on this Fusion account (`definition.refresh` and not skipped static).
      */
     hasEligibleAlwaysRecalculate?: boolean
     /** Caller-computed prelude bit: live source snapshots are required before this layer runs. */
@@ -455,7 +455,7 @@ export class FusionLayers {
     }
 
     /**
-     * Blends managed accounts already listed on the fusion row (e.g. from
+     * Blends managed accounts already listed on the Fusion account (e.g. from
      * {@link addIdentityLayer} identity.accounts links) when they exist in the
      * work queue but were not reached by the identity-id index or previous-run paths.
      */
@@ -539,7 +539,7 @@ export class FusionLayers {
     }
 
     /**
-     * Whole-row decide-before-claim: live sources are required when any prelude flag
+     * Whole-account decide-before-claim: live sources are required when any prelude flag
      * is set, `needsRefresh` is already true, any linked queue key is a new blend or
      * over-threshold newer, or prune-deleted would drop a tracked key.
      */

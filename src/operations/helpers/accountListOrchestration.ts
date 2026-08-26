@@ -96,7 +96,7 @@ export async function runAccountListPhases(
 
 /**
  * Self-contained setup + fetch + process for Fusion report (`report` action).
- * Runs phases 1–4 (`throughPhase: 4`) so Output does not stream account-list rows.
+ * Runs phases 1–4 (`throughPhase: 4`) so Output does not stream `StdAccountListOutput` objects.
  * Callers activate dry-run before this so Match uses the account-list outcome tree.
  */
 export async function buildReportContext(serviceRegistry: ServiceRegistry): Promise<{

@@ -235,7 +235,7 @@ When **Include identities in the scope** is on:
 | --- | --- |
 | `$identity.name` | Root identity name |
 | `$identity.<attr>` | Any identity attribute |
-| `$name` | Falls back to identity name when no mapped `name` exists (identity-origin rows) |
+| `$name` | Falls back to identity name when no mapped `name` exists (identity-origin Fusion accounts) |
 
 #### `$accounts` — all linked managed accounts
 
@@ -244,14 +244,14 @@ Each entry includes source attributes plus nested metadata:
 | Part | Key fields |
 | --- | --- |
 | Attributes | All fields from the managed account |
-| `source.id` / `source.name` | Source identifier (`id` absent for Identities rows) |
+| `source.id` / `source.name` | Source identifier (`id` absent for Identities snapshots) |
 | `schema.id` / `schema.name` | Native identity and display name |
 | `IIQDisabled` | Disabled flag when present |
 
-**Order:** configured sources → insertion order within each source → unknown sources last. When `mainAccount` is set, that account moves to index `0`. Always recalculate and `needsRefresh` still read this run's managed snapshots (`$accounts` / `$sources`); unchanged Fusion rows may not copy those snapshots during Refresh.
+**Order:** configured sources → insertion order within each source → unknown sources last. When `mainAccount` is set, that account moves to index `0`. Always recalculate and `needsRefresh` still read this run's managed snapshots (`$accounts` / `$sources`); unchanged Fusion accounts may not copy those snapshots during Refresh.
 
 !!! tip "$accounts[0] is not always the origin"
-    `$accounts[0]` follows **source configuration order**. `$account` is always the **origin** row. When `mainAccount` differs from the origin, use `$account` for origin-specific logic.
+    `$accounts[0]` follows **source configuration order**. `$account` is always the **origin snapshot**. When `mainAccount` differs from the origin, use `$account` for origin-specific logic.
 
 ```velocity
 $accounts[0].source.name
