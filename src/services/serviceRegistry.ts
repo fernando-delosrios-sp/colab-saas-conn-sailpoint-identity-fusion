@@ -208,16 +208,18 @@ export class ServiceRegistry {
         })
         this.fusion.matchOutcomeDispatcher = this.matchOutcomeDispatcher
 
-        this.reports = new ReportService(
-            this.config.baseurl,
-            this.log,
-            this.sources,
-            this.identities,
-            this.forms,
-            this.fusion,
-            this.email,
-            this.run
-        )
+        this.reports =
+            (context as any).reportService ??
+            new ReportService(
+                this.config.baseurl,
+                this.log,
+                this.sources,
+                this.identities,
+                this.forms,
+                this.fusion,
+                this.email,
+                this.run
+            )
 
         this.proxy = context.proxyService ?? new ProxyService(this.config, this.log, this.res, commandType)
     }

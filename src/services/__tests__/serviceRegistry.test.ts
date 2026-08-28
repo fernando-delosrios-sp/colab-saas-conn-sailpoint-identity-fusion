@@ -33,6 +33,21 @@ function minimalConfig(overrides: Partial<FusionConfig> = {}): FusionConfig {
     } as unknown as FusionConfig
 }
 
+describe('ServiceRegistry context overrides', () => {
+    it('uses a ReportService provided on context instead of constructing one', () => {
+        const reportService = { id: 'injected-report-service' }
+
+        const registry = new ServiceRegistry(
+            minimalConfig(),
+            { reportService } as any,
+            { send: vi.fn() } as any,
+            'accountList'
+        )
+
+        expect(registry.reports).toBe(reportService)
+    })
+})
+
 describe('ServiceRegistry.activateDryRunMode', () => {
     afterEach(() => {
         vi.restoreAllMocks()
