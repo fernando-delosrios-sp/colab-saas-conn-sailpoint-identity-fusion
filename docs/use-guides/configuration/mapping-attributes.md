@@ -22,26 +22,26 @@ This page explains **how and when** to configure settings with examples. For fie
 
 ## Default merge behavior
 
-The **Default attribute merge from multiple sources** setting applies globally to mapped attributes (unless overridden per attribute) **and** to **unmapped snapshot keys** on refresh: same-named attributes that appear on this account’s live snapshots but have no mapping row. Map does **not** walk the full Fusion schema — names that never appear on this invocation’s snapshots are left unchanged. New configurations default to **Main account**.
+The **Default attribute merge from multiple sources** setting applies globally to mapped attributes (unless overridden per attribute) **and** to implicit Map candidates on refresh: **unmapped snapshot keys** (same-named attributes on this account’s live snapshots with no mapping row) together with names already present on the Fusion account. A **vanished snapshot key** — a persisted name that no live snapshot still carries — is deleted. Map does **not** walk the full Fusion schema. Control attributes, `id`, `name`, snapshot overlay fields, and **definition-owned names** (Normal and Unique definition `name`s) are never implicit candidates. To retain a value after its source stops publishing it, add an explicit mapping row or a Normal attribute definition for that name. New configurations default to **Main account**.
 
-| Merge strategy                   | Behavior                                                     | Result format         | Use when                                            |
-| -------------------------------- | ------------------------------------------------------------ | --------------------- | --------------------------------------------------- |
-| **Main account**                 | Uses `mainAccount` when found; otherwise uses the origin     | Single value (string) | Attributes should follow one representative account |
+| Merge strategy                   | Behavior                                                         | Result format         | Use when                                            |
+| -------------------------------- | ---------------------------------------------------------------- | --------------------- | --------------------------------------------------- |
+| **Main account**                 | Uses `mainAccount` when found; otherwise uses the origin         | Single value (string) | Attributes should follow one representative account |
 | **Origin account**               | Uses only the account that originally created the Fusion account | Single value (string) | Attributes must remain pinned to provenance         |
-| **First found**                  | Uses first non-null value by source order                    | Single value (string) | One source is preferred/authoritative               |
-| **Keep a list of values**        | Array of all distinct non-null values                        | Array of strings      | Need all values (roles, groups, entitlements)       |
-| **Concatenate different values** | Distinct values in brackets, space-separated                 | Single string         | Human-readable combined view                        |
+| **First found**                  | Uses first non-null value by source order                        | Single value (string) | One source is preferred/authoritative               |
+| **Keep a list of values**        | Array of all distinct non-null values                            | Array of strings      | Need all values (roles, groups, entitlements)       |
+| **Concatenate different values** | Distinct values in brackets, space-separated                     | Single string         | Human-readable combined view                        |
 
 **Main account and Origin account do not fall back to other accounts.** If the selected snapshot does not contain a mapped value, the result is empty. Choose **First found** when missing values should fall through to configured source order.
 
 **Origin** and **main** are pointers into the snapshot-key index. When the identity bag is present, **Identities** is a contributing snapshot indexed under the identity id, so `originAccount` or `mainAccount` may name either a managed account or that identity. Identity-origin is not a separate merge path.
 
-| Pointer                                          | Snapshot used                                      |
-| ------------------------------------------------ | -------------------------------------------------- |
-| `originAccount` = managed account key            | That managed snapshot                              |
-| `originAccount` = identity id                    | Identities snapshot                                |
-| `mainAccount` found in the index                 | That snapshot (managed or Identities)              |
-| `mainAccount` missing or not found this run      | Origin snapshot (Main account merge only)          |
+| Pointer                                     | Snapshot used                             |
+| ------------------------------------------- | ----------------------------------------- |
+| `originAccount` = managed account key       | That managed snapshot                     |
+| `originAccount` = identity id               | Identities snapshot                       |
+| `mainAccount` found in the index            | That snapshot (managed or Identities)     |
+| `mainAccount` missing or not found this run | Origin snapshot (Main account merge only) |
 
 **Screenshot Placeholder:** Attribute Mapping with merge strategies.
 ![Attribute mapping and merge](../../assets/images/attribute-management-mapping-merge.png)

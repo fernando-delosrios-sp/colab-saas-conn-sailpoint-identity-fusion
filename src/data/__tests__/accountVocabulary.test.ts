@@ -122,3 +122,29 @@ describe('canonical account vocabulary', () => {
         expect(operationDocs).not.toMatch(/\b(?:streamed?|streaming|previewing) account rows?\b/i)
     })
 })
+
+describe('Map glossary terms', () => {
+    it('Vanished snapshot key entry', () => {
+        expect(glossary).toMatch(/\*\*Vanished snapshot key\*\*/)
+        expect(glossary).toMatch(/deletes it from `attributeBag\.current`/)
+        expect(glossary).not.toMatch(/orphaned attribute.*synonym/i)
+    })
+
+    it('Definition-owned name entry', () => {
+        expect(glossary).toMatch(/\*\*Definition-owned name\*\*/)
+        expect(glossary).toMatch(/normalAttributeDefinitions/)
+        expect(glossary).toMatch(/uniqueAttributeDefinitions/)
+        expect(glossary).toMatch(/neither merges nor clears/)
+    })
+
+    it('Unmapped snapshot key entry', () => {
+        expect(glossary).toMatch(/\*\*Unmapped snapshot key\*\*/)
+        expect(glossary).toMatch(/not every Fusion schema attribute/)
+        expect(glossary).toMatch(/vanished snapshot keys/)
+    })
+
+    it('Identities snapshot entry', () => {
+        expect(glossary).toMatch(/\*\*Identities snapshot\*\*/)
+        expect(glossary).toMatch(/not a separate merge algebra/)
+    })
+})
