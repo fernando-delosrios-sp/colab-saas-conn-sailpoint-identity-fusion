@@ -24,12 +24,6 @@
 - [x] 3.3 Test: `needsRefresh` false still skips Map without cloning `attributeBag.current`
 - [x] 3.4 Test: identity-origin account keeps a bag key backed by the Identities snapshot
 
-## 4. Scenario regression against the recording
-
-- [x] 4.1 Replay `recordings/cambridge-sb/accountread` and confirm `STUDENT_ID` and `STUDENT_FLAG` are absent from the `accountRead` output
-- [x] 4.2 Confirm `STUDENT_URL` and `IN_STUDENT_SYSTEM` recompute from the cleared inputs rather than retaining derived stale values
-- [x] 4.3 Confirm `id`, `name`, and Fusion control attributes are unchanged in that output
-
 ## 5. Verification
 
 - [x] 5.1 Confirm canonical test command: `npm test`
