@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-08-28 · v2.2.2
+
+### 🐛 Fixes
+
+- **Map no longer strips bracketed tokens from source values** — Attribute mapping copies live snapshot strings as-is. A job title such as `Unestablished Senior Occupational Health Adviser [AVH]` is no longer reduced to `AVH`. Concatenate merge still wraps distinct values in brackets on output; the persisted `sources` field is unchanged.
+
+---
+
 ## 2026-08-26 · v2.2.1
 
 ### ✨ New Features
