@@ -6,15 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
-## 2026-08-28 · v2.2.2
+## 2026-08-28 · v2.2.0
 
-### 🐛 Fixes
+### ⚠️ Breaking Changes
 
-- **Map no longer strips bracketed tokens from source values** — Attribute mapping copies live snapshot strings as-is. A job title such as `Unestablished Senior Occupational Health Adviser [AVH]` is no longer reduced to `AVH`. Concatenate merge still wraps distinct values in brackets on output; the persisted `sources` field is unchanged.
-
----
-
-## 2026-08-26 · v2.2.1
+- **Fetch STATUS uses independent inventory counters** — Account-list Fetch heartbeats now report `fusion-accounts=done/total`, `managed-accounts=done/total`, and (when identity Fetch runs) `identities=done/total` on one STATUS line, each with its own interval delta. Fetch no longer uses a single last-writer `progress=` fraction with unit `fetched` or `ingested`. This is a log-contract change only: Map, Define, and aggregation output are unchanged. Refresh and Process still use `progress=` (`refreshed`, `analyzed`, and so on). DETAIL `action=ingesting identities|fusion-accounts` may still appear.
+-  - Migration: Log scrapers that match Fetch `progress=`, `fetched`, or `ingested` must switch to the population tokens (`fusion-accounts=`, `managed-accounts=`, `identities=`). Do not require an `identities=` segment when identity Fetch is skipped.
 
 ### ✨ New Features
 
@@ -24,24 +21,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 - **Fusion report is the same Match preview as dry-run** — Requesting the `report` entitlement now runs dry-run Match analysis (writes inhibited, no account-list stream) and emails **Identity Fusion Report** to global owners. The post-aggregation owner email is now **Identity Fusion Aggregation Report**. Dry-run remains **Identity Fusion Dry Run Report**. Match cards are captured even when **Send report to owner on aggregation?** is off.
 - **Unchanged Fusion accounts skip copying managed source attributes** — Quiet Refresh still visits every Fusion row and claims linked managed accounts so Process cannot rematch them, but it no longer copies those accounts' attributes onto the Fusion row when source data did not change. Always recalculate, force attribute refresh, new blends, deletions, and over-threshold managed `modified` still copy this run's snapshots so Map and Velocity `$accounts` / `$sources` can read them.
-
-### 📚 Documentation
-
-- **Account terminology distinguishes accounts from table rows** — Operator documentation and living specifications now call Fusion accounts, managed source accounts, identity-origin Fusion accounts, and origin snapshots by their canonical names. **Row** remains valid for real tables such as mappings, scores, and HTML reports; the `rowsSent` summary field is unchanged and counts streamed Fusion accounts.
-- **Glossary: source snapshot materialization and claim-only absorb** — Documents how Refresh can claim linked managed accounts without copying live source attributes, and that this is not skipping Refresh or Map merge.
-- **Glossary: dry-run report, Fusion report, aggregation report, Fusion Review decision section, Fusion review** — Distinguishes analysis emails from the post-aggregation owner email and from Fusion review (the review-required form), and aligns the FusionReport entitlement with Fusion report.
-
----
-
-## 2026-08-25 · v2.2.0
-
-### ⚠️ Breaking Changes
-
-- **Fetch STATUS uses independent inventory counters** — Account-list Fetch heartbeats now report `fusion-accounts=done/total`, `managed-accounts=done/total`, and (when identity Fetch runs) `identities=done/total` on one STATUS line, each with its own interval delta. Fetch no longer uses a single last-writer `progress=` fraction with unit `fetched` or `ingested`. This is a log-contract change only: Map, Define, and aggregation output are unchanged. Refresh and Process still use `progress=` (`refreshed`, `analyzed`, and so on). DETAIL `action=ingesting identities|fusion-accounts` may still appear.
--  - Migration: Log scrapers that match Fetch `progress=`, `fetched`, or `ingested` must switch to the population tokens (`fusion-accounts=`, `managed-accounts=`, `identities=`). Do not require an `identities=` segment when identity Fetch is skipped.
-
-### 🔧 Improvements
-
 - **Identity match scoring allocates less work on non-matches** — Comparing a managed account to existing identities no longer builds a per-rule score breakdown unless the pair meets the review threshold. Passing matches still store the same per-rule scores (including skipped rules). Aggregation configuration is unchanged.
 - **Name-matcher scoring reuses token splits and phonetic codes** — During an aggregation, each distinct name token is split and Double-Metaphone encoded once instead of once per identity comparison. Match scores and thresholds are unchanged.
 - **Always recalculate** replaces **Refresh on each aggregation?** — The Normal definition toggle label and help now state that the expression re-runs even when managed source data is unchanged. The stored `refresh` config key is unchanged.
@@ -58,6 +37,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 ### 🐛 Fixes
 
 - **Threshold-zero mandatory attributes no longer filter identity candidates** — Mandatory match rules with minimum similarity unset or zero are not added to the trigram index, so identities that lack that attribute can still match on other rules.
+- **Map no longer strips bracketed tokens from source values** — Attribute mapping copies live snapshot strings as-is. A job title such as `Unestablished Senior Occupational Health Adviser [AVH]` is no longer reduced to `AVH`. Concatenate merge still wraps distinct values in brackets on output; the persisted `sources` field is unchanged.
+
+### 📚 Documentation
+
+- **Account terminology distinguishes accounts from table rows** — Operator documentation and living specifications now call Fusion accounts, managed source accounts, identity-origin Fusion accounts, and origin snapshots by their canonical names. **Row** remains valid for real tables such as mappings, scores, and HTML reports; the `rowsSent` summary field is unchanged and counts streamed Fusion accounts.
+- **Glossary: source snapshot materialization and claim-only absorb** — Documents how Refresh can claim linked managed accounts without copying live source attributes, and that this is not skipping Refresh or Map merge.
+- **Glossary: dry-run report, Fusion report, aggregation report, Fusion Review decision section, Fusion review** — Distinguishes analysis emails from the post-aggregation owner email and from Fusion review (the review-required form), and aligns the FusionReport entitlement with Fusion report.
 
 ---
 
