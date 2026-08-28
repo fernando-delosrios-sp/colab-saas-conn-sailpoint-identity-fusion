@@ -351,7 +351,7 @@ describe('MappingService selective targets', () => {
     it('Schema-only names are not mapping targets', () => {
         const service = new MappingService({ ...config, attributeMaps: [] } as any, mockLog)
         const fusionAccount = buildManagedAccount()
-        fusionAccount.attributeBag.current.cloudLifecycleState = 'active'
+        delete fusionAccount.attributeBag.current.cloudLifecycleState
         fusionAccount.attributeBag.sources.set('Record Source', [
             {
                 source: { id: 'src-1', name: 'Record Source' },
@@ -362,7 +362,7 @@ describe('MappingService selective targets', () => {
 
         service.mapAttributes(fusionAccount, new FusionRun())
 
-        expect(fusionAccount.attributeBag.current.cloudLifecycleState).toBe('active')
+        expect(fusionAccount.attributeBag.current.cloudLifecycleState).toBeUndefined()
     })
 
     it('Origin resolves through the index for identity-origin', () => {
@@ -502,5 +502,308 @@ describe('MappingService selective targets', () => {
 
         expect(fusionAccount.attributes.employeeId).toBe('E123')
         expect(fusionAccount.attributeBag.current.title).toBe('Kept')
+    })
+})
+
+describe('MappingService vanished snapshot keys', () => {
+    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
+    const baseConfig = {
+        attributeMaps: [],
+        attributeMerge: AttributeMergeMode.First,
+        sources: [{ name: 'Record Source' }],
+        fusionAccountRefreshThresholdInSeconds: 3600,
+        maxHistoryMessages: 50,
+        resetAccounts: false,
+        resetForms: false,
+        normalAttributeDefinitions: [],
+        uniqueAttributeDefinitions: [],
+    } as any
+
+    beforeAll(() => {
+        FusionAccount.configure(baseConfig)
+    })
+
+    function buildManagedAccount(): FusionAccount {
+        const account = {
+            id: 'src-1::native-1',
+            name: 'User One',
+            sourceId: 'src-1',
+            nativeIdentity: 'native-1',
+            sourceName: 'Record Source',
+            attributes: {
+                emp_id: 'E123',
+                name: 'User One',
+                email: 'user@example.com',
+            },
+            uncorrelated: true,
+        } as any
+        const fusionAccount = FusionAccount.fromManagedAccount(account)
+        fusionAccount.setNeedsRefresh(true)
+        return fusionAccount
+    }
+
+    function originSnapshot(extra: Record<string, unknown> = {}) {
+        return {
+            source: { id: 'src-1', name: 'Record Source' },
+            nativeIdentity: 'native-1',
+            ...extra,
+        }
+    }
+
+    it('Unique definition value is preserved', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                uniqueAttributeDefinitions: [
+                    { name: 'UID', expression: 'WD', normalize: false, spaces: true, trim: true },
+                ],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.UID = 'WD000015'
+        fusionAccount.attributeBag.sources.set('Record Source', [originSnapshot({ emp_id: 'E123' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.UID).toBe('WD000015')
+    })
+
+    it('Normal definition output is left to Define', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                normalAttributeDefinitions: [
+                    {
+                        name: 'STUDENT_URL',
+                        expression: '$STUDENT_ID',
+                        normalize: false,
+                        spaces: true,
+                        trim: true,
+                        refresh: true,
+                    },
+                ],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.STUDENT_URL = 'https://example.test/students/sailpoint-307803971'
+        fusionAccount.attributeBag.sources.set('Record Source', [originSnapshot({ emp_id: 'E123' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.STUDENT_URL).toBe('https://example.test/students/sailpoint-307803971')
+    })
+
+    it('Definition-owned name on a snapshot is not merged by Map', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                normalAttributeDefinitions: [
+                    {
+                        name: 'CRSID',
+                        expression: '$nativeIdentity',
+                        normalize: false,
+                        spaces: true,
+                        trim: true,
+                        refresh: true,
+                    },
+                ],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = buildManagedAccount()
+        delete fusionAccount.attributeBag.current.CRSID
+        fusionAccount.attributeBag.sources.set('Record Source', [originSnapshot({ CRSID: 'sailpoint-AH2543' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.CRSID).toBeUndefined()
+    })
+
+    it('Explicit map wins over definition-owned exclusion', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                attributeMaps: [{ newAttribute: 'COLLEGE_NAME', existingAttributes: ['COLLEGE_NAME'] }],
+                normalAttributeDefinitions: [
+                    {
+                        name: 'COLLEGE_NAME',
+                        expression: '"ignored"',
+                        normalize: false,
+                        spaces: true,
+                        trim: true,
+                        refresh: true,
+                    },
+                ],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.sources.set('Record Source', [originSnapshot({ COLLEGE_NAME: "St John's College" })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.COLLEGE_NAME).toBe("St John's College")
+    })
+
+    it('Attribute dropped by its origin source clears', () => {
+        const service = new MappingService(baseConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.STUDENT_ID = 'sailpoint-307803971'
+        fusionAccount.attributeBag.sources.set('Record Source', [originSnapshot({ emp_id: 'E123' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.STUDENT_ID).toBeUndefined()
+    })
+
+    it('Attribute dropped by a record source clears', () => {
+        const recordConfig = {
+            ...baseConfig,
+            sources: [{ name: 'Origin Source' }, { name: 'Record Source' }],
+        } as any
+        const service = new MappingService(recordConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.department = 'Physics'
+        fusionAccount.attributeBag.sources.set('Origin Source', [
+            {
+                source: { id: 'src-origin', name: 'Origin Source' },
+                nativeIdentity: 'native-1',
+            },
+        ])
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            {
+                source: { id: 'src-record', name: 'Record Source' },
+                nativeIdentity: 'native-rec',
+            },
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.department).toBeUndefined()
+    })
+
+    it('Vanished key still present on a snapshot is merged not cleared', () => {
+        const service = new MappingService(baseConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.COLLEGE_ID = 'JOHNS'
+        fusionAccount.attributeBag.sources.set('Record Source', [originSnapshot({ COLLEGE_ID: 'TRIN' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.COLLEGE_ID).toBe('TRIN')
+    })
+
+    it('Clearing does not require the selected snapshot to be present', () => {
+        const mainConfig = { ...baseConfig, attributeMerge: AttributeMergeMode.MainAccount } as any
+        const service = new MappingService(mainConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current[FusionAttribute.MainAccount] = 'src-missing::native-missing'
+        fusionAccount.attributeBag.current.title = 'Reader'
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            {
+                source: { id: 'src-other', name: 'Record Source' },
+                nativeIdentity: 'native-other',
+                department: 'Other',
+            },
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.title).toBeUndefined()
+    })
+
+    it('Removing a definition row lets its leftover value clear', () => {
+        const service = new MappingService({ ...baseConfig, normalAttributeDefinitions: [] } as any, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.STAFF_URL = 'https://example.test/staff/left-over'
+        fusionAccount.attributeBag.sources.set('Record Source', [originSnapshot({ emp_id: 'E123' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.STAFF_URL).toBeUndefined()
+    })
+
+    it('Selective mapping does not clear vanished keys', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                attributeMaps: [{ newAttribute: 'employeeId', existingAttributes: ['emp_id'] }],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.STUDENT_ID = 'sailpoint-307803971'
+        fusionAccount.attributeBag.sources.set('Record Source', [originSnapshot({ emp_id: 'E123' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun(), { onlyTargets: new Set(['employeeId']) })
+
+        expect(fusionAccount.attributeBag.current.STUDENT_ID).toBe('sailpoint-307803971')
+    })
+
+    it('Fusion account with no managed context keeps its bag', () => {
+        const service = new MappingService(baseConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.STUDENT_ID = 'sailpoint-307803971'
+        fusionAccount.attributeBag.sources.set('Record Source', [])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.STUDENT_ID).toBe('sailpoint-307803971')
+    })
+
+    it('does not replace current bag object when needsRefresh is false', () => {
+        const service = new MappingService(baseConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.setNeedsRefresh(false)
+        fusionAccount.attributeBag.current.STUDENT_ID = 'sailpoint-307803971'
+        const before = fusionAccount.attributeBag.current
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.STUDENT_ID).toBe('sailpoint-307803971')
+        expect(fusionAccount.attributeBag.current).toBe(before)
+    })
+
+    it('identity-origin account keeps a bag key backed by the Identities snapshot', () => {
+        const service = new MappingService(baseConfig, mockLog)
+        const fusionAccount = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-1',
+            name: 'Fusion One',
+            sourceName: 'Identity Fusion',
+            identityId: 'identity-1',
+            attributes: {
+                originSource: 'Identities',
+                originAccount: 'identity-1',
+                statuses: ['baseline'],
+                CRSID: 'sailpoint-AH2543',
+            },
+        } as any)
+        fusionAccount.addIdentityLayer({
+            id: 'identity-1',
+            name: 'identity-one',
+            attributes: { CRSID: 'sailpoint-AH2543' },
+        } as any)
+        fusionAccount.setNeedsRefresh(true)
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.CRSID).toBe('sailpoint-AH2543')
+    })
+
+    it('candidate list stays per-invocation with no MappingService candidate cache', () => {
+        const service = new MappingService(baseConfig, mockLog)
+        const first = buildManagedAccount()
+        first.attributeBag.current.STUDENT_ID = 'sailpoint-307803971'
+        first.attributeBag.sources.set('Record Source', [originSnapshot({ emp_id: 'E123' })])
+        service.mapAttributes(first, new FusionRun())
+        expect(first.attributeBag.current.STUDENT_ID).toBeUndefined()
+
+        const second = buildManagedAccount()
+        second.attributeBag.current.STUDENT_ID = 'sailpoint-307803971'
+        second.attributeBag.sources.set('Record Source', [originSnapshot({ STUDENT_ID: 'fresh-id' })])
+        service.mapAttributes(second, new FusionRun())
+        expect(second.attributeBag.current.STUDENT_ID).toBe('fresh-id')
     })
 })

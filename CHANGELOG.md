@@ -11,7 +11,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 ### ⚠️ Breaking Changes
 
 - **Fetch STATUS uses independent inventory counters** — Account-list Fetch heartbeats now report `fusion-accounts=done/total`, `managed-accounts=done/total`, and (when identity Fetch runs) `identities=done/total` on one STATUS line, each with its own interval delta. Fetch no longer uses a single last-writer `progress=` fraction with unit `fetched` or `ingested`. This is a log-contract change only: Map, Define, and aggregation output are unchanged. Refresh and Process still use `progress=` (`refreshed`, `analyzed`, and so on). DETAIL `action=ingesting identities|fusion-accounts` may still appear.
--  - Migration: Log scrapers that match Fetch `progress=`, `fetched`, or `ingested` must switch to the population tokens (`fusion-accounts=`, `managed-accounts=`, `identities=`). Do not require an `identities=` segment when identity Fetch is skipped.
+-   - Migration: Log scrapers that match Fetch `progress=`, `fetched`, or `ingested` must switch to the population tokens (`fusion-accounts=`, `managed-accounts=`, `identities=`). Do not require an `identities=` segment when identity Fetch is skipped.
+- **Map clears attributes that sources stopped publishing** — On a full Map, implicit candidates are live-snapshot keys plus names already on the Fusion account (minus control keys and Normal/Unique definition names). A vanished snapshot key is deleted instead of persisting forever. Velocity definitions that read those inputs recompute on refresh. Covers mapping-service and ubiquitous-language.
+    - Migration: To retain a value after its source drops it, add an explicit attribute mapping row or a Normal attribute definition for that name. Removing a definition row lets its leftover value clear on the next full Map.
 
 ### ✨ New Features
 
@@ -140,11 +142,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 ---
 
 ## 2026-08-08
+
 ### ⚠️ Breaking Changes
+
 - **Legacy raw managed account IDs removed from schema attributes** — The `accounts`, `missing-accounts`, and `originAccount` attributes no longer accept plain ISC account UUIDs without the composite `sourceId::nativeIdentity` form (except `originAccount` when `originSource` is `Identities`, which continues to store an identity ID). Non-composite values are dropped during load with a diagnostic warning. **Migration:** Before upgrading, patch persisted Fusion account attributes to composite managed account keys or re-aggregate sources so references are rewritten.
 
 ---
-
 
 ## 2026-08-03
 
@@ -467,7 +470,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### 🗑️ Removed
 
-- **Removed legacy _id Velocity fallback** — Removed legacy `_id` fallback from Velocity Context account snapshots.
+- **Removed legacy \_id Velocity fallback** — Removed legacy `_id` fallback from Velocity Context account snapshots.
 
 ### 📚 Documentation
 
