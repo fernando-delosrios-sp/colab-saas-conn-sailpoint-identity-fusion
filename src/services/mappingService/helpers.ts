@@ -148,8 +148,7 @@ const findFirstAttributeValue = (accounts: Attributes[], attributeNames: string[
         for (const attribute of attributeNames) {
             const value = account[attribute]
             if (hasValue(value)) {
-                const splitValues = typeof value === 'string' ? attrSplit(value) : [value]
-                return splitValues[0]
+                return value
             }
         }
     }
@@ -207,9 +206,9 @@ const collectAllAttributeValues = (
 
 /**
  * Extract attribute values from a list of accounts.
- * - Strings are split via attrSplit (bracketed format)
+ * - Strings are kept as-is (including incidental brackets in source data)
  * - Arrays are passed through as-is (flattening deferred to output stage)
- * - Non-string scalars are wrapped in an array
+ * - Non-array scalars are wrapped in an array
  */
 const extractValuesFromAccounts = (accounts: Attributes[], attributeNames: string[]): any[] => {
     const values: any[] = []
@@ -218,17 +217,11 @@ const extractValuesFromAccounts = (accounts: Attributes[], attributeNames: strin
         for (const attribute of attributeNames) {
             const value = account[attribute]
             if (hasValue(value)) {
-                let splitValues: any[]
-                if (typeof value === 'string') {
-                    splitValues = attrSplit(value)
-                } else if (Array.isArray(value)) {
-                    // Pass arrays through as-is; flattening happens at getISCAccount
-                    splitValues = value
+                if (Array.isArray(value)) {
+                    values.push(...value)
                 } else {
-                    // Convert non-string scalar values to strings
-                    splitValues = [value]
+                    values.push(value)
                 }
-                values.push(...splitValues)
             }
         }
     }

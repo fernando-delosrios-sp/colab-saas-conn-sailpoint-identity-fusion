@@ -68,6 +68,18 @@ describe('attributeService helpers', () => {
             expect(processAttributeMapping(config, map, ['Source1'])).toBe('Alice')
         })
 
+        it('keeps source strings that contain brackets', () => {
+            const title = 'Unestablished Senior Occupational Health Adviser [AVH]'
+            const map = createMap('Jackdaw', [{ POSITION: title }])
+            const config = mappingConfig({
+                attributeName: 'POSITION',
+                sourceAttributes: ['POSITION'],
+                attributeMerge: AttributeMergeMode.MainAccount,
+            })
+            const originSnapshot = { POSITION: title } as Attributes
+            expect(processAttributeMapping(config, map, ['Jackdaw'], undefined, originSnapshot)).toBe(title)
+        })
+
         it('should return only from specified source for "source" merge', () => {
             const map = new Map<string, Attributes[]>()
             map.set('HR', [{ email: 'hr@acme.com' }])
@@ -155,8 +167,8 @@ describe('attributeService helpers', () => {
 
         it('should return list for "list" merge', () => {
             const map = new Map<string, Attributes[]>()
-            map.set('S1', [{ dept: '[HR]' }])
-            map.set('S2', [{ dept: '[IT]' }])
+            map.set('S1', [{ dept: 'HR' }])
+            map.set('S2', [{ dept: 'IT' }])
             const config = mappingConfig({
                 attributeName: 'dept',
                 sourceAttributes: ['dept'],
@@ -227,7 +239,7 @@ describe('attributeService helpers', () => {
                 attributeMerge: AttributeMergeMode.List,
             })
             const result = processAttributeMapping(config, map, ['S1', 'S2'])
-            expect(result).toEqual(['A', 'B', 'C', 'D'])
+            expect(result).toEqual(['[A] [B]', 'C', 'D'])
         })
 
         it('should preserve null and undefined in "list" merge (filtered at output stage)', () => {
