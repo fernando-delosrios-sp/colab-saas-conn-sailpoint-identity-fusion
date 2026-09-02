@@ -11,6 +11,7 @@
 
 const DOCS_BASE_URL =
     'https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/'
+const { version: INSTALLED_CONNECTOR_VERSION } = require('../package.json')
 
 /** Common typo: dot instead of hyphen in GitHub username */
 const WRONG_DOCS_HOST = 'fernando.delosrios-sp.github.io'
@@ -163,7 +164,7 @@ const SECTION_HELP = {
     },
     'Developer Settings': {
         sectionHelpMessage:
-            '<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation) and manage memory consumption during match detection by adjusting batch sizes.<br><br>The section header in ISC shows the <strong>installed connector version</strong> for reference — it updates automatically when you upgrade the connector package.' +
+            `<strong>Advanced options for troubleshooting and performance tuning.</strong><br><br>Use these settings to safely recover from configuration changes (e.g. rebuilding accounts or forcing attribute recalculation) and manage memory consumption during match detection by adjusting batch sizes.<br><br>Installed connector version: <strong>${INSTALLED_CONNECTOR_VERSION}</strong>.` +
             seeAlso([
                 ['use-guides/operation/', 'Operation guides'],
             ]),
@@ -321,6 +322,16 @@ function collectViolations(spec) {
                             message: `has ${sectionSentences} sentences (max ${SECTION_HELP_MAX_SENTENCES})`,
                         })
                     }
+                }
+                if (
+                    title === 'Developer Settings' &&
+                    !String(item.sectionHelpMessage || '').includes(INSTALLED_CONNECTOR_VERSION)
+                ) {
+                    violations.push({
+                        kind: 'sectionHelpMessage',
+                        id: title,
+                        message: `must include installed connector version ${INSTALLED_CONNECTOR_VERSION}`,
+                    })
                 }
                 if (!item.docLink || !item.docLinkLabel) {
                     violations.push({
