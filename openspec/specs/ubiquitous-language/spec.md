@@ -494,6 +494,17 @@ The ubiquitous-language glossary SHALL define **Source snapshot materialization*
 - **WHEN** they look up Refresh work-queue depletion without copying attributes
 - **THEN** a **Claim-only absorb** entry SHALL define it as absorbing a work-queue managed account by claiming it and updating Fusion account bookkeeping without source snapshot materialization
 
+### Requirement: Glossary defines Installed connector version
+
+The ubiquitous-language glossary SHALL define **Installed connector version** as the semver string in `package.json` `version` for the connector package operators have installed in ISC. It SHALL NOT mean a git SHA, CI build number, or Identity Security Cloud platform version. Documentation and help copy that tell operators which package is deployed SHALL use this term.
+
+#### Scenario: Glossary entry for Installed connector version
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain an **Installed connector version** entry
+- **AND** the entry SHALL identify `package.json` `version` as the source
+- **AND** the entry SHALL exclude git SHA, CI build number, and ISC platform version
+
 ### Requirement: Structural correlation MUST NOT be confused with business correlation
 
 Documentation, specs, and agent-generated text MUST use **correlation** (unqualified) for the business process of linking managed source accounts to an ISC identity, and MUST use **FusionCorrelation** (or “Fusion account correlation collaborator”) when referring to the `FusionAccount.correlation` object.
