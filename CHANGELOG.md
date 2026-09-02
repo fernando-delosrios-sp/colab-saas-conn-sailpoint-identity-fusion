@@ -38,6 +38,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### 🐛 Fixes
 
+- **Developer Settings help shows the installed connector version** — The ISC section help now displays the exact connector package version and lint rejects stale help after a version change. The section title and generated Configuration reference remain version-free.
 - **Threshold-zero mandatory attributes no longer filter identity candidates** — Mandatory match rules with minimum similarity unset or zero are not added to the trigram index, so identities that lack that attribute can still match on other rules.
 - **Map no longer strips bracketed tokens from source values** — Attribute mapping copies live snapshot strings as-is. A job title such as `Unestablished Senior Occupational Health Adviser [AVH]` is no longer reduced to `AVH`. Concatenate merge still wraps distinct values in brackets on output; the persisted `sources` field is unchanged.
 

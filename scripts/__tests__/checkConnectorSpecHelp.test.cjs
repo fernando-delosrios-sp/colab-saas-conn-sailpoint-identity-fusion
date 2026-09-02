@@ -7,6 +7,7 @@ const {
     SECTION_HELP_MAX,
     DOCS_BASE_URL,
 } = require('../connector-spec-help-lib.cjs')
+const { version: installedConnectorVersion } = require('../../package.json')
 
 describe('connector-spec-help-lib', () => {
     it('passes a spec with ISC-compliant section and field help', () => {
@@ -203,5 +204,107 @@ describe('connector-spec-help-lib', () => {
         expect(section.docLinkLabel).toBe('Normal attribute definitions reference')
         expect(section.sectionHelpMessage).not.toMatch(/\]\(/)
         expect(section.sectionHelpMessage).not.toContain('configuration/definition/')
+    })
+
+    it('reports Developer Settings help that omits the installed connector version', () => {
+        const spec = {
+            sourceConfig: [
+                {
+                    type: 'menu',
+                    label: 'Advanced Settings',
+                    items: [
+                        {
+                            type: 'section',
+                            sectionTitle: 'Developer Settings',
+                            sectionHelpMessage: '<strong>Advanced troubleshooting options.</strong>',
+                            docLinkLabel: 'Advanced settings reference',
+                            docLink: `${DOCS_BASE_URL}configuration/advanced/`,
+                            items: [],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        expect(
+            collectViolations(spec).some(
+                (violation) =>
+                    violation.kind === 'sectionHelpMessage' &&
+                    violation.id === 'Developer Settings' &&
+                    violation.message.includes(installedConnectorVersion)
+            )
+        ).toBe(true)
+    })
+
+    it('accepts Developer Settings help with the installed connector version', () => {
+        const spec = {
+            sourceConfig: [
+                {
+                    type: 'menu',
+                    label: 'Advanced Settings',
+                    items: [
+                        {
+                            type: 'section',
+                            sectionTitle: 'Developer Settings',
+                            sectionHelpMessage: `<strong>Installed connector version: ${installedConnectorVersion}.</strong>`,
+                            docLinkLabel: 'Advanced settings reference',
+                            docLink: `${DOCS_BASE_URL}configuration/advanced/`,
+                            items: [],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        expect(collectViolations(spec)).toEqual([])
+    })
+
+    it('does not require the installed connector version in other sections', () => {
+        const spec = {
+            sourceConfig: [
+                {
+                    type: 'menu',
+                    label: 'Connection Settings',
+                    items: [
+                        {
+                            type: 'section',
+                            sectionTitle: 'Connection Settings',
+                            sectionHelpMessage: '<strong>Configure the ISC connection.</strong>',
+                            docLinkLabel: 'Connection settings reference',
+                            docLink: `${DOCS_BASE_URL}configuration/connection/`,
+                            items: [],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        expect(collectViolations(spec)).toEqual([])
+    })
+
+    it('slimSpec includes the installed connector version without changing the section title', () => {
+        const spec = {
+            sourceConfig: [
+                {
+                    type: 'menu',
+                    label: 'Advanced Settings',
+                    items: [
+                        {
+                            type: 'section',
+                            sectionTitle: 'Developer Settings',
+                            sectionHelpMessage: 'Outdated help.',
+                            items: [],
+                        },
+                    ],
+                },
+            ],
+        }
+
+        slimSpec(spec)
+        const section = spec.sourceConfig[0].items[0]
+
+        expect(section.sectionTitle).toBe('Developer Settings')
+        expect(section.sectionHelpMessage).toContain(installedConnectorVersion)
+        expect(plainTextLength(section.sectionHelpMessage)).toBeLessThanOrEqual(SECTION_HELP_MAX)
     })
 })

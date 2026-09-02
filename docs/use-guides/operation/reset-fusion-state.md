@@ -19,7 +19,7 @@ Use this guide when you need to **safely rebuild Fusion account data or clear re
 | Stuck processing state | **No reset** | Retry aggregation (auto-resets stuck flag) |
 | Production environment | ⚠️ **Rarely** | High impact; coordinate with stakeholders |
 
-The **Developer Settings** section header in the ISC source configuration UI displays the **installed connector version**. Use it to confirm which build is deployed.
+The **Developer Settings** section help in the ISC source configuration UI displays the **installed connector version**. Use it to confirm which build is deployed.
 
 ![Developer Settings - Configuration](../../assets/images/advanced-settings-developer.png)
 
