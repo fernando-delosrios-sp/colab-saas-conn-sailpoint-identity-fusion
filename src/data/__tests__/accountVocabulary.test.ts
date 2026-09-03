@@ -134,7 +134,14 @@ describe('Map glossary terms', () => {
         expect(glossary).toMatch(/\*\*Definition-owned name\*\*/)
         expect(glossary).toMatch(/normalAttributeDefinitions/)
         expect(glossary).toMatch(/uniqueAttributeDefinitions/)
-        expect(glossary).toMatch(/neither merges nor clears/)
+        expect(glossary).toMatch(/Normal definition name is merged as an implicit candidate/)
+        expect(glossary).toMatch(/Unique definition name is neither merged nor cleared as an implicit candidate/)
+    })
+
+    it('Pass-through definition entry', () => {
+        expect(glossary).toMatch(/\*\*Pass-through definition\*\*/)
+        expect(glossary).toMatch(/expression reads its own name/)
+        expect(glossary).toMatch(/Define reads only the bag, never flattened snapshots/)
     })
 
     it('Unmapped snapshot key entry', () => {
