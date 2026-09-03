@@ -22,7 +22,7 @@ This page explains **how and when** to configure settings with examples. For fie
 
 ## Default merge behavior
 
-The **Default attribute merge from multiple sources** setting applies globally to mapped attributes (unless overridden per attribute) **and** to implicit Map candidates on refresh: **unmapped snapshot keys** (same-named attributes on this account’s live snapshots with no mapping row) together with names already present on the Fusion account. A **vanished snapshot key** — a persisted name that no live snapshot still carries — is deleted. Map does **not** walk the full Fusion schema. Control attributes, `id`, `name`, snapshot overlay fields, and **definition-owned names** (Normal and Unique definition `name`s) are never implicit candidates. To retain a value after its source stops publishing it, add an explicit mapping row or a Normal attribute definition for that name. New configurations default to **Main account**.
+The **Default attribute merge from multiple sources** setting applies globally to mapped attributes (unless overridden per attribute) **and** to implicit Map candidates on refresh: **unmapped snapshot keys** (same-named attributes on this account’s live snapshots with no mapping row) together with names already present on the Fusion account. A **vanished snapshot key** — a persisted name that no live snapshot still carries — is deleted. Map does **not** walk the full Fusion schema. Control attributes, `id`, `name`, snapshot overlay fields, and **Unique attribute definition** names are never implicit candidates. **Normal attribute definition** names are ordinary implicit candidates: when a live snapshot carries the same name, Map merges it under the global default. Map never clears a **definition-owned name** of either kind — if the merge yields nothing, the value already on the Fusion account stays. To retain a value after its source stops publishing it, add an explicit mapping row or a Normal attribute definition for that name. New configurations default to **Main account**.
 
 | Merge strategy                   | Behavior                                                         | Result format         | Use when                                            |
 | -------------------------------- | ---------------------------------------------------------------- | --------------------- | --------------------------------------------------- |
@@ -56,6 +56,12 @@ Example: Source order is [Workday, Active Directory]
 - Merge: First found
 → Result: "Senior Engineer" (Workday wins)
 ```
+
+### Pass-through definitions
+
+A **pass-through definition** is a Normal attribute definition whose expression reads its own name — a definition named `CRSID` with the expression `$CRSID`. Define reads only the Fusion account attribute bag (`attributeBag.current`), never the flattened snapshots, so the implicit merge above is what seeds the value the expression reads: Map merges `CRSID` from the same-named snapshot key, then Define transforms that value. With nothing seeded in the bag, the expression renders as an unresolved literal instead.
+
+Use this pattern to normalize or reformat a source-provided value under the same name. For expression syntax and the full Velocity context, see [Attribute Definitions](defining-attributes.md).
 
 ---
 

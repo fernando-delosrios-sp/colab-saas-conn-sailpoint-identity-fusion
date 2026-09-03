@@ -569,6 +569,25 @@ describe('MappingService vanished snapshot keys', () => {
         expect(fusionAccount.attributeBag.current.UID).toBe('WD000015')
     })
 
+    it('Definition-owned name on a snapshot is not merged by Map', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                uniqueAttributeDefinitions: [
+                    { name: 'UID', expression: 'WD', normalize: false, spaces: true, trim: true },
+                ],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.UID = 'WD000015'
+        fusionAccount.attributeBag.sources.set('Record Source', [originSnapshot({ UID: 'from-source' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.UID).toBe('WD000015')
+    })
+
     it('Normal definition output is left to Define', () => {
         const service = new MappingService(
             {
@@ -595,14 +614,15 @@ describe('MappingService vanished snapshot keys', () => {
         expect(fusionAccount.attributeBag.current.STUDENT_URL).toBe('https://example.test/students/sailpoint-307803971')
     })
 
-    it('Definition-owned name on a snapshot is not merged by Map', () => {
+    it('Normal definition name on a snapshot is merged by Map', () => {
         const service = new MappingService(
             {
                 ...baseConfig,
+                attributeMerge: AttributeMergeMode.MainAccount,
                 normalAttributeDefinitions: [
                     {
                         name: 'CRSID',
-                        expression: '$nativeIdentity',
+                        expression: '$CRSID',
                         normalize: false,
                         spaces: true,
                         trim: true,
@@ -618,7 +638,37 @@ describe('MappingService vanished snapshot keys', () => {
 
         service.mapAttributes(fusionAccount, new FusionRun())
 
+        expect(fusionAccount.attributeBag.current.CRSID).toBe('sailpoint-AH2543')
+    })
+
+    it('Selective mapping does not merge a Normal definition name', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                attributeMaps: [{ newAttribute: 'employeeId', existingAttributes: ['emp_id'] }],
+                normalAttributeDefinitions: [
+                    {
+                        name: 'CRSID',
+                        expression: '$CRSID',
+                        normalize: false,
+                        spaces: true,
+                        trim: true,
+                        refresh: true,
+                    },
+                ],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = buildManagedAccount()
+        delete fusionAccount.attributeBag.current.CRSID
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            originSnapshot({ emp_id: 'E123', CRSID: 'sailpoint-AH2543' }),
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun(), { onlyTargets: new Set(['employeeId']) })
+
         expect(fusionAccount.attributeBag.current.CRSID).toBeUndefined()
+        expect(fusionAccount.attributeBag.current.employeeId).toBe('E123')
     })
 
     it('Explicit map wins over definition-owned exclusion', () => {

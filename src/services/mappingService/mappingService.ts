@@ -36,11 +36,15 @@ function buildSnapshotIndex(sourceAttributeMap: Map<string, Attributes[]>): Map<
     return index
 }
 
-function collectDefinitionOwnedNames(config: FusionConfig): ReadonlySet<string> {
+function collectDefinitionNames(
+    ...definitionLists: (readonly ({ name?: string } | undefined)[] | undefined)[]
+): ReadonlySet<string> {
     const names = new Set<string>()
-    for (const def of [...(config.normalAttributeDefinitions ?? []), ...(config.uniqueAttributeDefinitions ?? [])]) {
-        const name = trimStr(def?.name)
-        if (name) names.add(name)
+    for (const definitions of definitionLists) {
+        for (const def of definitions ?? []) {
+            const name = trimStr(def?.name)
+            if (name) names.add(name)
+        }
     }
     return names
 }
@@ -48,34 +52,38 @@ function collectDefinitionOwnedNames(config: FusionConfig): ReadonlySet<string> 
 function isImplicitCandidateKey(
     key: string,
     explicitTargets: ReadonlySet<string>,
-    definitionOwnedNames: ReadonlySet<string>
+    uniqueDefinitionNames: ReadonlySet<string>
 ): boolean {
-    return !IMPLICIT_KEY_DENYLIST.has(key) && !explicitTargets.has(key) && !definitionOwnedNames.has(key)
+    return !IMPLICIT_KEY_DENYLIST.has(key) && !explicitTargets.has(key) && !uniqueDefinitionNames.has(key)
 }
 
 /**
  * Implicit Map candidates: live-snapshot keys union `attributeBag.current` keys,
- * minus explicit mapping targets, definition-owned names, and the control denylist.
+ * minus explicit mapping targets, Unique definition names, and the control denylist.
+ * Only Unique definition names are excluded here, so they are neither merged nor cleared;
+ * Normal definition names stay candidates so a same-named snapshot key still merges.
+ * An empty merge never deletes a definition-owned name — that suppression lives in
+ * `applyMappedValue`, not in this filter.
  */
 function collectImplicitCandidateKeys(
     sourceAttributeMap: Map<string, Attributes[]>,
     currentBag: Attributes,
     explicitTargets: ReadonlySet<string>,
-    definitionOwnedNames: ReadonlySet<string>
+    uniqueDefinitionNames: ReadonlySet<string>
 ): string[] {
     const names = new Set<string>()
     for (const accounts of sourceAttributeMap.values()) {
         for (const account of accounts) {
             if (!account || typeof account !== 'object') continue
             for (const key of Object.keys(account)) {
-                if (isImplicitCandidateKey(key, explicitTargets, definitionOwnedNames)) {
+                if (isImplicitCandidateKey(key, explicitTargets, uniqueDefinitionNames)) {
                     names.add(key)
                 }
             }
         }
     }
     for (const key of Object.keys(currentBag ?? {})) {
-        if (isImplicitCandidateKey(key, explicitTargets, definitionOwnedNames)) {
+        if (isImplicitCandidateKey(key, explicitTargets, uniqueDefinitionNames)) {
             names.add(key)
         }
     }
@@ -90,6 +98,7 @@ export class MappingService {
     private readonly sourceOrder: string[]
     private readonly mappingTargetNames: string[]
     private readonly includeIdentities: boolean
+    private readonly uniqueDefinitionNames: ReadonlySet<string>
     private readonly definitionOwnedNames: ReadonlySet<string>
 
     constructor(config: FusionConfig, _log: LogService) {
@@ -99,15 +108,21 @@ export class MappingService {
         this.sourceOrder = this.sourceConfigs.map((sc) => sc.name)
         this.mappingTargetNames = this.getAttributeMappingTargetNames()
         this.includeIdentities = config.includeIdentities !== false
-        this.definitionOwnedNames = collectDefinitionOwnedNames(config)
+        this.uniqueDefinitionNames = collectDefinitionNames(config.uniqueAttributeDefinitions)
+        this.definitionOwnedNames = collectDefinitionNames(
+            config.normalAttributeDefinitions,
+            config.uniqueAttributeDefinitions
+        )
     }
 
     /**
      * Maps explicit `attributeMaps` targets onto `attributeBag.current`.
      * On a full invocation (`onlyTargets` omitted), also evaluates implicit candidates:
-     * live-snapshot keys union bag keys, minus the control denylist and definition-owned names.
+     * live-snapshot keys union bag keys, minus the control denylist and Unique definition names.
      * A vanished snapshot key resolves empty and is deleted, subject to identity-bag fallback
-     * and no-managed-context preservation.
+     * and no-managed-context preservation. A definition-owned name (Normal or Unique) is never
+     * deleted on an empty result, so Define outputs and generated unique values survive; a
+     * definition-owned name still takes a value whenever the merge yields one.
      */
     mapAttributes(fusionAccount: FusionAccount, _run: FusionRun, options?: MapAttributesOptions): void {
         const { attributeBag, needsRefresh } = fusionAccount
@@ -160,7 +175,7 @@ export class MappingService {
             if (processedValue === undefined) {
                 if (fusionAccount.isIdentity && fusionAccount.attributeBag.identity[attribute] !== undefined) {
                     attributes[attribute] = fusionAccount.attributeBag.identity[attribute]
-                } else if (!shouldPreserveCurrentWithoutContext) {
+                } else if (!shouldPreserveCurrentWithoutContext && !this.definitionOwnedNames.has(attribute)) {
                     delete attributes[attribute]
                 }
                 if (attribute === FusionAttribute.MainAccount) {
@@ -207,7 +222,7 @@ export class MappingService {
                 sourceAttributeMap,
                 attributeBag.current,
                 explicitTargetSet,
-                this.definitionOwnedNames
+                this.uniqueDefinitionNames
             )) {
                 const processingConfig = buildAttributeMappingConfig(attribute, this.attributeMaps, this.attributeMerge)
                 applyMappedValue(

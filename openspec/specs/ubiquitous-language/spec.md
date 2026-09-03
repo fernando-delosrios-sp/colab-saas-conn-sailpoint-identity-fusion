@@ -345,7 +345,7 @@ The ubiquitous-language glossary SHALL define **Main account merge**, **Origin a
 
 ### Requirement: Glossary defines vanished snapshot key and definition-owned name
 
-The ubiquitous-language glossary SHALL define **vanished snapshot key** and **definition-owned name** as Map-step terms. Documentation SHALL NOT describe implicit Map as overwrite-only, and SHALL NOT use "orphaned attribute" or "stale attribute" for a vanished snapshot key, because **Orphan** already denotes a Fusion account with no contributing managed source accounts.
+The ubiquitous-language glossary SHALL define **vanished snapshot key** and **definition-owned name** as Map-step terms. A **definition-owned name** SHALL be an attribute name configured as a `normalAttributeDefinitions` or `uniqueAttributeDefinitions` entry name, with Map behavior split by definition kind: a Normal definition name is merged as an implicit candidate when a live snapshot carries it and is never cleared; a Unique definition name is neither merged nor cleared as an implicit candidate. An explicit attribute mapping row SHALL still apply. Documentation SHALL NOT describe implicit Map as overwrite-only, and SHALL NOT use "orphaned attribute" or "stale attribute" for a vanished snapshot key, because **Orphan** already denotes a Fusion account with no contributing managed source accounts.
 
 #### Scenario: Vanished snapshot key entry
 
@@ -358,9 +358,23 @@ The ubiquitous-language glossary SHALL define **vanished snapshot key** and **de
 #### Scenario: Definition-owned name entry
 
 - **GIVEN** a reader consults the glossary
-- **WHEN** they look up why Map leaves Velocity outputs alone
+- **WHEN** they look up how Map treats names owned by Define
 - **THEN** a **definition-owned name** entry SHALL define it as an attribute name configured as a `normalAttributeDefinitions` or `uniqueAttributeDefinitions` entry name
-- **AND** it SHALL state that Map neither merges nor clears such a name as an implicit candidate, while an explicit attribute mapping row still applies
+- **AND** it SHALL state that a Normal definition name is merged as an implicit candidate when a live snapshot carries it and is never cleared
+- **AND** it SHALL state that a Unique definition name is neither merged nor cleared as an implicit candidate
+- **AND** it SHALL state that an explicit attribute mapping row still applies
+
+### Requirement: Glossary defines pass-through definition
+
+The ubiquitous-language glossary SHALL define **pass-through definition** as a Define-step term: a Normal attribute definition whose expression reads its own name, so Define transforms a value Map seeded into `attributeBag.current` from the same-named snapshot key. Documentation SHALL NOT call this an identity mapping or a copy definition. The glossary SHALL state that Define reads only the bag, never flattened snapshots.
+
+#### Scenario: Pass-through definition entry
+
+- **GIVEN** a reader consults the ubiquitous-language glossary
+- **WHEN** they look up a Normal definition that transforms a same-named snapshot value
+- **THEN** a **pass-through definition** entry SHALL define it as a Normal attribute definition whose expression reads its own name
+- **AND** it SHALL state that Map seeds `attributeBag.current` from the same-named snapshot key and Define transforms that bag value
+- **AND** it SHALL NOT use "identity mapping" or "copy definition" as a synonym
 
 ### Requirement: Glossary defines unmapped snapshot key and Identities snapshot
 
@@ -741,6 +755,7 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 |---|---|
 | **Normal attribute definition** | A Define-step rule that computes a Fusion account attribute value using an Apache Velocity template. Recalculation follows **Static** and **Always recalculate**: definitions with **Always recalculate** on evaluate every aggregation even if source data is unchanged; definitions with **Always recalculate** off evaluate when underlying source data changes (`needsRefresh`), on reset, or when force attribute refresh is enabled. |
 | **Unique attribute definition** | A Define-step rule that generates a value guaranteed to be unique across all Fusion accounts. Uses collision-based disambiguation or an incremental counter. Runs after normal definitions. |
+| **Pass-through definition** | A Normal attribute definition whose expression reads its own name (for example `$CRSID` for the `CRSID` definition). Map seeds `attributeBag.current` from the same-named snapshot key and Define transforms that bag value. Define reads only the bag, never flattened snapshots. Not an identity mapping and not a copy definition. |
 | **Static attribute** | A normal attribute evaluated only once — when the attribute has no value. Existing values are never recalculated. Overrides **Always recalculate**. |
 | **Always recalculate** | Per-definition toggle (`definition.refresh`) for Normal attribute definitions, shown as **Always recalculate?**. When on, the definition evaluates every aggregation even if source data is unchanged. When off, evaluation is skipped for existing values unless the Fusion account `needsRefresh`, `needsReset`, or force attribute refresh is enabled. |
 | **$account** | The origin account snapshot available in Velocity templates — the managed source account that triggered creation, or the identity-origin Fusion account's origin snapshot when the origin is the Identities source. |
@@ -773,6 +788,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Origin account merge** | A Map strategy that reads mapped values only from the origin snapshot and ignores `mainAccount`. Stored as `originAccount`. It does not fall through to another account. |
 | **Origin snapshot** | The managed account whose key equals `originAccount`, or the Identities identity bag for an identity-origin Fusion account. The same object Velocity exposes as `$account`. |
 | **$originSource Source-name token** | A per-attribute Source name value that resolves to the prioritized (`mainAccount`) source name, then selects the first account on that source. It is source-level and is not **Origin account merge**. In Velocity, `$originSource` remains the origin source name string. |
+| **Definition-owned name** | An attribute name configured as a `normalAttributeDefinitions` or `uniqueAttributeDefinitions` entry name. Map behavior splits by definition kind: a Normal definition name is merged as an implicit candidate when a live snapshot carries it and is never cleared; a Unique definition name is neither merged nor cleared as an implicit candidate. An explicit attribute mapping row still applies to either kind. |
 | **Attribute Definition Settings** | The top-level configuration menu for the Define step. Contains Normal Attribute Definitions and Unique Attribute Definitions. |
 | **Normal Attribute Definitions** | The section defining Velocity expressions that compute Fusion account attributes. Each definition honors **Static** and **Always recalculate**; definitions with **Always recalculate** off do not re-evaluate unchanged accounts that already have a value. |
 | **Unique Attribute Definitions** | The section defining Velocity expressions that generate values guaranteed unique across all Fusion accounts. Uses collision-based disambiguation or incremental counters. |
