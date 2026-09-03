@@ -21,7 +21,7 @@
 ## 4. Verification
 
 - [x] 4.1 Confirm canonical test command: `npm test` (do not pipe the suite to `tail`; redirect to a file if output is long)
-- [x] 4.2 All delta spec scenarios covered by named automated tests in `src/services/mappingService/__tests__/mapService.test.ts`
+- [x] 4.2 Mapping-service delta scenarios covered by named tests in `src/services/mappingService/__tests__/mapService.test.ts`; glossary scenarios in `src/data/__tests__/accountVocabulary.test.ts`
 - [x] 4.3 `npm run lint` clean (ESLint, connector-spec help check, knip)
 - [x] 4.4 `openspec validate --all --json` all valid
 

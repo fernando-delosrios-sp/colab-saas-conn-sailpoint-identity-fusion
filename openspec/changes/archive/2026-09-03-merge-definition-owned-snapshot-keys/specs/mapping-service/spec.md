@@ -99,6 +99,15 @@ MappingService SHALL treat **definition-owned names** by definition kind on a fu
 - **WHEN** `mapAttributes` runs without `onlyTargets`
 - **THEN** `COLLEGE_NAME` SHALL be `"St John's College"`
 
+#### Scenario: Explicit empty map preserves a Unique definition name
+
+- **GIVEN** `uniqueAttributeDefinitions` contains a definition named `UID`
+- **AND** the persisted bag has `UID` `"WD000015"`
+- **AND** an attribute map whose `newAttribute` is `UID`
+- **AND** that mapping yields empty
+- **WHEN** `mapAttributes` runs without `onlyTargets`
+- **THEN** `UID` SHALL still be `"WD000015"`
+
 #### Scenario: Removing a definition row lets its leftover value clear
 
 - **GIVEN** the persisted bag has `STAFF_URL` with a value
