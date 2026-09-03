@@ -689,6 +689,417 @@ describe('ClientService', () => {
     })
 
     // -------------------------------------------------------------------------
+    // Pagination circuit (gateway failure cooldown-then-abort)
+    // -------------------------------------------------------------------------
+
+    const gateway504 = () => {
+        const err = new Error('Gateway Timeout') as Error & { response?: { status: number } }
+        err.response = { status: 504 }
+        return err
+    }
+
+    const httpError = (status: number, message: string) => {
+        const err = new Error(message) as Error & { response?: { status: number } }
+        err.response = { status }
+        return err
+    }
+
+    it('parallel window sheds, cools down, and resumes after a successful probe', async () => {
+        const sc = {
+            ...mockConfig,
+            pageSize: 1,
+            sailPointListMax: 250,
+            parallelBatchSize: 4,
+            paginationCooldownMs: 0,
+        }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        const attempts = new Map<number, number>()
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                attempts.set(offset, (attempts.get(offset) ?? 0) + 1)
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '6' } })
+                }
+                if (offset >= 1 && offset <= 3 && attempts.get(offset) === 1) {
+                    return Promise.reject(gateway504())
+                }
+                if (offset === 4 && attempts.get(offset) === 1) {
+                    return new Promise(() => {
+                        // In-flight page HTTP; the pagination circuit must abort this stream.
+                    })
+                }
+                return Promise.resolve({ data: [{ id: `a${offset}` }] })
+            }),
+        } as any
+
+        const unrelated = client.call((_api: IscApiSurface) => Promise.resolve('unrelated-ok'))
+
+        const gen = client.call(
+            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+            { context: 'circuit-resume', paginate: { mode: 'parallel', baseParams: {}, batchSize: 4 } }
+        )
+
+        const collected: string[] = []
+        for await (const page of gen) {
+            collected.push(...page.map((item: { id: string }) => item.id))
+        }
+
+        expect(await unrelated).toBe('unrelated-ok')
+        expect(collected).toEqual(['a0', 'a1', 'a2', 'a3', 'a4', 'a5'])
+        expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/shedding/i))
+        expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/cooldown/i))
+        expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/probe/i))
+        expect(attempts.get(1)).toBeGreaterThanOrEqual(2)
+    }, 5000)
+
+    it('does not sleep the default 30s cooldown when paginationCooldownMs is injected', async () => {
+        vi.useFakeTimers()
+        const sc = {
+            ...mockConfig,
+            pageSize: 1,
+            sailPointListMax: 250,
+            parallelBatchSize: 3,
+            paginationCooldownMs: 40,
+        }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        const attempts = new Map<number, number>()
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                attempts.set(offset, (attempts.get(offset) ?? 0) + 1)
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '4' } })
+                }
+                if (attempts.get(offset) === 1) {
+                    return Promise.reject(gateway504())
+                }
+                return Promise.resolve({ data: [{ id: `a${offset}` }] })
+            }),
+        } as any
+
+        try {
+            const gen = client.call(
+                (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+                { paginate: { mode: 'parallel', baseParams: {}, batchSize: 3 } }
+            )
+            const consume = (async () => {
+                for await (const _page of gen) {
+                    // consume
+                }
+            })()
+            await vi.advanceTimersByTimeAsync(40)
+            await consume
+            expect(mockLog.warn).toHaveBeenCalledWith(expect.stringContaining('40ms'))
+            expect(mockLog.warn).not.toHaveBeenCalledWith(expect.stringContaining('30000ms'))
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('probe gateway failure aborts with PaginationError and no silent partial success', async () => {
+        const sc = {
+            ...mockConfig,
+            pageSize: 1,
+            sailPointListMax: 250,
+            parallelBatchSize: 3,
+            paginationCooldownMs: 0,
+        }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '4' } })
+                }
+                return Promise.reject(gateway504())
+            }),
+        } as any
+
+        const gen = client.call(
+            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+            { context: 'probe-fail', paginate: { mode: 'parallel', baseParams: {} } }
+        )
+
+        let thrown: unknown
+        try {
+            for await (const _page of gen) {
+                // consume until circuit abort
+            }
+        } catch (error: unknown) {
+            thrown = error
+        }
+
+        expect(thrown).toBeInstanceOf(PaginationError)
+        expect((thrown as PaginationError).itemsCollected).toBe(1)
+        expect((thrown as PaginationError).message).toContain('probe-fail')
+        const cooldownWarns = (mockLog.warn as any).mock.calls.filter((call: string[]) =>
+            String(call[0]).toLowerCase().includes('cooldown')
+        )
+        expect(cooldownWarns).toHaveLength(1)
+    })
+
+    it('second streak after resume aborts without another cooldown', async () => {
+        const sc = {
+            ...mockConfig,
+            pageSize: 1,
+            sailPointListMax: 250,
+            parallelBatchSize: 3,
+            paginationCooldownMs: 0,
+        }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        const attempts = new Map<number, number>()
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                attempts.set(offset, (attempts.get(offset) ?? 0) + 1)
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '7' } })
+                }
+                const n = attempts.get(offset)!
+                if (offset <= 3 && n === 1) {
+                    return Promise.reject(gateway504())
+                }
+                if (offset >= 4 && offset <= 6) {
+                    return Promise.reject(gateway504())
+                }
+                return Promise.resolve({ data: [{ id: `a${offset}` }] })
+            }),
+        } as any
+
+        const gen = client.call(
+            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+            { paginate: { mode: 'parallel', baseParams: {}, batchSize: 3 } }
+        )
+
+        await expect(async () => {
+            for await (const _page of gen) {
+                // first streak resumes; second streak must throw
+            }
+        }).rejects.toThrow(PaginationError)
+
+        const cooldownWarns = (mockLog.warn as any).mock.calls.filter((call: string[]) =>
+            String(call[0]).toLowerCase().includes('cooldown')
+        )
+        expect(cooldownWarns).toHaveLength(1)
+        expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/second gateway-failure streak/i))
+    })
+
+    it('HTTP 429 does not trip the pagination circuit', async () => {
+        const sc = { ...mockConfig, pageSize: 2, sailPointListMax: 250, paginationCooldownMs: 0 }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        let calls = 0
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation(() => {
+                calls++
+                if (calls === 1) {
+                    return Promise.reject(httpError(429, 'Too Many Requests'))
+                }
+                return Promise.resolve({ data: [{ id: 'a' }] })
+            }),
+        } as any
+
+        await expect(
+            client.call(
+                (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+                { paginate: { mode: 'sequential', baseParams: {} } }
+            )
+        ).rejects.toThrow(PaginationError)
+
+        expect(mockLog.warn).not.toHaveBeenCalledWith(expect.stringMatching(/shedding|cooldown/i))
+    })
+
+    it('exhausted HTTP 500 throws PaginationError without cooldown', async () => {
+        const sc = { ...mockConfig, paginationCooldownMs: 0 }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockRejectedValue(httpError(500, 'Internal Server Error')),
+        } as any
+
+        await expect(
+            client.call(
+                (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+                { paginate: { mode: 'sequential', baseParams: {} } }
+            )
+        ).rejects.toThrow(PaginationError)
+
+        expect(mockLog.warn).not.toHaveBeenCalledWith(expect.stringMatching(/cooldown/i))
+    })
+
+    it('caller abort during cooldown skips the probe', async () => {
+        vi.useFakeTimers()
+        const sc = {
+            ...mockConfig,
+            pageSize: 1,
+            sailPointListMax: 250,
+            paginationCooldownMs: 5_000,
+        }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+        const abort = new AbortController()
+        let calls = 0
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                calls++
+                const offset = params.offset ?? 0
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }] })
+                }
+                return Promise.reject(gateway504())
+            }),
+        } as any
+
+        try {
+            const promise = client.call(
+                (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+                { abortSignal: abort.signal, paginate: { mode: 'sequential', baseParams: {} } }
+            )
+            const assertion = expect(promise).rejects.toThrow(PaginationError)
+            await vi.advanceTimersByTimeAsync(10)
+            abort.abort()
+            await vi.advanceTimersByTimeAsync(5_000)
+            await assertion
+            expect(calls).toBe(4)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('sequential and searchAfter use the same circuit and probe the same offset or cursor', async () => {
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, paginationCooldownMs: 0 }
+        const seqClient = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(seqClient)
+
+        const seqOffsets: number[] = []
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                seqOffsets.push(offset)
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }] })
+                }
+                return Promise.reject(gateway504())
+            }),
+        } as any
+
+        await expect(
+            seqClient.call(
+                (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+                { paginate: { mode: 'sequential', baseParams: {} } }
+            )
+        ).rejects.toThrow(PaginationError)
+
+        expect(seqOffsets.filter((offset) => offset === 1).length).toBeGreaterThanOrEqual(4)
+
+        const searchClient = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(searchClient)
+        const searchAfterBodies: unknown[] = []
+        mockAdapter.searchApi = {
+            searchPost: vi.fn().mockImplementation((params: any) => {
+                searchAfterBodies.push(params.search?.searchAfter)
+                if (!params.search?.searchAfter) {
+                    return Promise.resolve({ data: [{ id: 'id1' }] })
+                }
+                return Promise.reject(gateway504())
+            }),
+        } as any
+
+        await expect(
+            searchClient.call(
+                (_api: IscApiSurface, params: any) => (_api.search.searchPost as any)(params),
+                {
+                    paginate: {
+                        mode: 'searchAfter',
+                        search: { indices: ['identities'], query: { query: '*' } } as any,
+                    },
+                }
+            )
+        ).rejects.toThrow(PaginationError)
+
+        const failedCursor = searchAfterBodies.filter((cursor) => cursor !== undefined)
+        expect(failedCursor.length).toBeGreaterThanOrEqual(4)
+        expect(new Set(failedCursor.map((cursor) => JSON.stringify(cursor))).size).toBe(1)
+    })
+
+    it('paginated 504 uses at most one retry per page fetch', async () => {
+        vi.useFakeTimers()
+        const realQueue = new ApiQueue({
+            requestsPerSecond: 100,
+            maxConcurrentRequests: 5,
+            maxRetries: 20,
+            enablePriority: true,
+        })
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, paginationCooldownMs: 0 }
+        const client = new ClientService(mockAdapter, realQueue, sc, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockRejectedValue(gateway504()),
+        } as any
+
+        try {
+            const promise = client.call(
+                (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+                { paginate: { mode: 'sequential', baseParams: {} } }
+            )
+            const assertion = expect(promise).rejects.toThrow(PaginationError)
+            await vi.runAllTimersAsync()
+            await assertion
+            expect(mockAdapter.accountsApi.listAccounts).toHaveBeenCalledTimes(8)
+        } finally {
+            realQueue.stop()
+            realQueue.clear()
+            vi.useRealTimers()
+        }
+    })
+
+    it('non-paginated 504 keeps configured retries and does not shed other calls', async () => {
+        vi.useFakeTimers()
+        const realQueue = new ApiQueue({
+            requestsPerSecond: 100,
+            maxConcurrentRequests: 5,
+            maxRetries: 20,
+            enablePriority: true,
+        })
+        const client = new ClientService(mockAdapter, realQueue, mockConfig, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.accountsApi = {
+            updateAccount: vi.fn().mockRejectedValue(gateway504()),
+        } as any
+
+        try {
+            const promise = client.call(
+                (api: IscApiSurface) => api.accounts.updateAccount({} as any),
+                { throwOnError: true }
+            )
+            const assertion = expect(promise).rejects.toThrow(/Gateway Timeout/)
+            await vi.runAllTimersAsync()
+            await assertion
+            expect(mockAdapter.accountsApi.updateAccount).toHaveBeenCalledTimes(21)
+            expect(mockLog.warn).not.toHaveBeenCalledWith(expect.stringMatching(/shedding/i))
+        } finally {
+            realQueue.stop()
+            realQueue.clear()
+            vi.useRealTimers()
+        }
+    })
+
+    // -------------------------------------------------------------------------
     // Public API surface
     // -------------------------------------------------------------------------
 

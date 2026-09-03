@@ -551,6 +551,33 @@ New documentation and DETAIL actions for bulk-ingest work SHALL use **Bulk inges
 - **THEN** the example SHALL include `fusion-accounts=` and `managed-accounts=`
 - **AND** the example SHALL NOT use a single Fetch `progress=` with unit `fetched` or `ingested`
 
+### Requirement: Glossary defines pagination circuit terms
+
+The ubiquitous-language glossary SHALL define **Gateway failure** as an HTTP 504 or request timeout (`ECONNABORTED` / `ETIMEDOUT`) on a page fetch, distinct from HTTP 429 and from other 5xx. It SHALL define **Pagination circuit** as per-pagination-stream state that sheds load after consecutive gateway failures, then resumes after a successful probe or fails the call — not a tenant-wide or whole-queue breaker. It SHALL define **Cooldown** as a bounded wait after shed with no new page starts on that stream, distinct from per-request retry backoff. It SHALL define **Probe** as a single page request after cooldown used to decide resume versus abort.
+
+#### Scenario: Glossary entry for Gateway failure
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **Gateway failure** entry
+- **AND** the entry SHALL exclude HTTP 429 from that term
+
+#### Scenario: Glossary entry for Pagination circuit
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **Pagination circuit** entry
+- **AND** the entry SHALL state that the circuit is per pagination stream and is not a global API kill switch
+
+#### Scenario: Glossary entry for Cooldown
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **Cooldown** entry
+- **AND** the entry SHALL distinguish cooldown from per-request retry backoff
+
+#### Scenario: Glossary entry for Probe
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **Probe** entry describing a single page request after cooldown
+
 ## Canonical Terms
 
 ### Account taxonomy
@@ -608,6 +635,15 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **Sweep** | A traversal of a set of accounts with a single purpose within a phase. |
 | **Correlated account sweep** | A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts. |
 | **Aggregation** | The ISC source-refresh operation. Use **managed source aggregation** or **Fusion source aggregation** when the source matters. |
+
+### Pagination and API client
+
+| Term | Definition |
+|------|------------|
+| **Gateway failure** | An HTTP 504 or a request timeout (`ECONNABORTED` / `ETIMEDOUT`) on a page fetch. Distinct from HTTP 429 (rate limit) and from other 5xx, which keep the existing per-request retry path. |
+| **Pagination circuit** | Per-pagination-stream state that sheds load after consecutive gateway failures, then either resumes after a successful probe or fails the call. Not a tenant-wide or whole-queue breaker, and not a global API kill switch. |
+| **Cooldown** | A bounded wait after shed with no new page starts on that stream, long enough for gateway-abandoned DB work to finish. One cooldown per pagination stream. Distinct from per-request retry backoff. |
+| **Probe** | A single page request after cooldown (window = 1) used to decide resume versus abort. Not a separate health-check endpoint. |
 
 ### Report and review communications
 

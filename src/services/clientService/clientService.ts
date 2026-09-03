@@ -4,7 +4,9 @@ import { LogService } from '../logService'
 import { FusionConfig } from '../../model/config'
 import { readNumber } from '../../utils/safeRead'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
-import { mergeAbortSignals, invokeAbortable, runWithRequestAbortSignal } from './helpers'
+import { mergeAbortSignals, invokeAbortable, runWithRequestAbortSignal, isGatewayFailure } from './helpers'
+import { PaginationCircuit, isAbortError } from './paginationCircuit'
+import { internalConfig } from '../../data/config/internal'
 import { IscApiAdapter } from './iscApiAdapter'
 import { IscApiSurface } from './iscApiSurface'
 import type { Search, AccountsV2025Api, IdentitiesV2025Api, IdentityAttributesV2025Api, IdentityProfilesV2025Api, CustomFormsV2025Api, EntitlementsV2025Api, GovernanceGroupsV2025Api, TaskManagementV2025Api, SearchApi, TransformsApi, SourcesV2025Api, WorkflowsV2025Api, Configuration } from 'sailpoint-api-client'
@@ -23,6 +25,7 @@ class OffsetPageScheduler<T> {
     private loaded: number
     private scheduleIndex = 0
     private yieldIndex = 0
+    private probed = false
     private readonly completed = new Map<number, T[]>()
     private readonly inFlight = new Map<number, Promise<void>>()
     /** First page error, recorded so no task rejection is left unobserved. */
@@ -35,29 +38,65 @@ class OffsetPageScheduler<T> {
         windowSize: number,
         initialLoaded: number,
         private readonly progressTotal: number | undefined,
-        private readonly fetchPage: (offset: number) => Promise<T[] | undefined>,
+        private readonly fetchPage: (offset: number, extraAbort?: AbortSignal) => Promise<T[]>,
         private readonly fail: (offset: number, loadedBeforeFailure: number) => PaginationError,
         private readonly onPageComplete: (loaded: number, total?: number) => void,
+        private readonly circuit: PaginationCircuit,
         private readonly abortSignal?: AbortSignal
     ) {
         this.loaded = initialLoaded
         this.window = Math.max(1, windowSize)
     }
 
+    private lowestUnfilledOffset(): number {
+        for (let i = this.yieldIndex; i < this.offsets.length; i++) {
+            const offset = this.offsets[i]
+            if (!this.completed.has(offset)) {
+                return offset
+            }
+        }
+        return this.offsets[Math.min(this.yieldIndex, this.offsets.length - 1)]
+    }
+
     private pump(): void {
+        if (this.circuit.isShedding || this.failure !== undefined) {
+            return
+        }
         while (this.inFlight.size < this.window && this.scheduleIndex < this.offsets.length) {
             const offset = this.offsets[this.scheduleIndex++]
+            if (this.completed.has(offset) || this.inFlight.has(offset)) {
+                continue
+            }
             const task = (async () => {
-                if (this.abortSignal?.aborted) {
+                if (this.abortSignal?.aborted || this.circuit.isShedding) {
                     return
                 }
-                const page = await this.fetchPage(offset)
-                if (page === undefined) {
-                    throw this.fail(offset, this.loaded)
+                try {
+                    const page = await this.fetchPage(offset, this.circuit.shedSignal)
+                    this.circuit.recordSuccess()
+                    this.completed.set(offset, page)
+                    this.loaded += page.length
+                    this.onPageComplete(this.loaded, this.progressTotal)
+                } catch (error: unknown) {
+                    if (isAbortError(error, this.circuit.shedSignal) || this.circuit.isShedding) {
+                        return
+                    }
+                    if (this.abortSignal?.aborted || isAbortError(error, this.abortSignal)) {
+                        return
+                    }
+                    if (!isGatewayFailure(error)) {
+                        throw this.fail(offset, this.loaded)
+                    }
+                    const action = this.circuit.noteGatewayFailure()
+                    if (action === 'continue') {
+                        return
+                    }
+                    if (action === 'open') {
+                        this.circuit.abortAfterSecondStreak(`offset ${offset}`)
+                        throw this.fail(offset, this.loaded)
+                    }
+                    this.circuit.shed(`offset ${offset}`)
                 }
-                this.completed.set(offset, page)
-                this.loaded += page.length
-                this.onPageComplete(this.loaded, this.progressTotal)
             })()
                 // Promise.race only settles on the first promise, so a sibling's rejection
                 // would otherwise go unobserved and terminate the process.
@@ -68,6 +107,32 @@ class OffsetPageScheduler<T> {
                     this.inFlight.delete(offset)
                 })
             this.inFlight.set(offset, task)
+        }
+    }
+
+    private async cooldownAndProbe(): Promise<void> {
+        const probeOffset = this.lowestUnfilledOffset()
+        try {
+            await this.circuit.cooldown()
+        } catch {
+            throw this.fail(probeOffset, this.loaded)
+        }
+        this.circuit.beginProbe(`offset ${probeOffset}`)
+        this.probed = true
+        try {
+            const page = await this.fetchPage(probeOffset)
+            this.circuit.recordSuccess()
+            this.circuit.resumeAfterSuccessfulProbe()
+            this.completed.set(probeOffset, page)
+            this.loaded += page.length
+            this.onPageComplete(this.loaded, this.progressTotal)
+            this.scheduleIndex = this.yieldIndex
+        } catch (error: unknown) {
+            if (this.abortSignal?.aborted || isAbortError(error, this.abortSignal)) {
+                throw this.fail(probeOffset, this.loaded)
+            }
+            this.circuit.abortAfterFailedProbe(`offset ${probeOffset}`)
+            throw this.fail(probeOffset, this.loaded)
         }
     }
 
@@ -99,11 +164,23 @@ class OffsetPageScheduler<T> {
                 break
             }
 
+            if (this.circuit.isShedding) {
+                if (this.inFlight.size > 0) {
+                    await Promise.race(Array.from(this.inFlight.values()))
+                    continue
+                }
+                if (!this.probed) {
+                    await this.cooldownAndProbe()
+                    this.pump()
+                    continue
+                }
+            }
+
             if (this.inFlight.size === 0) {
                 // Every offset has been scheduled and settled, yet the next page in
                 // sequence never landed. Continuing here would spin without awaiting
                 // and starve the event loop for the remainder of the operation.
-                throw this.fail(this.offsets[this.yieldIndex], this.loaded)
+                throw this.fail(this.lowestUnfilledOffset(), this.loaded)
             }
 
             await Promise.race(Array.from(this.inFlight.values()))
@@ -123,6 +200,10 @@ export class ClientService {
     private readonly requestTimeoutMs?: number
     /** Number of pages to fetch in parallel inside paginateParallel. */
     private readonly parallelBatchSize: number
+    private readonly consecutiveGatewayFailures: number
+    private readonly paginationCooldownMs: number
+    private readonly paginationGatewayMaxRetries: number
+    private readonly maxCooldownsPerStream: number
     constructor(
         private adapter: IscApiAdapter,
         protected readonly queue: ApiQueue | null,
@@ -142,8 +223,15 @@ export class ClientService {
         this.sailPointListMax = fusionConfig.sailPointListMax
         const parallelBatchSize = fusionConfig.parallelBatchSize ?? 16
         const maxConcurrentRequests = fusionConfig.maxConcurrentRequests ?? 20
+        const clientInternal = internalConfig.clientService
 
         this.parallelBatchSize = parallelBatchSize
+        this.consecutiveGatewayFailures =
+            fusionConfig.consecutiveGatewayFailures ?? clientInternal.consecutiveGatewayFailures
+        this.paginationCooldownMs = fusionConfig.paginationCooldownMs ?? clientInternal.paginationCooldownMs
+        this.paginationGatewayMaxRetries =
+            fusionConfig.paginationGatewayMaxRetries ?? clientInternal.paginationGatewayMaxRetries
+        this.maxCooldownsPerStream = fusionConfig.maxCooldownsPerStream ?? clientInternal.maxCooldownsPerStream
 
         if (this.queue) {
             this.log.info(
@@ -280,25 +368,123 @@ export class ClientService {
         }
     }
 
+    private createPaginationCircuit(policy: Pick<CallPolicy, 'context' | 'abortSignal'>): PaginationCircuit {
+        return new PaginationCircuit(
+            this.consecutiveGatewayFailures,
+            this.paginationCooldownMs,
+            this.maxCooldownsPerStream,
+            (message) => this.log.warn(message),
+            policy.context,
+            policy.abortSignal
+        )
+    }
+
+    /**
+     * Fetch one paginated page with gateway-failure retry cap and throw-on-error so the
+     * pagination circuit can classify the outcome.
+     */
+    private async executePage<T>(
+        apiFunction: () => Promise<T>,
+        policy: CallPolicy,
+        extraAbort?: AbortSignal
+    ): Promise<T> {
+        const result = await this.execute<T>(apiFunction, {
+            priority: policy.priority,
+            context: policy.context,
+            abortSignal: mergeAbortSignals([policy.abortSignal, extraAbort]),
+            throwOnError: true,
+            gatewayMaxRetries: this.paginationGatewayMaxRetries,
+        })
+        if (result === undefined) {
+            throw new Error('Paginated page returned no data')
+        }
+        return result
+    }
+
+    /**
+     * Sequential/searchAfter page loader: same-position retries count toward the gateway streak,
+     * then one cooldown and one probe at that position.
+     */
+    private async loadWithCircuit<T>(
+        fetchOnce: () => Promise<T>,
+        circuit: PaginationCircuit,
+        positionLabel: string,
+        fail: () => PaginationError
+    ): Promise<T> {
+        while (true) {
+            try {
+                const page = await fetchOnce()
+                circuit.recordSuccess()
+                return page
+            } catch (error: unknown) {
+                if (isAbortError(error)) {
+                    throw fail()
+                }
+                if (!isGatewayFailure(error)) {
+                    throw fail()
+                }
+                const action = circuit.noteGatewayFailure()
+                if (action === 'continue') {
+                    continue
+                }
+                if (action === 'open') {
+                    circuit.abortAfterSecondStreak(positionLabel)
+                    throw fail()
+                }
+                circuit.shed(positionLabel)
+                try {
+                    await circuit.cooldown()
+                } catch {
+                    throw fail()
+                }
+                circuit.beginProbe(positionLabel)
+                try {
+                    const probed = await fetchOnce()
+                    circuit.recordSuccess()
+                    circuit.resumeAfterSuccessfulProbe()
+                    return probed
+                } catch (probeError: unknown) {
+                    if (!isAbortError(probeError)) {
+                        circuit.abortAfterFailedProbe(positionLabel)
+                    }
+                    throw fail()
+                }
+            }
+        }
+    }
+
     private async fetchSequentialOffsetPages<T>(
-        fetchPage: (limit: number, offset: number) => Promise<T[] | undefined>,
+        fetchPage: (limit: number, offset: number) => Promise<T[]>,
         config: {
             effectivePageSize: number
             baseLimit?: number | null
             paginateLimit?: number
             context?: string
             onProgress?: (loaded: number, total?: number) => void
+            abortSignal?: AbortSignal
         }
     ): Promise<T[]> {
         const { effectivePageSize: eps, baseLimit: bl, paginateLimit: ol, context, onProgress } = config
         const hasExplicitBaseLimit = bl != null
         const initialLimit = hasExplicitBaseLimit && bl! < eps ? bl! : eps
         const all: T[] = []
+        const circuit = this.createPaginationCircuit({ context, abortSignal: config.abortSignal })
+        const fail = (offset: number) =>
+            new PaginationError(
+                offset === 0 && all.length === 0
+                    ? `Pagination failed on initial page (${context ?? 'paginate'}).`
+                    : `Pagination failed at offset ${offset} (${context ?? 'paginate'}). ${all.length} item(s) collected before failure.`,
+                all.length
+            )
+        const load = (limit: number, offset: number) =>
+            this.loadWithCircuit(
+                () => fetchPage(limit, offset),
+                circuit,
+                `offset ${offset}`,
+                () => fail(offset)
+            )
 
-        const firstPage = await fetchPage(initialLimit, 0)
-        if (firstPage === undefined) {
-            throw new PaginationError(`Pagination failed on initial page (${context ?? 'paginate'}).`, 0)
-        }
+        const firstPage = await load(initialLimit, 0)
         all.push(...firstPage)
 
         const effectiveLimit = ol ?? (hasExplicitBaseLimit ? bl! : undefined)
@@ -317,13 +503,7 @@ export class ClientService {
             }
             const remainingLimit = effectiveLimit != null ? effectiveLimit - all.length : undefined
             const requestLimit = remainingLimit != null && remainingLimit < eps ? remainingLimit : eps
-            const pageData = await fetchPage(requestLimit, offset)
-            if (pageData === undefined) {
-                throw new PaginationError(
-                    `Pagination failed at offset ${offset} (${context ?? 'paginate'}). ${all.length} item(s) collected before failure.`,
-                    all.length
-                )
-            }
+            const pageData = await load(requestLimit, offset)
             if (!pageData.length) break
             all.push(...pageData)
             reportProgress()
@@ -348,12 +528,12 @@ export class ClientService {
 
         return this.fetchSequentialOffsetPages<T>(
             async (limit, offset) => {
-                const response = await this.execute<{ data: T[] }>(() => fn(api, { ...bp, limit, offset }), {
+                const response = await this.executePage<{ data: T[] }>(() => fn(api, { ...bp, limit, offset }), {
                     priority: policy.priority,
                     context: ctx(offset === 0 ? '[page 1, offset 0]' : `[page, offset ${offset}]`),
                     abortSignal: policy.abortSignal,
                 })
-                return response?.data
+                return response.data ?? Promise.reject(new Error('Paginated page returned no data'))
             },
             {
                 effectivePageSize: eps,
@@ -361,6 +541,7 @@ export class ClientService {
                 paginateLimit: paginate.limit,
                 context: policy.context,
                 onProgress: policy.onPageProgress,
+                abortSignal: policy.abortSignal,
             }
         )
     }
@@ -371,9 +552,10 @@ export class ClientService {
         fetchCeiling: number,
         effectivePageSize: number,
         batchSize: number,
-        fetchPageAtOffset: (offset: number) => Promise<T[] | undefined>,
+        fetchPageAtOffset: (offset: number, extraAbort?: AbortSignal) => Promise<T[]>,
         fail: (offset: number, loadedBeforeFailure: number) => PaginationError,
         onPageComplete: (loaded: number, total?: number) => void,
+        circuit: PaginationCircuit,
         abortSignal?: AbortSignal
     ): AsyncGenerator<T[], void, unknown> {
         if (!totalCount || totalCount <= initialItems.length) {
@@ -393,6 +575,7 @@ export class ClientService {
             fetchPageAtOffset,
             fail,
             onPageComplete,
+            circuit,
             abortSignal
         )
     }
@@ -408,15 +591,23 @@ export class ClientService {
         const bp = paginate.baseParams ?? {}
         const limit = paginate.limit
         const ctx = (suffix: string) => (policy.context ? `${policy.context} ${suffix}` : suffix)
+        const circuit = this.createPaginationCircuit(policy)
+        const failInit = () => new PaginationError(`Pagination failed on initial page (${policy.context ?? 'paginate'}).`, 0)
 
-        const initialResponse = await this.execute<{ data: T[]; headers?: any }>(() => fn(api, { ...bp, limit: eps, offset: 0, count: true }), {
-            priority: policy.priority,
-            context: ctx('[parallel-init]'),
-            abortSignal: policy.abortSignal,
-        })
-        if (!initialResponse) {
-            throw new PaginationError(`Pagination failed on initial page (${policy.context ?? 'paginate'}).`, 0)
-        }
+        const initialResponse = await this.loadWithCircuit(
+            () =>
+                this.executePage<{ data: T[]; headers?: any }>(
+                    () => fn(api, { ...bp, limit: eps, offset: 0, count: true }),
+                    {
+                        priority: policy.priority,
+                        context: ctx('[parallel-init]'),
+                        abortSignal: policy.abortSignal,
+                    }
+                ),
+            circuit,
+            'offset 0',
+            failInit
+        )
 
         const initialItems = initialResponse.data || []
         if (limit != null && initialItems.length >= limit) {
@@ -436,13 +627,17 @@ export class ClientService {
             fetchCeiling,
             eps,
             bs,
-            async (offset) => {
-                const response = await this.execute<{ data: T[] }>(() => fn(api, { ...bp, limit: eps, offset }), {
-                    priority: policy.priority,
-                    context: ctx(`[offset ${offset}]`),
-                    abortSignal: policy.abortSignal,
-                })
-                return response?.data
+            async (offset, extraAbort) => {
+                const response = await this.executePage<{ data: T[] }>(
+                    () => fn(api, { ...bp, limit: eps, offset }),
+                    {
+                        priority: policy.priority,
+                        context: ctx(`[offset ${offset}]`),
+                        abortSignal: policy.abortSignal,
+                    },
+                    extraAbort
+                )
+                return response.data ?? Promise.reject(new Error('Paginated page returned no data'))
             },
             (offset, loaded) =>
                 new PaginationError(
@@ -450,6 +645,7 @@ export class ClientService {
                     loaded
                 ),
             (loaded, total) => policy.onPageProgress?.(loaded, total),
+            circuit,
             policy.abortSignal
         )
     }
@@ -463,9 +659,10 @@ export class ClientService {
         windowSize: number,
         initialLoaded: number,
         progressTotal: number | undefined,
-        fetchPage: (offset: number) => Promise<T[] | undefined>,
+        fetchPage: (offset: number, extraAbort?: AbortSignal) => Promise<T[]>,
         fail: (offset: number, loadedBeforeFailure: number) => PaginationError,
         onPageComplete: (loaded: number, total?: number) => void,
+        circuit: PaginationCircuit,
         abortSignal?: AbortSignal
     ): AsyncGenerator<T[], void, unknown> {
         if (abortSignal?.aborted || offsets.length === 0) {
@@ -480,6 +677,7 @@ export class ClientService {
             fetchPage,
             fail,
             onPageComplete,
+            circuit,
             abortSignal
         )
         yield* scheduler.run()
@@ -495,11 +693,25 @@ export class ClientService {
         const bs = { ...paginate.search, sort: ['id'] }
         let sa: string[] | undefined, first = true, more = true, pn = 1
         const all: T[] = []
+        const circuit = this.createPaginationCircuit(policy)
         while (more) {
             if (policy.abortSignal?.aborted) break
             const pc = policy.context ? `${policy.context} [page ${pn}]` : `search [page ${pn}]`
-            const r = await this.execute<{ data: unknown[] }>(() => fn(api, { search: sa ? { ...bs, searchAfter: sa } : bs, limit: ps, count: first ? true : undefined }), { priority: policy.priority, context: pc, abortSignal: policy.abortSignal })
-            if (!r) throw new PaginationError(`Search pagination failed at page ${pn} (${policy.context ?? 'search'}). ${all.length} item(s) collected before failure.`, all.length)
+            const cursorLabel = sa ? `searchAfter ${sa.join(',')}` : 'searchAfter start'
+            const r = await this.loadWithCircuit(
+                () =>
+                    this.executePage<{ data: unknown[] }>(
+                        () => fn(api, { search: sa ? { ...bs, searchAfter: sa } : bs, limit: ps, count: first ? true : undefined }),
+                        { priority: policy.priority, context: pc, abortSignal: policy.abortSignal }
+                    ),
+                circuit,
+                cursorLabel,
+                () =>
+                    new PaginationError(
+                        `Search pagination failed at page ${pn} (${policy.context ?? 'search'}). ${all.length} item(s) collected before failure.`,
+                        all.length
+                    )
+            )
             const items = (r.data ?? []) as T[]
             if (items.length) all.push(...items)
             policy.onPageProgress?.(all.length, undefined)
@@ -524,7 +736,7 @@ export class ClientService {
         policy: CallPolicy = {}
     ): Promise<TResponse | undefined> {
         const priority = policy.priority ?? QueuePriority.MEDIUM
-        const { context, abortSignal, throwOnError = false, noRetry } = policy
+        const { context, abortSignal, throwOnError = false, noRetry, gatewayMaxRetries } = policy
         const fn = () => {
             const timeoutController = this.requestTimeoutMs ? new AbortController() : undefined
             let timeoutId: ReturnType<typeof setTimeout> | undefined
@@ -556,6 +768,7 @@ export class ClientService {
                     abortSignal,
                     label: context,
                     noRetry,
+                    gatewayMaxRetries,
                 })
             }
 
@@ -622,11 +835,11 @@ export class ClientService {
             return await this.fetchSequentialOffsetPages<T>(
                 async (limit, offset) => {
                     const params = { ...baseParameters, limit, offset } as TRequestParams
-                    const response = await this.execute<{ data: T[] }>(() => callFunction(params), {
+                    const response = await this.executePage<{ data: T[] }>(() => callFunction(params), {
                         priority,
                         context: pageContext(offset),
                     })
-                    return response?.data
+                    return response.data ?? Promise.reject(new Error('Paginated page returned no data'))
                 },
                 {
                     effectivePageSize,
@@ -825,21 +1038,24 @@ export class ClientService {
         const effectivePageSize = Math.min(this.pageSize, this.sailPointListMax)
         const batchSize = this.parallelBatchSize
         const initialCtx = context ? `${context} [parallel-init]` : 'list [parallel-init]'
+        const circuit = this.createPaginationCircuit({ context, abortSignal })
 
-        const initialResponse = await this.execute<{ data: T[]; headers?: any }>(
+        const initialResponse = await this.loadWithCircuit(
             () =>
-                callFunction({
-                    ...baseParameters,
-                    limit: effectivePageSize,
-                    offset: 0,
-                    count: true,
-                } as TRequestParams),
-            { priority, context: initialCtx, abortSignal }
+                this.executePage<{ data: T[]; headers?: any }>(
+                    () =>
+                        callFunction({
+                            ...baseParameters,
+                            limit: effectivePageSize,
+                            offset: 0,
+                            count: true,
+                        } as TRequestParams),
+                    { priority, context: initialCtx, abortSignal }
+                ),
+            circuit,
+            'offset 0',
+            () => new PaginationError(`Pagination failed on initial page (${context ?? 'paginate'}).`, 0)
         )
-
-        if (!initialResponse) {
-            return
-        }
 
         const initialItems = initialResponse.data || []
         yield initialItems
@@ -856,15 +1072,15 @@ export class ClientService {
             fetchCeiling,
             effectivePageSize,
             batchSize,
-            async (offset) => {
+            async (offset, extraAbort) => {
                 const params = { ...baseParameters, limit: effectivePageSize, offset } as TRequestParams
                 const pageCtx = context ? `${context} [offset ${offset}]` : `list [offset ${offset}]`
-                const response = await this.execute<{ data: T[] }>(() => callFunction(params), {
+                const response = await this.executePage<{ data: T[] }>(() => callFunction(params), {
                     priority,
                     context: pageCtx,
                     abortSignal,
-                })
-                return response?.data
+                }, extraAbort)
+                return response.data ?? Promise.reject(new Error('Paginated page returned no data'))
             },
             (offset, loaded) =>
                 new PaginationError(
@@ -872,6 +1088,7 @@ export class ClientService {
                     loaded
                 ),
             () => {},
+            circuit,
             abortSignal
         )
     }

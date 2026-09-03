@@ -1,4 +1,4 @@
-import { createRetriesConfig, shouldRetry, calculateRetryDelay, getRequestAbortSignal, runWithRequestAbortSignal, invokeAbortable, mergeAbortSignals } from '../helpers'
+import { createRetriesConfig, shouldRetry, isGatewayFailure, calculateRetryDelay, getRequestAbortSignal, runWithRequestAbortSignal, invokeAbortable, mergeAbortSignals } from '../helpers'
 import {
     BASE_RETRY_DELAY_MS,
     MAX_RETRY_DELAY_MS,
@@ -89,6 +89,31 @@ describe('clientService helpers', () => {
         it('should return false for null/undefined', () => {
             expect(shouldRetry(null)).toBe(false)
             expect(shouldRetry(undefined)).toBe(false)
+        })
+    })
+
+    describe('isGatewayFailure', () => {
+        it('returns true for HTTP 504', () => {
+            expect(isGatewayFailure({ response: { status: 504 } })).toBe(true)
+        })
+
+        it('returns true for ECONNABORTED and ETIMEDOUT', () => {
+            expect(isGatewayFailure({ code: 'ECONNABORTED' })).toBe(true)
+            expect(isGatewayFailure({ code: 'ETIMEDOUT' })).toBe(true)
+        })
+
+        it('returns false for HTTP 429', () => {
+            expect(isGatewayFailure({ response: { status: 429 } })).toBe(false)
+        })
+
+        it('returns false for other 5xx', () => {
+            expect(isGatewayFailure({ response: { status: 500 } })).toBe(false)
+            expect(isGatewayFailure({ response: { status: 502 } })).toBe(false)
+        })
+
+        it('returns false for null/undefined', () => {
+            expect(isGatewayFailure(null)).toBe(false)
+            expect(isGatewayFailure(undefined)).toBe(false)
         })
     })
 

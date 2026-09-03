@@ -22,6 +22,8 @@ export interface QueueItem<T = any> {
     abortSignal?: AbortSignal
     label?: string
     noRetry?: boolean
+    /** When set, gateway failures (504/timeout) use this retry budget instead of `maxRetries`. */
+    gatewayMaxRetries?: number
 }
 
 /**
@@ -75,6 +77,8 @@ export interface CallPolicy {
     abortSignal?: AbortSignal
     /** Called as paginated loads advance; `loaded` is cumulative items for this pagination stream. */
     onPageProgress?: (loaded: number, total?: number) => void
+    /** When set, gateway failures on this call use this retry budget instead of queue `maxRetries`. */
+    gatewayMaxRetries?: number
 }
 
 interface OffsetPaginate {
