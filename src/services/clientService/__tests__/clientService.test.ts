@@ -6,6 +6,7 @@ import { FusionConfig } from '../../../model/config'
 import { LogService } from '../../logService'
 import { QueuePriority, PaginationError } from '../types'
 import type { IscApiSurface } from '../iscApiSurface'
+import { getRequestAbortSignal } from '../helpers'
 
 describe('ClientService', () => {
     let mockAdapter: Mocked<IscApiAdapter>
@@ -716,6 +717,7 @@ describe('ClientService', () => {
         activeClients.push(client)
 
         const attempts = new Map<number, number>()
+        let hangAborted = false
 
         mockAdapter.accountsApi = {
             listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
@@ -728,8 +730,20 @@ describe('ClientService', () => {
                     return Promise.reject(gateway504())
                 }
                 if (offset === 4 && attempts.get(offset) === 1) {
-                    return new Promise(() => {
-                        // In-flight page HTTP; the pagination circuit must abort this stream.
+                    return new Promise((_resolve, reject) => {
+                        const signal = getRequestAbortSignal()
+                        if (!signal) {
+                            reject(new Error('expected request abort signal on in-flight page'))
+                            return
+                        }
+                        signal.addEventListener(
+                            'abort',
+                            () => {
+                                hangAborted = true
+                                reject(signal.reason ?? new Error('Aborted'))
+                            },
+                            { once: true }
+                        )
                     })
                 }
                 return Promise.resolve({ data: [{ id: `a${offset}` }] })
@@ -750,6 +764,7 @@ describe('ClientService', () => {
 
         expect(await unrelated).toBe('unrelated-ok')
         expect(collected).toEqual(['a0', 'a1', 'a2', 'a3', 'a4', 'a5'])
+        expect(hangAborted).toBe(true)
         expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/shedding/i))
         expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/cooldown/i))
         expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/probe/i))
@@ -894,9 +909,16 @@ describe('ClientService', () => {
         expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/second gateway-failure streak/i))
     })
 
-    it('HTTP 429 does not trip the pagination circuit', async () => {
+    it('HTTP 429 follows Retry-After and does not trip the pagination circuit', async () => {
+        vi.useFakeTimers()
+        const realQueue = new ApiQueue({
+            requestsPerSecond: 100,
+            maxConcurrentRequests: 5,
+            maxRetries: 20,
+            enablePriority: true,
+        })
         const sc = { ...mockConfig, pageSize: 2, sailPointListMax: 250, paginationCooldownMs: 0 }
-        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        const client = new ClientService(mockAdapter, realQueue, sc, mockLog)
         activeClients.push(client)
 
         let calls = 0
@@ -904,20 +926,30 @@ describe('ClientService', () => {
             listAccounts: vi.fn().mockImplementation(() => {
                 calls++
                 if (calls === 1) {
-                    return Promise.reject(httpError(429, 'Too Many Requests'))
+                    const err = httpError(429, 'Too Many Requests') as Error & {
+                        response?: { status: number; headers?: Record<string, string> }
+                    }
+                    err.response = { status: 429, headers: { 'retry-after': '1' } }
+                    return Promise.reject(err)
                 }
                 return Promise.resolve({ data: [{ id: 'a' }] })
             }),
         } as any
 
-        await expect(
-            client.call(
+        try {
+            const promise = client.call(
                 (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
                 { paginate: { mode: 'sequential', baseParams: {} } }
             )
-        ).rejects.toThrow(PaginationError)
-
-        expect(mockLog.warn).not.toHaveBeenCalledWith(expect.stringMatching(/shedding|cooldown/i))
+            await vi.runAllTimersAsync()
+            await expect(promise).resolves.toEqual([{ id: 'a' }])
+            expect(calls).toBe(2)
+            expect(mockLog.warn).not.toHaveBeenCalledWith(expect.stringMatching(/shedding|cooldown/i))
+        } finally {
+            realQueue.stop()
+            realQueue.clear()
+            vi.useRealTimers()
+        }
     })
 
     it('exhausted HTTP 500 throws PaginationError without cooldown', async () => {
@@ -1097,6 +1129,36 @@ describe('ClientService', () => {
             realQueue.clear()
             vi.useRealTimers()
         }
+    })
+
+    it('paginateSearchApiGenerator applies the pagination circuit on gateway failures', async () => {
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, paginationCooldownMs: 0 }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.searchApi = {
+            searchPost: vi.fn().mockImplementation((params: any) => {
+                if (!params.search?.searchAfter) {
+                    return Promise.resolve({ data: [{ id: 'id1' }], headers: { 'x-total-count': '2' } })
+                }
+                return Promise.reject(gateway504())
+            }),
+        } as any
+
+        const gen = client.paginateSearchApiGenerator(
+            { indices: ['identities'], query: { query: '*' } } as any,
+            QueuePriority.MEDIUM,
+            'identity-fetch'
+        )
+
+        await expect(async () => {
+            for await (const _page of gen) {
+                // first page yields; later cursor 504s trip the circuit
+            }
+        }).rejects.toThrow(PaginationError)
+
+        expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/cooldown/i))
+        expect(mockAdapter.searchApi.searchPost.mock.calls.length).toBeGreaterThanOrEqual(4)
     })
 
     // -------------------------------------------------------------------------
