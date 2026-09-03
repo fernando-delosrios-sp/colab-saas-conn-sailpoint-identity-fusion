@@ -6,6 +6,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-09-03 · v2.2.0
+
+### 🔧 Improvements
+
+- **Paginated fetches cooldown once, then abort on 504/timeout storms** — After three consecutive gateway failures (HTTP 504 or request timeout) on one pagination stream, Identity Fusion sheds that stream’s in-flight pages, waits 30 seconds, probes the next needed page once, and resumes on success. A failed probe or a second streak fails Fetch/account-list with `PaginationError` instead of stacking skip-scans. Paginated 504s use at most one extra retry; OFFSET paging, HTTP 429 Retry-After, and non-paginated queue traffic are unchanged. This is not a global API kill switch.
+
 ## 2026-08-28 · v2.2.0
 
 ### ⚠️ Breaking Changes

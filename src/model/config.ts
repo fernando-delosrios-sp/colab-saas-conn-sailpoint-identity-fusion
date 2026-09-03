@@ -454,6 +454,10 @@ interface InternalConfig {
     readonly tokenUrlPath: string
     readonly processingWaitConstant: number
     readonly retriesConstant: number
+    readonly consecutiveGatewayFailures: number
+    readonly paginationCooldownMs: number
+    readonly paginationGatewayMaxRetries: number
+    readonly maxCooldownsPerStream: number
     readonly workflowName: string
     readonly delayedAggregationWorkflowName: string
     readonly padding: string

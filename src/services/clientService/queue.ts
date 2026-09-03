@@ -1,7 +1,7 @@
 import { logger } from '@sailpoint/connector-sdk'
 import crypto from 'crypto'
 import { QueueItem, QueueStats, QueueConfig, QueuePriority, QueuedItemInfo } from './types'
-import { shouldRetry, calculateRetryDelay } from './helpers'
+import { shouldRetry, calculateRetryDelay, isGatewayFailure } from './helpers'
 import { internalConfig } from '../../data/config'
 import { SlidingWindowRateLimiter, resolveRateLimitMaxRequests } from './rateLimiter'
 
@@ -97,6 +97,7 @@ export class ApiQueue {
             abortSignal?: AbortSignal
             label?: string
             noRetry?: boolean
+            gatewayMaxRetries?: number
         } = {}
     ): Promise<T> {
         const item: QueueItem<T> = {
@@ -111,6 +112,7 @@ export class ApiQueue {
             abortSignal: options.abortSignal,
             label: options.label,
             noRetry: options.noRetry,
+            gatewayMaxRetries: options.gatewayMaxRetries,
         }
 
         return new Promise<T>((resolve, reject) => {
@@ -227,7 +229,11 @@ export class ApiQueue {
                 this.pushStat('processing', processingTime)
 
                 // Check if we should retry
-                if (!item.noRetry && shouldRetry(error) && item.retryCount < item.maxRetries) {
+                const retryBudget =
+                    isGatewayFailure(error) && item.gatewayMaxRetries !== undefined
+                        ? item.gatewayMaxRetries
+                        : item.maxRetries
+                if (!item.noRetry && shouldRetry(error) && item.retryCount < retryBudget) {
                     item.retryCount++
                     this.stats.totalRetries++
                     this.updateStats()

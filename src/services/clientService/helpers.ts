@@ -60,6 +60,18 @@ export function shouldRetry(error: unknown): boolean {
     return false
 }
 
+/**
+ * True when a page fetch failed because the gateway gave up or the request timed out.
+ * HTTP 504 and `ECONNABORTED` / `ETIMEDOUT` count; HTTP 429 and other 5xx do not.
+ */
+export function isGatewayFailure(error: unknown): boolean {
+    if (!error) return false
+    const err = error as { response?: { status?: number }; code?: string }
+    if (err.response?.status === 504) return true
+    if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') return true
+    return false
+}
+
 const IMF_FIXDATE_REGEX = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/
 
 /**

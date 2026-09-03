@@ -115,6 +115,22 @@ Retry uses exponential backoff (1000 ms base). For HTTP 429, the connector uses 
 
 ---
 
+## Pagination circuit vs API request retries
+
+**API request retries** apply to each queued HTTP call (including non-paginated writes). Default is 20 attempts with exponential backoff.
+
+A **pagination circuit** applies only to one paginated `client.call` stream (sequential, parallel, or searchAfter). It does **not** replace OFFSET paging, shrink the parallel window on success, or pause the whole API queue.
+
+When **3** completed page outcomes on that stream are **gateway failures** (HTTP **504** or request timeout) with no successful page in between:
+
+1. **Shed** — stop scheduling further pages on that stream and abort in-flight page HTTP for that stream. Other queued calls keep running.
+2. **Cooldown** — wait once (30 seconds). Caller abort during cooldown fails the call and does **not** send a probe.
+3. **Probe** — fetch the lowest not-yet-successful page once (same offset or same searchAfter cursor). Success resumes the configured parallel window. Another gateway failure, or a second 504/timeout streak after resume, fails Fetch/account-list with `PaginationError` (no silent partial list, no second cooldown).
+
+Paginated pages use **at most one extra attempt** on gateway failure so the circuit can see the streak. Non-paginated calls still use **API request retries**. HTTP 429 still uses Retry-After and does not trip the circuit. Other exhausted 5xx (for example HTTP 500) still fail the page immediately without cooldown.
+
+---
+
 ## Configuration patterns
 
 ### Production with many accounts (5,000–50,000)

@@ -62,6 +62,15 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms do n
 | **Correlated account sweep**  | A sweep that processes already-correlated managed source accounts before the main matching sweeps begin, so their outcomes are visible as candidates for uncorrelated accounts.                                                                                           |
 | **Aggregation**               | The ISC source-refresh operation. Use **managed source aggregation** or **Fusion source aggregation** when the source matters.                                                                                                                                            |
 
+## Pagination and API client
+
+| Term                    | Definition                                                                                                                                                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gateway failure**     | An HTTP 504 or a request timeout (`ECONNABORTED` / `ETIMEDOUT`) on a page fetch. Distinct from HTTP 429 (rate limit) and from other 5xx, which keep the existing per-request retry path.                                            |
+| **Pagination circuit**  | Per-pagination-stream state that sheds load after consecutive gateway failures, then either resumes after a successful probe or fails the call. Not a tenant-wide or whole-queue breaker, and not a global API kill switch.         |
+| **Cooldown**            | A bounded wait after shed with no new page starts on that stream, long enough for gateway-abandoned DB work to finish. One cooldown per pagination stream. Distinct from per-request retry backoff.                                 |
+| **Probe**               | A single page request after cooldown (window = 1) used to decide resume versus abort. Not a separate health-check endpoint.                                                                                                         |
+
 ## Framework steps
 
 | Term       | Definition                                                                                                                                                        |
