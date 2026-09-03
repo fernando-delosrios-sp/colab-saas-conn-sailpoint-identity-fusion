@@ -697,6 +697,26 @@ describe('MappingService vanished snapshot keys', () => {
         expect(fusionAccount.attributeBag.current.COLLEGE_NAME).toBe("St John's College")
     })
 
+    it('Explicit empty map preserves a Unique definition name', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                attributeMaps: [{ newAttribute: 'UID', existingAttributes: ['missing_uid'] }],
+                uniqueAttributeDefinitions: [
+                    { name: 'UID', expression: 'WD', normalize: false, spaces: true, trim: true },
+                ],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.UID = 'WD000015'
+        fusionAccount.attributeBag.sources.set('Record Source', [originSnapshot({ emp_id: 'E123' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.UID).toBe('WD000015')
+    })
+
     it('Attribute dropped by its origin source clears', () => {
         const service = new MappingService(baseConfig, mockLog)
         const fusionAccount = buildManagedAccount()

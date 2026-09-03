@@ -122,7 +122,7 @@ MappingService SHALL derive explicit mapping configuration from the user-configu
 
 ### Requirement: MappingService merges unmapped snapshot keys with the default merge
 
-On a full `mapAttributes` invocation (`onlyTargets` omitted), after explicit mapping targets are processed, MappingService SHALL also merge implicit candidates: **unmapped snapshot keys**, being attribute names that appear on at least one live snapshot in `sourceAttributeMap` this invocation, together with attribute names present in `attributeBag.current`, that are not `attributeMaps[].newAttribute` targets, that are not definition-owned names, and that are not on the denylist (Fusion control attributes, Fusion identity/display `id` and `name`, snapshot overlay fields `source`, `schema`, and `IIQDisabled`). Each implicit candidate SHALL use the global `attributeMerge` default and same-name lookup through `processAttributeMapping`. Empty results SHALL follow the same write, delete, and identity-bag fallback path as explicit maps. MappingService SHALL NOT treat Fusion schema names that appear neither on this invocation’s snapshots nor in `attributeBag.current` as mapping targets.
+On a full `mapAttributes` invocation (`onlyTargets` omitted), after explicit mapping targets are processed, MappingService SHALL also merge implicit candidates: **unmapped snapshot keys**, being attribute names that appear on at least one live snapshot in `sourceAttributeMap` this invocation, together with attribute names present in `attributeBag.current`, that are not `attributeMaps[].newAttribute` targets, that are not Unique definition names, and that are not on the denylist (Fusion control attributes, Fusion identity/display `id` and `name`, snapshot overlay fields `source`, `schema`, and `IIQDisabled`). Each implicit candidate SHALL use the global `attributeMerge` default and same-name lookup through `processAttributeMapping`. Empty results SHALL follow the same write, delete, and identity-bag fallback path as explicit maps, except that a definition-owned name SHALL NOT be deleted. MappingService SHALL NOT treat Fusion schema names that appear neither on this invocation’s snapshots nor in `attributeBag.current` as mapping targets.
 
 #### Scenario: Unmapped same-named key uses stored First found default
 
@@ -223,15 +223,24 @@ On a full `mapAttributes` invocation (`onlyTargets` omitted), MappingService SHA
 - **WHEN** `mapAttributes` runs
 - **THEN** `STUDENT_ID` SHALL still be `"sailpoint-307803971"`
 
-### Requirement: MappingService excludes definition-owned names from implicit candidates
+### Requirement: MappingService treats definition-owned names by definition kind
 
-MappingService SHALL exclude **definition-owned names** — every configured `normalAttributeDefinitions[].name` and `uniqueAttributeDefinitions[].name` — from implicit Map candidates, so Map neither merges nor clears them. Explicit `attributeMaps[].newAttribute` targets SHALL be unaffected by this exclusion. Exclusion SHALL follow the definition lists configured for the current invocation, so a name whose definition row has been removed SHALL become an ordinary implicit candidate.
+MappingService SHALL treat **definition-owned names** by definition kind on a full `mapAttributes` invocation (`onlyTargets` omitted). Unique definition names SHALL be excluded from implicit candidate collection, so Map neither merges nor clears them as implicit candidates. A Normal definition name SHALL be an ordinary implicit candidate: when a live snapshot carries it, Map SHALL merge it under the global `attributeMerge` default; when `processAttributeMapping` yields empty, Map SHALL preserve the existing `attributeBag.current` value instead of deleting it. Empty merge SHALL also preserve a Unique definition name that reaches `applyMappedValue` through an explicit `attributeMaps[].newAttribute` target. Explicit mapping rows SHALL still write when they yield a value. Exclusion and delete suppression SHALL follow the definition lists configured for the current invocation, so a name whose definition row has been removed SHALL become an ordinary implicit candidate, including vanished-key clearing.
 
 #### Scenario: Unique definition value is preserved
 
 - **GIVEN** `uniqueAttributeDefinitions` contains a definition named `UID`
 - **AND** the persisted bag has `UID` `"WD000015"`
 - **AND** no live snapshot has `UID`
+- **WHEN** `mapAttributes` runs without `onlyTargets`
+- **THEN** `UID` SHALL still be `"WD000015"`
+
+#### Scenario: Definition-owned name on a snapshot is not merged by Map
+
+- **GIVEN** `uniqueAttributeDefinitions` contains a definition named `UID`
+- **AND** the persisted bag has `UID` `"WD000015"`
+- **AND** a live snapshot has `UID` `"from-source"`
+- **AND** there is no attribute map whose `newAttribute` is `UID`
 - **WHEN** `mapAttributes` runs without `onlyTargets`
 - **THEN** `UID` SHALL still be `"WD000015"`
 
@@ -243,13 +252,14 @@ MappingService SHALL exclude **definition-owned names** — every configured `no
 - **WHEN** `mapAttributes` runs without `onlyTargets`
 - **THEN** MappingService SHALL NOT delete `STUDENT_URL`
 
-#### Scenario: Definition-owned name on a snapshot is not merged by Map
+#### Scenario: Normal definition name on a snapshot is merged by Map
 
 - **GIVEN** `normalAttributeDefinitions` contains a definition named `CRSID`
 - **AND** a live snapshot has `CRSID` `"sailpoint-AH2543"`
 - **AND** there is no attribute map whose `newAttribute` is `CRSID`
+- **AND** global `attributeMerge` is Main account
 - **WHEN** `mapAttributes` runs without `onlyTargets`
-- **THEN** MappingService SHALL NOT write `CRSID` as an implicit map result
+- **THEN** `CRSID` SHALL be `"sailpoint-AH2543"`
 
 #### Scenario: Explicit map wins over definition-owned exclusion
 
@@ -259,6 +269,15 @@ MappingService SHALL exclude **definition-owned names** — every configured `no
 - **WHEN** `mapAttributes` runs without `onlyTargets`
 - **THEN** `COLLEGE_NAME` SHALL be `"St John's College"`
 
+#### Scenario: Explicit empty map preserves a Unique definition name
+
+- **GIVEN** `uniqueAttributeDefinitions` contains a definition named `UID`
+- **AND** the persisted bag has `UID` `"WD000015"`
+- **AND** an attribute map whose `newAttribute` is `UID`
+- **AND** that mapping yields empty
+- **WHEN** `mapAttributes` runs without `onlyTargets`
+- **THEN** `UID` SHALL still be `"WD000015"`
+
 #### Scenario: Removing a definition row lets its leftover value clear
 
 - **GIVEN** the persisted bag has `STAFF_URL` with a value
@@ -267,6 +286,14 @@ MappingService SHALL exclude **definition-owned names** — every configured `no
 - **AND** there is no attribute map for `STAFF_URL`
 - **WHEN** `mapAttributes` runs without `onlyTargets`
 - **THEN** `STAFF_URL` SHALL be absent from `attributeBag.current`
+
+#### Scenario: Selective mapping does not merge a Normal definition name
+
+- **GIVEN** `normalAttributeDefinitions` contains a definition named `CRSID`
+- **AND** a live snapshot has `CRSID` `"sailpoint-AH2543"`
+- **AND** `onlyTargets` is `Set(['employeeId'])`
+- **WHEN** `mapAttributes` runs
+- **THEN** MappingService SHALL NOT write `CRSID` as an implicit map result
 
 ### Requirement: MappingService registers the Identities snapshot when the identity bag is present
 
