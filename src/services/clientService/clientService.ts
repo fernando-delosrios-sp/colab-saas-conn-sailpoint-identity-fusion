@@ -924,19 +924,31 @@ export class ClientService {
         let pageNum = 1
         let loaded = 0
         let total: number | undefined
+        const circuit = this.createPaginationCircuit({ context, abortSignal })
 
         while (hasMore) {
             if (abortSignal?.aborted) return
 
             const pageContext = context ? `${context} [page ${pageNum}]` : `search [page ${pageNum}]`
-            const response = await this.execute<{ data: unknown[]; headers?: any }>(
+            const cursorLabel = searchAfter ? `searchAfter ${searchAfter.join(',')}` : 'searchAfter start'
+            const response = await this.loadWithCircuit(
                 () =>
-                    this.adapter.searchApi.searchPost({
-                        search: searchAfter ? { ...baseSearch, searchAfter } : baseSearch,
-                        limit: pageSize,
-                        count: isFirstPage ? true : undefined,
-                    }),
-                { priority, context: pageContext, abortSignal }
+                    this.executePage<{ data: unknown[]; headers?: any }>(
+                        () =>
+                            this.adapter.searchApi.searchPost({
+                                search: searchAfter ? { ...baseSearch, searchAfter } : baseSearch,
+                                limit: pageSize,
+                                count: isFirstPage ? true : undefined,
+                            }),
+                        { priority, context: pageContext, abortSignal }
+                    ),
+                circuit,
+                cursorLabel,
+                () =>
+                    new PaginationError(
+                        `Search pagination failed at page ${pageNum} (${context ?? 'search'}). ${loaded} item(s) collected before failure.`,
+                        loaded
+                    )
             )
 
             const items = (response?.data ?? []) as T[]
