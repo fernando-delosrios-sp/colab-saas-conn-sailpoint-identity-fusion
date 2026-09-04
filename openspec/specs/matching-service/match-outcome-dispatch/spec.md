@@ -22,7 +22,7 @@ The connector SHALL provide a `MatchOutcomeDispatcher` module in `src/services/m
 
 ### Requirement: MatchOutcomeDispatcher exposes `runMatchSweep` as its public interface
 
-`MatchOutcomeDispatcher` SHALL expose a single public method `runMatchSweep(accounts, batchSize, options?): MatchSweepResult` that scores the supplied accounts and dispatches each to its outcome. No other public method on `MatchOutcomeDispatcher` SHALL be required by callers to perform a managed-account matching sweep.
+`MatchOutcomeDispatcher` SHALL expose a single public method `runMatchSweep(accounts, batchSize, options?): MatchSweepResult` that scores the supplied accounts and dispatches each to its outcome. No other public method on `MatchOutcomeDispatcher` SHALL be required by callers to perform a managed-account matching sweep. Identity-phase scoring SHALL pass the `getCandidates` result as the identity pool and SHALL pass `fusionMaxCandidatesForForm` as the top-K retention cap, not as a first-K comparison stop. MatchOutcomeDispatcher SHALL NOT substitute `run.allFusionIdentities` unless `getCandidates` returns undefined.
 
 #### Scenario: FusionService invokes one verb
 
@@ -44,6 +44,13 @@ The connector SHALL provide a `MatchOutcomeDispatcher` module in `src/services/m
 - **WHEN** identity-phase scoring runs for a managed account
 - **THEN** MatchOutcomeDispatcher SHALL pass that Set as the identity pool to scoreFusionAccount
 - **AND** SHALL NOT substitute run.allFusionIdentities unless getCandidates returns undefined
+
+#### Scenario: Identity scoring cap is top-K retention
+
+- **GIVEN** identity-phase scoring for an uncorrelated authoritative account
+- **WHEN** MatchOutcomeDispatcher calls scoreFusionAccount
+- **THEN** the maxIdentityMatches argument SHALL mean retain at most that many identity matches after scoring the whole pool
+- **AND** MatchOutcomeDispatcher SHALL NOT require MatchingService to stop comparing after the first K passing identities
 
 ---
 
