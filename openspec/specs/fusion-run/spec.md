@@ -18,7 +18,7 @@ FusionRun SHALL be the centralized state container for a single operation run. A
 
 ### Requirement: FusionRun holds all run-scoped data
 
-FusionRun SHALL contain maps, sets, and state fields for all data loaded and processed during an operation run: managed accounts, identities, Fusion accounts, Fusion identities, source information, form decisions, form counters, form delete queue, matching state, aggregation tracker, trigram index, normalization caches, managed account processing state machine, analysis recording, and timing metrics.
+FusionRun SHALL contain maps, sets, and state fields for all data loaded and processed during an operation run: managed accounts, identities, Fusion accounts, Fusion identities, source information, form decisions, form counters, form delete queue, matching state, aggregation tracker, candidate blocking indexes, normalization caches, managed account processing state machine, analysis recording, and timing metrics.
 
 #### Scenario: FusionRun contains managed account state
 - **WHEN** aggregation loads managed accounts
@@ -39,7 +39,9 @@ FusionRun SHALL contain maps, sets, and state fields for all data loaded and pro
 - **THEN** run.linkedAccountKeyIndex SHALL contain correlated account keys
 - **AND** run.analysisRecorder SHALL capture per-account analysis results
 - **AND** run.fusionBlends SHALL track blending events
-- **AND** run.trigramIndexByAttribute SHALL contain per-attribute inverted trigram maps
+- **AND** run.trigramIndexByAttribute SHALL contain per-attribute inverted trigram maps when those maps are still built
+- **AND** FusionRun SHALL hold Binary exact-value and LIG3 length-bucket blocking indexes when those algorithms are configured
+- **AND** run.identityComparisonCount and run.identityCandidateSetSizeSum SHALL accumulate identity-phase observability
 - **AND** run.normalizedCache and run.nameNormalizedCache SHALL contain normalization caches
 
 #### Scenario: FusionRun contains form lifecycle state
@@ -426,18 +428,61 @@ FusionRun SHALL expose a run-scoped numeric field `mandatoryMissingBlockCount` i
 - **WHEN** both are processed through getCandidates
 - **THEN** `mandatoryMissingBlockCount` SHALL equal `2`
 
+### Requirement: FusionRun tracks identity comparison count
+
+FusionRun SHALL expose a run-scoped numeric field `identityComparisonCount` initialized to zero at run start. MatchingService SHALL add each identity-phase `compareFusionAccounts` invocation to this field. Deferred comparisons SHALL NOT increment it.
+
+#### Scenario: Counter starts at zero
+
+- **WHEN** a new FusionRun is constructed for an operation
+- **THEN** `identityComparisonCount` SHALL be `0`
+
+#### Scenario: Identity comparisons accumulate
+
+- **GIVEN** an uncorrelated authoritative account whose identity pool contains 10 identities
+- **WHEN** identity-phase scoring compares all 10
+- **THEN** `identityComparisonCount` SHALL increase by 10
+
+### Requirement: FusionRun tracks identity candidate-set size sum
+
+FusionRun SHALL expose a run-scoped numeric field `identityCandidateSetSizeSum` initialized to zero at run start. For each managed account that enters identity-phase scoring, MatchingService or MatchOutcomeDispatcher SHALL add the size of the identity pool actually scored: `|getCandidates set|` when a Set is returned (including 0 for an empty set), or the Fusion identity baseline size when `getCandidates` returns undefined.
+
+#### Scenario: Counter starts at zero
+
+- **WHEN** a new FusionRun is constructed for an operation
+- **THEN** `identityCandidateSetSizeSum` SHALL be `0`
+
+#### Scenario: Full-scan account adds baseline size
+
+- **GIVEN** `getCandidates` returns undefined
+- **AND** the Fusion identity baseline contains 100 identities
+- **WHEN** identity-phase scoring runs for that account
+- **THEN** `identityCandidateSetSizeSum` SHALL increase by 100
+
+#### Scenario: Empty candidate set adds zero
+
+- **GIVEN** `getCandidates` returns an empty Set
+- **WHEN** identity-phase scoring runs for that account
+- **THEN** `identityCandidateSetSizeSum` SHALL remain unchanged for that account
+
 ### Requirement: FusionRun tracks full-scan trigram fallback count
 
-FusionRun SHALL expose a run-scoped numeric field `fullScanFallbackCount` initialized to zero at run start. MatchingService SHALL increment this field only when getCandidates returns undefined because trigram blocking was unavailable, not when returning an empty set for mandatory-missing accounts.
+FusionRun SHALL expose a run-scoped numeric field `fullScanFallbackCount` initialized to zero at run start. MatchingService SHALL increment this field when getCandidates returns undefined because no recall-safe candidate blocker applies (index not built, or no mandatory rule with a proven blocker can filter), not when returning an empty set for mandatory-missing accounts.
 
 #### Scenario: Counter starts at zero
 - **WHEN** a new FusionRun is constructed for an operation
 - **THEN** `fullScanFallbackCount` SHALL be `0`
 
 #### Scenario: Counter accumulates across multiple accounts
-- **GIVEN** two managed accounts each triggering full-scan fallback because trigram blocking was unavailable in the same run
+- **GIVEN** two managed accounts each triggering full-scan fallback because candidate blocking was unavailable in the same run
 - **WHEN** both are processed through `getCandidates`
 - **THEN** `fullScanFallbackCount` SHALL equal `2`
+
+#### Scenario: Undefined getCandidates increments the counter
+- **GIVEN** matching configuration whose mandatory rules have no recall-safe blocker (for example only Jaro-Winkler)
+- **WHEN** getCandidates is called for an account that has values for those attributes
+- **THEN** getCandidates SHALL return undefined
+- **AND** `fullScanFallbackCount` SHALL increment by one
 
 ### Requirement: FusionRun exposes non-copying fusion account iteration
 
