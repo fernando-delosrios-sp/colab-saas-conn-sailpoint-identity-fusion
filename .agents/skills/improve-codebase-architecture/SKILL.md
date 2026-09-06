@@ -15,12 +15,7 @@ This command is _informed_ by the project's domain model and built on a shared d
 
 ## Mode detection
 
-Before domain-model guidance, check whether OpenSpec is present in the target repo (same detection as `domain-modeling`):
-
-- `openspec/config.yaml` exists, or
-- `openspec/specs/` exists
-
-If either is true, follow **OpenSpec mode**. Otherwise follow **Legacy mode**.
+OpenSpec mode: see [OPENSPEC-MODE.md](../domain-modeling/OPENSPEC-MODE.md) §Detection. If OpenSpec mode, follow **OpenSpec mode**; otherwise **Legacy mode**.
 
 ### OpenSpec mode
 

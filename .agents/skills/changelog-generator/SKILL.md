@@ -1,36 +1,13 @@
 ---
 name: changelog-generator
-description: Creates user-facing changelogs from spec changes and git history. Analyzes commits (often one spec at a time), OpenSpec capabilities when available, and diffs; categorizes changes; proposes semver bumps (MAJOR/MINOR/PATCH); and transforms technical work into clear release notes. Never adds unreleased sections.
+description: Changelog from spec changes and git history. Never adds unreleased sections.
 ---
 
 # Changelog Generator
 
-This skill transforms spec work and git commits into polished, user-facing changelogs.
+Transform spec work and git commits into user-facing release notes.
 
-## When to Use This Skill
-
-- Preparing release notes for a new version
-- Creating weekly or monthly product update summaries
-- Documenting changes for customers
-- Writing changelog entries for app store submissions
-- Generating update notifications
-- Creating internal release documentation
-- Maintaining a public changelog/product updates page
-- Closing an OpenSpec apply step (covers user-visible Capabilities from the proposal)
-
-## Role
-
-You are a **technical release writer** specializing in user-facing changelogs. You turn spec work and git history into clear, scannable release notes that customers and operators understand.
-
-**Competencies:**
-
-- Reading git history and diffs; grouping spec-by-spec commits into single user-visible changes
-- Mapping Conventional Commits and OpenSpec Capabilities to changelog categories
-- Writing in benefits-focused language (public mode) or traceable language (internal mode)
-- Applying [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) structure with ISO 8601 dates, semver release headings, and emoji category headings
-- Proposing semver bumps from classified changes; idempotent updates to `CHANGELOG.md` without duplicating release sections
-
----
+Category headings, audience modes, format examples, and bump edge cases live in [reference.md](reference.md).
 
 ## INPUT
 
@@ -38,7 +15,6 @@ You are a **technical release writer** specializing in user-facing changelogs. Y
 
 | Source                 | Path / command                                          | Purpose                                                 |
 | ---------------------- | ------------------------------------------------------- | ------------------------------------------------------- |
-| Changelog skill spec   | `@./SKILL.md`                                           | Format rules, generation process, validation gates      |
 | Existing changelog     | `@./CHANGELOG.md` (repo root)                           | Avoid duplicates; merge into today's section if present |
 | Active change proposal | `<change-root>/proposal.md`                             | User-visible Capabilities checklist (when present)      |
 | Git commit range       | `git log <range> --oneline`                             | Primary history source; group by spec/feature           |
@@ -77,46 +53,7 @@ When no folder resolves after all four steps, record OpenSpec inputs as absent a
 
 When user-visible changes exist, **propose a semver bump** per **Version bump** below — never write an unreleased section or a date-only heading.
 
-See **Change Categories** and **Version bump** below. See `reference.md` for format examples, bump edge cases, model specs, and audience modes.
-
----
-
-## Change Categories
-
-Use exactly one category per grouped change. Category headings use a fixed emoji + label — the emoji is decorative; the **label text is canonical** for validation.
-
-| Category | Heading | Conventional Commits | Include when | Exclude |
-| --- | --- | --- | --- | --- |
-| **New Features** | `### ✨ New Features` | `feat:` | New user-visible capability, screen, API surface, integration, or behavior that did not exist before | Internal scaffolding, feature flags with no user path yet, refactors that only rename code |
-| **Improvements** | `### 🔧 Improvements` | `perf:`, user-visible `refactor:`, `style:` (UI polish) | Existing behavior works better: faster, clearer UX, better defaults, smoother flows — no new capability | Pure code cleanup, internal-only perf, dependency bumps with no user impact |
-| **Fixes** | `### 🐛 Fixes` | `fix:` | Restores expected behavior; resolves incorrect output, crashes, broken flows, or regressions | Test-only fixes, CI/lint fixes, “fix” commits that only affect developers |
-| **Breaking Changes** | `### ⚠️ Breaking Changes` | `BREAKING CHANGE` footer, `!` after type (`feat!:`, `fix!:`), explicit breaking notes | Contract, API, config, or behavior change that breaks existing integrations or requires user action | Internal breaking refactors with no external contract change |
-| **Documentation** | `### 📚 Documentation` | `docs:` | User-facing docs, guides, help center, README sections customers read, API reference prose | Internal ADRs, code comments, agent/skill docs unless shipped to users |
-| **Security** | `### 🔒 Security` | `security:` (or `fix:` when clearly a CVE/patch) | Security patches, vulnerability remediations, hardening users should know about | Routine dependency bumps without a disclosed security impact |
-| **Deprecated** | `### ⏳ Deprecated` | deprecation notices in commit body or `deprecate:` | Features or APIs marked for removal with timeline or replacement path | Removing code without prior deprecation notice → use **Removed** |
-| **Removed** | `### 🗑️ Removed` | removal/sunset commits | Capabilities, endpoints, or UI removed in this release | Hiding UI without deleting capability (often **Improvements** or **Fixes**) |
-
-### Classification rules
-
-1. **One primary category** — pick the best fit; do not duplicate the same change under multiple headings.
-2. **User-visible first** — if the change is not user- or operator-facing, omit it from the changelog (tests, CI, chore, internal refactors).
-3. **Breaking wins** — if a change is both a feature and breaking, file under **Breaking Changes** and mention the new behavior in the bullet.
-4. **Security vs Fixes** — use **Security** when the commit message, advisory, or diff indicates a vulnerability or hardening users must know about; otherwise **Fixes**.
-5. **Documentation is not a catch-all** — README tweaks for developers only stay out unless the audience is internal mode and the user asked for them.
-6. **Empty sections omitted** — never emit a category heading with zero bullets.
-
-### Prefix quick reference
-
-```
-feat:     → ✨ New Features
-fix:      → 🐛 Fixes (or 🔒 Security when security-related)
-perf:     → 🔧 Improvements
-refactor: → 🔧 Improvements (only if user-visible outcome)
-docs:     → 📚 Documentation
-style:    → 🔧 Improvements (UI/UX polish) or omit if internal
-test/ci/chore/build: → omit unless operator-facing
-feat! / fix! / BREAKING CHANGE: → ⚠️ Breaking Changes
-```
+Category mapping and prefix quick reference: [reference.md](reference.md).
 
 ---
 
@@ -150,8 +87,6 @@ User-provided semver overrides the computed target when explicit.
 
 ## PHASES
 
-**Model specification:** Sonnet for Phases 1–2; Opus for Phase 3; Sonnet for Phase 4. See `reference.md`.
-
 Every bullet must **trace** to a commit, diff, or OpenSpec capability — do not invent features or fixes.
 
 ### Phase 1: Scope
@@ -171,7 +106,7 @@ Every bullet must **trace** to a commit, diff, or OpenSpec capability — do not
 - For each group with `feat`, `fix`, or breaking signal, read the relevant diff; note user-visible outcomes.
 - Exclude internal-only work: tests, CI, refactors with no user impact, chore unless operator-facing.
 - Optionally enrich from PR descriptions when they exist; do not fail if none exist.
-- Map each group to a category per **Change Categories**.
+- Map each group to a category per [reference.md](reference.md).
 - Assign release date: `YYYY-MM-DD` (today unless user specifies otherwise).
 - Compute proposed semver per **Version bump** from baseline + categories; if no user-visible changes, stop — no release section.
 - Cross-check grouped changes against OpenSpec user-visible Capabilities checklist (when present).
@@ -216,7 +151,7 @@ Every bullet must **trace** to a commit, diff, or OpenSpec capability — do not
 - Confirm all validation gates pass:
 
 - [ ] ISO 8601 date + semver in heading (`## YYYY-MM-DD · vX.Y.Z`); no `[Unreleased]` / `Unreleased` sections
-- [ ] Category headings match **Change Categories** (emoji + canonical label)
+- [ ] Category headings match [reference.md](reference.md) (emoji + canonical label)
 - [ ] No empty category sections
 - [ ] No duplicate titles within the release
 - [ ] Every ⚠️ entry states who is affected + migration when applicable
@@ -233,68 +168,3 @@ Every bullet must **trace** to a commit, diff, or OpenSpec capability — do not
 - Propose manifest `version` (and git tag when releasing) matching approved semver.
 - **CHECKPOINT:** Present final changelog section, proposed version bump, and brief summary before commit/publish.
 - **Done when:** `CHANGELOG.md` updated; all validation gates confirmed; user approves changelog and version bump.
-
----
-
-## EXPECTATIONS
-
-### Deliverable
-
-An updated `@./CHANGELOG.md` with a new or merged release section. See `reference.md` for format example.
-
-### Audience
-
-- **Default (public):** End users and customers — plain language, outcome-focused.
-- **Internal (on request):** Engineering and operators — scope labels, evidence links, migration detail.
-
-### Quality standards
-
-- One bullet = one user-visible change (grouped from multiple commits when needed).
-- Descriptions explain **what changed for the user**, not which files moved.
-- Breaking changes always include actionable migration guidance when users must act.
-- Tone is concise, professional, and scannable.
-- Every bullet **traces** to a commit, diff, or OpenSpec capability.
-
-### Final package
-
-- Updated `CHANGELOG.md` at repo root
-- Proposed semver bump (baseline → target) with bump class rationale
-- Brief summary of: range used, capabilities covered, categories populated, anything excluded as internal-only
-
-### Quality gates
-
-- All Phase 4 validation checks pass
-- User checkpoint approved before treating changelog as final
-
----
-
-## NARROWING
-
-### Compliance
-
-- Follow `@./SKILL.md` as the authoritative format and process spec.
-- Format inspired by Keep a Changelog; do not invent non-standard section names unless the skill allows (Security, Deprecated, Removed).
-
-### Audience specificity
-
-- Default to **public** mode unless the user explicitly requests internal changelog.
-- Do not expose internal ticket IDs, branch names, or refactor details in public mode.
-
-### Style constraints
-
-- Release headings: always `## YYYY-MM-DD · vX.Y.Z` for shipped releases; never `[Unreleased]`
-- Category headings: use the exact emoji + labels from **Change Categories** (`✨ New Features`, `🔧 Improvements`, `🐛 Fixes`, `⚠️ Breaking Changes`, `📚 Documentation`, `🔒 Security`, `⏳ Deprecated`, `🗑️ Removed`)
-- Entry format: `- **Title** — Description.` (em dash, not hyphen)
-- Separators: `---` between release sections only
-
-### Trace discipline
-
-- Every bullet must trace to a commit, diff, or OpenSpec capability — do not invent features or fixes.
-- If a capability is listed in the proposal but no commit evidence exists, flag it at the checkpoint rather than fabricating an entry.
-
-### Checkpoint discipline
-
-- Do not write to `CHANGELOG.md` until Phase 2 gaps are resolved and Phase 3 draft is approved.
-- Pause at every **CHECKPOINT**; wait for user confirmation before continuing.
-- If interrupted, re-invoke with the same range — re-derive analysis from git, OpenSpec, and `CHANGELOG.md`; idempotent merge prevents duplicates.
-- For cross-session handoff, optionally use `/handoff` — not a skill requirement.

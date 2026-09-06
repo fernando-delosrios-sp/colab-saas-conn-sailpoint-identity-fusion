@@ -19,7 +19,7 @@ Every decision branches into decisions that hang off it. The **frontier** is eve
 
 ## Present a round
 
-Follow [`structured-choices`](../structured-choices/SKILL.md). One gate per round — never numbered prose lists.
+Follow [structured-choices](../structured-choices/SKILL.md). One gate per round — never numbered prose lists.
 
 **Multi-question round:** one decision-tool call (e.g. Cursor `AskQuestion`) with a `questions` entry per frontier item. The user answers each in sequence within that single gate.
 
@@ -38,4 +38,4 @@ Finding facts is your job — dispatch a sub-agent when a frontier question need
 
 ## Done
 
-Frontier empty and user confirms shared understanding (`confirm_dialog` gate). Every branch of the design tree visited, nothing left silently assumed. Do not act until confirmed.
+Frontier empty and user confirms shared understanding (`confirm_dialog` gate per structured-choices). Every branch of the design tree visited, nothing left silently assumed. Do not act until confirmed.

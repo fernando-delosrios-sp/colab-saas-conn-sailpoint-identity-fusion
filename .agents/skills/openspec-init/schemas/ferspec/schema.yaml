@@ -109,56 +109,21 @@ apply:
   requires: [tasks]
   tracks: tasks.md
   instruction: |
-    Invoke **apply-code-changes** via Skill tool when present (OpenSpec adapter — default
-    for `/opsx:apply`; skill also supports Direct adapter for explicit task folders).
+    Invoke **apply-code-changes** via Skill tool when present (OpenSpec adapter for `/opsx:apply`;
+    Direct adapter for explicit task folders). Venue, bind, and handoff live in the skill only.
 
-    Pre-flight: resolve paths from CLI — never assume repo-local `openspec/changes/<name>/`. A
-    hint-derived `--store` is only a probe; an explicit store overrides feature-branch tracking.
-    When no hint is available before the first status call, load tracking from that resolved root
-    and re-run the CLI once if it names a store. A store in an otherwise unreachable tree requires
-    an explicit `--store` or OpenSpec declared/default store. Run
-    `openspec status --change "<name>" --json` and `openspec instructions apply --change "<name>" --json`
-    (append `--store` when applicable) for `changeRoot`, `planningHome`, `artifactPaths`, and
-    `contextFiles`. Adapter output is planning-only; after apply-code-changes **bind** (step 2),
-    all artifact reads and edits use `ACTIVE_CHANGE_ROOT = WORK_CHECKOUT + CHANGE_ROOT_REL` on the
-    bound checkout — see skill venue matrix. Never edit artifacts via pre-bind `changeRoot` after bind.
+    Pre-flight: run `openspec status --change "<name>" --json` and
+    `openspec instructions apply --change "<name>" --json` (append `--store` when set) for paths
+    and `operationGuidance`. After bind, artifact I/O uses `ACTIVE_CHANGE_ROOT` on the bound checkout.
 
-    **Fallback** (skill absent): resolve paths as above; read tasks.md, specs, design from bound
-    checkout; execute tasks in order; invoke **tdd** when present; delegate commits to
-    **git-commit**; run **changelog-generator** for the Changelog group.
+    **Fallback** (skill absent): execute tasks in order; invoke **tdd** when present; delegate
+    commits to **git-commit**; run **changelog-generator** for the Changelog group.
 
-    **Completion gate — verify-aligned** (blocking — re-run after every verify-fix iteration):
-    1. All tasks.md checkboxes `[x]` (including Documentation and Changelog)
-    2. Canonical test command from tasks.md exit 0; every `#### Scenario:` → passing named test
-    3. Lint/format when tasks.md or repo docs name commands — zero new warnings from this change
-    4. `openspec validate --all --json` (from `planningHome.root`, with `--store` when set) — all `"valid": true`
-    5. design.md decisions reflected in specs — material drift = FAIL
-    6. Documentation tasks reflect actual behavior
-    7. Changelog task complete (generated during apply, not archive)
-    8. `git status --porcelain` empty on verification ref (`ORIGINAL_BRANCH` local/worktree; `FEATURE_BRANCH` remote)
+    **Verify** (blocking last gate before handoff): run `/opsx:verify` on the verification ref
+    until CRITICAL, WARNING, and SUGGESTION are all empty. Fix every issue autonomously; repeat
+    after each fix. End with a **confirmation scorecard** pass (scorecard-only — no new hunting).
+    Worktree: squash `apply-<name>` → `ORIGINAL_BRANCH` on main repo before verify.
 
-    **Worktree merge gate** (blocking before verify-aligned): squash `apply-<name>` → `ORIGINAL_BRANCH`;
-    session on main repo — never run verify on the worktree checkout.
+    **Never in apply**: archive, spec sync, archive commit, `/opsx:archive`.
 
-    **Verify-fix loop** (blocking before handoff): invoke **openspec-verify-change** or `/opsx:verify`
-    on the verification ref; fix FAILs and warnings; re-run verify-aligned; repeat until ✅ PASS.
-    Done when standalone `/opsx:verify` would confirm PASS — not surface new FAILs or warnings.
-    Apply owns verify-fix autonomously — never defer to the user.
-
-    **Invariant**: ORIGINAL_BRANCH is durable for local/worktree — no feature branch on those venues.
-    Worktree uses ephemeral `apply-<name>` squash-merged at handoff. FEATURE_BRANCH exists for
-    **remote** only (PR head). When FEATURE_BRANCH exists on origin only, track it — never recreate
-    from ORIGINAL_BRANCH.
-
-    **Setup**: interactive hosts — structured-choices **venue** gate (`local` | `worktree` | `remote`);
-    never skip because Issue or Presets are prefilled. Agent picks **parallelism** (same criteria all
-    venues); lock `venue` and `parallelism` in Presets and preset overrides. Non-interactive (CI):
-    venue from Presets else `remote` when shipping else `local`.
-
-    **Handoff**: local+single → return control on ORIGINAL_BRANCH; local+subagent and worktree →
-    squash merge onto ORIGINAL_BRANCH; remote → push FEATURE_BRANCH, PR with --base ORIGINAL_BRANCH,
-    link issue. Subagent-per-group: sequential only.
-
-    **Never in apply**: archive, spec sync, archive commit, `/opsx-archive`.
-
-    Done when verify-fix PASS and venue handoff completes.
+    Done when verify tiers are empty and venue handoff completes.

@@ -1,6 +1,6 @@
 ---
 name: improve
-description: Survey any codebase as a senior advisor and produce prioritized handoff artifacts for OTHER models/agents to execute — OpenSpec change packages (when capability specs exist) or legacy implementation plans. Strictly read-only on source code — never implements, fixes, or refactors anything itself. Use when asked to audit a codebase, find improvement opportunities (bugs, security, performance, test coverage, tech debt, migrations, DX), suggest features or where to take the project next (roadmap, product direction), or generate handoff plans for another agent to implement.
+description: Read-only codebase survey producing executor-ready handoff artifacts.
 disable-model-invocation: true
 license: MIT
 metadata:
@@ -16,12 +16,7 @@ The economics of this skill: an expensive, high-ceiling model does the part wher
 
 ## Mode detection
 
-Before intent and design doc ingestion in Phase 1, check whether OpenSpec is present in the target repo:
-
-- `openspec/config.yaml` exists, or
-- `openspec/specs/` exists with at least one capability spec
-
-If either is true, follow **OpenSpec mode** below. Otherwise follow **Legacy mode**.
+OpenSpec mode: see [OPENSPEC-MODE.md](../domain-modeling/OPENSPEC-MODE.md) §Detection. If OpenSpec mode, follow **OpenSpec mode** below; otherwise **Legacy mode**.
 
 When OpenSpec is absent and the user needs to initialize it, suggest the `openspec-init` skill.
 
@@ -138,16 +133,7 @@ Write each artifact **for the weakest plausible executor**:
 
 ## Invocation variants
 
-- Bare invocation → full workflow above.
-- `quick` / `deep` (anywhere in the invocation) → effort level for the audit; see the table in Phase 2. Composes with everything: `quick security`, `deep --issues`. Default is `standard`.
-- With a focus argument (e.g. `security`, `perf`, `tests`) → run Recon, then audit only that category, then plan.
-- `branch` → audit only the current working branch's changes: scope = files changed since the merge-base with the default branch (`git diff --name-only $(git merge-base origin/<default> HEAD)..HEAD`) plus their direct importers/callers. Light recon, all categories, usually no subagents. **Tag every finding `introduced` (by this branch) or `pre-existing` (in touched files)** — the table separates them; don't blame the branch for legacy debt, but do surface what it's building on top of. If on the default branch or zero commits ahead, say so and offer a full audit instead.
-- `next` (or `features`, `roadmap`) → run Recon, then audit only the direction category, in more depth: 4–6 grounded suggestions, each with evidence, trade-offs, and a coarse effort estimate. Selected ones become spike-scoped packages (OpenSpec) or design/spike plans (legacy), not build-everything artifacts.
-- `plan <description>` → skip the audit; the user already knows what they want. Run Recon, investigate just enough to specify it properly, and write a single package (OpenSpec) or plan (legacy). If the description is too ambiguous to specify honestly, first try to resolve each ambiguity from the codebase itself; only what's left becomes questions to the user — asked one at a time, each with a recommended answer.
-- `review-plan <path>` → **Legacy:** critique a plan in `plans/`. **OpenSpec:** critique `tasks.md` + delta specs in the change folder. Tighten in place. If you authored it this session, also have a fresh-context subagent read it cold and report ambiguities.
-- `execute <slug|plan>` → **OpenSpec:** invoke **apply-code-changes** on `openspec/changes/<slug>/`; review apply output — never edit source. **Legacy:** dispatch an executor subagent on one plan (isolated worktree), then review its diff. **Read [references/closing-the-loop.md](references/closing-the-loop.md) before the first dispatch.**
-- `reconcile` → **OpenSpec:** walk open changes per [references/openspec-change.md](references/openspec-change.md). **Legacy:** verify DONE plans, investigate BLOCKED ones, refresh drifted TODOs. See [references/closing-the-loop.md](references/closing-the-loop.md).
-- `--issues` (modifier on any planning invocation) → publish handoff artifacts as GitHub issues. **OpenSpec:** body from `proposal.md` + pointer to change folder. **Legacy:** `--body-file` the plan. Only with the explicit flag. **Before creating any issue, check whether the repo is public (`gh repo view --json visibility`). If it is, warn the user that issues are publicly visible and get explicit confirmation before publishing any package that describes a security vulnerability, credential location, or other sensitive finding.** See [references/closing-the-loop.md](references/closing-the-loop.md).
+See [references/invocation-variants.md](references/invocation-variants.md).
 
 ## Tone of the output
 

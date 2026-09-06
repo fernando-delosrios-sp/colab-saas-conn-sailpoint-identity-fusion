@@ -28,9 +28,16 @@ operations:
       - "Fallback when git-commit skill is absent: conventional commit manually, e.g. docs(openspec): archive <change-name> and sync specs — do not skip when porcelain is non-empty."
       - "Post-commit gate (blocking): git status --porcelain must be empty; when the change is under openspec/changes/archive/, confirm the latest commit includes synced specs and the archive folder via git log -1 --name-only -- openspec/specs/ openspec/changes/archive/."
       - "Do not report archive complete until the post-commit gate passes."
+  apply:
+    guidance:
+      - "Apply is incomplete until /opsx:verify reports empty CRITICAL, WARNING, and SUGGESTION tiers on the verification ref."
+      - "All tasks checked off is not handoff — run verify as the blocking last gate before reporting apply complete."
+      - "Fix every verify issue autonomously; repeat until all three tiers are empty, then run a confirmation scorecard pass (scorecard-only — no new hunting)."
+      - "Worktree venue: squash apply-<name> to ORIGINAL_BRANCH on main repo before verify."
+      - "Do not report apply complete while any verify tier still has issues."
 ```
 
-For **ferspec** projects, include the `operations.archive` block above (or equivalent prose). Other schemas may omit it or customize guidance. `openspec instructions archive --change "<name>" --json` surfaces this as `operationGuidance` for `/opsx:archive`.
+For **ferspec** projects, include the `operations.archive` and `operations.apply` blocks above (or equivalent prose). Other schemas may omit or customize guidance. `openspec instructions archive --change "<name>" --json` surfaces archive guidance as `operationGuidance` for `/opsx:archive`; `openspec instructions apply --change "<name>" --json` surfaces apply guidance for `/opsx:apply`.
 
 ### Context Building
 To build a meaningful `context` section:
