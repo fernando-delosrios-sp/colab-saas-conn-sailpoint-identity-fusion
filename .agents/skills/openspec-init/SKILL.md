@@ -1,6 +1,7 @@
 ---
 name: openspec-init
-description: Use when the user asks to initialize or update an OpenSpec project — schema refresh, config/rules sync, agent routing fragments, and companion skills. Triggers include "update openspec", "upgrade schema", and "refresh ferspec".
+description: Initialize or update an OpenSpec project — schema, config/rules, agent routing, companion skills.
+disable-model-invocation: true
 ---
 
 # openspec-init

@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: 'Session-scoped git commit with conventional message analysis and staging. Use when user asks to commit changes, create a git commit, or mentions "/commit". Commits only this session''s work — never picks up changes from concurrent sessions on the same branch. Asks for scope clarification when session work is empty or ambiguous. Private-data gate on staged diff before commit.'
+description: Session-scoped git commit with conventional message analysis.
 license: MIT
 allowed-tools: Bash
 ---
@@ -8,44 +8,6 @@ allowed-tools: Bash
 # Git Commit with Conventional Commits
 
 Create standardized, semantic git commits scoped to **this session's work**. Analyze the diff for type, scope, and message — but stage and commit **only in-scope paths**.
-
-## Conventional Commit Format
-
-```
-<type>[optional scope]: <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-## Commit Types
-
-| Type       | Purpose                        |
-| ---------- | ------------------------------ |
-| `feat`     | New feature                    |
-| `fix`      | Bug fix                        |
-| `docs`     | Documentation only             |
-| `style`    | Formatting/style (no logic)    |
-| `refactor` | Code refactor (no feature/fix) |
-| `perf`     | Performance improvement        |
-| `test`     | Add/update tests               |
-| `build`    | Build system/dependencies      |
-| `ci`       | CI/config changes              |
-| `chore`    | Maintenance/misc               |
-| `revert`   | Revert commit                  |
-
-## Breaking Changes
-
-```
-# Exclamation mark after type/scope
-feat!: remove deprecated endpoint
-
-# BREAKING CHANGE footer
-feat: allow config to extend other configs
-
-BREAKING CHANGE: `extends` key behavior changed
-```
 
 ## Workflow
 
@@ -88,7 +50,7 @@ git add path/to/in-scope-file1 path/to/in-scope-file2
 git add -p path/to/mixed-file   # when only some hunks belong to this session
 ```
 
-**Never** use `git add -A`, `git add .`, or other catch-all staging when out-of-scope dirty files exist.
+Use path-specific `git add` only — never `git add -A` or `git add .` when out-of-scope dirty files exist.
 
 Stage only paths destined to pass the private-data gate (step 4).
 
@@ -144,18 +106,9 @@ EOF
 
 **Done when:** commit succeeds and `git status` shows no staged in-scope changes remaining (out-of-scope dirt may still exist — that is expected).
 
-## Best Practices
+## Safety
 
-- One logical change per commit
-- Present tense: "add" not "added"
-- Imperative mood: "fix bug" not "fixes bug"
-- Reference issues: `Closes #123`, `Refs #456`
-- Keep description under 72 characters
-
-## Git Safety Protocol
-
-- NEVER update git config
-- NEVER run destructive commands (--force, hard reset) without explicit request
-- NEVER skip hooks (--no-verify) unless user asks
-- NEVER force push to main/master
-- If commit fails due to hooks, fix and create NEW commit (don't amend)
+- Session scope only — never pick up concurrent-session dirt (steps 1–3).
+- Private-data gate blocks commit until resolved or user proceeds via gate (step 4).
+- No git config updates, destructive commands, hook skips, or force push to main/master unless the user explicitly requests.
+- Failed hooks: fix and create a **new** commit — do not amend unless the user asks.

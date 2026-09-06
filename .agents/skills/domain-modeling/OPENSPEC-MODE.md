@@ -9,7 +9,7 @@ Use this reference when `openspec/config.yaml` or `openspec/specs/` exists in th
 OpenSpec mode activates when either exists:
 
 - `openspec/config.yaml`
-- `openspec/specs/` (directory with at least one capability spec)
+- `openspec/specs/` (directory)
 
 Otherwise use legacy mode ([CONTEXT-FORMAT.md](./CONTEXT-FORMAT.md), [ADR-FORMAT.md](./ADR-FORMAT.md)).
 

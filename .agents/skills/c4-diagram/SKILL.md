@@ -1,6 +1,6 @@
 ---
 name: c4-diagram
-description: Generate C4 Container diagrams (Simon Brown standard) as editable .drawio XML files. Use when the user asks for architecture diagrams, system diagrams, C4 diagrams, container diagrams, or wants to visualize system architecture. Also use proactively when explaining systems with 3+ components where a visual would clarify the architecture.
+description: C4 Container diagrams as editable .drawio XML files.
 ---
 
 # C4 Container Diagram Generator

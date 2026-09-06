@@ -1,6 +1,43 @@
 # Changelog Generator Reference
 
-Category definitions and emoji assignments live in [`SKILL.md` § Change Categories](./SKILL.md#change-categories). This file covers model selection, format examples, and audience modes.
+Category definitions, classification rules, and emoji assignments. SKILL.md links here for Phase 2 mapping.
+
+## Change Categories
+
+Use exactly one category per grouped change. Category headings use a fixed emoji + label — the emoji is decorative; the **label text is canonical** for validation.
+
+| Category | Heading | Conventional Commits | Include when | Exclude |
+| --- | --- | --- | --- | --- |
+| **New Features** | `### ✨ New Features` | `feat:` | New user-visible capability, screen, API surface, integration, or behavior that did not exist before | Internal scaffolding, feature flags with no user path yet, refactors that only rename code |
+| **Improvements** | `### 🔧 Improvements` | `perf:`, user-visible `refactor:`, `style:` (UI polish) | Existing behavior works better: faster, clearer UX, better defaults, smoother flows — no new capability | Pure code cleanup, internal-only perf, dependency bumps with no user impact |
+| **Fixes** | `### 🐛 Fixes` | `fix:` | Restores expected behavior; resolves incorrect output, crashes, broken flows, or regressions | Test-only fixes, CI/lint fixes, “fix” commits that only affect developers |
+| **Breaking Changes** | `### ⚠️ Breaking Changes` | `BREAKING CHANGE` footer, `!` after type (`feat!:`, `fix!:`), explicit breaking notes | Contract, API, config, or behavior change that breaks existing integrations or requires user action | Internal breaking refactors with no external contract change |
+| **Documentation** | `### 📚 Documentation` | `docs:` | User-facing docs, guides, help center, README sections customers read, API reference prose | Internal ADRs, code comments, agent/skill docs unless shipped to users |
+| **Security** | `### 🔒 Security` | `security:` (or `fix:` when clearly a CVE/patch) | Security patches, vulnerability remediations, hardening users should know about | Routine dependency bumps without a disclosed security impact |
+| **Deprecated** | `### ⏳ Deprecated` | deprecation notices in commit body or `deprecate:` | Features or APIs marked for removal with timeline or replacement path | Removing code without prior deprecation notice → use **Removed** |
+| **Removed** | `### 🗑️ Removed` | removal/sunset commits | Capabilities, endpoints, or UI removed in this release | Hiding UI without deleting capability (often **Improvements** or **Fixes**) |
+
+### Classification rules
+
+1. **One primary category** — pick the best fit; do not duplicate the same change under multiple headings.
+2. **User-visible first** — if the change is not user- or operator-facing, omit it from the changelog (tests, CI, chore, internal refactors).
+3. **Breaking wins** — if a change is both a feature and breaking, file under **Breaking Changes** and mention the new behavior in the bullet.
+4. **Security vs Fixes** — use **Security** when the commit message, advisory, or diff indicates a vulnerability or hardening users must know about; otherwise **Fixes**.
+5. **Documentation is not a catch-all** — README tweaks for developers only stay out unless the audience is internal mode and the user asked for them.
+6. **Empty sections omitted** — never emit a category heading with zero bullets.
+
+### Prefix quick reference
+
+```
+feat:     → ✨ New Features
+fix:      → 🐛 Fixes (or 🔒 Security when security-related)
+perf:     → 🔧 Improvements
+refactor: → 🔧 Improvements (only if user-visible outcome)
+docs:     → 📚 Documentation
+style:    → 🔧 Improvements (UI/UX polish) or omit if internal
+test/ci/chore/build: → omit unless operator-facing
+feat! / fix! / BREAKING CHANGE: → ⚠️ Breaking Changes
+```
 
 ## Model Specification
 

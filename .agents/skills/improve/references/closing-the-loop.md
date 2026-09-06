@@ -83,7 +83,7 @@ Running verification commands inside the executor's worktree is fine — it's is
 
 1. Confirm `openspec/changes/<slug>/` exists. Read **Apply status** from that folder's `proposal.md`. Every **Depends on** slug must be DONE (see [openspec-change.md](./openspec-change.md)); if not, stop and name the missing dependency.
 2. Run the drift check from `design.md` yourself before invoking apply.
-3. Invoke **apply-code-changes** on the change folder — the skill owns venue gate, bind, task execution, and verify-fix.
+3. Invoke **apply-code-changes** on the change folder — the skill owns venue gate, bind, task execution, and verify last gate.
 4. Review apply handoff like a tech lead: re-run verification criteria from `tasks.md`, check scope against `design.md`, read the diff — never edit source yourself.
 5. Write this package's **Status** (`DONE` | `BLOCKED`) in `proposal.md` Apply status. **Merging and archive are the user's decision** — never run `/opsx:archive` from improve.
 
