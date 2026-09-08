@@ -690,7 +690,7 @@ describe('ClientService', () => {
     })
 
     // -------------------------------------------------------------------------
-    // Pagination circuit (gateway failure cooldown-then-abort)
+    // Pagination circuit (gateway-failure pool then shed)
     // -------------------------------------------------------------------------
 
     const gateway504 = () => {
@@ -705,48 +705,44 @@ describe('ClientService', () => {
         return err
     }
 
-    it('parallel window sheds, cools down, and resumes after a successful probe', async () => {
+    const warnText = () => (mockLog.warn as any).mock.calls.map((call: string[]) => String(call[0]))
+
+    it('parallel window 12 trips the pool at 10 and aborts without cooldown', async () => {
+        vi.useFakeTimers()
         const sc = {
             ...mockConfig,
             pageSize: 1,
             sailPointListMax: 250,
-            parallelBatchSize: 4,
-            paginationCooldownMs: 0,
+            parallelBatchSize: 12,
         }
         const client = new ClientService(mockAdapter, null, sc, mockLog)
         activeClients.push(client)
 
-        const attempts = new Map<number, number>()
         let hangAborted = false
-
         mockAdapter.accountsApi = {
             listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
                 const offset = params.offset ?? 0
-                attempts.set(offset, (attempts.get(offset) ?? 0) + 1)
                 if (offset === 0) {
-                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '6' } })
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '13' } })
                 }
-                if (offset >= 1 && offset <= 3 && attempts.get(offset) === 1) {
+                if (offset >= 1 && offset <= 10) {
                     return Promise.reject(gateway504())
                 }
-                if (offset === 4 && attempts.get(offset) === 1) {
-                    return new Promise((_resolve, reject) => {
-                        const signal = getRequestAbortSignal()
-                        if (!signal) {
-                            reject(new Error('expected request abort signal on in-flight page'))
-                            return
-                        }
-                        signal.addEventListener(
-                            'abort',
-                            () => {
-                                hangAborted = true
-                                reject(signal.reason ?? new Error('Aborted'))
-                            },
-                            { once: true }
-                        )
-                    })
-                }
-                return Promise.resolve({ data: [{ id: `a${offset}` }] })
+                return new Promise((_resolve, reject) => {
+                    const signal = getRequestAbortSignal()
+                    if (!signal) {
+                        reject(new Error('expected request abort signal on in-flight page'))
+                        return
+                    }
+                    signal.addEventListener(
+                        'abort',
+                        () => {
+                            hangAborted = true
+                            reject(signal.reason ?? new Error('Aborted'))
+                        },
+                        { once: true }
+                    )
+                })
             }),
         } as any
 
@@ -754,7 +750,67 @@ describe('ClientService', () => {
 
         const gen = client.call(
             (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { context: 'circuit-resume', paginate: { mode: 'parallel', baseParams: {}, batchSize: 4 } }
+            { context: 'pool-trip', paginate: { mode: 'parallel', baseParams: {}, batchSize: 12 } }
+        )
+
+        let thrown: unknown
+        const collected: string[] = []
+        const consume = (async () => {
+            try {
+                for await (const page of gen) {
+                    collected.push(...page.map((item: { id: string }) => item.id))
+                }
+            } catch (error: unknown) {
+                thrown = error
+                throw error
+            }
+        })()
+
+        try {
+            const assertion = expect(consume).rejects.toThrow(PaginationError)
+            await vi.advanceTimersByTimeAsync(0)
+            await assertion
+            expect(await unrelated).toBe('unrelated-ok')
+            expect(thrown).toBeInstanceOf(PaginationError)
+            expect((thrown as PaginationError).itemsCollected).toBe(1)
+            expect((thrown as PaginationError).message).toContain('pool-trip')
+            expect(collected).toEqual(['a0'])
+            expect(hangAborted).toBe(true)
+            expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/shedding/i))
+            expect(warnText().some((line: string) => /cooldown|probe/i.test(line))).toBe(false)
+        } finally {
+            vi.useRealTimers()
+        }
+    }, 5000)
+
+    it('successful page leaves the gateway-failure pool and the call continues', async () => {
+        const sc = {
+            ...mockConfig,
+            pageSize: 1,
+            sailPointListMax: 250,
+            parallelBatchSize: 12,
+        }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        const attempts = new Map<number, number>()
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                attempts.set(offset, (attempts.get(offset) ?? 0) + 1)
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '13' } })
+                }
+                if (offset >= 1 && offset <= 9 && attempts.get(offset) === 1) {
+                    return Promise.reject(gateway504())
+                }
+                return Promise.resolve({ data: [{ id: `a${offset}` }] })
+            }),
+        } as any
+
+        const gen = client.call(
+            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
+            { paginate: { mode: 'parallel', baseParams: {}, batchSize: 12 } }
         )
 
         const collected: string[] = []
@@ -762,68 +818,18 @@ describe('ClientService', () => {
             collected.push(...page.map((item: { id: string }) => item.id))
         }
 
-        expect(await unrelated).toBe('unrelated-ok')
-        expect(collected).toEqual(['a0', 'a1', 'a2', 'a3', 'a4', 'a5'])
-        expect(hangAborted).toBe(true)
-        expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/shedding/i))
-        expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/cooldown/i))
-        expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/probe/i))
+        expect(collected).toHaveLength(13)
         expect(attempts.get(1)).toBeGreaterThanOrEqual(2)
+        expect(mockLog.warn).not.toHaveBeenCalledWith(expect.stringMatching(/shedding/i))
     }, 5000)
 
-    it('does not sleep the default 30s cooldown when paginationCooldownMs is injected', async () => {
+    it('parallel window 8 trips the pool at 8 without cooldown', async () => {
         vi.useFakeTimers()
         const sc = {
             ...mockConfig,
             pageSize: 1,
             sailPointListMax: 250,
-            parallelBatchSize: 3,
-            paginationCooldownMs: 40,
-        }
-        const client = new ClientService(mockAdapter, null, sc, mockLog)
-        activeClients.push(client)
-
-        const attempts = new Map<number, number>()
-        mockAdapter.accountsApi = {
-            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
-                const offset = params.offset ?? 0
-                attempts.set(offset, (attempts.get(offset) ?? 0) + 1)
-                if (offset === 0) {
-                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '4' } })
-                }
-                if (attempts.get(offset) === 1) {
-                    return Promise.reject(gateway504())
-                }
-                return Promise.resolve({ data: [{ id: `a${offset}` }] })
-            }),
-        } as any
-
-        try {
-            const gen = client.call(
-                (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-                { paginate: { mode: 'parallel', baseParams: {}, batchSize: 3 } }
-            )
-            const consume = (async () => {
-                for await (const _page of gen) {
-                    // consume
-                }
-            })()
-            await vi.advanceTimersByTimeAsync(40)
-            await consume
-            expect(mockLog.warn).toHaveBeenCalledWith(expect.stringContaining('40ms'))
-            expect(mockLog.warn).not.toHaveBeenCalledWith(expect.stringContaining('30000ms'))
-        } finally {
-            vi.useRealTimers()
-        }
-    })
-
-    it('probe gateway failure aborts with PaginationError and no silent partial success', async () => {
-        const sc = {
-            ...mockConfig,
-            pageSize: 1,
-            sailPointListMax: 250,
-            parallelBatchSize: 3,
-            paginationCooldownMs: 0,
+            parallelBatchSize: 8,
         }
         const client = new ClientService(mockAdapter, null, sc, mockLog)
         activeClients.push(client)
@@ -832,7 +838,7 @@ describe('ClientService', () => {
             listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
                 const offset = params.offset ?? 0
                 if (offset === 0) {
-                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '4' } })
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '9' } })
                 }
                 return Promise.reject(gateway504())
             }),
@@ -840,73 +846,76 @@ describe('ClientService', () => {
 
         const gen = client.call(
             (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { context: 'probe-fail', paginate: { mode: 'parallel', baseParams: {} } }
+            { paginate: { mode: 'parallel', baseParams: {}, batchSize: 8 } }
         )
 
-        let thrown: unknown
-        try {
+        const consume = (async () => {
             for await (const _page of gen) {
-                // consume until circuit abort
+                // consume until pool abort
             }
-        } catch (error: unknown) {
-            thrown = error
-        }
+        })()
 
-        expect(thrown).toBeInstanceOf(PaginationError)
-        expect((thrown as PaginationError).itemsCollected).toBe(1)
-        expect((thrown as PaginationError).message).toContain('probe-fail')
-        const cooldownWarns = (mockLog.warn as any).mock.calls.filter((call: string[]) =>
-            String(call[0]).toLowerCase().includes('cooldown')
-        )
-        expect(cooldownWarns).toHaveLength(1)
+        try {
+            const assertion = expect(consume).rejects.toThrow(PaginationError)
+            await vi.advanceTimersByTimeAsync(0)
+            await assertion
+            expect(warnText().some((line: string) => /cooldown/i.test(line))).toBe(false)
+        } finally {
+            vi.useRealTimers()
+        }
     })
 
-    it('second streak after resume aborts without another cooldown', async () => {
-        const sc = {
-            ...mockConfig,
-            pageSize: 1,
-            sailPointListMax: 250,
-            parallelBatchSize: 3,
-            paginationCooldownMs: 0,
-        }
+    it('sequential paging fails on the first gateway failure without cooldown', async () => {
+        vi.useFakeTimers()
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250 }
         const client = new ClientService(mockAdapter, null, sc, mockLog)
         activeClients.push(client)
 
-        const attempts = new Map<number, number>()
         mockAdapter.accountsApi = {
-            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
-                const offset = params.offset ?? 0
-                attempts.set(offset, (attempts.get(offset) ?? 0) + 1)
-                if (offset === 0) {
-                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '7' } })
-                }
-                const n = attempts.get(offset)!
-                if (offset <= 3 && n === 1) {
-                    return Promise.reject(gateway504())
-                }
-                if (offset >= 4 && offset <= 6) {
-                    return Promise.reject(gateway504())
-                }
-                return Promise.resolve({ data: [{ id: `a${offset}` }] })
-            }),
+            listAccounts: vi.fn().mockRejectedValue(gateway504()),
         } as any
 
-        const gen = client.call(
+        const promise = client.call(
             (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { paginate: { mode: 'parallel', baseParams: {}, batchSize: 3 } }
+            { paginate: { mode: 'sequential', baseParams: {} } }
         )
 
-        await expect(async () => {
-            for await (const _page of gen) {
-                // first streak resumes; second streak must throw
+        try {
+            await expect(promise).rejects.toThrow(PaginationError)
+            expect(mockAdapter.accountsApi.listAccounts).toHaveBeenCalledTimes(1)
+            expect(warnText().some((line: string) => /cooldown/i.test(line))).toBe(false)
+        } finally {
+            vi.useRealTimers()
+        }
+    })
+
+    it('searchAfter paging fails on the first gateway failure without cooldown', async () => {
+        vi.useFakeTimers()
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250 }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.searchApi = {
+            searchPost: vi.fn().mockRejectedValue(gateway504()),
+        } as any
+
+        const promise = client.call(
+            (_api: IscApiSurface, params: any) => (_api.search.searchPost as any)(params),
+            {
+                paginate: {
+                    mode: 'searchAfter',
+                    search: { indices: ['identities'], query: { query: '*' } } as any,
+                },
             }
-        }).rejects.toThrow(PaginationError)
-
-        const cooldownWarns = (mockLog.warn as any).mock.calls.filter((call: string[]) =>
-            String(call[0]).toLowerCase().includes('cooldown')
         )
-        expect(cooldownWarns).toHaveLength(1)
-        expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/second gateway-failure streak/i))
+
+        try {
+            await expect(promise).rejects.toThrow(PaginationError)
+            expect(mockAdapter.searchApi.searchPost).toHaveBeenCalledTimes(1)
+            expect(warnText().some((line: string) => /cooldown/i.test(line))).toBe(false)
+        } finally {
+            vi.useRealTimers()
+        }
     })
 
     it('HTTP 429 follows Retry-After and does not trip the pagination circuit', async () => {
@@ -917,7 +926,7 @@ describe('ClientService', () => {
             maxRetries: 20,
             enablePriority: true,
         })
-        const sc = { ...mockConfig, pageSize: 2, sailPointListMax: 250, paginationCooldownMs: 0 }
+        const sc = { ...mockConfig, pageSize: 2, sailPointListMax: 250 }
         const client = new ClientService(mockAdapter, realQueue, sc, mockLog)
         activeClients.push(client)
 
@@ -944,7 +953,7 @@ describe('ClientService', () => {
             await vi.runAllTimersAsync()
             await expect(promise).resolves.toEqual([{ id: 'a' }])
             expect(calls).toBe(2)
-            expect(mockLog.warn).not.toHaveBeenCalledWith(expect.stringMatching(/shedding|cooldown/i))
+            expect(mockLog.warn).not.toHaveBeenCalledWith(expect.stringMatching(/shedding/i))
         } finally {
             realQueue.stop()
             realQueue.clear()
@@ -953,8 +962,7 @@ describe('ClientService', () => {
     })
 
     it('exhausted HTTP 500 throws PaginationError without cooldown', async () => {
-        const sc = { ...mockConfig, paginationCooldownMs: 0 }
-        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        const client = new ClientService(mockAdapter, null, mockConfig, mockLog)
         activeClients.push(client)
 
         mockAdapter.accountsApi = {
@@ -968,30 +976,36 @@ describe('ClientService', () => {
             )
         ).rejects.toThrow(PaginationError)
 
-        expect(mockLog.warn).not.toHaveBeenCalledWith(expect.stringMatching(/cooldown/i))
+        expect(warnText().some((line: string) => /cooldown/i.test(line))).toBe(false)
     })
 
-    it('caller abort during cooldown skips the probe', async () => {
+    it('caller abort during paging fails without a cooldown wait', async () => {
         vi.useFakeTimers()
-        const sc = {
-            ...mockConfig,
-            pageSize: 1,
-            sailPointListMax: 250,
-            paginationCooldownMs: 5_000,
-        }
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250 }
         const client = new ClientService(mockAdapter, null, sc, mockLog)
         activeClients.push(client)
         const abort = new AbortController()
-        let calls = 0
 
         mockAdapter.accountsApi = {
             listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
-                calls++
                 const offset = params.offset ?? 0
                 if (offset === 0) {
                     return Promise.resolve({ data: [{ id: 'a0' }] })
                 }
-                return Promise.reject(gateway504())
+                return new Promise((_resolve, reject) => {
+                    const signal = getRequestAbortSignal()
+                    if (!signal) {
+                        reject(new Error('expected request abort signal on in-flight page'))
+                        return
+                    }
+                    signal.addEventListener(
+                        'abort',
+                        () => {
+                            reject(signal.reason ?? new Error('Aborted'))
+                        },
+                        { once: true }
+                    )
+                })
             }),
         } as any
 
@@ -1001,70 +1015,13 @@ describe('ClientService', () => {
                 { abortSignal: abort.signal, paginate: { mode: 'sequential', baseParams: {} } }
             )
             const assertion = expect(promise).rejects.toThrow(PaginationError)
-            await vi.advanceTimersByTimeAsync(10)
+            await vi.advanceTimersByTimeAsync(0)
             abort.abort()
-            await vi.advanceTimersByTimeAsync(5_000)
             await assertion
-            expect(calls).toBe(4)
+            expect(warnText().some((line: string) => /cooldown/i.test(line))).toBe(false)
         } finally {
             vi.useRealTimers()
         }
-    })
-
-    it('sequential and searchAfter use the same circuit and probe the same offset or cursor', async () => {
-        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, paginationCooldownMs: 0 }
-        const seqClient = new ClientService(mockAdapter, null, sc, mockLog)
-        activeClients.push(seqClient)
-
-        const seqOffsets: number[] = []
-        mockAdapter.accountsApi = {
-            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
-                const offset = params.offset ?? 0
-                seqOffsets.push(offset)
-                if (offset === 0) {
-                    return Promise.resolve({ data: [{ id: 'a0' }] })
-                }
-                return Promise.reject(gateway504())
-            }),
-        } as any
-
-        await expect(
-            seqClient.call(
-                (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-                { paginate: { mode: 'sequential', baseParams: {} } }
-            )
-        ).rejects.toThrow(PaginationError)
-
-        expect(seqOffsets.filter((offset) => offset === 1).length).toBeGreaterThanOrEqual(4)
-
-        const searchClient = new ClientService(mockAdapter, null, sc, mockLog)
-        activeClients.push(searchClient)
-        const searchAfterBodies: unknown[] = []
-        mockAdapter.searchApi = {
-            searchPost: vi.fn().mockImplementation((params: any) => {
-                searchAfterBodies.push(params.search?.searchAfter)
-                if (!params.search?.searchAfter) {
-                    return Promise.resolve({ data: [{ id: 'id1' }] })
-                }
-                return Promise.reject(gateway504())
-            }),
-        } as any
-
-        await expect(
-            searchClient.call(
-                (_api: IscApiSurface, params: any) => (_api.search.searchPost as any)(params),
-                {
-                    paginate: {
-                        mode: 'searchAfter',
-                        search: { indices: ['identities'], query: { query: '*' } } as any,
-                    },
-                }
-            )
-        ).rejects.toThrow(PaginationError)
-
-        const failedCursor = searchAfterBodies.filter((cursor) => cursor !== undefined)
-        expect(failedCursor.length).toBeGreaterThanOrEqual(4)
-        expect(new Set(failedCursor.map((cursor) => JSON.stringify(cursor))).size).toBe(1)
     })
 
     it('paginated 504 uses at most one retry per page fetch', async () => {
@@ -1075,7 +1032,7 @@ describe('ClientService', () => {
             maxRetries: 20,
             enablePriority: true,
         })
-        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, paginationCooldownMs: 0 }
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250 }
         const client = new ClientService(mockAdapter, realQueue, sc, mockLog)
         activeClients.push(client)
 
@@ -1091,7 +1048,7 @@ describe('ClientService', () => {
             const assertion = expect(promise).rejects.toThrow(PaginationError)
             await vi.runAllTimersAsync()
             await assertion
-            expect(mockAdapter.accountsApi.listAccounts).toHaveBeenCalledTimes(8)
+            expect(mockAdapter.accountsApi.listAccounts).toHaveBeenCalledTimes(2)
         } finally {
             realQueue.stop()
             realQueue.clear()
@@ -1132,7 +1089,7 @@ describe('ClientService', () => {
     })
 
     it('paginateSearchApiGenerator applies the pagination circuit on gateway failures', async () => {
-        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, paginationCooldownMs: 0 }
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250 }
         const client = new ClientService(mockAdapter, null, sc, mockLog)
         activeClients.push(client)
 
@@ -1157,8 +1114,8 @@ describe('ClientService', () => {
             }
         }).rejects.toThrow(PaginationError)
 
-        expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/cooldown/i))
-        expect(mockAdapter.searchApi.searchPost.mock.calls.length).toBeGreaterThanOrEqual(4)
+        expect(warnText().some((line: string) => /cooldown/i.test(line))).toBe(false)
+        expect(mockAdapter.searchApi.searchPost.mock.calls.length).toBe(2)
     })
 
     // -------------------------------------------------------------------------

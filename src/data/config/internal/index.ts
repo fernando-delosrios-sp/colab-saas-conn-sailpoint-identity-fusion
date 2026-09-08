@@ -22,10 +22,8 @@ export function getInternalConfigFlat(): {
     tokenUrlPath: string
     processingWaitConstant: number
     retriesConstant: number
-    consecutiveGatewayFailures: number
-    paginationCooldownMs: number
+    inFlightGatewayFailureCap: number
     paginationGatewayMaxRetries: number
-    maxCooldownsPerStream: number
     maxRetryDelayMs: number
     retryJitterFactor: number
     rateLimitJitterFactor: number

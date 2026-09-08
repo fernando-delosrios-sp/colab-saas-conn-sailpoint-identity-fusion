@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-09-08 · v2.2.1
+
+### 🔧 Improvements
+
+- **Paginated fetches abort on a gateway-failure pool, with no 30s wait** — When enough in-flight pages on one pagination stream have seen HTTP 504 or timeout and have not yet succeeded (`min(10, this stream’s window)`), Identity Fusion sheds that stream and throws `PaginationError` immediately. There is no cooldown and no probe. Sequential and searchAfter fail on the first gateway failure. Paginated 504s still use at most one extra retry; OFFSET paging, HTTP 429 Retry-After, and non-paginated queue retries are unchanged. This is not a global API kill switch and does not replace OFFSET paging.
+
+---
+
 ## 2026-09-03 · v2.2.0
 
 ### 🔧 Improvements

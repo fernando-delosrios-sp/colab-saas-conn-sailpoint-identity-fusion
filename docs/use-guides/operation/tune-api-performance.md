@@ -121,13 +121,16 @@ Retry uses exponential backoff (1000 ms base). For HTTP 429, the connector uses 
 
 A **pagination circuit** applies only to one paginated `client.call` stream (sequential, parallel, or searchAfter). It does **not** replace OFFSET paging, shrink the parallel window on success, or pause the whole API queue.
 
-When **3** completed page outcomes on that stream are **gateway failures** (HTTP **504** or request timeout) with no successful page in between:
+The circuit tracks a **gateway-failure pool**: pages on that stream that have seen HTTP **504** or a request timeout and have not yet succeeded. The trip threshold is `min(10, this stream’s window)`. Parallel window is `paginate.batchSize` when set, otherwise **Parallel pagination batch size** (default 12). Sequential and searchAfter windows are **1**, so the first gateway failure fails the call.
+
+When the pool reaches the threshold:
 
 1. **Shed** — stop scheduling further pages on that stream and abort in-flight page HTTP for that stream. Other queued calls keep running.
-2. **Cooldown** — wait once (30 seconds). Caller abort during cooldown fails the call and does **not** send a probe.
-3. **Probe** — fetch the lowest not-yet-successful page once (same offset or same searchAfter cursor). Success resumes the configured parallel window. Another gateway failure, or a second 504/timeout streak after resume, fails Fetch/account-list with `PaginationError` (no silent partial list, no second cooldown).
+2. Throw `PaginationError` immediately (items already collected are on the error, not returned as a successful partial list). There is **no** 30-second cooldown and **no** probe page.
 
-Paginated pages use **at most one extra attempt** on gateway failure so the circuit can see the streak. Non-paginated calls still use **API request retries**. HTTP 429 still uses Retry-After and does not trip the circuit. Other exhausted 5xx (for example HTTP 500) still fail the page immediately without cooldown.
+Below the threshold, a sick page keeps its window slot and is re-attempted; a later **200** on that same page removes it from the pool. OFFSET paging is unchanged.
+
+Paginated pages use **at most one extra attempt** on gateway failure so a blip can leave the pool without consuming 20 retries. Non-paginated calls still use **API request retries**. HTTP 429 still uses Retry-After and does not enter the pool. Other exhausted 5xx (for example HTTP 500) still fail the page immediately.
 
 ---
 
