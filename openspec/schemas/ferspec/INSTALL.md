@@ -69,7 +69,7 @@ npx skills add fernando-delosrios-sp/skills --skill setup-matt-pocock-skills
 | gherkin-authoring | specs | schema.yaml |
 | c4-diagram | design | schema.yaml |
 | git-commit | apply, archive | schema.yaml; archive commit (manual fallback if absent) |
-| changelog-generator | tasks, apply | schema.yaml; git-commit |
+| changelog-generator | tasks, apply | schema.yaml; apply Changelog group |
 | tdd | apply | schema.yaml |
 | codebase-design | apply | tdd (seam / interface vocabulary) |
 | code-review | apply | tdd (post-implementation review) |
@@ -78,9 +78,9 @@ npx skills add fernando-delosrios-sp/skills --skill setup-matt-pocock-skills
 
 If the user skips skills from this list, note which phases lose skill-backed behavior and which fallbacks apply.
 
-### OpenSpec built-in (verify-fix)
+### Verify last gate
 
-`openspec-verify-change` runs during apply step 6 (verify-fix loop). It ships with OpenSpec — no separate install. `/opsx:verify` is its user-facing equivalent. Apply must not hand off until ✅ PASS; standalone `/opsx:verify` after apply should confirm PASS, not surface new warnings.
+Apply runs `/opsx:verify` as the blocking last gate before handoff. All CRITICAL, WARNING, and SUGGESTION tiers must be empty. Standalone `/opsx:verify` after a completed apply must also be empty in all three tiers.
 
 **User gates** — after **setup-matt-pocock-skills**, invoke **structured-choices install** (or say `install structured-choices`) to wire User gates into `AGENTS.md` / `CLAUDE.md`. The fragment does not include User gates; Install owns that content.
 
