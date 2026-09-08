@@ -1,30 +1,9 @@
 /**
- * Per-pagination-stream circuit: shed after consecutive gateway failures,
- * one cooldown, one probe, then resume or abort.
+ * Per-pagination-stream circuit: gateway-failure pool, then shed at
+ * `min(inFlightGatewayFailureCap, window)` with no cooldown or probe.
  */
 
-export type GatewayStreakAction = 'continue' | 'shed' | 'open'
-
-/** Wait `ms`, aborting if `signal` fires. Zero/negative ms still honor an already-aborted signal. */
-async function sleepAbortable(ms: number, signal?: AbortSignal): Promise<void> {
-    if (signal?.aborted) {
-        throw signal.reason ?? new Error('Aborted')
-    }
-    if (ms <= 0) {
-        return
-    }
-    await new Promise<void>((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-            signal?.removeEventListener('abort', onAbort)
-            resolve()
-        }, ms)
-        const onAbort = () => {
-            clearTimeout(timeoutId)
-            reject(signal?.reason ?? new Error('Aborted'))
-        }
-        signal?.addEventListener('abort', onAbort, { once: true })
-    })
-}
+export type GatewayPoolAction = 'continue' | 'shed'
 
 /** True when the error (or signal) represents an abort rather than an HTTP outcome. */
 export function isAbortError(error: unknown, signal?: AbortSignal): boolean {
@@ -37,20 +16,38 @@ export function isAbortError(error: unknown, signal?: AbortSignal): boolean {
 /**
  * Pagination circuit state for one `client.call` pagination stream.
  * Not a queue-wide or tenant-wide breaker.
+ *
+ * A page key (offset or searchAfter cursor) enters the gateway-failure pool on 504/timeout
+ * and leaves only when that same page succeeds. At threshold the stream sheds.
  */
 export class PaginationCircuit {
-    private gatewayStreak = 0
-    private cooldownsUsed = 0
+    private readonly pool = new Set<string>()
     private shedController = new AbortController()
 
     constructor(
-        private readonly consecutiveGatewayFailures: number,
-        private readonly paginationCooldownMs: number,
-        private readonly maxCooldownsPerStream: number,
+        private readonly inFlightGatewayFailureCap: number,
+        window: number,
         private readonly logWarn: (message: string) => void,
-        private readonly context: string | undefined,
-        private readonly callerSignal?: AbortSignal
-    ) {}
+        private readonly context: string | undefined
+    ) {
+        this.windowValue = Math.max(1, window)
+    }
+
+    private readonly windowValue: number
+
+    /** This stream’s concurrent page cap (never below 1). */
+    get window(): number {
+        return this.windowValue
+    }
+
+    /** `min(inFlightGatewayFailureCap, window)`. */
+    get threshold(): number {
+        return Math.min(this.inFlightGatewayFailureCap, this.windowValue)
+    }
+
+    get poolSize(): number {
+        return this.pool.size
+    }
 
     get shedSignal(): AbortSignal {
         return this.shedController.signal
@@ -60,57 +57,47 @@ export class PaginationCircuit {
         return this.shedController.signal.aborted
     }
 
-    recordSuccess(): void {
-        this.gatewayStreak = 0
+    /**
+     * Remove a page from the pool after that page returns success.
+     */
+    recordSuccess(pageKey: string): void {
+        if (!this.pool.delete(pageKey)) {
+            return
+        }
+        this.logPoolChange('leave', pageKey)
     }
 
     /**
-     * Record a completed page outcome that is a gateway failure.
-     * `continue` — below threshold; `shed` — first streak, cooldown remaining; `open` — no cooldown left.
+     * Record a gateway failure for `pageKey`.
+     * `continue` — below threshold; `shed` — pool reached `min(cap, window)`.
      */
-    noteGatewayFailure(): GatewayStreakAction {
-        this.gatewayStreak += 1
-        if (this.gatewayStreak < this.consecutiveGatewayFailures) {
-            return 'continue'
+    noteGatewayFailure(pageKey: string): GatewayPoolAction {
+        this.pool.add(pageKey)
+        this.logPoolChange('enter', pageKey)
+        if (this.pool.size >= this.threshold) {
+            return 'shed'
         }
-        if (this.cooldownsUsed >= this.maxCooldownsPerStream) {
-            return 'open'
-        }
-        return 'shed'
+        return 'continue'
     }
 
     shed(positionLabel: string): void {
         if (this.shedController.signal.aborted) return
         this.logWarn(
-            `Pagination circuit shedding stream (${this.context ?? 'paginate'}) at ${positionLabel} after ${this.gatewayStreak} consecutive gateway failures`
+            `Pagination circuit shedding stream (${this.context ?? 'paginate'}) at ${positionLabel} pool ${this.pool.size}/${this.threshold}`
         )
         this.shedController.abort(new Error('Pagination circuit shed'))
     }
 
-    async cooldown(): Promise<void> {
-        this.cooldownsUsed += 1
-        this.logWarn(`Pagination circuit cooldown ${this.paginationCooldownMs}ms (${this.context ?? 'paginate'})`)
-        await sleepAbortable(this.paginationCooldownMs, this.callerSignal)
-    }
-
-    beginProbe(positionLabel: string): void {
-        this.logWarn(`Pagination circuit probe (${this.context ?? 'paginate'}) at ${positionLabel}`)
-    }
-
-    resumeAfterSuccessfulProbe(): void {
-        this.gatewayStreak = 0
-        this.shedController = new AbortController()
-    }
-
-    abortAfterFailedProbe(positionLabel: string): void {
+    private logPoolChange(action: 'enter' | 'leave', pageKey: string): void {
+        const approaching = this.pool.size >= Math.max(1, this.threshold - 1)
+        if (!approaching && action === 'leave') {
+            return
+        }
+        if (!approaching && action === 'enter' && this.pool.size < this.threshold - 1) {
+            return
+        }
         this.logWarn(
-            `Pagination circuit abort after failed probe (${this.context ?? 'paginate'}) at ${positionLabel}`
-        )
-    }
-
-    abortAfterSecondStreak(positionLabel: string): void {
-        this.logWarn(
-            `Pagination circuit abort after second gateway-failure streak (${this.context ?? 'paginate'}) at ${positionLabel}`
+            `Pagination circuit pool ${action} ${pageKey} (${this.context ?? 'paginate'}) pool ${this.pool.size}/${this.threshold}`
         )
     }
 }

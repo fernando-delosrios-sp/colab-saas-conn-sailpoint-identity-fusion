@@ -25,7 +25,6 @@ class OffsetPageScheduler<T> {
     private loaded: number
     private scheduleIndex = 0
     private yieldIndex = 0
-    private probed = false
     private readonly completed = new Map<number, T[]>()
     private readonly inFlight = new Map<number, Promise<void>>()
     /** First page error, recorded so no task rejection is left unobserved. */
@@ -58,6 +57,43 @@ class OffsetPageScheduler<T> {
         return this.offsets[Math.min(this.yieldIndex, this.offsets.length - 1)]
     }
 
+    private pageKey(offset: number): string {
+        return `offset ${offset}`
+    }
+
+    /**
+     * Hold this offset’s window slot until success or shed: re-attempt the same page
+     * on gateway failure instead of enqueueing a new offset into the slot.
+     */
+    private async runOffsetUntilSettled(offset: number): Promise<void> {
+        const key = this.pageKey(offset)
+        while (!this.abortSignal?.aborted && !this.circuit.isShedding) {
+            try {
+                const page = await this.fetchPage(offset, this.circuit.shedSignal)
+                this.circuit.recordSuccess(key)
+                this.completed.set(offset, page)
+                this.loaded += page.length
+                this.onPageComplete(this.loaded, this.progressTotal)
+                return
+            } catch (error: unknown) {
+                if (isAbortError(error, this.circuit.shedSignal) || this.circuit.isShedding) {
+                    return
+                }
+                if (this.abortSignal?.aborted || isAbortError(error, this.abortSignal)) {
+                    return
+                }
+                if (!isGatewayFailure(error)) {
+                    throw this.fail(offset, this.loaded)
+                }
+                if (this.circuit.noteGatewayFailure(key) === 'shed') {
+                    this.circuit.shed(key)
+                    this.failure ??= this.fail(offset, this.loaded)
+                    return
+                }
+            }
+        }
+    }
+
     private pump(): void {
         if (this.circuit.isShedding || this.failure !== undefined) {
             return
@@ -67,37 +103,7 @@ class OffsetPageScheduler<T> {
             if (this.completed.has(offset) || this.inFlight.has(offset)) {
                 continue
             }
-            const task = (async () => {
-                if (this.abortSignal?.aborted || this.circuit.isShedding) {
-                    return
-                }
-                try {
-                    const page = await this.fetchPage(offset, this.circuit.shedSignal)
-                    this.circuit.recordSuccess()
-                    this.completed.set(offset, page)
-                    this.loaded += page.length
-                    this.onPageComplete(this.loaded, this.progressTotal)
-                } catch (error: unknown) {
-                    if (isAbortError(error, this.circuit.shedSignal) || this.circuit.isShedding) {
-                        return
-                    }
-                    if (this.abortSignal?.aborted || isAbortError(error, this.abortSignal)) {
-                        return
-                    }
-                    if (!isGatewayFailure(error)) {
-                        throw this.fail(offset, this.loaded)
-                    }
-                    const action = this.circuit.noteGatewayFailure()
-                    if (action === 'continue') {
-                        return
-                    }
-                    if (action === 'open') {
-                        this.circuit.abortAfterSecondStreak(`offset ${offset}`)
-                        throw this.fail(offset, this.loaded)
-                    }
-                    this.circuit.shed(`offset ${offset}`)
-                }
-            })()
+            const task = this.runOffsetUntilSettled(offset)
                 // Promise.race only settles on the first promise, so a sibling's rejection
                 // would otherwise go unobserved and terminate the process.
                 .catch((error: unknown) => {
@@ -107,32 +113,6 @@ class OffsetPageScheduler<T> {
                     this.inFlight.delete(offset)
                 })
             this.inFlight.set(offset, task)
-        }
-    }
-
-    private async cooldownAndProbe(): Promise<void> {
-        const probeOffset = this.lowestUnfilledOffset()
-        try {
-            await this.circuit.cooldown()
-        } catch {
-            throw this.fail(probeOffset, this.loaded)
-        }
-        this.circuit.beginProbe(`offset ${probeOffset}`)
-        this.probed = true
-        try {
-            const page = await this.fetchPage(probeOffset)
-            this.circuit.recordSuccess()
-            this.circuit.resumeAfterSuccessfulProbe()
-            this.completed.set(probeOffset, page)
-            this.loaded += page.length
-            this.onPageComplete(this.loaded, this.progressTotal)
-            this.scheduleIndex = this.yieldIndex
-        } catch (error: unknown) {
-            if (this.abortSignal?.aborted || isAbortError(error, this.abortSignal)) {
-                throw this.fail(probeOffset, this.loaded)
-            }
-            this.circuit.abortAfterFailedProbe(`offset ${probeOffset}`)
-            throw this.fail(probeOffset, this.loaded)
         }
     }
 
@@ -169,11 +149,7 @@ class OffsetPageScheduler<T> {
                     await Promise.race(Array.from(this.inFlight.values()))
                     continue
                 }
-                if (!this.probed) {
-                    await this.cooldownAndProbe()
-                    this.pump()
-                    continue
-                }
+                throw this.failure ?? this.fail(this.lowestUnfilledOffset(), this.loaded)
             }
 
             if (this.inFlight.size === 0) {
@@ -200,10 +176,8 @@ export class ClientService {
     private readonly requestTimeoutMs?: number
     /** Number of pages to fetch in parallel inside paginateParallel. */
     private readonly parallelBatchSize: number
-    private readonly consecutiveGatewayFailures: number
-    private readonly paginationCooldownMs: number
+    private readonly inFlightGatewayFailureCap: number
     private readonly paginationGatewayMaxRetries: number
-    private readonly maxCooldownsPerStream: number
     constructor(
         private adapter: IscApiAdapter,
         protected readonly queue: ApiQueue | null,
@@ -226,12 +200,10 @@ export class ClientService {
         const clientInternal = internalConfig.clientService
 
         this.parallelBatchSize = parallelBatchSize
-        this.consecutiveGatewayFailures =
-            fusionConfig.consecutiveGatewayFailures ?? clientInternal.consecutiveGatewayFailures
-        this.paginationCooldownMs = fusionConfig.paginationCooldownMs ?? clientInternal.paginationCooldownMs
+        this.inFlightGatewayFailureCap =
+            fusionConfig.inFlightGatewayFailureCap ?? clientInternal.inFlightGatewayFailureCap
         this.paginationGatewayMaxRetries =
             fusionConfig.paginationGatewayMaxRetries ?? clientInternal.paginationGatewayMaxRetries
-        this.maxCooldownsPerStream = fusionConfig.maxCooldownsPerStream ?? clientInternal.maxCooldownsPerStream
 
         if (this.queue) {
             this.log.info(
@@ -368,14 +340,12 @@ export class ClientService {
         }
     }
 
-    private createPaginationCircuit(policy: Pick<CallPolicy, 'context' | 'abortSignal'>): PaginationCircuit {
+    private createPaginationCircuit(policy: Pick<CallPolicy, 'context'>, window: number): PaginationCircuit {
         return new PaginationCircuit(
-            this.consecutiveGatewayFailures,
-            this.paginationCooldownMs,
-            this.maxCooldownsPerStream,
+            this.inFlightGatewayFailureCap,
+            window,
             (message) => this.log.warn(message),
-            policy.context,
-            policy.abortSignal
+            policy.context
         )
     }
 
@@ -402,8 +372,8 @@ export class ClientService {
     }
 
     /**
-     * Sequential/searchAfter page loader: same-position retries count toward the gateway streak,
-     * then one cooldown and one probe at that position.
+     * Sequential/searchAfter (and parallel-init) page loader: the page occupies a pool slot
+     * on gateway failure and is re-attempted until it succeeds or the pool hits threshold.
      */
     private async loadWithCircuit<T>(
         fetchOnce: () => Promise<T>,
@@ -414,7 +384,7 @@ export class ClientService {
         while (true) {
             try {
                 const page = await fetchOnce()
-                circuit.recordSuccess()
+                circuit.recordSuccess(positionLabel)
                 return page
             } catch (error: unknown) {
                 if (isAbortError(error)) {
@@ -423,30 +393,8 @@ export class ClientService {
                 if (!isGatewayFailure(error)) {
                     throw fail()
                 }
-                const action = circuit.noteGatewayFailure()
-                if (action === 'continue') {
-                    continue
-                }
-                if (action === 'open') {
-                    circuit.abortAfterSecondStreak(positionLabel)
-                    throw fail()
-                }
-                circuit.shed(positionLabel)
-                try {
-                    await circuit.cooldown()
-                } catch {
-                    throw fail()
-                }
-                circuit.beginProbe(positionLabel)
-                try {
-                    const probed = await fetchOnce()
-                    circuit.recordSuccess()
-                    circuit.resumeAfterSuccessfulProbe()
-                    return probed
-                } catch (probeError: unknown) {
-                    if (!isAbortError(probeError)) {
-                        circuit.abortAfterFailedProbe(positionLabel)
-                    }
+                if (circuit.noteGatewayFailure(positionLabel) === 'shed') {
+                    circuit.shed(positionLabel)
                     throw fail()
                 }
             }
@@ -468,7 +416,7 @@ export class ClientService {
         const hasExplicitBaseLimit = bl != null
         const initialLimit = hasExplicitBaseLimit && bl! < eps ? bl! : eps
         const all: T[] = []
-        const circuit = this.createPaginationCircuit({ context, abortSignal: config.abortSignal })
+        const circuit = this.createPaginationCircuit({ context }, 1)
         const fail = (offset: number) =>
             new PaginationError(
                 offset === 0 && all.length === 0
@@ -591,7 +539,7 @@ export class ClientService {
         const bp = paginate.baseParams ?? {}
         const limit = paginate.limit
         const ctx = (suffix: string) => (policy.context ? `${policy.context} ${suffix}` : suffix)
-        const circuit = this.createPaginationCircuit(policy)
+        const circuit = this.createPaginationCircuit(policy, bs)
         const failInit = () => new PaginationError(`Pagination failed on initial page (${policy.context ?? 'paginate'}).`, 0)
 
         const initialResponse = await this.loadWithCircuit(
@@ -693,7 +641,7 @@ export class ClientService {
         const bs = { ...paginate.search, sort: ['id'] }
         let sa: string[] | undefined, first = true, more = true, pn = 1
         const all: T[] = []
-        const circuit = this.createPaginationCircuit(policy)
+        const circuit = this.createPaginationCircuit(policy, 1)
         while (more) {
             if (policy.abortSignal?.aborted) break
             const pc = policy.context ? `${policy.context} [page ${pn}]` : `search [page ${pn}]`
@@ -924,7 +872,7 @@ export class ClientService {
         let pageNum = 1
         let loaded = 0
         let total: number | undefined
-        const circuit = this.createPaginationCircuit({ context, abortSignal })
+        const circuit = this.createPaginationCircuit({ context }, 1)
 
         while (hasMore) {
             if (abortSignal?.aborted) return
@@ -1050,7 +998,7 @@ export class ClientService {
         const effectivePageSize = Math.min(this.pageSize, this.sailPointListMax)
         const batchSize = this.parallelBatchSize
         const initialCtx = context ? `${context} [parallel-init]` : 'list [parallel-init]'
-        const circuit = this.createPaginationCircuit({ context, abortSignal })
+        const circuit = this.createPaginationCircuit({ context }, batchSize)
 
         const initialResponse = await this.loadWithCircuit(
             () =>
