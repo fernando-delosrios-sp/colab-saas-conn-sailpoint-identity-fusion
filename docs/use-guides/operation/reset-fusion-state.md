@@ -14,7 +14,7 @@ Use this guide when you need to **safely rebuild Fusion account data or clear re
 | Scenario | Use | Alternative |
 | --- | --- | --- |
 | Testing major config changes in dev | **Reset accounts?** once | Dry-run first — see [Analyze changes with dry-run](analyze-with-dry-run.md) |
-| Clear all pending/completed review forms | **Reset forms?** once | Manual form cleanup in ISC (if feasible) |
+| Clear in-flight Fusion reviews (and recut layout after a form change) | **Reset forms?** once | Manual form cleanup in ISC (if feasible) |
 | Schema changes (mapping/definition) | Maybe reset accounts | Discover Schema is usually sufficient |
 | Stuck processing state | **No reset** | Retry aggregation (auto-resets stuck flag) |
 | Production environment | ⚠️ **Rarely** | High impact; coordinate with stakeholders |
@@ -30,7 +30,7 @@ The **Developer Settings** section help in the ISC source configuration UI displ
 | Field | Risk | What it does |
 | --- | --- | --- |
 | **Reset accounts?** | High | Clears persisted Fusion account state; reset run emits zero accounts |
-| **Reset forms?** | Medium | Deletes all Fusion review form definitions |
+| **Reset forms?** | Medium | Closes in-flight Fusion reviews (matching definitions, and leftover instances) so rematch can issue restyled forms |
 | **Force attribute refresh** | Medium | One-run Normal attribute recalculation |
 
 Both reset flags **automatically turn off after one aggregation**.
@@ -41,7 +41,7 @@ Both reset flags **automatically turn off after one aggregation**.
 | --- | --- | --- |
 | No | No | Normal aggregation |
 | Yes | No | Account reset only — zero accounts emitted |
-| No | Yes | Forms deleted — aggregation continues |
+| No | Yes | In-flight Fusion reviews closed — aggregation continues |
 | Yes | Yes | Forms deleted, then account reset — zero accounts emitted |
 
 ---
@@ -74,11 +74,13 @@ Both reset flags **automatically turn off after one aggregation**.
 
 **What reset forms does:**
 
-- Removes all Fusion review form definitions (pending and completed)
+- Closes in-flight Fusion reviews: deletes Fusion review form definitions that match the Fusion form name pattern, and cancels leftover open instances if definition delete leaves them
 - Aggregation continues normally unless **Reset accounts?** is also enabled
-- Managed accounts held by pending forms re-enter Match on the same run
+- Managed accounts held by those reviews re-enter Match on the same run
+- A form layout change (for example DESCRIPTION HTML restyle) does not migrate pending instances by itself — operators run **Reset forms?** when they want the inbox recut
+- There is no per-account review reset flag
 
-Use when review form definitions are stale or corrupted but Fusion account data should remain.
+Use when review form definitions are stale, after a form layout change, or when open reviews should be reissued.
 
 ---
 

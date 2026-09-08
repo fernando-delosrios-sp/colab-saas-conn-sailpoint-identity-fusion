@@ -1060,7 +1060,7 @@
                             "label": "Reset forms?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "On the next aggregation only, delete all Fusion review form definitions."
+                            "helpKey": "On the next aggregation only, close in-flight Fusion reviews: delete matching Fusion review form definitions and cancel leftover open instances."
                         },
                         {
                             "key": "forceAttributeRefresh",

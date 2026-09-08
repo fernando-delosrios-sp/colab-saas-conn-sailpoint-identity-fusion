@@ -30,7 +30,7 @@ Identities and correlated managed accounts form the Match **baseline**. See [Glo
 | Setting | Config menu | Phase | Behavior |
 | --- | --- | --- | --- |
 | **Reset accounts?** | Advanced → Developer Settings | Setup | Clears fusion state; emits zero accounts; exits early |
-| **Reset forms?** | Advanced → Developer Settings | Setup | Deletes Fusion review form definitions |
+| **Reset forms?** | Advanced → Developer Settings | Setup | Closes in-flight Fusion reviews (matching definitions and leftover instances) |
 | **Force attribute refresh on next aggregation?** | Advanced → Developer Settings | Setup (flag cleared); Refresh/Process | Normal attributes recalculated when definitions run |
 
 ## Source type and Match sweep

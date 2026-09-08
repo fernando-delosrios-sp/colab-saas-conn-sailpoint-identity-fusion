@@ -9,6 +9,7 @@ export type Score = {
     weightedScore?: number
     skipped?: boolean
     algorithm?: string
+    isMatch?: boolean
 }
 
 /**

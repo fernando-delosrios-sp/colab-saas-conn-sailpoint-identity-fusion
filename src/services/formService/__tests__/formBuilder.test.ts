@@ -1,71 +1,97 @@
-import { buildCandidateConditions, buildCandidateFields, buildFormConditions, buildFormFields, buildFormInput, buildFormInputs } from '../formBuilder'
+import { buildFormConditions, buildFormFields, buildFormInput, buildFormInputs } from '../formBuilder'
 import { SourceType } from '../../../model/config'
 import { resolveFormLocale } from '../../emailService/localization'
-import { buildCandidateList } from '../helpers'
+import { buildCandidateList, buildFormName } from '../helpers'
+import { FORM_HTML_ACCOUNT_INPUT, FORM_HTML_CANDIDATES_INPUT } from '../formHtml'
 
-describe('formBuilder conditions', () => {
-    it('uses candidate displayName in identities comparison rule', () => {
-        const candidates = [
-            {
-                id: 'identity-123',
-                name: 'Alice Doe',
-                attributes: { email: 'alice@example.com' },
-                scores: [{ attribute: 'email', algorithm: 'lig3', score: 95, fusionScore: 60 }],
-            },
-        ] as any
+const collectElements = (elements: any[], acc: any[] = []): any[] => {
+    for (const el of elements ?? []) {
+        acc.push(el)
+        const nested = el.config?.formElements
+        if (Array.isArray(nested)) collectElements(nested, acc)
+        const columns = el.config?.columns
+        if (Array.isArray(columns)) {
+            for (const col of columns) {
+                if (Array.isArray(col)) collectElements(col, acc)
+            }
+        }
+    }
+    return acc
+}
 
-        const conditions = buildFormConditions(candidates, ['Email'])
+describe('formBuilder HTML restyle', () => {
+    const fusionAccount = {
+        managedAccountId: 'src-1::native-1',
+        identityDisplayName: 'User One',
+        name: 'User One',
+        sourceName: 'HR',
+        iscAccountId: 'isc-acct-1',
+        attributes: { email: 'user@example.com' },
+    } as any
 
-        const hideCondition = conditions.find(
-            (condition) =>
-                condition.ruleOperator === 'OR' &&
-                condition.rules?.some((rule: any) => rule.source === 'identities' && rule.operator === 'NE')
-        )
-
-        expect(hideCondition).toBeDefined()
-        const identityRule = hideCondition!.rules.find((rule: any) => rule.source === 'identities')
-        expect(identityRule!.value).toBe('Alice Doe')
-    })
-
-    it('skips candidate conditions when candidate has no renderable elements', () => {
-        const candidates = [
-            {
-                id: 'identity-empty',
-                name: 'Empty Candidate',
-                attributes: {},
-                scores: [],
-            },
-        ] as any
-
-        const conditions = buildFormConditions(candidates)
-        expect(conditions).toHaveLength(0)
-    })
-
-    it('buildCandidateConditions returns disable and hide rules per candidate', () => {
-        const candidate = {
-            id: 'identity-456',
+    const candidates = [
+        {
+            id: 'identity-1',
+            name: 'Alice Doe',
+            attributes: { email: 'alice@example.com' },
+            scores: [{ attribute: 'email', algorithm: 'lig3', score: 95, fusionScore: 60, isMatch: true }],
+        },
+        {
+            id: 'identity-2',
             name: 'Bob Smith',
             attributes: { email: 'bob@example.com' },
-            scores: [{ attribute: 'email', algorithm: 'lig3', score: 90 }],
-        } as any
+            scores: [{ attribute: 'email', algorithm: 'lig3', score: 80, fusionScore: 60, isMatch: false }],
+        },
+    ] as any
 
-        const conditions = buildCandidateConditions(candidate, 0, ['Email'])
-        expect(conditions).toHaveLength(2)
-        expect(conditions[0].effects[0].effectType).toBe('DISABLE')
-        expect(conditions[1].effects[0].effectType).toBe('HIDE')
+    it('New review form uses HTML for the whole display surface', () => {
+        const fields = buildFormFields(fusionAccount, candidates, ['Email'], SourceType.Authoritative, 'en')
+        const all = collectElements(fields)
+        expect(all.filter((el) => el.elementType === 'TEXT')).toHaveLength(0)
+        expect(all.some((el) => el.id === 'newIdentity' && el.elementType === 'TOGGLE')).toBe(true)
+        expect(all.some((el) => el.id === 'identities' && el.elementType === 'SELECT')).toBe(true)
+        expect(
+            all.some((el) => el.id === 'accountDisplay' && el.config?.description === '{{$.form.input.accountHtml}}')
+        ).toBe(true)
+        expect(
+            all.some(
+                (el) => el.id === 'candidatesDisplay' && el.config?.description === '{{$.form.input.candidatesHtml}}'
+            )
+        ).toBe(true)
+
+        const input = buildFormInput(fusionAccount, candidates, ['Email'])
+        expect(input[FORM_HTML_ACCOUNT_INPUT]).toContain('User One')
+        expect(input[FORM_HTML_CANDIDATES_INPUT]).toContain('Alice Doe')
+        expect(input.account).toBe('src-1::native-1')
+        expect(input.candidates).toBe('identity-1,identity-2')
     })
 
-    it('buildCandidateFields includes attribute and score elements', () => {
-        const candidate = {
-            id: 'identity-789',
-            name: 'Carol Jones',
-            attributes: { email: 'carol@example.com' },
-            scores: [{ attribute: 'email', algorithm: 'lig3', score: 88, fusionScore: 55 }],
-        } as any
+    it('Multiple candidates stay visible together', () => {
+        const fields = buildFormFields(fusionAccount, candidates, ['Email'])
+        const all = collectElements(fields)
+        expect(all.some((el) => el.elementType === 'SECTION' && String(el.id).includes('selectionsection'))).toBe(false)
 
-        const fields = buildCandidateFields(candidate, 0, ['Email'])
-        expect(fields.some((f) => f.id === 'identity-789.email')).toBe(true)
-        expect(fields.some((f) => f.id === 'identity-789.email.lig3.score')).toBe(true)
+        const conditions = buildFormConditions(candidates, ['Email'])
+        expect(conditions).toHaveLength(0)
+        expect(conditions.some((c) => c.effects?.some((e) => e.effectType === 'HIDE'))).toBe(false)
+
+        const html = buildFormInput(fusionAccount, candidates, ['Email'])[FORM_HTML_CANDIDATES_INPUT]
+        expect(html).toContain('Alice Doe')
+        expect(html).toContain('Bob Smith')
+    })
+
+    it('Per-account definition naming unchanged', () => {
+        const name = buildFormName(fusionAccount, 'Fusion Review')
+        expect(name).toContain('Fusion Review')
+        expect(name).toContain('User One')
+        expect(name).toContain('[HR]')
+        expect(name).toContain('src-1::native-1')
+
+        const fields = buildFormFields(fusionAccount, candidates, ['Email'])
+        const all = collectElements(fields)
+        const select = all.find((el) => el.id === 'identities')
+        expect(select?.config?.dataSource?.dataSourceType).toBe('SEARCH_V2')
+        expect(select?.config?.dataSource?.config?.query).toBe('id:identity-1 OR id:identity-2')
     })
 })
 
@@ -202,12 +228,10 @@ describe('buildFormFields localization', () => {
     })
 
     it('localizes Combined score attribute label when locale is fr', () => {
-        const fields = buildFormFields(fusionAccount, candidates, ['Email'], SourceType.Authoritative, 'fr')
-        const candidateSection = fields.find((f) => f.key === 'identity-1.selectionsection')
-        const scoreField = ((candidateSection?.config as any)?.formElements ?? []).find((el: any) =>
-            String(el.key).includes('weighted-mean')
-        )
-        expect(scoreField?.config?.label).toBe('Score combiné')
+        const html = buildFormInput(fusionAccount, candidates, ['Email'], SourceType.Authoritative, 'fr')[
+            FORM_HTML_CANDIDATES_INPUT
+        ]
+        expect(html).toContain('Score combiné')
     })
 
     it('localizes toggle label when locale is ja', () => {
@@ -234,5 +258,3 @@ describe('buildFormFields localization', () => {
         expect(toggle?.config?.label).toBe('New identity')
     })
 })
-
-

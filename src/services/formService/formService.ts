@@ -45,12 +45,10 @@ import {
     extractCandidateIdsFromFormInput,
     getReviewerInfo,
 } from './formProcessor'
+import { createUrlContext, UrlContext } from '../../utils/url'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { resolveIdentityDocumentDisplayName } from '../../model/fusionAccountUtils'
-import {
-    isReportableIscAccountId,
-    resolveManagedAccountIscIdForReport,
-} from '../fusionService/reportAccountResolver'
+import { isReportableIscAccountId, resolveManagedAccountIscIdForReport } from '../fusionService/reportAccountResolver'
 import { FormLifecycle } from './formLifecycle'
 import { analyzeFormInstances } from './formInstanceAnalyzer'
 import {
@@ -59,7 +57,7 @@ import {
     summarizeDecisionCounts,
 } from '../fusionService/decisionLogging'
 
-export type { PendingReviewFormContext,  PendingReviewAccountContext } from './types'
+export type { PendingReviewFormContext, PendingReviewAccountContext } from './types'
 
 // ============================================================================
 // FormService Class
@@ -89,6 +87,7 @@ export class FormService {
     private readonly fusionFormExpirationDays: number
     private readonly fusionFormAttributes?: string[]
     private readonly fusionMaxCandidatesForForm: number
+    private readonly urlContext: UrlContext
     private readonly lifecycle: FormLifecycle
 
     // ------------------------------------------------------------------------
@@ -108,6 +107,7 @@ export class FormService {
         this.fusionFormExpirationDays = config.fusionFormExpirationDays
         this.fusionFormAttributes = config.fusionFormAttributes
         this.fusionMaxCandidatesForForm = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
+        this.urlContext = createUrlContext(config.baseurl)
         if (this.localizationEnabled) {
             this.log.info(
                 `Form localization enabled: defaultLanguage=${config.defaultLanguage ?? '(unset)'} → form locale ${this.formLocale}`
@@ -144,9 +144,10 @@ export class FormService {
         await this.processFetchedFormData()
     }
 
-    private partitionStaleForms(
-        forms: FormDefinitionResponseV2025[]
-    ): { activeForms: FormDefinitionResponseV2025[]; staleForms: FormDefinitionResponseV2025[] } {
+    private partitionStaleForms(forms: FormDefinitionResponseV2025[]): {
+        activeForms: FormDefinitionResponseV2025[]
+        staleForms: FormDefinitionResponseV2025[]
+    } {
         const staleForms: FormDefinitionResponseV2025[] = []
         const activeForms: FormDefinitionResponseV2025[] = []
         for (const form of forms) {
@@ -216,9 +217,7 @@ export class FormService {
             return instances
         })
 
-        this.log.debug(
-            `Fetched ${instanceCount} instance(s) from ${activeForms.length} form definition(s)`
-        )
+        this.log.debug(`Fetched ${instanceCount} instance(s) from ${activeForms.length} form definition(s)`)
         fetchInstancesOp.done({ definitions: activeForms.length, instances: instanceCount })
     }
 
@@ -258,9 +257,40 @@ export class FormService {
         this.fetchedFormInstances = []
     }
 
+    /**
+     * Deletes Fusion review form definitions matching the name pattern and closes leftover
+     * in-flight instances so Reset forms leaves no open Fusion reviews.
+     */
     public async deleteExistingForms(): Promise<void> {
         const forms = await this.findFormDefinitionsByName(this.fusionFormNamePattern)
-        await promiseAllBatched(forms, (form) => this.deleteFormDefinition(form.id!))
+        await promiseAllBatched(forms, async (form) => {
+            const formId = form.id
+            if (!formId) {
+                return
+            }
+            const instances = await this.fetchFormInstancesByDefinitionId(formId)
+            await this.deleteFormDefinition(formId)
+            await this.closeLeftoverFormInstances(instances)
+        })
+    }
+
+    private async closeLeftoverFormInstances(instances: FormInstanceResponseV2025[]): Promise<void> {
+        const alreadyClosed = new Set(['COMPLETED', 'SUBMITTED', 'CANCELLED'])
+        for (const instance of instances) {
+            if (!instance.id) {
+                continue
+            }
+            const state = String(instance.state ?? '').toUpperCase()
+            if (alreadyClosed.has(state)) {
+                continue
+            }
+            try {
+                await this.setFormInstanceState(instance.id, 'CANCELLED' as FormInstanceResponseV2025StateV2025)
+            } catch (error) {
+                const detail = error instanceof Error ? error.message : String(error)
+                this.log.warn(`Could not cancel leftover form instance ${instance.id} after Reset forms: ${detail}`)
+            }
+        }
     }
 
     /**
@@ -411,13 +441,15 @@ export class FormService {
         })
         assert(formName, 'Form name is required')
 
-        const formDefinition = await this.getOrCreateFormDefinition(
-            formName,
+        const formDefinition = await this.getOrCreateFormDefinition(formName, fusionAccount, candidates, formLocale)
+        const formInput = buildFormInput(
             fusionAccount,
             candidates,
-            formLocale
+            this.fusionFormAttributes,
+            sourceType,
+            formLocale,
+            this.urlContext
         )
-        const formInput = buildFormInput(fusionAccount, candidates, this.fusionFormAttributes, sourceType, formLocale)
         assert(formInput, 'Form input is required')
 
         const expire = calculateExpirationDate(this.fusionFormExpirationDays)
@@ -472,12 +504,7 @@ export class FormService {
             const doc = this.identities.getIdentityById(c.id)
             const previousName = c.name
             const resolved = resolveIdentitiesSelectLabel(c.attributes, c.id, doc)
-            c.name =
-                resolved !== c.id
-                    ? resolved
-                    : previousName && previousName !== c.id
-                      ? previousName
-                      : resolved
+            c.name = resolved !== c.id ? resolved : previousName && previousName !== c.id ? previousName : resolved
 
             const existing = normalizeEmail(readUnknown(c.attributes, 'email'))
             if (existing) {
@@ -548,9 +575,7 @@ export class FormService {
                 formDefinition = await this.buildFusionFormDefinition(formName, fusionAccount, candidates, formLocale)
             } catch (error) {
                 if (this.isDuplicateFormDefinitionNameConflict(error)) {
-                    this.log.warn(
-                        `Form definition create conflict for name ${formName}; retrying lookup by exact name`
-                    )
+                    this.log.warn(`Form definition create conflict for name ${formName}; retrying lookup by exact name`)
                     formDefinition = await this.getFormDefinitionByName(formName)
                 }
                 if (!formDefinition) {
@@ -851,7 +876,6 @@ export class FormService {
         }
     }
 
-
     private enrichDecisionSubmitterName(decision: FusionDecision): FusionDecision {
         const submitterId = trimStr(decision.submitter?.id)
         if (!submitterId || submitterId === 'system') return decision
@@ -962,7 +986,6 @@ export class FormService {
     // ------------------------------------------------------------------------
     // Private Helper Methods
     // ------------------------------------------------------------------------
-
 
     /**
      * Collect pending (unanswered) form instance URLs by recipient identityId,
@@ -1086,7 +1109,16 @@ export class FormService {
     private extractAccountInfoOverride(
         accountId: string | undefined,
         shouldRemoveAccountFromMap: boolean
-    ): { id: string; iscAccountId?: string; name: string; sourceName: string; sourceId?: string; nativeIdentity?: string } | undefined {
+    ):
+        | {
+              id: string
+              iscAccountId?: string
+              name: string
+              sourceName: string
+              sourceId?: string
+              nativeIdentity?: string
+          }
+        | undefined {
         if (!accountId) {
             return undefined
         }
@@ -1146,7 +1178,14 @@ export class FormService {
     private async createDecisionsFromInstances(
         instancesToProcess: FormInstanceResponseV2025[],
         accountInfoOverride:
-            | { id: string; iscAccountId?: string; name: string; sourceName: string; sourceId?: string; nativeIdentity?: string }
+            | {
+                  id: string
+                  iscAccountId?: string
+                  name: string
+                  sourceName: string
+                  sourceId?: string
+                  nativeIdentity?: string
+              }
             | undefined
     ): Promise<number> {
         let decisionsAdded = 0
@@ -1252,7 +1291,14 @@ export class FormService {
         const sourceType =
             this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
         const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes, sourceType, formLocale)
-        const formInputs = buildFormInputs(fusionAccount, candidates, this.fusionFormAttributes, formLocale)
+        const formInputs = buildFormInputs(
+            fusionAccount,
+            candidates,
+            this.fusionFormAttributes,
+            formLocale,
+            this.urlContext,
+            sourceType
+        )
         const formConditions = buildFormConditions(candidates, this.fusionFormAttributes)
 
         this.log.debug(
@@ -1275,7 +1321,6 @@ export class FormService {
             sampleToggleLabel: readNewIdentityToggleLabel(formFields),
         }
     }
-
 
     // ------------------------------------------------------------------------
     // Lifecycle delegators (logic in formLifecycle.ts)
@@ -1324,4 +1369,3 @@ export class FormService {
         return this.lifecycle.deleteFormDefinition(formDefinitionId)
     }
 }
-
