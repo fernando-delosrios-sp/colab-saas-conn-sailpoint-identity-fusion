@@ -32,13 +32,3 @@ The ubiquitous-language glossary SHALL define **Gateway failure** as an HTTP 504
 
 - **WHEN** a reader consults the ubiquitous-language spec glossary
 - **THEN** it SHALL NOT describe **Probe** as a current pagination-circuit page after cooldown
-
-#### Scenario: Glossary entry for Cooldown
-
-- **WHEN** a reader consults the ubiquitous-language spec glossary
-- **THEN** it SHALL NOT describe **Cooldown** as a current pagination-circuit wait after shed
-
-#### Scenario: Glossary entry for Probe
-
-- **WHEN** a reader consults the ubiquitous-language spec glossary
-- **THEN** it SHALL NOT describe **Probe** as a current pagination-circuit page after cooldown

@@ -18,14 +18,6 @@ All pagination modes (sequential, parallel, searchAfter) MUST throw a `Paginatio
 - **WHEN** a pool member page later returns success
 - **THEN** that page SHALL leave the pool
 - **AND** the call SHALL NOT throw a `PaginationError` solely because that page had earlier gateway failures
-
-#### Scenario: Gateway-failure streak does not throw before cooldown and probe
-
-- **GIVEN** a parallel paginated call whose window is greater than 1
-- **AND** the gateway-failure pool size is below `min(10, window)`
-- **WHEN** a pool member page later returns success
-- **THEN** that page SHALL leave the pool
-- **AND** the call SHALL NOT throw a `PaginationError` solely because that page had earlier gateway failures
 - **AND** the client MUST NOT wait a pagination cooldown
 - **AND** the client MUST NOT send a probe page
 
@@ -45,6 +37,7 @@ When `client.call()` uses any pagination mode (`sequential`, `parallel`, or `sea
 - **AND** the call MUST throw a `PaginationError` including items collected before the failure
 - **AND** the client MUST NOT wait a pagination cooldown
 - **AND** the client MUST NOT send a probe page
+- **AND** the client MUST NOT resume that stream after a probe
 - **AND** the client MUST NOT return those items as a successful partial list
 
 #### Scenario: Successful page leaves the gateway-failure pool
@@ -97,41 +90,6 @@ When `client.call()` uses any pagination mode (`sequential`, `parallel`, or `sea
 - **WHEN** the caller `abortSignal` aborts
 - **THEN** the call MUST fail
 - **AND** the client MUST NOT wait a pagination cooldown before failing
-
-#### Scenario: Parallel window sheds, cools down, and resumes after a successful probe
-
-- **GIVEN** a parallel paginated `client.call` with window 12
-- **AND** 10 in-flight pages are in the gateway-failure pool
-- **WHEN** the pagination circuit sheds the stream
-- **THEN** in-flight page HTTP for that stream SHALL have been aborted
-- **AND** unrelated queued calls SHALL continue
-- **AND** the call MUST throw a `PaginationError` including items collected before the failure
-- **AND** the client MUST NOT wait a pagination cooldown
-- **AND** the client MUST NOT send a probe page
-- **AND** the client MUST NOT resume that stream after a probe
-
-#### Scenario: Probe gateway failure aborts with PaginationError
-
-- **GIVEN** a paginated `client.call` whose gateway-failure pool has reached `min(10, window)`
-- **WHEN** the pagination circuit sheds the stream
-- **THEN** the call MUST throw a `PaginationError` including items collected before the failure
-- **AND** the client MUST NOT return those items as a successful partial list
-- **AND** the client MUST NOT wait a pagination cooldown
-- **AND** the client MUST NOT send a probe page
-
-#### Scenario: Second streak after resume aborts without another cooldown
-
-- **GIVEN** a paginated `client.call` whose gateway-failure pool has reached `min(10, window)`
-- **WHEN** the pagination circuit sheds the stream
-- **THEN** the call MUST throw a `PaginationError`
-- **AND** the client MUST NOT wait a pagination cooldown before throwing
-
-#### Scenario: Caller abort during cooldown skips the probe
-
-- **GIVEN** a paginated `client.call` in progress
-- **WHEN** the caller `abortSignal` aborts
-- **THEN** the call MUST fail
-- **AND** the client MUST NOT wait a pagination cooldown
 - **AND** the client MUST NOT send a probe page
 
 ---
