@@ -67,9 +67,8 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms do n
 | Term                    | Definition                                                                                                                                                                                                                          |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Gateway failure**     | An HTTP 504 or a request timeout (`ECONNABORTED` / `ETIMEDOUT`) on a page fetch. Distinct from HTTP 429 (rate limit) and from other 5xx, which keep the existing per-request retry path.                                            |
-| **Pagination circuit**  | Per-pagination-stream state that sheds load after consecutive gateway failures, then either resumes after a successful probe or fails the call. Not a tenant-wide or whole-queue breaker, and not a global API kill switch.         |
-| **Cooldown**            | A bounded wait after shed with no new page starts on that stream, long enough for gateway-abandoned DB work to finish. One cooldown per pagination stream. Distinct from per-request retry backoff.                                 |
-| **Probe**               | A single page request after cooldown (window = 1) used to decide resume versus abort. Not a separate health-check endpoint.                                                                                                         |
+| **Gateway-failure pool** | The set of page fetches on one pagination stream that have observed a gateway failure and have not yet returned success. A page leaves the pool only when that same page succeeds.                                                 |
+| **Pagination circuit**  | Per-pagination-stream state that sheds load when the gateway-failure pool reaches `min(10, window)` and fails the call. Not cooldown-then-probe, not a tenant-wide or whole-queue breaker, and not a global API kill switch.     |
 
 ## Framework steps
 
