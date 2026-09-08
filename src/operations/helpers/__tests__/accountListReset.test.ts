@@ -22,7 +22,7 @@ describe('setupPhase reset flags', () => {
         expect(registry.sources.resetBatchCumulativeCount).toHaveBeenCalled()
     })
 
-    it('resetForms only deletes forms and continues setup', async () => {
+    it('resetForms only deletes forms and continues', async () => {
         const registry = createRegistry()
         const fusion = registry.fusion as any
         fusion.isResetAccounts.mockReturnValue(false)
