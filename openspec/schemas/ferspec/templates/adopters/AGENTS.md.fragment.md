@@ -50,4 +50,5 @@ When all 5 hold → proactively suggest "ready to `/opsx:propose`?" — wait for
 - Promoting to opsx with unresolved blocking TBDs
 - Opening a change for bug fix / typo
 - Running archive or spec sync inside apply — user runs `/opsx:archive` after merge or when ready
+- Reporting apply complete while `/opsx:verify` still has CRITICAL, WARNING, or SUGGESTION issues — return to apply
 - Reporting archive complete without committing synced specs and the moved change folder — archive requires commit + post-commit gate (see ferspec README § Archive)

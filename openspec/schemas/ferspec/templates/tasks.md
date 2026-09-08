@@ -13,7 +13,7 @@
 <!-- Record canonical test command when not obvious from the repo -->
 
 - [ ] N.1 Confirm canonical test command: `<!-- e.g. npm test, ./mvnw verify -->`
-- [ ] N.2 All delta spec scenarios covered by named automated tests
+- [ ] N.2 All delta spec scenarios covered by named automated tests (coverage evidence for `/opsx:verify`)
 
 ## N+1. Documentation
 
