@@ -160,3 +160,52 @@ describe('extractCandidateIdsFromFormInput', () => {
         expect(extractCandidateIdsFromFormInput(null)).toEqual([])
     })
 })
+
+describe('Processor ignores display HTML keys', () => {
+    it('Processor ignores display HTML keys', async () => {
+        const decision = await createFusionDecision({
+            id: 'fi-html',
+            state: 'SUBMITTED',
+            recipients: [{ id: 'reviewer-1', type: 'IDENTITY' }],
+            formInput: {
+                account: 'src-1::account-1',
+                name: 'Account One',
+                source: 'HR',
+                sourceType: 'authoritative',
+                candidates: 'identity-123',
+                accountHtml: '<p><b>Account One</b></p>',
+                candidatesHtml: '<table><tr><td>email</td></tr></table>',
+            },
+            formData: {
+                newIdentity: false,
+                identities: ['identity-123'],
+                comments: 'Approved from HTML form',
+            },
+        } as any)
+
+        expect(decision).toBeDefined()
+        expect(decision?.finished).toBe(true)
+        expect(decision?.identityId).toBe('identity-123')
+        expect(decision?.account.id).toBe('src-1::account-1')
+    })
+
+    it('produces a decision when display HTML keys are omitted', async () => {
+        const decision = await createFusionDecision({
+            id: 'fi-no-html',
+            state: 'SUBMITTED',
+            recipients: [{ id: 'reviewer-1', type: 'IDENTITY' }],
+            formInput: {
+                account: 'src-1::account-1',
+                name: 'Account One',
+                source: 'HR',
+                sourceType: 'authoritative',
+            },
+            formData: {
+                newIdentity: false,
+                identities: ['identity-123'],
+            },
+        } as any)
+
+        expect(decision?.identityId).toBe('identity-123')
+    })
+})

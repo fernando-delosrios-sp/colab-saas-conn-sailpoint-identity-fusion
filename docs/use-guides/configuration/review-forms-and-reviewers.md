@@ -26,6 +26,12 @@ For reviewer assignment and access profiles, see [Managing reviewers](managing-r
 
 For localization (**Default Language**, **Identity Language Attribute**, form locale behavior), see [Managing reviewers — Localization and reviewer experience](managing-reviewers.md#localization-and-reviewer-experience).
 
+### What reviewers see
+
+The Fusion review form display is **DESCRIPTION HTML** aligned with the Fusion review email: account context, configured form attributes, identity and account links (when ISC URLs can be built), and a score table for every candidate (columns: attribute, algorithm, threshold, value, score; match/miss/combined row colors). Reviewers still decide with the **new identity / no match** toggle and the identities SELECT. Display is not a stack of TEXT fields.
+
+A form layout change does not rewrite in-flight reviews. To recut open reviews onto this layout, run **Reset forms?** once on a persistent aggregation — see [Reset Fusion state](../operation/reset-fusion-state.md). There is no per-account review reset flag.
+
 ### Aggregation report contents
 
 When **Send report to owner on aggregation?** is enabled, the **aggregation report** includes:

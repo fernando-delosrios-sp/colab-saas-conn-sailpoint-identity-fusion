@@ -38,7 +38,7 @@ Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identit
 
     - Loads all managed sources.
     - Acquires a **process lock** to prevent concurrent aggregations.
-    - Checks for **Reset forms?**; when enabled, deletes all Fusion review form definitions and auto-disables the flag (aggregation continues unless account reset is also set).
+    - Checks for **Reset forms?**; when enabled, closes in-flight Fusion reviews (matching definitions and leftover instances) and auto-disables the flag (aggregation continues unless account reset is also set).
     - Checks for **Reset accounts?**; when enabled, clears persisted fusion state, auto-disables the flag, and exits Setup without performing aggregation (zero accounts emitted).
     - Checks for **Force attribute refresh on next aggregation?**; when enabled, the connector disables the flag immediately so it applies to a single aggregation only, then proceeds with the run (Normal-type attributes are recalculated when their definitions execute in step 3/step 4).
     - Sets the fusion account schema.

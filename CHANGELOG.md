@@ -10,6 +10,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### 🔧 Improvements
 
+- **Fusion review forms use DESCRIPTION HTML aligned with the review email** — Reviewers see account context, identity and account links, and a score table for every candidate (attribute, algorithm, threshold, value, score, with the same match/miss/combined colors as email). The new-identity / no-match toggle and identities SELECT remain the decision controls. In-flight reviews keep their existing layout until **Reset forms?** runs.
+- **Reset forms closes open Fusion reviews** — On the next persistent aggregation, **Reset forms?** deletes matching Fusion review form definitions and cancels leftover open instances so those accounts can rematch on the same run. Dry-run still does not apply the flag.
 - **Paginated fetches abort on a gateway-failure pool, with no 30s wait** — When enough in-flight pages on one pagination stream have seen HTTP 504 or timeout and have not yet succeeded (`min(10, this stream’s window)`), Identity Fusion sheds that stream and throws `PaginationError` immediately. There is no cooldown and no probe. Sequential and searchAfter fail on the first gateway failure. Paginated 504s still use at most one extra retry; OFFSET paging, HTTP 429 Retry-After, and non-paginated queue retries are unchanged. This is not a global API kill switch and does not replace OFFSET paging.
 
 ---

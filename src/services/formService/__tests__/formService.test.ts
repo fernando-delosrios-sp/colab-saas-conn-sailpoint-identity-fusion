@@ -6,10 +6,13 @@ import { analyzeFormInstances, extractAccountIdFromInstance } from '../formInsta
 
 /** Minimal client.call mock that supports sequential pagination used by form instance fetch. */
 function createFormClientCallMock(customFormsMock: Record<string, unknown>) {
-    return async (fn: (api: { customForms: typeof customFormsMock }, params?: unknown) => Promise<unknown>, policy?: {
-        paginate?: { mode: string; baseParams?: Record<string, unknown> }
-        onPageProgress?: (loaded: number, total?: number) => void
-    }) => {
+    return async (
+        fn: (api: { customForms: typeof customFormsMock }, params?: unknown) => Promise<unknown>,
+        policy?: {
+            paginate?: { mode: string; baseParams?: Record<string, unknown> }
+            onPageProgress?: (loaded: number, total?: number) => void
+        }
+    ) => {
         const api = { customForms: customFormsMock }
         if (policy?.paginate?.mode === 'sequential') {
             const params = { ...(policy.paginate.baseParams ?? {}), limit: 250, offset: 0 }
@@ -134,7 +137,12 @@ describe('FormService fetchFormInstances logging', () => {
         const searchFormInstancesByTenant = vi
             .fn()
             .mockResolvedValueOnce({ data: [{ id: 'inst-1', formDefinitionId: 'form-1' }] })
-            .mockResolvedValueOnce({ data: [{ id: 'inst-2', formDefinitionId: 'form-2' }, { id: 'inst-3', formDefinitionId: 'form-2' }] })
+            .mockResolvedValueOnce({
+                data: [
+                    { id: 'inst-2', formDefinitionId: 'form-2' },
+                    { id: 'inst-3', formDefinitionId: 'form-2' },
+                ],
+            })
 
         const customFormsMock = {
             searchFormDefinitionsByTenant,
@@ -260,6 +268,49 @@ describe('FormService stale-form cleanup queue', () => {
     })
 })
 
+describe('FormService deleteExistingForms', () => {
+    it('resetForms only closes in-flight reviews and continues', async () => {
+        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({
+            data: { results: [{ id: 'form-1', name: 'Fusion Review - A' }] },
+        })
+        const searchFormInstancesByTenant = vi.fn().mockResolvedValue({
+            data: [
+                { id: 'open-1', formDefinitionId: 'form-1', state: 'ASSIGNED' },
+                { id: 'done-1', formDefinitionId: 'form-1', state: 'COMPLETED' },
+            ],
+        })
+        const deleteFormDefinition = vi.fn().mockResolvedValue({})
+        const patchFormInstance = vi.fn().mockResolvedValue({ data: { id: 'open-1', state: 'CANCELLED' } })
+
+        const customFormsMock = {
+            searchFormDefinitionsByTenant,
+            searchFormInstancesByTenant,
+            deleteFormDefinition,
+            patchFormInstance,
+        }
+
+        const service = new FormService(
+            { fusionFormNamePattern: 'Fusion Review', fusionFormExpirationDays: 7 } as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
+            {
+                customFormsApi: customFormsMock,
+                call: createFormClientCallMock(customFormsMock),
+            } as any,
+            {} as any
+        )
+
+        await service.deleteExistingForms()
+
+        expect(deleteFormDefinition).toHaveBeenCalledWith({ formDefinitionID: 'form-1' })
+        expect(patchFormInstance).toHaveBeenCalledWith(
+            expect.objectContaining({
+                formInstanceID: 'open-1',
+                body: expect.arrayContaining([expect.objectContaining({ path: '/state', value: 'CANCELLED' })]),
+            })
+        )
+        expect(patchFormInstance).not.toHaveBeenCalledWith(expect.objectContaining({ formInstanceID: 'done-1' }))
+    })
+})
 
 describe('FormService stale cleanup with simulated replay time', () => {
     const simulatedTime = '2026-07-31T08:24:12.899Z'
@@ -283,7 +334,13 @@ describe('FormService stale cleanup with simulated replay time', () => {
                 fusionFormNamePattern: 'Fusion',
                 fusionFormExpirationDays: 7,
             } as any,
-            { warn: vi.fn(), info: vi.fn(), debug: vi.fn(), setProgress: vi.fn(), track: vi.fn(() => ({ done: vi.fn() })) } as any,
+            {
+                warn: vi.fn(),
+                info: vi.fn(),
+                debug: vi.fn(),
+                setProgress: vi.fn(),
+                track: vi.fn(() => ({ done: vi.fn() })),
+            } as any,
             {
                 customFormsApi: customFormsMock,
                 call: createFormClientCallMock(customFormsMock),
@@ -337,13 +394,18 @@ describe('FormService managed work queue synchronization', () => {
         } as any
 
         const managedAccountsById = new Map([[managedKey, managedAccount]])
-        const managedAccountInventory = new Map([[managedKey, {
-            id: managedAccount.id,
-            name: managedAccount.name,
-            sourceName: managedAccount.sourceName,
-            sourceId: managedAccount.sourceId,
-            nativeIdentity: managedAccount.nativeIdentity,
-        }]])
+        const managedAccountInventory = new Map([
+            [
+                managedKey,
+                {
+                    id: managedAccount.id,
+                    name: managedAccount.name,
+                    sourceName: managedAccount.sourceName,
+                    sourceId: managedAccount.sourceId,
+                    nativeIdentity: managedAccount.nativeIdentity,
+                },
+            ],
+        ])
         const managedAccountsByIdentityId = new Map([[identityId, new Set([managedKey])]])
 
         const run = {
@@ -561,10 +623,7 @@ describe('FormService createFusionForm', () => {
         const createFormInstance = vi.fn().mockImplementation(
             () =>
                 new Promise((resolve) => {
-                    setTimeout(
-                        () => resolve({ data: { id: 'inst-1', standAloneFormUrl: 'https://review/1' } }),
-                        30
-                    )
+                    setTimeout(() => resolve({ data: { id: 'inst-1', standAloneFormUrl: 'https://review/1' } }), 30)
                 })
         )
         const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({ data: { results: [] } })
@@ -711,6 +770,81 @@ describe('FormService createFusionForm', () => {
         expect(formBody.name).toMatch(/ \[fr\]$/)
     })
 
+    it('builds formInput HTML links from UrlContext', async () => {
+        FusionAccount.configure({ sources: ['Source A'] } as any)
+
+        const createFormDefinition = vi.fn().mockResolvedValue({ data: { id: 'form-def-1', name: 'Fusion Review' } })
+        const createFormInstance = vi.fn().mockResolvedValue({
+            data: { id: 'inst-1', standAloneFormUrl: 'https://review/1' },
+        })
+        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({ data: { results: [] } })
+        const searchFormInstancesByTenant = vi.fn().mockResolvedValue({ data: [] })
+
+        const customFormsMock = {
+            createFormDefinition,
+            createFormInstance,
+            searchFormDefinitionsByTenant,
+            searchFormInstancesByTenant,
+        }
+
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'acct-1',
+            nativeIdentity: 'native-1',
+            name: 'Test User',
+            sourceId: 'source-a-id',
+            sourceName: 'Source A',
+            attributes: { email: 'user@example.com' },
+        } as any)
+        fusionAccount.layers.addFusionMatch({
+            fusionIdentity: {
+                identityId: 'candidate-1',
+                attributes: { displayName: 'Candidate One', email: 'candidate@example.com' },
+            },
+            scores: [{ attribute: 'email', algorithm: 'lig3', score: 85, fusionScore: 50, isMatch: true }],
+        } as any)
+
+        const reviewer = FusionAccount.fromIdentity({
+            id: 'reviewer-1',
+            name: 'Reviewer',
+            attributes: { email: 'reviewer@example.com' },
+        } as any)
+
+        const service = new FormService(
+            {
+                baseurl: 'https://example.api.identitynow.com',
+                fusionFormNamePattern: 'Fusion Review',
+                fusionFormExpirationDays: 7,
+                fusionFormAttributes: ['Email'],
+                fusionMaxCandidatesForForm: 10,
+            } as any,
+            { warn: vi.fn(), debug: vi.fn(), info: vi.fn() } as any,
+            {
+                customFormsApi: customFormsMock,
+                call: createFormClientCallMock(customFormsMock),
+            } as any,
+            {
+                fusionSourceId: 'fusion-src',
+                fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
+                getSourceByNameSafe: vi.fn().mockReturnValue({ sourceType: SourceType.Authoritative }),
+            } as any,
+            undefined,
+            undefined,
+            new FusionRun()
+        )
+
+        await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        const formInput = createFormInstance.mock.calls[0][0].body.formInput
+        expect(formInput.accountHtml).toContain('accounts-management/human-accounts/acct-1')
+        expect(formInput.candidatesHtml).toContain('identities/candidate-1/details/attributes')
+        expect(formInput.accountHtml).toContain('target="_blank"')
+        const formElements = createFormDefinition.mock.calls[0][0].body.formElements
+        const allKeys = JSON.stringify(formElements)
+        expect(allKeys).not.toContain('"elementType":"TEXT"')
+        expect(allKeys).toContain('newIdentity')
+        expect(allKeys).toContain('identities')
+    })
+
     it('builds English form definition when localization is disabled despite defaultLanguage fr', async () => {
         FusionAccount.configure({ sources: ['Source A'] } as any)
 
@@ -793,14 +927,17 @@ describe('FormService createFusionForm', () => {
         const legacyEnglishDefinition = {
             id: 'form-def-legacy',
             name: 'Fusion Review - Test User [Source A] (source-a-id::native-1)',
-            description: 'Review potential matching identity and decide whether to create a new identity or merge with an existing one',
+            description:
+                'Review potential matching identity and decide whether to create a new identity or merge with an existing one',
         }
         const createFormDefinition = vi.fn().mockResolvedValue({ data: { id: 'form-def-fr', name: 'localized' } })
         const patchFormDefinition = vi.fn()
         const createFormInstance = vi.fn().mockResolvedValue({
             data: { id: 'inst-1', standAloneFormUrl: 'https://review/1' },
         })
-        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({ data: { results: [legacyEnglishDefinition] } })
+        const searchFormDefinitionsByTenant = vi
+            .fn()
+            .mockResolvedValue({ data: { results: [legacyEnglishDefinition] } })
         const searchFormInstancesByTenant = vi.fn().mockResolvedValue({ data: [] })
 
         const customFormsMock = {
@@ -875,6 +1012,85 @@ describe('FormService createFusionForm', () => {
         expect(info).toHaveBeenCalledWith(expect.stringContaining('Creating fusion form definition'))
         expect(info).toHaveBeenCalledWith(expect.stringContaining('toggle label="Nouvelle identité"'))
     })
+
+    it('Restyle does not migrate pending instances without Reset forms', async () => {
+        FusionAccount.configure({ sources: ['Source A'] } as any)
+        const existingDefinition = {
+            id: 'form-pending',
+            name: 'Fusion Review - Test User [Source A] (source-a-id::native-1)',
+        }
+        const createFormDefinition = vi.fn()
+        const deleteFormDefinition = vi.fn()
+        const patchFormDefinition = vi.fn()
+        const createFormInstance = vi.fn().mockResolvedValue({
+            data: { id: 'inst-1', standAloneFormUrl: 'https://review/1' },
+        })
+        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({ data: { results: [existingDefinition] } })
+        const searchFormInstancesByTenant = vi.fn().mockResolvedValue({
+            data: [{ id: 'pending-1', formDefinitionId: 'form-pending', state: 'ASSIGNED', recipients: [] }],
+        })
+
+        const customFormsMock = {
+            createFormDefinition,
+            deleteFormDefinition,
+            patchFormDefinition,
+            createFormInstance,
+            searchFormDefinitionsByTenant,
+            searchFormInstancesByTenant,
+        }
+
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'acct-1',
+            nativeIdentity: 'native-1',
+            name: 'Test User',
+            sourceId: 'source-a-id',
+            sourceName: 'Source A',
+            attributes: { email: 'user@example.com' },
+        } as any)
+        fusionAccount.layers.addFusionMatch({
+            fusionIdentity: {
+                identityId: 'candidate-1',
+                attributes: { displayName: 'Candidate One', email: 'candidate@example.com' },
+            },
+            scores: [{ attribute: 'email', algorithm: 'lig3', score: 85, fusionScore: 50 }],
+        } as any)
+
+        const reviewer = FusionAccount.fromIdentity({
+            id: 'reviewer-1',
+            name: 'Reviewer',
+            attributes: { email: 'reviewer@example.com' },
+        } as any)
+
+        const service = new FormService(
+            {
+                fusionFormNamePattern: 'Fusion Review',
+                fusionFormExpirationDays: 7,
+                fusionFormAttributes: ['Email'],
+                fusionMaxCandidatesForForm: 10,
+                enableLocalization: false,
+            } as any,
+            { warn: vi.fn(), debug: vi.fn(), info: vi.fn() } as any,
+            {
+                customFormsApi: customFormsMock,
+                call: createFormClientCallMock(customFormsMock),
+            } as any,
+            {
+                fusionSourceId: 'fusion-src',
+                fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
+                getSourceByNameSafe: vi.fn().mockReturnValue({ sourceType: SourceType.Authoritative }),
+            } as any,
+            undefined,
+            undefined,
+            new FusionRun()
+        )
+
+        await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        expect(createFormDefinition).not.toHaveBeenCalled()
+        expect(deleteFormDefinition).not.toHaveBeenCalled()
+        expect(patchFormDefinition).not.toHaveBeenCalled()
+        expect(createFormInstance).toHaveBeenCalled()
+    })
 })
 
 describe('FormService getOrCreateFormDefinition conflict recovery', () => {
@@ -883,7 +1099,8 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
         const existingDefinition = {
             id: 'form-existing',
             name: 'Fusion Test Form [fr]',
-            description: 'Review potential matching identity and decide whether to create a new identity or merge with an existing one',
+            description:
+                'Review potential matching identity and decide whether to create a new identity or merge with an existing one',
         }
         const createdDefinition = {
             id: 'form-new',
@@ -930,7 +1147,8 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
         const existingDefinition = {
             id: 'form-existing',
             name: 'Fusion Test Form [fr]',
-            description: 'Review potential matching identity and decide whether to create a new identity or merge with an existing one',
+            description:
+                'Review potential matching identity and decide whether to create a new identity or merge with an existing one',
         }
         const patchedDefinition = {
             id: 'form-existing',
@@ -1081,9 +1299,7 @@ describe('FormService finished decision reviewer metadata', () => {
     it('stores submitter display name when registering finished decisions', () => {
         const reviewerId = 'reviewer-report-1'
         const identities = {
-            getIdentityById: vi.fn((id?: string) =>
-                id === reviewerId ? { id, name: 'Reviewer Display' } : undefined
-            ),
+            getIdentityById: vi.fn((id?: string) => (id === reviewerId ? { id, name: 'Reviewer Display' } : undefined)),
         }
         const run = {
             fusionIdentityDecisions: [],
@@ -1121,5 +1337,3 @@ describe('FormService finished decision reviewer metadata', () => {
         expect((service as any).finishedFusionDecisionsValue[0].submitter.name).toBe('Reviewer Display')
     })
 })
-
-
