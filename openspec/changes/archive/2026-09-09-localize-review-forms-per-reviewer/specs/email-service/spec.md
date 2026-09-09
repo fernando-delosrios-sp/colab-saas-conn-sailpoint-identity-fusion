@@ -46,14 +46,6 @@ The connector SHALL read `enableLocalization`, `defaultLanguage`, and `identityL
 - **THEN** form labels MUST use locale `en`
 - **AND** MUST NOT use `ja` solely because it is `defaultLanguage`
 
-#### Scenario: Review forms use defaultLanguage only
-
-- **GIVEN** `enableLocalization` is `true` and `defaultLanguage` is `ja`
-- **AND** the review email recipient resolves to locale `en` via identity attributes
-- **WHEN** `FormService` builds a review form definition
-- **THEN** form labels MUST use locale `en` from reviewer locale (`getRecipientLocale` / `resolveEffectiveLocale`)
-- **AND** MUST NOT use `ja` solely because it is `defaultLanguage`
-
 ---
 
 ## REMOVED Requirements
