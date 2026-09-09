@@ -33,6 +33,107 @@ function createFormClientCallMock(customFormsMock: Record<string, unknown>) {
     }
 }
 
+function toggleLabelFromDefinition(formElements: Array<{ key?: string; config?: any }>): string | undefined {
+    const identitiesSection = formElements.find((element) => element.key === 'identitiesSection')
+    return identitiesSection?.config?.formElements?.[0]?.config?.columns?.[0]?.[0]?.config?.label
+}
+
+function buildManagedAccountAndReviewer(reviewerId: string) {
+    FusionAccount.configure({ sources: ['Source A'] } as any)
+    const fusionAccount = FusionAccount.fromManagedAccount({
+        id: 'acct-1',
+        nativeIdentity: 'native-1',
+        name: 'Test User',
+        sourceId: 'source-a-id',
+        sourceName: 'Source A',
+        attributes: { email: 'user@example.com' },
+    } as any)
+    fusionAccount.layers.addFusionMatch({
+        fusionIdentity: {
+            identityId: 'candidate-1',
+            attributes: { displayName: 'Candidate One', email: 'candidate@example.com' },
+        },
+        scores: [{ attribute: 'email', algorithm: 'lig3', score: 85, fusionScore: 50 }],
+    } as any)
+    const reviewer = FusionAccount.fromIdentity({
+        id: reviewerId,
+        name: 'Reviewer',
+        attributes: { email: 'reviewer@example.com' },
+    } as any)
+    return { fusionAccount, reviewer }
+}
+
+function buildLocalizedCreateFusionFormHarness(options: {
+    enableLocalization?: boolean
+    defaultLanguage?: string
+    getRecipientLocale?: (id: string | undefined) => Promise<string>
+    existingDefinitions?: Array<{ id: string; name: string; description?: string; formElements?: unknown[] }>
+    existingInstancesByDefinitionId?: Record<string, unknown[]>
+}) {
+    FusionAccount.configure({ sources: ['Source A'] } as any)
+    const createFormDefinition = vi.fn().mockImplementation(async (req: { body: { name: string } }) => ({
+        data: { id: `form-def-${createFormDefinition.mock.calls.length}`, name: req.body.name },
+    }))
+    const createFormInstance = vi.fn().mockImplementation(async () => ({
+        data: {
+            id: `inst-${createFormInstance.mock.calls.length}`,
+            standAloneFormUrl: `https://review/${createFormInstance.mock.calls.length}`,
+        },
+    }))
+    const patchFormDefinition = vi.fn()
+    const deleteFormDefinition = vi.fn().mockResolvedValue({})
+    const existingDefinitions = options.existingDefinitions ?? []
+    const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({
+        data: { results: existingDefinitions },
+    })
+    const searchFormInstancesByTenant = vi.fn().mockImplementation(async (params?: { filters?: string }) => {
+        const filter = params?.filters ?? ''
+        const match = /formDefinitionId eq "([^"]+)"/.exec(filter)
+        const byId = options.existingInstancesByDefinitionId
+        if (match && byId) {
+            return { data: byId[match[1]] ?? [] }
+        }
+        return { data: [] }
+    })
+    const customFormsMock = {
+        createFormDefinition,
+        createFormInstance,
+        patchFormDefinition,
+        deleteFormDefinition,
+        searchFormDefinitionsByTenant,
+        searchFormInstancesByTenant,
+        getFormDefinitionByKey: vi.fn().mockImplementation(async (params: { formDefinitionID: string }) => {
+            const found = existingDefinitions.find((definition) => definition.id === params.formDefinitionID)
+            return { data: found }
+        }),
+    }
+    const email = options.getRecipientLocale ? { getRecipientLocale: vi.fn(options.getRecipientLocale) } : undefined
+    const service = new FormService(
+        {
+            fusionFormNamePattern: 'Fusion Review',
+            fusionFormExpirationDays: 7,
+            fusionFormAttributes: ['Email'],
+            fusionMaxCandidatesForForm: 10,
+            enableLocalization: options.enableLocalization ?? true,
+            defaultLanguage: options.defaultLanguage,
+        } as any,
+        { warn: vi.fn(), debug: vi.fn(), info: vi.fn(), error: vi.fn() } as any,
+        {
+            customFormsApi: customFormsMock,
+            call: createFormClientCallMock(customFormsMock),
+        } as any,
+        {
+            fusionSourceId: 'fusion-src',
+            fusionSourceOwner: { id: 'owner-1', type: 'IDENTITY' },
+            getSourceByNameSafe: vi.fn().mockReturnValue({ sourceType: SourceType.Authoritative }),
+        } as any,
+        undefined,
+        email as any,
+        new FusionRun()
+    )
+    return { service, createFormDefinition, createFormInstance, patchFormDefinition, deleteFormDefinition }
+}
+
 describe('FormService fetchFormInstancesByDefinitionId', () => {
     it('filters out instances with mismatched formDefinitionId', async () => {
         const warn = vi.fn()
@@ -309,6 +410,51 @@ describe('FormService deleteExistingForms', () => {
             })
         )
         expect(patchFormInstance).not.toHaveBeenCalledWith(expect.objectContaining({ formInstanceID: 'done-1' }))
+    })
+
+    it('Reset forms deletes French and German variants for the same account', async () => {
+        const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({
+            data: {
+                results: [
+                    { id: 'form-fr', name: 'Fusion Review - Test User [Source A] (source-a-id::native-1) [fr]' },
+                    { id: 'form-de', name: 'Fusion Review - Test User [Source A] (source-a-id::native-1) [de]' },
+                ],
+            },
+        })
+        const searchFormInstancesByTenant = vi.fn().mockImplementation(async (params?: { filters?: string }) => {
+            if (params?.filters?.includes('form-fr')) {
+                return {
+                    data: [{ id: 'open-fr', formDefinitionId: 'form-fr', state: 'ASSIGNED' }],
+                }
+            }
+            return {
+                data: [{ id: 'open-de', formDefinitionId: 'form-de', state: 'ASSIGNED' }],
+            }
+        })
+        const deleteFormDefinition = vi.fn().mockResolvedValue({})
+        const patchFormInstance = vi.fn().mockResolvedValue({ data: { state: 'CANCELLED' } })
+        const customFormsMock = {
+            searchFormDefinitionsByTenant,
+            searchFormInstancesByTenant,
+            deleteFormDefinition,
+            patchFormInstance,
+        }
+        const service = new FormService(
+            { fusionFormNamePattern: 'Fusion Review', fusionFormExpirationDays: 7 } as any,
+            { warn: vi.fn(), info: vi.fn(), debug: vi.fn() } as any,
+            {
+                customFormsApi: customFormsMock,
+                call: createFormClientCallMock(customFormsMock),
+            } as any,
+            {} as any
+        )
+
+        await service.deleteExistingForms()
+
+        expect(deleteFormDefinition).toHaveBeenCalledWith({ formDefinitionID: 'form-fr' })
+        expect(deleteFormDefinition).toHaveBeenCalledWith({ formDefinitionID: 'form-de' })
+        expect(patchFormInstance).toHaveBeenCalledWith(expect.objectContaining({ formInstanceID: 'open-fr' }))
+        expect(patchFormInstance).toHaveBeenCalledWith(expect.objectContaining({ formInstanceID: 'open-de' }))
     })
 })
 
@@ -1091,6 +1237,224 @@ describe('FormService createFusionForm', () => {
         expect(patchFormDefinition).not.toHaveBeenCalled()
         expect(createFormInstance).toHaveBeenCalled()
     })
+
+    it('Reviewer language attribute sets form locale', async () => {
+        const { service, createFormDefinition, createFormInstance } = buildLocalizedCreateFusionFormHarness({
+            defaultLanguage: undefined,
+            getRecipientLocale: async () => 'ja',
+        })
+        const { fusionAccount, reviewer } = buildManagedAccountAndReviewer('reviewer-ja')
+
+        await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        const formBody = createFormDefinition.mock.calls[0][0].body
+        expect(formBody.name).toMatch(/ \[ja\]$/)
+        expect(toggleLabelFromDefinition(formBody.formElements)).toBe('新規アイデンティティ')
+        expect(createFormInstance.mock.calls[0][0].body.formInput.candidatesHtml).toContain('しきい値')
+    })
+
+    it('Review forms use reviewer locale', async () => {
+        const { service, createFormDefinition } = buildLocalizedCreateFusionFormHarness({
+            defaultLanguage: 'ja',
+            getRecipientLocale: async () => 'en',
+        })
+        const { fusionAccount, reviewer } = buildManagedAccountAndReviewer('reviewer-en')
+
+        await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        const formBody = createFormDefinition.mock.calls[0][0].body
+        expect(toggleLabelFromDefinition(formBody.formElements)).toBe('New identity')
+        expect(formBody.name).toMatch(/ \[en\]$/)
+        expect(formBody.name).not.toMatch(/ \[ja\]$/)
+    })
+
+    it('Localization enabled with French defaultLanguage', async () => {
+        const { service, createFormDefinition } = buildLocalizedCreateFusionFormHarness({
+            defaultLanguage: 'fr',
+        })
+        const { fusionAccount, reviewer } = buildManagedAccountAndReviewer('reviewer-1')
+
+        await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        const formBody = createFormDefinition.mock.calls[0][0].body
+        expect(toggleLabelFromDefinition(formBody.formElements)).toBe('Nouvelle identité')
+        expect(formBody.description).toMatch(/^fusion-locale:\d+:fr\|/)
+    })
+
+    it('Unsupported defaultLanguage falls back to English', async () => {
+        const { service, createFormDefinition } = buildLocalizedCreateFusionFormHarness({
+            defaultLanguage: 'xx',
+        })
+        const { fusionAccount, reviewer } = buildManagedAccountAndReviewer('reviewer-1')
+
+        await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        const formBody = createFormDefinition.mock.calls[0][0].body
+        expect(toggleLabelFromDefinition(formBody.formElements)).toBe('New identity')
+        expect(formBody.name).toMatch(/ \[en\]$/)
+    })
+
+    it('Two reviewers with different language attributes get two definitions', async () => {
+        const { service, createFormDefinition, createFormInstance } = buildLocalizedCreateFusionFormHarness({
+            defaultLanguage: 'en',
+            getRecipientLocale: async (id) => (id === 'reviewer-fr' ? 'fr' : 'de'),
+        })
+        const { fusionAccount } = buildManagedAccountAndReviewer('unused')
+        const reviewerFr = FusionAccount.fromIdentity({
+            id: 'reviewer-fr',
+            name: 'French Reviewer',
+            attributes: { preferredLanguage: 'fr' },
+        } as any)
+        const reviewerDe = FusionAccount.fromIdentity({
+            id: 'reviewer-de',
+            name: 'German Reviewer',
+            attributes: { preferredLanguage: 'de' },
+        } as any)
+
+        await service.createFusionForm(fusionAccount, new Set([reviewerFr, reviewerDe]))
+
+        expect(createFormDefinition).toHaveBeenCalledTimes(2)
+        const names = createFormDefinition.mock.calls.map((call) => call[0].body.name)
+        expect(names.some((name: string) => name.endsWith(' [fr]'))).toBe(true)
+        expect(names.some((name: string) => name.endsWith(' [de]'))).toBe(true)
+        const frBody = createFormDefinition.mock.calls.find((call) => call[0].body.name.endsWith(' [fr]'))[0].body
+        const deBody = createFormDefinition.mock.calls.find((call) => call[0].body.name.endsWith(' [de]'))[0].body
+        expect(toggleLabelFromDefinition(frBody.formElements)).toBe('Nouvelle identité')
+        expect(toggleLabelFromDefinition(deBody.formElements)).toBe('Neue Identität')
+        expect(createFormInstance).toHaveBeenCalledTimes(2)
+        const frInstance = createFormInstance.mock.calls.find((call) => call[0].body.recipients[0].id === 'reviewer-fr')
+        const deInstance = createFormInstance.mock.calls.find((call) => call[0].body.recipients[0].id === 'reviewer-de')
+        expect(frInstance[0].body.formInput.candidatesHtml).toContain('Seuil')
+        expect(deInstance[0].body.formInput.candidatesHtml).toContain('Schwellenwert')
+    })
+
+    it('Localization disabled uses one English definition with no suffix', async () => {
+        const { service, createFormDefinition } = buildLocalizedCreateFusionFormHarness({
+            enableLocalization: false,
+            defaultLanguage: 'fr',
+        })
+        const { fusionAccount } = buildManagedAccountAndReviewer('unused')
+        const reviewerA = FusionAccount.fromIdentity({
+            id: 'reviewer-a',
+            name: 'A',
+            attributes: { preferredLanguage: 'de' },
+        } as any)
+        const reviewerB = FusionAccount.fromIdentity({
+            id: 'reviewer-b',
+            name: 'B',
+            attributes: { preferredLanguage: 'fr' },
+        } as any)
+
+        await service.createFusionForm(fusionAccount, new Set([reviewerA, reviewerB]))
+
+        expect(createFormDefinition).toHaveBeenCalledTimes(1)
+        const formBody = createFormDefinition.mock.calls[0][0].body
+        expect(formBody.name).not.toMatch(/ \[[a-z]{2}\]$/)
+        expect(toggleLabelFromDefinition(formBody.formElements)).toBe('New identity')
+    })
+
+    it('Distinct reviewers on different locale groups are not duplicate reviews', async () => {
+        const accountPrefix = 'Fusion Review - Test User [Source A] (source-a-id::native-1)'
+        const { service, createFormInstance } = buildLocalizedCreateFusionFormHarness({
+            defaultLanguage: 'en',
+            getRecipientLocale: async (id) => (id === 'reviewer-a' ? 'fr' : 'de'),
+            existingDefinitions: [
+                {
+                    id: 'form-fr',
+                    name: `${accountPrefix} [fr]`,
+                    description: 'fusion-locale:3:fr|French description',
+                    formElements: [{ key: 'newIdentity', config: { label: 'Nouvelle identité' } }],
+                },
+                {
+                    id: 'form-de',
+                    name: `${accountPrefix} [de]`,
+                    description: 'fusion-locale:3:de|German description',
+                    formElements: [{ key: 'newIdentity', config: { label: 'Neue Identität' } }],
+                },
+            ],
+            existingInstancesByDefinitionId: {
+                'form-fr': [
+                    {
+                        id: 'inst-fr',
+                        formDefinitionId: 'form-fr',
+                        state: 'ASSIGNED',
+                        recipients: [{ id: 'reviewer-a' }],
+                    },
+                ],
+                'form-de': [
+                    {
+                        id: 'inst-de',
+                        formDefinitionId: 'form-de',
+                        state: 'ASSIGNED',
+                        recipients: [{ id: 'reviewer-b' }],
+                    },
+                ],
+            },
+        })
+        const { fusionAccount } = buildManagedAccountAndReviewer('unused')
+        const reviewerA = FusionAccount.fromIdentity({ id: 'reviewer-a', name: 'A', attributes: {} } as any)
+        const reviewerB = FusionAccount.fromIdentity({ id: 'reviewer-b', name: 'B', attributes: {} } as any)
+
+        const outcome = await service.createFusionForm(fusionAccount, new Set([reviewerA, reviewerB]))
+
+        expect(createFormInstance).not.toHaveBeenCalled()
+        expect(outcome.newReviewInstancesQueued).toBe(0)
+    })
+
+    it('Language attribute change does not reissue an in-flight review', async () => {
+        const accountPrefix = 'Fusion Review - Test User [Source A] (source-a-id::native-1)'
+        const { service, createFormInstance } = buildLocalizedCreateFusionFormHarness({
+            defaultLanguage: 'en',
+            getRecipientLocale: async () => 'de',
+            existingDefinitions: [
+                {
+                    id: 'form-fr',
+                    name: `${accountPrefix} [fr]`,
+                    description: 'fusion-locale:3:fr|French description',
+                    formElements: [{ key: 'newIdentity', config: { label: 'Nouvelle identité' } }],
+                },
+            ],
+            existingInstancesByDefinitionId: {
+                'form-fr': [
+                    {
+                        id: 'inst-fr',
+                        formDefinitionId: 'form-fr',
+                        state: 'ASSIGNED',
+                        recipients: [{ id: 'reviewer-1' }],
+                    },
+                ],
+            },
+        })
+        const { fusionAccount, reviewer } = buildManagedAccountAndReviewer('reviewer-1')
+
+        const outcome = await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        expect(createFormInstance).not.toHaveBeenCalled()
+        expect(outcome.newReviewInstancesQueued).toBe(0)
+    })
+
+    it('French definition is not refreshed for a German defaultLanguage', async () => {
+        const accountPrefix = 'Fusion Review - Test User [Source A] (source-a-id::native-1)'
+        const frenchDefinition = {
+            id: 'form-fr',
+            name: `${accountPrefix} [fr]`,
+            description: 'fusion-locale:3:fr|French description',
+            formElements: [{ key: 'newIdentity', config: { label: 'Nouvelle identité' } }],
+        }
+        const { service, createFormDefinition, patchFormDefinition, deleteFormDefinition } =
+            buildLocalizedCreateFusionFormHarness({
+                defaultLanguage: 'de',
+                getRecipientLocale: async () => 'fr',
+                existingDefinitions: [frenchDefinition],
+            })
+        const { fusionAccount, reviewer } = buildManagedAccountAndReviewer('reviewer-fr')
+
+        await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        expect(createFormDefinition).not.toHaveBeenCalled()
+        expect(patchFormDefinition).not.toHaveBeenCalled()
+        expect(deleteFormDefinition).not.toHaveBeenCalled()
+    })
 })
 
 describe('FormService getOrCreateFormDefinition conflict recovery', () => {
@@ -1119,6 +1483,7 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
             {} as any
         )
         ;(service as any).getFormDefinitionByName = getFormDefinitionByName
+        ;(service as any).getFormDefinitionByKey = vi.fn().mockResolvedValue(existingDefinition)
         ;(service as any).deleteFormDefinition = deleteFormDefinition
         ;(service as any).buildFusionFormDefinition = buildFusionFormDefinition
         ;(service as any).refreshFusionFormDefinition = refreshFusionFormDefinition
@@ -1133,7 +1498,8 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any),
-            []
+            [],
+            'fr'
         )
 
         expect(result).toEqual(createdDefinition)
@@ -1172,6 +1538,7 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
             {} as any
         )
         ;(service as any).getFormDefinitionByName = getFormDefinitionByName
+        ;(service as any).getFormDefinitionByKey = vi.fn().mockResolvedValue(existingDefinition)
         ;(service as any).deleteFormDefinition = deleteFormDefinition
         ;(service as any).buildFusionFormDefinition = buildFusionFormDefinition
         ;(service as any).refreshFusionFormDefinition = refreshFusionFormDefinition
@@ -1186,7 +1553,8 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any),
-            []
+            [],
+            'fr'
         )
 
         expect(result).toEqual(patchedDefinition)
@@ -1223,7 +1591,8 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
                 sourceName: 'Source A',
                 attributes: {},
             } as any),
-            []
+            [],
+            'en'
         )
 
         expect(result).toEqual(existingDefinition)

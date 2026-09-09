@@ -14,7 +14,8 @@ import {
     buildFormDefinitionDescription,
     isLocalizationEnabled,
     readNewIdentityToggleLabel,
-    resolveFormLocale,
+    resolveEffectiveLocale,
+    shouldRefreshLocalizedFormDefinition,
 } from '../emailService/localization'
 import { SourceService } from '../sourceService'
 import { FusionRun } from '../../model/fusionRun'
@@ -110,7 +111,7 @@ export class FormService {
         this.urlContext = createUrlContext(config.baseurl)
         if (this.localizationEnabled) {
             this.log.info(
-                `Form localization enabled: defaultLanguage=${config.defaultLanguage ?? '(unset)'} → form locale ${this.formLocale}`
+                `Form localization enabled: defaultLanguage=${config.defaultLanguage ?? '(unset)'}; review forms use reviewer locale`
             )
         } else {
             this.log.debug('Form localization disabled; review forms use English labels')
@@ -128,8 +129,60 @@ export class FormService {
         return isLocalizationEnabled(this.config)
     }
 
-    private get formLocale(): string {
-        return resolveFormLocale(this.config)
+    /**
+     * Reviewer locale for one reviewer identity: `EmailService.getRecipientLocale` when
+     * available, otherwise `resolveEffectiveLocale` from config (no identity attributes).
+     */
+    private async resolveReviewerLocale(reviewer: FusionAccount): Promise<string> {
+        if (this.email?.getRecipientLocale) {
+            return this.email.getRecipientLocale(reviewer.identityId)
+        }
+        return resolveEffectiveLocale(this.config)
+    }
+
+    /**
+     * Groups an account's reviewers by reviewer locale. One locale group maps to one
+     * Fusion review form definition. Groups are processed in insertion order (sequential).
+     */
+    private async groupReviewersByLocale(reviewers: Set<FusionAccount>): Promise<Map<string, Set<FusionAccount>>> {
+        const groups = new Map<string, Set<FusionAccount>>()
+        for (const reviewer of reviewers) {
+            const locale = await this.resolveReviewerLocale(reviewer)
+            let group = groups.get(locale)
+            if (!group) {
+                group = new Set<FusionAccount>()
+                groups.set(locale, group)
+            }
+            group.add(reviewer)
+        }
+        return groups
+    }
+
+    private isFormDefinitionForManagedAccount(formName: string | undefined, accountFormPrefix: string): boolean {
+        if (!formName) {
+            return false
+        }
+        return formName === accountFormPrefix || formName.startsWith(`${accountFormPrefix} [`)
+    }
+
+    /**
+     * Unions recipients of pending (and other) instances on every locale-variant definition
+     * for this managed account so duplicate-review detection stays per reviewer.
+     */
+    private async collectExistingRecipientIdsForAccount(fusionAccount: FusionAccount): Promise<Set<string>> {
+        const accountFormPrefix = buildFormName(fusionAccount, this.fusionFormNamePattern)
+        const forms = await this.findFormDefinitionsByName(this.fusionFormNamePattern)
+        const recipientIds = new Set<string>()
+        for (const form of forms) {
+            if (!form.id || !this.isFormDefinitionForManagedAccount(form.name, accountFormPrefix)) {
+                continue
+            }
+            const instances = await this.fetchFormInstancesByDefinitionId(form.id)
+            for (const id of this.extractExistingRecipientIds(instances)) {
+                recipientIds.add(id)
+            }
+        }
+        return recipientIds
     }
 
     // ------------------------------------------------------------------------
@@ -359,39 +412,47 @@ export class FormService {
             return { formDefinitionReady: false, newReviewInstancesQueued: 0 }
         }
 
-        const { candidates, formDefinition, formInput, expire, fusionSourceId } = await this.prepareFormCreationData(
-            fusionAccount,
-            reviewers!
-        )
+        const localeGroups = await this.groupReviewersByLocale(reviewers!)
+        const existingRecipientIds = await this.collectExistingRecipientIdsForAccount(fusionAccount)
 
-        if (formDefinition) {
-            const existingInstances = await this.fetchFormInstancesByDefinitionId(formDefinition.id)
-            const existingRecipientIds = this.extractExistingRecipientIds(existingInstances)
+        let formDefinitionReady = false
+        let newReviewInstancesQueued = 0
+        let candidates: Candidate[] | undefined
 
-            this.associateExistingInstancesWithReviewers(existingInstances, reviewers!)
-
-            const newReviewInstancesQueued = await this.createFormInstancesForReviewers(
-                reviewers!,
-                formDefinition,
-                formInput,
-                fusionSourceId,
-                expire,
+        for (const [formLocale, groupReviewers] of localeGroups) {
+            const prepared = await this.prepareFormCreationData(fusionAccount, groupReviewers, formLocale)
+            candidates = prepared.candidates
+            if (!prepared.formDefinition) {
+                continue
+            }
+            formDefinitionReady = true
+            const existingInstances = await this.fetchFormInstancesByDefinitionId(prepared.formDefinition.id)
+            this.associateExistingInstancesWithReviewers(existingInstances, groupReviewers)
+            newReviewInstancesQueued += await this.createFormInstancesForReviewers(
+                groupReviewers,
+                prepared.formDefinition,
+                prepared.formInput,
+                prepared.fusionSourceId,
+                prepared.expire,
                 fusionAccount,
-                candidates,
+                prepared.candidates,
                 existingRecipientIds
             )
+            for (const reviewer of groupReviewers) {
+                if (reviewer.identityId) {
+                    existingRecipientIds.add(reviewer.identityId)
+                }
+            }
+        }
 
-            // Register candidate IDs from this newly-created form so that
-            // reconcilePendingFormState can mark them as candidates even though
-            // fetchFormData (which populates pendingCandidateIdentityIds) already ran.
+        if (candidates) {
             for (const candidate of candidates) {
                 if (candidate.id) {
                     this.run.addPendingCandidateId(candidate.id)
                 }
             }
-            return { formDefinitionReady: true, newReviewInstancesQueued }
         }
-        return { formDefinitionReady: false, newReviewInstancesQueued: 0 }
+        return { formDefinitionReady, newReviewInstancesQueued }
     }
 
     /**
@@ -410,7 +471,8 @@ export class FormService {
      */
     private async prepareFormCreationData(
         fusionAccount: FusionAccount,
-        reviewers: Set<FusionAccount>
+        reviewers: Set<FusionAccount>,
+        formLocale: string
     ): Promise<{
         candidates: Candidate[]
         formName: string
@@ -419,7 +481,9 @@ export class FormService {
         expire: string
         fusionSourceId: string
     }> {
-        this.log.debug(`Building fusion form for account ${fusionAccount.name} with ${reviewers.size} reviewer(s)`)
+        this.log.debug(
+            `Building fusion form for account ${fusionAccount.name} with ${reviewers.size} reviewer(s) in locale ${formLocale}`
+        )
 
         const candidates = buildCandidateList(fusionAccount, this.fusionMaxCandidatesForForm)
         assert(candidates, 'Failed to build candidate list')
@@ -429,11 +493,8 @@ export class FormService {
         const sourceType =
             this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
 
-        const formLocale = this.formLocale
         if (this.localizationEnabled) {
-            this.log.debug(
-                `Building localized form definition for defaultLanguage=${this.config.defaultLanguage ?? '(unset)'} → locale ${formLocale}`
-            )
+            this.log.debug(`Building localized form definition for reviewer locale ${formLocale}`)
         }
         const formName = buildFormName(fusionAccount, this.fusionFormNamePattern, {
             enableLocalization: this.localizationEnabled,
@@ -536,6 +597,20 @@ export class FormService {
         if (this.localizationEnabled) {
             const existing = await this.getFormDefinitionByName(formName)
             if (existing?.id) {
+                const fullDefinition = existing.formElements ? existing : await this.getFormDefinitionByKey(existing.id)
+                if (
+                    !shouldRefreshLocalizedFormDefinition(
+                        fullDefinition.description,
+                        formLocale,
+                        true,
+                        fullDefinition.formElements
+                    )
+                ) {
+                    this.log.debug(
+                        `Using existing localized form definition: ${fullDefinition.id} (locale ${formLocale})`
+                    )
+                    return fullDefinition
+                }
                 this.log.info(
                     `Replacing existing form definition ${existing.id} for localized form "${formName}" (locale ${formLocale})`
                 )
@@ -689,9 +764,9 @@ export class FormService {
             const hasPreviousInstance = existingRecipientIds.has(reviewerId)
             if (hasPreviousInstance) {
                 this.log.debug(`Form instance already exists for reviewer ${reviewerId}`)
-            } else {
-                newReviewInstancesQueued++
+                continue
             }
+            newReviewInstancesQueued++
 
             const reviewPromise = this.createReviewPromise(
                 formDefinition.id!,
@@ -701,7 +776,7 @@ export class FormService {
                 expire,
                 fusionAccount,
                 candidates,
-                hasPreviousInstance
+                false
             )
 
             reviewer.collections.reviews.addPromise(reviewPromise)
@@ -1332,6 +1407,10 @@ export class FormService {
 
     private async getFormDefinitionByName(formName: string): Promise<FormDefinitionResponseV2025 | undefined> {
         return this.lifecycle.getFormDefinitionByName(formName)
+    }
+
+    private async getFormDefinitionByKey(formDefinitionId: string): Promise<FormDefinitionResponseV2025> {
+        return this.lifecycle.getFormDefinitionByKey(formDefinitionId)
     }
 
     private async createFormDefinition(
