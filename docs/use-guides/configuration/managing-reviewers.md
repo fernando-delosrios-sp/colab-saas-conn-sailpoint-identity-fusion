@@ -80,11 +80,12 @@ Enable **Send report to owner on aggregation?** in Review Settings to email an *
 
 When **Enable localized user communications?** is on:
 
+- **Reviewer locale** is the language of the Fusion review email **and** the Fusion review form. It is the identity language attribute when set, then **Default Language**, then English.
 - **Default Language** is the connector-wide fallback. Leave it unset for English.
-- **Identity Language Attribute** overrides **Default Language** for emails and aggregation reports when the attribute is set on the reviewer's identity.
-- **Fusion review forms** always use **Default Language** only. They do not use the identity language attribute because form definitions are shared across reviewers — one locale applies to every form.
+- Reviewers who share a **reviewer locale** share one Fusion review form definition (**locale group**). Reviewers with different languages get different definitions; toggle and SELECT labels stay in the same language as the form HTML.
+- When localization is off, forms stay English and there is no `[locale]` suffix on definition names.
 
-Set **Default Language** only when most reviewers should see a non-English locale on form labels and help text.
+Set **Default Language** when reviewers without a language attribute should see a non-English locale.
 
 ## Workload and SLA tuning
 

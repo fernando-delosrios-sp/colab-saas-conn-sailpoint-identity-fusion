@@ -1,6 +1,6 @@
 import { buildFormConditions, buildFormFields, buildFormInput, buildFormInputs } from '../formBuilder'
 import { SourceType } from '../../../model/config'
-import { resolveFormLocale } from '../../emailService/localization'
+import { resolveEffectiveLocale } from '../../emailService/localization'
 import { buildCandidateList, buildFormName } from '../helpers'
 import { FORM_HTML_ACCOUNT_INPUT, FORM_HTML_CANDIDATES_INPUT } from '../formHtml'
 
@@ -254,7 +254,7 @@ describe('buildFormFields localization', () => {
     })
 
     it('uses English labels when localization is disabled even if defaultLanguage is fr', () => {
-        const locale = resolveFormLocale({ enableLocalization: false, defaultLanguage: 'fr' })
+        const locale = resolveEffectiveLocale({ enableLocalization: false, defaultLanguage: 'fr' })
         expect(locale).toBe('en')
 
         const fields = buildFormFields(fusionAccount, candidates, ['Email'], SourceType.Authoritative, locale)

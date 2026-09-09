@@ -69,17 +69,8 @@ export function resolveIdentityLanguageRaw(
     return undefined
 }
 
-/** Returns the locale for review forms from defaultLanguage when localization is enabled. Ignores identity language attributes. */
-export function resolveFormLocale(config: LocalizationConfig): string {
-    if (!isLocalizationEnabled(config)) {
-        return 'en'
-    }
-
-    return normalizeLanguageCode(config.defaultLanguage) || 'en'
-}
-
 /**
- * Resolves the effective locale for user communications (email, reports).
+ * Resolves the effective locale for user communications (email, reports, Fusion review forms).
  * Precedence when localization is enabled: recipient identity language attribute, then defaultLanguage, then English.
  */
 export function resolveEffectiveLocale(
@@ -145,11 +136,7 @@ const FORM_DEFINITION_LOCALE_PREFIX = 'fusion-locale:'
 /** Bump when localized form element labels change so existing definitions are patched. */
 const FORM_DEFINITION_LOCALIZATION_VERSION = 3
 
-const COMBINED_SCORE_ATTRIBUTE_NAMES = new Set([
-    'Combined score',
-    'Combined match score',
-    'Average Score',
-])
+const COMBINED_SCORE_ATTRIBUTE_NAMES = new Set(['Combined score', 'Combined match score', 'Average Score'])
 
 type ParsedFormDefinitionLocaleMarker = {
     locale?: string
@@ -270,10 +257,7 @@ export function readNewIdentityToggleLabel(formElements: FormElementV2025[] | un
 }
 
 /** Returns true when stored form element labels literally match the target locale. */
-export function formDefinitionLabelsMatchLocale(
-    formElements: FormElementV2025[] | undefined,
-    locale: string
-): boolean {
+export function formDefinitionLabelsMatchLocale(formElements: FormElementV2025[] | undefined, locale: string): boolean {
     const actual = readNewIdentityToggleLabel(formElements)
     if (!actual) {
         return false
@@ -292,5 +276,3 @@ export function scoreAttributeLabel(attribute: string | undefined, locale: strin
     }
     return name
 }
-
-

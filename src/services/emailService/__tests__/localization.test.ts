@@ -2,7 +2,6 @@ import type { FusionConfig } from '../../../model/config'
 import {
     isLocalizationEnabled,
     resolveEffectiveLocale,
-    resolveFormLocale,
     resolveIdentityLanguageRaw,
     normalizeLanguageCode,
     translate,
@@ -50,26 +49,26 @@ describe('localization', () => {
         })
     })
 
-    describe('resolveFormLocale', () => {
+    describe('resolveEffectiveLocale', () => {
         it('returns en when localization is disabled', () => {
-            expect(resolveFormLocale({ enableLocalization: false, defaultLanguage: 'fr' })).toBe('en')
+            expect(resolveEffectiveLocale({ enableLocalization: false, defaultLanguage: 'fr' })).toBe('en')
         })
 
-        it('uses defaultLanguage when localization is enabled', () => {
-            expect(resolveFormLocale({ enableLocalization: true, defaultLanguage: 'fr' })).toBe('fr')
+        it('uses defaultLanguage when localization is enabled and no identity language is set', () => {
+            expect(resolveEffectiveLocale({ enableLocalization: true, defaultLanguage: 'fr' })).toBe('fr')
         })
 
         it('falls back to en for unsupported defaultLanguage', () => {
-            expect(resolveFormLocale({ enableLocalization: true, defaultLanguage: 'xx' })).toBe('en')
+            expect(resolveEffectiveLocale({ enableLocalization: true, defaultLanguage: 'xx' })).toBe('en')
         })
 
-        it('uses defaultLanguage as the authoritative form locale', () => {
-            expect(resolveFormLocale({ enableLocalization: true, defaultLanguage: 'ja' })).toBe('ja')
-            expect(resolveFormLocale({ enableLocalization: true, defaultLanguage: 'fr' })).toBe('fr')
+        it('uses defaultLanguage as the form locale when identity attributes are absent', () => {
+            expect(resolveEffectiveLocale({ enableLocalization: true, defaultLanguage: 'ja' })).toBe('ja')
+            expect(resolveEffectiveLocale({ enableLocalization: true, defaultLanguage: 'fr' })).toBe('fr')
         })
     })
 
-    describe('resolveEffectiveLocale', () => {
+    describe('resolveEffectiveLocale with identity attributes', () => {
         it('returns en when localization is disabled', () => {
             expect(
                 resolveEffectiveLocale(
@@ -83,12 +82,15 @@ describe('localization', () => {
             expect(resolveEffectiveLocale(baseConfig, { customLang: 'spanish' })).toBe('es')
         })
 
+        it('Review forms use reviewer locale', () => {
+            expect(
+                resolveEffectiveLocale({ enableLocalization: true, defaultLanguage: 'ja' }, { preferredLanguage: 'en' })
+            ).toBe('en')
+        })
+
         it('prefers identity attribute over defaultLanguage for communications', () => {
             expect(
-                resolveEffectiveLocale(
-                    { enableLocalization: true, defaultLanguage: 'en' },
-                    { preferredLanguage: 'ja' }
-                )
+                resolveEffectiveLocale({ enableLocalization: true, defaultLanguage: 'en' }, { preferredLanguage: 'ja' })
             ).toBe('ja')
         })
 
@@ -97,9 +99,7 @@ describe('localization', () => {
         })
 
         it('falls back to en when nothing resolves', () => {
-            expect(
-                resolveEffectiveLocale({ enableLocalization: true }, { preferredLanguage: 'unknown' })
-            ).toBe('en')
+            expect(resolveEffectiveLocale({ enableLocalization: true }, { preferredLanguage: 'unknown' })).toBe('en')
         })
     })
 
@@ -221,6 +221,3 @@ describe('localization', () => {
         })
     })
 })
-
-
-

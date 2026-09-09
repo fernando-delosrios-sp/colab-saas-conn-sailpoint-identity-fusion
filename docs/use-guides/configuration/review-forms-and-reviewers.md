@@ -24,7 +24,7 @@ For reviewer assignment and access profiles, see [Managing reviewers](managing-r
 !!! note
     When the candidate limit is exceeded, only the highest-scoring potential matches are included.
 
-For localization (**Default Language**, **Identity Language Attribute**, form locale behavior), see [Managing reviewers — Localization and reviewer experience](managing-reviewers.md#localization-and-reviewer-experience).
+For localization (**Default Language**, **Identity Language Attribute**, **reviewer locale**), see [Managing reviewers — Localization and reviewer experience](managing-reviewers.md#localization-and-reviewer-experience). Fusion review forms use the same reviewer locale as the Fusion review email.
 
 ### What reviewers see
 

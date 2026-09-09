@@ -95,17 +95,14 @@ export class EmailService {
     /**
      * Send review email to reviewers for a newly created form instance.
      */
-    public async sendFusionEmail(
-        formInstance: FormInstanceResponseV2025,
-        context?: FusionEmailContext
-    ): Promise<void> {
+    public async sendFusionEmail(formInstance: FormInstanceResponseV2025, context?: FusionEmailContext): Promise<void> {
         assert(formInstance, 'Form instance is required')
         assert(formInstance.recipients && formInstance.recipients.length > 0, 'Form instance recipients are required')
 
         const workflow = await this.getWorkflow()
         assert(workflow, 'Email workflow is required')
 
-        const recipientIds = formInstance.recipients?.map((r) => r.id).filter(Boolean) as string[] ?? []
+        const recipientIds = (formInstance.recipients?.map((r) => r.id).filter(Boolean) as string[]) ?? []
         assert(recipientIds.length > 0, 'Recipient IDs are required')
 
         const recipients = await this.getRecipientEmails(recipientIds)
@@ -118,7 +115,7 @@ export class EmailService {
         const accountSource = context?.accountSource || 'Unknown Source'
 
         const selectedAttributes =
-            (this.config.fusionFormAttributes && this.config.fusionFormAttributes.length > 0)
+            this.config.fusionFormAttributes && this.config.fusionFormAttributes.length > 0
                 ? this.config.fusionFormAttributes
                 : ['id', 'name', 'email', 'status', 'department', 'title']
 
@@ -135,15 +132,13 @@ export class EmailService {
         const sourceType =
             sourceTypeInput === SourceType.Authoritative || sourceTypeInput === SourceType.Record
                 ? (sourceTypeInput as SourceType)
-                : (sourceTypeInput === SourceType.Orphan ? (sourceTypeInput as SourceType) : undefined)
+                : sourceTypeInput === SourceType.Orphan
+                  ? (sourceTypeInput as SourceType)
+                  : undefined
 
         const reviewMatches =
             context?.fusionMatches && context.fusionMatches.length > 0
-                ? buildFusionReportMatchesForReviewEmail(
-                      context.fusionMatches,
-                      this.urlContext,
-                      context.maxCandidates
-                  )
+                ? buildFusionReportMatchesForReviewEmail(context.fusionMatches, this.urlContext, context.maxCandidates)
                 : candidates.map((candidate: any) => ({
                       identityName: candidate.name || 'Unknown',
                       identityId: candidate.id || undefined,
@@ -270,9 +265,7 @@ export class EmailService {
             this.log.recordEvent('emailSent')
         } catch (e) {
             const errStr = e instanceof Error ? e.toString() : String(e)
-            this.log.error(
-                `Failed to execute email workflow ${workflow.id}: ${errStr}`
-            )
+            this.log.error(`Failed to execute email workflow ${workflow.id}: ${errStr}`)
         }
     }
 
@@ -331,15 +324,20 @@ export class EmailService {
         return text + notice
     }
 
-    /** Resolves effective locale for an identity recipient. Always returns a supported locale code. */
+    /**
+     * Resolves reviewer locale for an identity recipient (review emails and Fusion review forms).
+     * Always returns a supported locale code via `resolveEffectiveLocale`.
+     */
     public async getRecipientLocale(recipientId: string | undefined): Promise<string> {
         if (!recipientId || !this.identities) {
             return resolveEffectiveLocale(this.config)
         }
 
         try {
-            if (!this.identities.getIdentityById(recipientId) &&
-                typeof this.identities.hydrateMissingIdentitiesById === 'function') {
+            if (
+                !this.identities.getIdentityById(recipientId) &&
+                typeof this.identities.hydrateMissingIdentitiesById === 'function'
+            ) {
                 await this.identities.hydrateMissingIdentitiesById([recipientId])
             }
 
@@ -438,18 +436,8 @@ export class EmailService {
         if (this.workflows) {
             return this.workflows.testWorkflow(params)
         }
-        return this.client.call<any>(
-            (api: any) => api.workflows.testWorkflow(params),
-            { context: `EmailService>testWorkflow id=${params.id}` }
-        )
+        return this.client.call<any>((api: any) => api.workflows.testWorkflow(params), {
+            context: `EmailService>testWorkflow id=${params.id}`,
+        })
     }
 }
-
-
-
-
-
-
-
-
-

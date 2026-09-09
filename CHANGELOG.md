@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-09-09 · v2.2.2
+
+### 🔧 Improvements
+
+- **Fusion review forms use reviewer locale** — When localization is enabled, Fusion review forms use the same language as the review email: identity language attribute, then **Default Language**, then English. Reviewers who share a language share one form definition; mixed-language reviewer sets get one definition per locale group (`[locale]` in the name). **Reset forms?** deletes every locale variant for matching accounts, not only the Default Language name. Localization off stays one English definition with no suffix.
+
+---
+
 ## 2026-09-08 · v2.2.1
 
 ### 🔧 Improvements
