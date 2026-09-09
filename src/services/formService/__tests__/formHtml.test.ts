@@ -74,6 +74,40 @@ describe('form HTML helpers', () => {
         expect(candidatesHtml).toContain('rel="noopener noreferrer"')
     })
 
+    it('Score rows carry the candidate value for the scored attribute', () => {
+        const candidates: Candidate[] = [
+            {
+                id: 'ident-1',
+                name: 'Sam User',
+                attributes: { firstname: 'Sam', email: 'sam@example.com' },
+                scores: [
+                    { attribute: 'firstname', algorithm: 'lig3', score: 92, weightedScore: 18, fusionScore: 50 },
+                    { attribute: 'Combined score', algorithm: 'weighted-mean', score: 85, fusionScore: 70 },
+                ],
+            },
+        ]
+
+        const html = renderCandidatesDisplayHtml(candidates, 'en')
+        expect(html).toContain('>Sam<')
+        // The combined-score row has no attribute of its own.
+        expect(html).toContain('>—<')
+    })
+
+    it('Candidate attribute values are HTML-escaped', () => {
+        const candidates: Candidate[] = [
+            {
+                id: 'ident-1',
+                name: 'Sam User',
+                attributes: { email: '<script>x</script>' },
+                scores: [{ attribute: 'email', algorithm: 'lig3', score: 10, weightedScore: 2, fusionScore: 50 }],
+            },
+        ]
+
+        const html = renderCandidatesDisplayHtml(candidates, 'en')
+        expect(html).toContain('&lt;script&gt;x&lt;/script&gt;')
+        expect(html).not.toContain('<script>')
+    })
+
     it('Candidate score table matches the review email columns', () => {
         const candidates: Candidate[] = [
             {
@@ -109,9 +143,10 @@ describe('form HTML helpers', () => {
 
         const html = renderCandidatesDisplayHtml(candidates, 'en')
         expect(html).toContain('>Attribute<')
+        expect(html).toContain('>Value<')
         expect(html).toContain('>Algorithm<')
         expect(html).toContain('>Threshold<')
-        expect(html).toContain('>Value<')
+        expect(html).toContain('>Result<')
         expect(html).toContain('>Score<')
         expect(html).toContain('#f0fdf4')
         expect(html).toContain('#fef2f2')
