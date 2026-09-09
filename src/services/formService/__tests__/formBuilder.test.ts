@@ -58,6 +58,11 @@ describe('formBuilder HTML restyle', () => {
                 (el) => el.id === 'candidatesDisplay' && el.config?.description === '{{$.form.input.candidatesHtml}}'
             )
         ).toBe(true)
+        const descriptions = all.filter((el) => el.elementType === 'DESCRIPTION')
+        expect(descriptions).toHaveLength(2)
+        for (const el of descriptions) {
+            expect(String(el.config?.label ?? '').trim().length).toBeGreaterThan(0)
+        }
 
         const input = buildFormInput(fusionAccount, candidates, ['Email'])
         expect(input[FORM_HTML_ACCOUNT_INPUT]).toContain('User One')

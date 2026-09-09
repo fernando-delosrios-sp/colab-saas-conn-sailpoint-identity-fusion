@@ -274,7 +274,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                               <th style="white-space:nowrap; text-align:left; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "attribute"}}</th>
                               <th style="white-space:nowrap; text-align:left; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "algorithm"}}</th>
                               <th style="white-space:nowrap; text-align:right; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "threshold"}}</th>
-                              <th style="white-space:nowrap; text-align:right; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "value"}}</th>
+                              <th style="white-space:nowrap; text-align:right; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "result"}}</th>
                               <th style="white-space:nowrap; text-align:right; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "score"}}</th>
                             </tr>
                             {{#each scores}}
@@ -508,7 +508,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                                             <th style="white-space:nowrap; text-align:left; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "attribute"}}</th>
                                                                             <th style="white-space:nowrap; text-align:left; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "algorithm"}}</th>
                                                                             <th style="white-space:nowrap; text-align:right; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "threshold"}}</th>
-                                                                            <th style="white-space:nowrap; text-align:right; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "value"}}</th>
+                                                                            <th style="white-space:nowrap; text-align:right; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "result"}}</th>
                                                                             <th style="white-space:nowrap; text-align:right; padding:4px 6px; border:1px solid #eef2f7; background:#f6f8ff; color:#5f6b7a; font-size:9px; font-weight:600;">{{i18n "score"}}</th>
                                                                         </tr>
                                                                         {{#each scores}}

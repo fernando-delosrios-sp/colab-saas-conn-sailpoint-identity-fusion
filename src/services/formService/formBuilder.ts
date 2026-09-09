@@ -97,12 +97,13 @@ function warnMissingAccountLabel(
     }
 }
 
-function descriptionElement(id: string, interpolationKey: string): FormElementV2025 {
+function descriptionElement(id: string, interpolationKey: string, label: string): FormElementV2025 {
     return {
         id,
         key: id,
         elementType: 'DESCRIPTION',
         config: {
+            label,
             description: formInputInterpolation(interpolationKey),
             showLabel: false,
         },
@@ -169,8 +170,18 @@ export const buildFormFields = (
             config: {
                 alignment: 'CENTER',
                 formElements: [
-                    descriptionElement('accountDisplay', FORM_HTML_ACCOUNT_INPUT),
-                    descriptionElement('candidatesDisplay', FORM_HTML_CANDIDATES_INPUT),
+                    descriptionElement(
+                        'accountDisplay',
+                        FORM_HTML_ACCOUNT_INPUT,
+                        translateWithParams('form_review_required_header', locale, {
+                            sourceName: fusionAccount.sourceName ?? '',
+                        })
+                    ),
+                    descriptionElement(
+                        'candidatesDisplay',
+                        FORM_HTML_CANDIDATES_INPUT,
+                        translate('form_fusion_score_details_label', locale)
+                    ),
                 ],
                 label: translateWithParams('form_review_required_header', locale, {
                     sourceName: fusionAccount.sourceName ?? '',
