@@ -72,6 +72,16 @@ export function readSettings(raw: Record<string, unknown>): MatchingSettingsSect
         thresholdCount: fusionScoreMap.size,
     })
 
+    // Match scoring is a no-op without rules: every managed account scores zero against every
+    // candidate and finalizes as NonMatched, which is indistinguishable from matching being broken.
+    if (fusionScoreMap.size === 0 && (fusionEnableAutoMerge || fusionEnableManualReview)) {
+        bootstrapLog.warn(
+            'No Fusion attribute matches are configured, so no managed account can ever match. ' +
+                'Every account will be treated as NonMatched and promoted to a Fusion account without review. ' +
+                'Add at least one attribute match under Matching Settings -> Fusion attribute matches.'
+        )
+    }
+
     return {
         matchingConfigs,
         fusionEnableAutoMerge,

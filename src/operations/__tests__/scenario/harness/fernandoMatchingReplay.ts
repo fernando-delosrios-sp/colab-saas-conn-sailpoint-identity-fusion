@@ -24,6 +24,7 @@ import { recordingScenarioDir } from '../../../../data/recordingPaths'
 export const FERNANDO_SCENARIO_REF = 'company12926-poc/fernando'
 const SOURCE_ID = 'fe0b4096bb02418e8225a54806f9b86f'
 const SOURCE_NAME = 'Umbrella Corporation'
+const REVIEWER_IDENTITY_ID = 'reviewer-identity-id'
 
 function fernandoRecordingDir(): string {
     return recordingScenarioDir(FERNANDO_SCENARIO_REF)
@@ -89,6 +90,10 @@ function buildDispatcher(config: FusionConfig) {
         sourceType: SourceType.Authoritative,
         config: { deferredMatching: true },
     } as any)
+
+    // Mirrors FusionService.setReviewerForSource: without a reviewer the manual review path is
+    // unavailable and every deferred match is demoted to an authoritative non-match.
+    run.reviewersBySourceId.set(SOURCE_ID, new Set([{ identityId: REVIEWER_IDENTITY_ID } as any]))
 
     const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
     const mockLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any

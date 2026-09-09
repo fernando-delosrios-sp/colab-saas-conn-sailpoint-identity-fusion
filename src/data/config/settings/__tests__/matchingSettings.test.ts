@@ -1,4 +1,5 @@
 import { readSettings } from '../matchingSettings'
+import { bootstrapLog } from '../../../../services/logService'
 
 describe('matchingSettings readSettings', () => {
     it('defaults fusionEnableManualReview to true when omitted', () => {
@@ -52,5 +53,44 @@ describe('matchingSettings readSettings', () => {
 
         expect(result.fusionEnableAutoMerge).toBe(true)
         expect(result.fusionAutoMergeScore).toBe(95)
+    })
+
+    describe('empty attribute match guard', () => {
+        let warn: ReturnType<typeof vi.spyOn>
+
+        beforeEach(() => {
+            warn = vi.spyOn(bootstrapLog, 'warn').mockImplementation(() => undefined)
+        })
+
+        afterEach(() => {
+            warn.mockRestore()
+        })
+
+        it('warns when matching is enabled but no attribute matches are configured', () => {
+            readSettings({ matchingConfigs: [] })
+
+            expect(warn).toHaveBeenCalledTimes(1)
+            expect(warn.mock.calls[0][0]).toContain('No Fusion attribute matches are configured')
+        })
+
+        it('warns when rules exist but none carry a score threshold', () => {
+            readSettings({ matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher' }] })
+
+            expect(warn).toHaveBeenCalledTimes(1)
+        })
+
+        it('stays quiet when attribute matches are configured', () => {
+            readSettings({
+                matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher', fusionScore: 70 }],
+            })
+
+            expect(warn).not.toHaveBeenCalled()
+        })
+
+        it('stays quiet when both auto merge and manual review are disabled', () => {
+            readSettings({ matchingConfigs: [], fusionEnableManualReview: false })
+
+            expect(warn).not.toHaveBeenCalled()
+        })
     })
 })

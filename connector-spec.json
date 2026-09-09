@@ -782,6 +782,7 @@
                             "label": "Enable manual review",
                             "type": "toggle",
                             "required": false,
+                            "value": "true",
                             "helpKey": "When enabled, potential matches below the automatic merge threshold may enter manual review when reviewers are configured."
                         },
                         {
@@ -918,7 +919,7 @@
                                             "label": "Skip match if threshold not met",
                                             "type": "toggle",
                                             "required": false,
-                                            "helpKey": "When enabled, this rule is excluded from the weighted combined match score if its computed similarity is below its minim."
+                                            "helpKey": "When enabled, this rule is excluded from the weighted combined match score if its computed similarity is below its minimum."
                                         }
                                     ]
                                 }

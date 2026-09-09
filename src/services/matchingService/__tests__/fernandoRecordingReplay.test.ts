@@ -6,65 +6,49 @@ import {
     isFernandoRecordingAvailable,
 } from '../../../operations/__tests__/scenario/harness/fernandoMatchingReplay'
 import { loadMatchingResultsRecording } from '../../../services/recordingService/reportArtifacts'
+import type { MatchingResultsSnapshot } from '../../recordingService/matchingResultsSnapshot'
 
 const CHAIN_REF = 'company12926-poc/fernando'
 const MATCHING_RESULTS_PATH = path.join(recordingChainDir(CHAIN_REF), 'reports', 'matching-results.json')
 
-function logDeferredMatches(deferredMatches: Array<{ accountName: string; accountId: string; matches?: Array<{ accountName: string; accountId: string; exact?: boolean; scores?: Array<{ attribute: string; algorithm: string; score: number; weightedScore?: number; isMatch?: boolean }> }> }>): void {
-    console.log('\n=== DEFERRED MATCHES WITH SCORES ===')
-    for (const row of [...deferredMatches].sort((a, b) => a.accountName.localeCompare(b.accountName))) {
-        console.log(`\n--- ${row.accountName} (${row.accountId}) ---`)
-        for (const match of row.matches ?? []) {
-            const combined = match.scores?.find((s) => s.attribute === '__combined__')
-            console.log(`  → ${match.accountName} (${match.accountId})`)
-            console.log(`     exact: ${match.exact}, combined: ${combined?.score ?? 'n/a'}`)
-            for (const s of match.scores ?? []) {
-                if (s.attribute === '__combined__') continue
-                console.log(
-                    `     ${s.attribute} (${s.algorithm}): score=${s.score}, weighted=${s.weightedScore}, match=${s.isMatch}`
-                )
-            }
-        }
+type DeferredMatches = MatchingResultsSnapshot['deferredMatches']
+
+/** Order-independent view of each deferred account and the candidates it scored against. */
+function summarizeDeferredMatches(deferredMatches: DeferredMatches): Record<string, string[]> {
+    const summary: Record<string, string[]> = {}
+    for (const row of deferredMatches) {
+        summary[row.accountName] = (row.matches ?? [])
+            .map((match) => {
+                const combined = match.scores?.find((score) => score.attribute.toLowerCase().startsWith('combined'))
+                return `${match.accountName} exact=${match.exact} combined=${combined?.score ?? 'n/a'}`
+            })
+            .sort()
     }
+    return summary
+}
+
+function loadRecordedStep10() {
+    if (!fs.existsSync(MATCHING_RESULTS_PATH)) return undefined
+    const recording = loadMatchingResultsRecording(JSON.parse(fs.readFileSync(MATCHING_RESULTS_PATH, 'utf8')))
+    return recording.runs.find((run) => run.stepId === 'step-10')
 }
 
 describe('fernando recording match replay', () => {
     it.skipIf(!isFernandoRecordingAvailable())(
-        'validates deferred matching outcomes from recording artifact or live replay',
+        'replays deferred matching from the api-log and reproduces the recorded outcomes',
         async () => {
-            const recording = loadMatchingResultsRecording(
-                fs.existsSync(MATCHING_RESULTS_PATH)
-                    ? JSON.parse(fs.readFileSync(MATCHING_RESULTS_PATH, 'utf8'))
-                    : {}
-            )
-            const artifact =
-                recording.runs.find((run) => run.stepId === 'step-10') ??
-                recording.runs.reduce(
-                    (best, run) =>
-                        (run.deferredMatches?.length ?? 0) > (best.deferredMatches?.length ?? 0) ? run : best,
-                    recording.runs[0]
-                )
-
-            if (artifact && (artifact.deferredMatches?.length ?? 0) > 0) {
-                console.log('\n=== MATCH SWEEP RESULT (from matching-results.json) ===')
-                console.log(JSON.stringify(artifact.sweepSummary, null, 2))
-                logDeferredMatches(artifact.deferredMatches)
-
-                expect(artifact.deferredMatches.length).toBe(12)
-                expect(artifact.sweepSummary?.deferred).toBe(12)
-                expect(artifact.sweepSummary?.nonMatch).toBe(24)
-                return
-            }
-
             const snapshot = await buildFernandoStep10MatchingSnapshot()
 
-            console.log('\n=== MATCH SWEEP RESULT (replayed from api-log) ===')
-            console.log(JSON.stringify(snapshot.sweepSummary, null, 2))
-            logDeferredMatches(snapshot.deferredMatches)
-
+            expect(snapshot.sweepSummary).toMatchObject({ deferred: 12, nonMatch: 24 })
             expect(snapshot.deferredMatches.length).toBe(12)
-            expect(snapshot.sweepSummary?.deferred).toBe(12)
-            expect(snapshot.sweepSummary?.nonMatch).toBe(24)
+
+            const recorded = loadRecordedStep10()
+            if (!recorded || (recorded.deferredMatches?.length ?? 0) === 0) return
+
+            expect(snapshot.sweepSummary).toEqual(recorded.sweepSummary)
+            expect(summarizeDeferredMatches(snapshot.deferredMatches)).toEqual(
+                summarizeDeferredMatches(recorded.deferredMatches)
+            )
         }
     )
 })
