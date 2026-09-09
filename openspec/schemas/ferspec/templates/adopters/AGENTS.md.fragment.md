@@ -51,4 +51,5 @@ When all 5 hold → proactively suggest "ready to `/opsx:propose`?" — wait for
 - Opening a change for bug fix / typo
 - Running archive or spec sync inside apply — user runs `/opsx:archive` after merge or when ready
 - Reporting apply complete while `/opsx:verify` still has CRITICAL, WARNING, or SUGGESTION issues — return to apply
+- Leaving superseded scenario titles or duplicate scenarios in a change's delta specs — apply reconciles them before verify; archive only syncs deltas into `openspec/specs/`
 - Reporting archive complete without committing synced specs and the moved change folder — archive requires commit + post-commit gate (see ferspec README § Archive)
