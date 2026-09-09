@@ -39,6 +39,18 @@ export type FormInstanceAnalyzerDeps = {
 // Helpers
 // ============================================================================
 
+/** Instance states that mean the reviewer already answered, or the review is closed. */
+const CLOSED_FORM_INSTANCE_STATES = new Set(['COMPLETED', 'IN_PROGRESS', 'SUBMITTED', 'CANCELLED'])
+
+/**
+ * True when a form instance is still awaiting a reviewer answer. Only pending instances count
+ * as an in-flight Fusion review: answered and cancelled instances must never suppress a reissue.
+ */
+export const isPendingFormInstance = (instance: FormInstanceResponseV2025): boolean => {
+    if (!instance.state) return false
+    return !CLOSED_FORM_INSTANCE_STATES.has(instance.state.toUpperCase())
+}
+
 /**
  * Extract account ID from form instance input
  */
@@ -145,4 +157,3 @@ export const analyzeFormInstances = (
         shouldRemoveAccountFromMap,
     }
 }
-

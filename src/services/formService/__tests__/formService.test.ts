@@ -69,6 +69,8 @@ function buildLocalizedCreateFusionFormHarness(options: {
     getRecipientLocale?: (id: string | undefined) => Promise<string>
     existingDefinitions?: Array<{ id: string; name: string; description?: string; formElements?: unknown[] }>
     existingInstancesByDefinitionId?: Record<string, unknown[]>
+    /** Definition ids that the search returns but that no longer exist (stale search index). */
+    missingByKeyDefinitionIds?: string[]
 }) {
     FusionAccount.configure({ sources: ['Source A'] } as any)
     const createFormDefinition = vi.fn().mockImplementation(async (req: { body: { name: string } }) => ({
@@ -103,11 +105,15 @@ function buildLocalizedCreateFusionFormHarness(options: {
         searchFormDefinitionsByTenant,
         searchFormInstancesByTenant,
         getFormDefinitionByKey: vi.fn().mockImplementation(async (params: { formDefinitionID: string }) => {
+            if (options.missingByKeyDefinitionIds?.includes(params.formDefinitionID)) {
+                throw Object.assign(new Error('Form definition not found'), { status: 404 })
+            }
             const found = existingDefinitions.find((definition) => definition.id === params.formDefinitionID)
             return { data: found }
         }),
     }
     const email = options.getRecipientLocale ? { getRecipientLocale: vi.fn(options.getRecipientLocale) } : undefined
+    const run = new FusionRun()
     const service = new FormService(
         {
             fusionFormNamePattern: 'Fusion Review',
@@ -129,9 +135,9 @@ function buildLocalizedCreateFusionFormHarness(options: {
         } as any,
         undefined,
         email as any,
-        new FusionRun()
+        run
     )
-    return { service, createFormDefinition, createFormInstance, patchFormDefinition, deleteFormDefinition }
+    return { service, run, createFormDefinition, createFormInstance, patchFormDefinition, deleteFormDefinition }
 }
 
 describe('FormService fetchFormInstancesByDefinitionId', () => {
@@ -1455,6 +1461,104 @@ describe('FormService createFusionForm', () => {
         expect(patchFormDefinition).not.toHaveBeenCalled()
         expect(deleteFormDefinition).not.toHaveBeenCalled()
     })
+
+    it.each([['CANCELLED'], ['COMPLETED']])(
+        'reissues a review when the reviewer only has a %s instance',
+        async (state) => {
+            const accountPrefix = 'Fusion Review - Test User [Source A] (source-a-id::native-1)'
+            const { service, createFormInstance } = buildLocalizedCreateFusionFormHarness({
+                defaultLanguage: 'fr',
+                getRecipientLocale: async () => 'fr',
+                existingDefinitions: [
+                    {
+                        id: 'form-fr',
+                        name: `${accountPrefix} [fr]`,
+                        description: 'fusion-locale:3:fr|French description',
+                        formElements: [{ key: 'newIdentity', config: { label: 'Nouvelle identité' } }],
+                    },
+                ],
+                existingInstancesByDefinitionId: {
+                    'form-fr': [
+                        {
+                            id: 'inst-fr',
+                            formDefinitionId: 'form-fr',
+                            state,
+                            recipients: [{ id: 'reviewer-1' }],
+                        },
+                    ],
+                },
+            })
+            const { fusionAccount, reviewer } = buildManagedAccountAndReviewer('reviewer-1')
+
+            const outcome = await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+            expect(createFormInstance).toHaveBeenCalledTimes(1)
+            expect(createFormInstance.mock.calls[0][0].body.recipients[0].id).toBe('reviewer-1')
+            expect(outcome.newReviewInstancesQueued).toBe(1)
+        }
+    )
+
+    it('creates a new definition when the search returns a definition that was already deleted', async () => {
+        const accountPrefix = 'Fusion Review - Test User [Source A] (source-a-id::native-1)'
+        const { service, createFormDefinition, createFormInstance } = buildLocalizedCreateFusionFormHarness({
+            defaultLanguage: 'fr',
+            getRecipientLocale: async () => 'fr',
+            existingDefinitions: [
+                {
+                    id: 'form-deleted',
+                    name: `${accountPrefix} [fr]`,
+                    description: 'fusion-locale:3:fr|French description',
+                },
+            ],
+            missingByKeyDefinitionIds: ['form-deleted'],
+        })
+        const { fusionAccount, reviewer } = buildManagedAccountAndReviewer('reviewer-1')
+
+        const outcome = await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        expect(createFormDefinition).toHaveBeenCalledTimes(1)
+        expect(createFormInstance).toHaveBeenCalledTimes(1)
+        expect(outcome.formDefinitionReady).toBe(true)
+        expect(outcome.newReviewInstancesQueued).toBe(1)
+    })
+
+    it('replaces a form definition already marked for deletion before issuing a review', async () => {
+        const accountPrefix = 'Fusion Review - Test User [Source A] (source-a-id::native-1)'
+        const { service, run, createFormDefinition, createFormInstance, deleteFormDefinition } =
+            buildLocalizedCreateFusionFormHarness({
+                defaultLanguage: 'fr',
+                getRecipientLocale: async () => 'fr',
+                existingDefinitions: [
+                    {
+                        id: 'form-fr',
+                        name: `${accountPrefix} [fr]`,
+                        description: 'fusion-locale:3:fr|French description',
+                        formElements: [{ key: 'newIdentity', config: { label: 'Nouvelle identité' } }],
+                    },
+                ],
+                existingInstancesByDefinitionId: {
+                    'form-fr': [
+                        {
+                            id: 'inst-fr',
+                            formDefinitionId: 'form-fr',
+                            state: 'CANCELLED',
+                            recipients: [{ id: 'reviewer-1' }],
+                        },
+                    ],
+                },
+            })
+        run.formsToDelete.add('form-fr')
+        const { fusionAccount, reviewer } = buildManagedAccountAndReviewer('reviewer-1')
+
+        const outcome = await service.createFusionForm(fusionAccount, new Set([reviewer]))
+
+        expect(deleteFormDefinition).toHaveBeenCalledWith({ formDefinitionID: 'form-fr' })
+        expect(createFormDefinition).toHaveBeenCalledTimes(1)
+        const newDefinitionId = createFormDefinition.mock.results[0].value
+        expect(createFormInstance.mock.calls[0][0].body.formDefinitionId).toBe((await newDefinitionId).data.id)
+        expect(run.formsToDelete.has('form-fr')).toBe(false)
+        expect(outcome.newReviewInstancesQueued).toBe(1)
+    })
 })
 
 describe('FormService getOrCreateFormDefinition conflict recovery', () => {
@@ -1483,7 +1587,7 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
             {} as any
         )
         ;(service as any).getFormDefinitionByName = getFormDefinitionByName
-        ;(service as any).getFormDefinitionByKey = vi.fn().mockResolvedValue(existingDefinition)
+        ;(service as any).getFormDefinitionByKeySafe = vi.fn().mockResolvedValue(existingDefinition)
         ;(service as any).deleteFormDefinition = deleteFormDefinition
         ;(service as any).buildFusionFormDefinition = buildFusionFormDefinition
         ;(service as any).refreshFusionFormDefinition = refreshFusionFormDefinition
@@ -1538,7 +1642,7 @@ describe('FormService getOrCreateFormDefinition conflict recovery', () => {
             {} as any
         )
         ;(service as any).getFormDefinitionByName = getFormDefinitionByName
-        ;(service as any).getFormDefinitionByKey = vi.fn().mockResolvedValue(existingDefinition)
+        ;(service as any).getFormDefinitionByKeySafe = vi.fn().mockResolvedValue(existingDefinition)
         ;(service as any).deleteFormDefinition = deleteFormDefinition
         ;(service as any).buildFusionFormDefinition = buildFusionFormDefinition
         ;(service as any).refreshFusionFormDefinition = refreshFusionFormDefinition

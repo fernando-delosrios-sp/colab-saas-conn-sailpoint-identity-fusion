@@ -51,7 +51,7 @@ import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountK
 import { resolveIdentityDocumentDisplayName } from '../../model/fusionAccountUtils'
 import { isReportableIscAccountId, resolveManagedAccountIscIdForReport } from '../fusionService/reportAccountResolver'
 import { FormLifecycle } from './formLifecycle'
-import { analyzeFormInstances } from './formInstanceAnalyzer'
+import { analyzeFormInstances, isPendingFormInstance } from './formInstanceAnalyzer'
 import {
     formatDecisionCountsSegment,
     logFusionDecisionDiscovered,
@@ -166,10 +166,14 @@ export class FormService {
     }
 
     /**
-     * Unions recipients of pending (and other) instances on every locale-variant definition
-     * for this managed account so duplicate-review detection stays per reviewer.
+     * Unions recipients of **pending** instances on every locale-variant definition for this
+     * managed account, so duplicate-review detection stays per reviewer across locale groups.
+     *
+     * Answered and cancelled instances are ignored on purpose: a reviewer whose previous review
+     * was submitted or cancelled must get a fresh review, otherwise the account leaves the match
+     * queue with no review and is promoted to a Fusion account unreviewed.
      */
-    private async collectExistingRecipientIdsForAccount(fusionAccount: FusionAccount): Promise<Set<string>> {
+    private async collectPendingRecipientIdsForAccount(fusionAccount: FusionAccount): Promise<Set<string>> {
         const accountFormPrefix = buildFormName(fusionAccount, this.fusionFormNamePattern)
         const forms = await this.findFormDefinitionsByName(this.fusionFormNamePattern)
         const recipientIds = new Set<string>()
@@ -178,11 +182,33 @@ export class FormService {
                 continue
             }
             const instances = await this.fetchFormInstancesByDefinitionId(form.id)
-            for (const id of this.extractExistingRecipientIds(instances)) {
+            for (const id of this.extractExistingRecipientIds(instances.filter(isPendingFormInstance))) {
                 recipientIds.add(id)
             }
         }
         return recipientIds
+    }
+
+    /**
+     * True when this run already decided to delete the definition (stale, answered, or all
+     * instances cancelled). Such a definition must not be reused: form deletion runs in the
+     * output phase, after match review creation, so a new instance on it would be deleted too.
+     */
+    private isFormDefinitionMarkedForDeletion(formDefinitionId: string): boolean {
+        return this.run.formsToDelete.has(formDefinitionId) || this.run.isFormQueuedForDeletion(formDefinitionId)
+    }
+
+    /** Deletes a definition we are about to recreate, and drops its pending deletion mark. */
+    private async deleteReplacedFormDefinition(formDefinitionId: string): Promise<void> {
+        try {
+            await this.deleteFormDefinition(formDefinitionId)
+            this.run.formsToDelete.delete(formDefinitionId)
+        } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error)
+            this.log.warn(
+                `Could not delete form definition ${formDefinitionId} before recreate; will attempt create anyway: ${detail}`
+            )
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -413,7 +439,7 @@ export class FormService {
         }
 
         const localeGroups = await this.groupReviewersByLocale(reviewers!)
-        const existingRecipientIds = await this.collectExistingRecipientIdsForAccount(fusionAccount)
+        const pendingRecipientIds = await this.collectPendingRecipientIdsForAccount(fusionAccount)
 
         let formDefinitionReady = false
         let newReviewInstancesQueued = 0
@@ -436,11 +462,11 @@ export class FormService {
                 prepared.expire,
                 fusionAccount,
                 prepared.candidates,
-                existingRecipientIds
+                pendingRecipientIds
             )
             for (const reviewer of groupReviewers) {
                 if (reviewer.identityId) {
-                    existingRecipientIds.add(reviewer.identityId)
+                    pendingRecipientIds.add(reviewer.identityId)
                 }
             }
         }
@@ -597,8 +623,19 @@ export class FormService {
         if (this.localizationEnabled) {
             const existing = await this.getFormDefinitionByName(formName)
             if (existing?.id) {
-                const fullDefinition = existing.formElements ? existing : await this.getFormDefinitionByKey(existing.id)
-                if (
+                const fullDefinition = existing.formElements
+                    ? existing
+                    : await this.getFormDefinitionByKeySafe(existing.id)
+                const markedForDeletion = this.isFormDefinitionMarkedForDeletion(existing.id)
+                if (!fullDefinition) {
+                    // Definition search is eventually consistent, so a review deleted moments ago
+                    // can still be returned. Fall through and create a replacement.
+                    this.log.info(
+                        `Form definition ${existing.id} for "${formName}" no longer exists; creating a replacement`
+                    )
+                    this.run.formsToDelete.delete(existing.id)
+                } else if (
+                    !markedForDeletion &&
                     !shouldRefreshLocalizedFormDefinition(
                         fullDefinition.description,
                         formLocale,
@@ -610,17 +647,13 @@ export class FormService {
                         `Using existing localized form definition: ${fullDefinition.id} (locale ${formLocale})`
                     )
                     return fullDefinition
-                }
-                this.log.info(
-                    `Replacing existing form definition ${existing.id} for localized form "${formName}" (locale ${formLocale})`
-                )
-                try {
-                    await this.deleteFormDefinition(existing.id)
-                } catch (error) {
-                    const detail = error instanceof Error ? error.message : String(error)
-                    this.log.warn(
-                        `Could not delete form definition ${existing.id} before recreate; will attempt create anyway: ${detail}`
+                } else {
+                    this.log.info(
+                        markedForDeletion
+                            ? `Replacing form definition ${existing.id} already marked for deletion this run for "${formName}" (locale ${formLocale})`
+                            : `Replacing existing form definition ${existing.id} for localized form "${formName}" (locale ${formLocale})`
                     )
+                    await this.deleteReplacedFormDefinition(existing.id)
                 }
             }
 
@@ -644,6 +677,13 @@ export class FormService {
         }
 
         let formDefinition = await this.getFormDefinitionByName(formName)
+        if (formDefinition?.id && this.isFormDefinitionMarkedForDeletion(formDefinition.id)) {
+            this.log.info(
+                `Replacing form definition ${formDefinition.id} already marked for deletion this run for "${formName}"`
+            )
+            await this.deleteReplacedFormDefinition(formDefinition.id)
+            formDefinition = undefined
+        }
         if (!formDefinition) {
             this.log.debug(`Form definition not found, creating new one: ${formName}`)
             try {
@@ -719,11 +759,9 @@ export class FormService {
         }
 
         for (const instance of existingInstances) {
-            if (!instance.state || !instance.recipients || !instance.standAloneFormUrl) continue
-            const state = instance.state.toUpperCase()
+            if (!instance.recipients || !instance.standAloneFormUrl) continue
             // Only pending instances should show up as active reviews on reviewer accounts.
-            if (state === 'COMPLETED' || state === 'IN_PROGRESS' || state === 'SUBMITTED' || state === 'CANCELLED')
-                continue
+            if (!isPendingFormInstance(instance)) continue
 
             for (const recipient of instance.recipients) {
                 if (!recipient.id) {
@@ -750,7 +788,7 @@ export class FormService {
         expire: string,
         fusionAccount: FusionAccount,
         candidates: Candidate[],
-        existingRecipientIds: Set<string>
+        pendingRecipientIds: Set<string>
     ): Promise<number> {
         let newReviewInstancesQueued = 0
         const reviewPromises: Promise<string | undefined>[] = []
@@ -761,9 +799,8 @@ export class FormService {
                 continue
             }
 
-            const hasPreviousInstance = existingRecipientIds.has(reviewerId)
-            if (hasPreviousInstance) {
-                this.log.debug(`Form instance already exists for reviewer ${reviewerId}`)
+            if (pendingRecipientIds.has(reviewerId)) {
+                this.log.debug(`Reviewer ${reviewerId} already has a pending Fusion review for this account`)
                 continue
             }
             newReviewInstancesQueued++
@@ -775,8 +812,7 @@ export class FormService {
                 fusionSourceId,
                 expire,
                 fusionAccount,
-                candidates,
-                false
+                candidates
             )
 
             reviewer.collections.reviews.addPromise(reviewPromise)
@@ -798,8 +834,7 @@ export class FormService {
         fusionSourceId: string,
         expire: string,
         fusionAccount: FusionAccount,
-        candidates: Candidate[],
-        hasPreviousInstance: boolean
+        candidates: Candidate[]
     ): Promise<string | undefined> {
         return (async (): Promise<string | undefined> => {
             const formInstance = await this.createFormInstance(
@@ -817,13 +852,7 @@ export class FormService {
 
             this.log.debug(`Created form instance ${formInstance.id} for reviewer ${reviewerId}`)
 
-            await this.sendFormInstanceNotificationIfEnabled(
-                formInstance,
-                fusionAccount,
-                candidates,
-                reviewerId,
-                hasPreviousInstance
-            )
+            await this.sendFormInstanceNotificationIfEnabled(formInstance, fusionAccount)
 
             const url = formInstance.standAloneFormUrl ?? undefined
             if (url) {
@@ -842,10 +871,7 @@ export class FormService {
      */
     private async sendFormInstanceNotificationIfEnabled(
         formInstance: FormInstanceResponseV2025,
-        fusionAccount: FusionAccount,
-        candidates: Candidate[],
-        reviewerId: string,
-        hasPreviousInstance: boolean
+        fusionAccount: FusionAccount
     ): Promise<void> {
         if (!this.email) {
             return
@@ -854,12 +880,6 @@ export class FormService {
         if (this.run.isDryRunMode) {
             this.log.debug(`Skipping review email for form ${formInstance.id} — dry-run mode`)
             return
-        }
-
-        if (hasPreviousInstance) {
-            this.log.debug(
-                `Previous instance existed for reviewer ${reviewerId}; still sending review email for new instance ${formInstance.id}`
-            )
         }
 
         try {
@@ -1071,10 +1091,7 @@ export class FormService {
      */
     private collectPendingReviewUrlsByReviewer(formInstances: FormInstanceResponseV2025[]): void {
         for (const instance of formInstances) {
-            if (!instance.state) continue
-            const state = instance.state.toUpperCase()
-            if (state === 'COMPLETED' || state === 'IN_PROGRESS' || state === 'SUBMITTED' || state === 'CANCELLED')
-                continue
+            if (!isPendingFormInstance(instance)) continue
             if (!instance.recipients?.length) continue
 
             const accountInfo = extractAccountInfoFromFormInput(instance.formInput)
@@ -1409,8 +1426,17 @@ export class FormService {
         return this.lifecycle.getFormDefinitionByName(formName)
     }
 
-    private async getFormDefinitionByKey(formDefinitionId: string): Promise<FormDefinitionResponseV2025> {
-        return this.lifecycle.getFormDefinitionByKey(formDefinitionId)
+    /** Full definition for an id, or undefined when it no longer exists (stale search result). */
+    private async getFormDefinitionByKeySafe(
+        formDefinitionId: string
+    ): Promise<FormDefinitionResponseV2025 | undefined> {
+        try {
+            return await this.lifecycle.getFormDefinitionByKey(formDefinitionId)
+        } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error)
+            this.log.debug(`Could not fetch form definition ${formDefinitionId}: ${detail}`)
+            return undefined
+        }
     }
 
     private async createFormDefinition(
