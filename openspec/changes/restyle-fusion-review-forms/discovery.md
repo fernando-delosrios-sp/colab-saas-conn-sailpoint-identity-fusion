@@ -32,7 +32,7 @@ Q1: Whole form vs candidates-only restyle?
 Chosen: **Whole form.** Header, account context, configured attributes, copy, candidate score details, and links. Native interactive controls remain: new-identity / no-match toggle and identities SELECT.
 
 Q2: Email table vs two-column attribute/score only?
-Chosen: **Email table, all candidates visible.** Columns: attribute, algorithm, threshold, value, score; match/miss/fusion-score row colors; identity and account links. Drop hide-other-candidates when SELECT changes.
+Chosen: **Email table, all candidates visible.** Columns: attribute, value, algorithm, threshold, result, score; match/miss/fusion-score row colors; identity and account links. Drop hide-other-candidates when SELECT changes.
 
 Q3: One shared definition vs per-account?
 Chosen: **Keep per-account definitions.** SEARCH_V2 candidate query and definition naming stay account-specific. Single-form is deferred (interpolation of SEARCH query unproven).
