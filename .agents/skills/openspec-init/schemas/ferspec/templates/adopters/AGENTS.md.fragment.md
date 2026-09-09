@@ -16,18 +16,18 @@ This repo uses the **ferspec** OpenSpec schema. Artifact instructions inject at 
 
 ### Entry routing
 
-| Trigger you observe | What to do |
-|---|---|
-| User starts a narrative design discussion | Run verbal grilling via **grill-with-docs**, but **do NOT** write repo-root CONTEXT.md. When converged per the 5 criteria below, promote to `/opsx:propose` |
-| User invokes `/opsx:new` / `/opsx:ff` / `/opsx:propose` directly | Follow the ferspec schema flow |
-| User explicitly says bug fix / typo / config tweak / doc update | Direct PR — **do NOT** open a change |
-| User is mid-change | Advance with `/opsx:continue`, `/opsx:apply`, or `/opsx:archive` (archive is manual, never part of apply) |
+| Trigger you observe                                              | What to do                                                                                                                                                  |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| User starts a narrative design discussion                        | Run verbal grilling via **grill-with-docs**, but **do NOT** write repo-root CONTEXT.md. When converged per the 5 criteria below, promote to `/opsx:propose` |
+| User invokes `/opsx:new` / `/opsx:ff` / `/opsx:propose` directly | Follow the ferspec schema flow                                                                                                                              |
+| User explicitly says bug fix / typo / config tweak / doc update  | Direct PR — **do NOT** open a change                                                                                                                        |
+| User is mid-change                                               | Advance with `/opsx:continue`, `/opsx:apply`, or `/opsx:archive` (archive is manual, never part of apply)                                                   |
 
 ### When NOT to use opsx (direct PR)
 
-| Scenario | Direct PR? |
-|---|---|
-| New feature / new capability / architectural change / breaking change | ❌ Use opsx |
+| Scenario                                                                                                              | Direct PR?   |
+| --------------------------------------------------------------------------------------------------------------------- | ------------ |
+| New feature / new capability / architectural change / breaking change                                                 | ❌ Use opsx  |
 | Bug fix (no contract change) / test backfill / linter tweak / non-breaking upgrade / typo / docs / config value tweak | ✅ Direct PR |
 
 Principle: **process ceremony scales with risk**. External contracts / schema / cross-system integration / compliance → opsx. Otherwise → direct PR.
@@ -51,4 +51,5 @@ When all 5 hold → proactively suggest "ready to `/opsx:propose`?" — wait for
 - Opening a change for bug fix / typo
 - Running archive or spec sync inside apply — user runs `/opsx:archive` after merge or when ready
 - Reporting apply complete while `/opsx:verify` still has CRITICAL, WARNING, or SUGGESTION issues — return to apply
+- Leaving superseded scenario titles or duplicate scenarios in a change's delta specs — apply reconciles them before verify; archive only syncs deltas into `openspec/specs/`
 - Reporting archive complete without committing synced specs and the moved change folder — archive requires commit + post-commit gate (see ferspec README § Archive)
