@@ -36,7 +36,7 @@ _(none)_
 
 - `form-service`: Review form definition and instance input use DESCRIPTION HTML for display; native toggle and identities SELECT remain; decision extractors unchanged
 - `account-list-operation`: **Reset forms?** closes in-flight Fusion reviews, then aggregation continues so those accounts rematch
-- `ubiquitous-language`: Promote Fusion review form definition, DESCRIPTION HTML, and in-flight review
+- `ubiquitous-language`: Promote DESCRIPTION HTML and in-flight review
 - `documentation-site`: Review-form and Reset Fusion state guides describe the HTML layout and that **Reset forms?** recuts in-flight reviews
 
 ## Impact

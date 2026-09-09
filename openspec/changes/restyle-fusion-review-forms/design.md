@@ -37,7 +37,7 @@ This change restyles the whole review form to that email look while keeping per-
 
 ### D3: Email score table, all candidates visible
 
-- **Choice**: One candidate HTML block listing every form candidate. Columns: attribute, algorithm, threshold, value, score. Row colors: match `#f0fdf4`, miss `#fef2f2`, fusion/average `#e0f2fe`. Links `#0b5cab`. Drop per-candidate HIDE conditions (and the TEXT disable-when-not-empty rules that exist only for display fields).
+- **Choice**: One candidate HTML block listing every form candidate. Columns: attribute, value, algorithm, threshold, result, score. Row colors: match `#f0fdf4`, miss `#fef2f2`, fusion/average `#e0f2fe`. Links `#0b5cab`. Drop per-candidate HIDE conditions (and the TEXT disable-when-not-empty rules that exist only for display fields).
 - **Reason**: Same comparison as email; hide-on-select fought a single HTML blob and added conditions.
 - **Considered alternatives**: Keep hide-on-select (needs per-candidate sections); two-column attribute/score only (less information than email).
 

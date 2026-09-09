@@ -370,7 +370,7 @@ describe('FormService stale-form cleanup queue', () => {
 })
 
 describe('FormService deleteExistingForms', () => {
-    it('resetForms only closes in-flight reviews and continues', async () => {
+    it('resetForms only deletes forms and continues', async () => {
         const searchFormDefinitionsByTenant = vi.fn().mockResolvedValue({
             data: { results: [{ id: 'form-1', name: 'Fusion Review - A' }] },
         })

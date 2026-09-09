@@ -21,14 +21,6 @@ During Phase 1 Setup of a persistent account-list aggregation, the connector SHA
 #### Scenario: resetForms only deletes forms and continues
 
 - **GIVEN** a persistent aggregation with `resetForms` enabled and `resetAccounts` disabled
-- **WHEN** Setup runs
-- **THEN** the connector SHALL call `FormService.deleteExistingForms()`
-- **AND** the connector SHALL patch `resetForms` to `false`
-- **AND** Setup SHALL continue through the normal aggregation pipeline
-
-#### Scenario: resetForms only closes in-flight reviews and continues
-
-- **GIVEN** a persistent aggregation with `resetForms` enabled and `resetAccounts` disabled
 - **AND** Fusion review form definitions exist with open instances
 - **WHEN** Setup runs
 - **THEN** the connector SHALL call `FormService.deleteExistingForms()`

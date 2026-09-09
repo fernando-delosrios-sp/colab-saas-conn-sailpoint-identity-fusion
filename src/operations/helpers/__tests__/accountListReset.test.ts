@@ -6,7 +6,7 @@ describe('setupPhase reset flags', () => {
         return createOperationTestRegistry()
     }
 
-    it('resetAccounts only clears state and exits without deleting forms', async () => {
+    it('resetAccounts only clears accounts and exits', async () => {
         const registry = createRegistry()
         const fusion = registry.fusion as any
         fusion.isResetAccounts.mockReturnValue(true)
@@ -38,7 +38,7 @@ describe('setupPhase reset flags', () => {
         expect(registry.definition.initializeCounters).toHaveBeenCalled()
     })
 
-    it('both flags delete forms then reset accounts and exit', async () => {
+    it('Both flags enabled deletes forms then resets accounts', async () => {
         const registry = createRegistry()
         const fusion = registry.fusion as any
         fusion.isResetAccounts.mockReturnValue(true)
@@ -68,7 +68,7 @@ describe('setupPhase reset flags', () => {
         expect(fusion.resetState).not.toHaveBeenCalled()
     })
 
-    it('dry-run with resetAccounts exits early without side effects', async () => {
+    it('Dry-run skips reset side effects', async () => {
         const registry = createRegistry()
         const fusion = registry.fusion as any
         fusion.isResetAccounts.mockReturnValue(true)
@@ -83,7 +83,7 @@ describe('setupPhase reset flags', () => {
         expect(fusion.resetState).not.toHaveBeenCalled()
     })
 
-    it('dry-run with resetForms only continues without side effects', async () => {
+    it('Dry-run skips reset side effects with resetForms only', async () => {
         const registry = createRegistry()
         const fusion = registry.fusion as any
         fusion.isResetAccounts.mockReturnValue(false)

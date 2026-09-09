@@ -16,7 +16,7 @@ The form service MUST present the entire Fusion review form display surface (hea
 
 - **GIVEN** a candidate with attribute scores
 - **WHEN** the form service renders candidate HTML
-- **THEN** the table MUST include columns for attribute, algorithm, threshold, value, and score
+- **THEN** the table MUST include columns for attribute, value, algorithm, threshold, result, and score
 - **AND** match, miss, and fusion/average rows MUST use the review-email background colors
 
 #### Scenario: Identity and account links when UrlContext can build them
