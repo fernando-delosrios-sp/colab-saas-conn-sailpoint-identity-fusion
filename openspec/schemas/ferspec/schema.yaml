@@ -81,6 +81,9 @@ artifacts:
       MODIFIED: copy the full requirement block from `openspec/specs/<capability>/spec.md`, edit,
       paste under `## MODIFIED Requirements`. Partial diffs fail at archive.
 
+      One scenario per behavior — when a decision changes later, rewrite the affected scenario
+      title and steps together rather than adding a parallel scenario beside it.
+
       Done when every proposal capability has a delta spec and every requirement has ≥1 scenario.
     requires:
       - proposal
@@ -119,11 +122,22 @@ apply:
     **Fallback** (skill absent): execute tasks in order; invoke **tdd** when present; delegate
     commits to **git-commit**; run **changelog-generator** for the Changelog group.
 
+    **Delta spec reconciliation** (apply owns this): when shipped behavior diverges from a
+    scenario — a design fork re-resolved mid-apply — edit this change's `specs/**` as the
+    divergence happens. Rewrite the steps and rename the title together; delete scenarios the
+    new design supersedes instead of leaving them beside their replacements; keep
+    `specs/ubiquitous-language/spec.md` entries matching shipped behavior. Superseded titles
+    over rewritten bodies fail verify.
+
     **Verify** (blocking last gate before handoff): run `/opsx:verify` on the verification ref
     until CRITICAL, WARNING, and SUGGESTION are all empty. Fix every issue autonomously; repeat
-    after each fix. End with a **confirmation scorecard** pass (scorecard-only — no new hunting).
+    after each fix. Findings that recommend a later phase ("before archive") are still apply's
+    when the fix lives inside the change directory. End with a **confirmation scorecard** pass
+    (scorecard-only — no new hunting).
     Worktree: squash `apply-<name>` → `ORIGINAL_BRANCH` on main repo before verify.
 
-    **Never in apply**: archive, spec sync, archive commit, `/opsx:archive`.
+    **Never in apply**: archive, spec sync (delta → canonical `openspec/specs/`), archive commit,
+    `/opsx:archive`. Editing this change's own delta specs is not spec sync.
 
-    Done when verify tiers are empty and venue handoff completes.
+    Done when verify tiers are empty, delta specs match shipped behavior, and venue handoff
+    completes.

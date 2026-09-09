@@ -74,9 +74,15 @@ See [templates/adopters/AGENTS.md.fragment.md](./templates/adopters/AGENTS.md.fr
 
 Invoke **apply-code-changes** when installed; schema carries a minimal fallback.
 
+### Delta spec reconciliation (apply owns it)
+
+Apply edits this change's `specs/**` whenever shipped behavior diverges from the scenario that drove it: rewrite title and steps together, delete superseded scenarios instead of parking them beside their replacements, and keep promoted ubiquitous-language entries matching shipped behavior. Merging deltas into canonical `openspec/specs/**` is spec sync and still waits for archive.
+
 ### Verify (blocking last gate)
 
 Run `/opsx:verify` on the verification ref until **CRITICAL**, **WARNING**, and **SUGGESTION** are all empty. Fix every issue autonomously; end with a confirmation scorecard pass (scorecard-only — no new hunting).
+
+A finding that recommends a later phase ("before archive, rename or drop those leftover titles") is still apply's to fix when the fix lives inside the change directory.
 
 **Worktree:** squash `apply-<name>` → `ORIGINAL_BRANCH` on main repo before verify.
 
@@ -153,7 +159,7 @@ openspec instructions archive --change "<name>" --json
 | Schema major | `schema.yaml: version: 1` | Graph contract — breaking changes bump this |
 | Bundle release | [VERSION](./VERSION) | SemVer of this bundle |
 
-Current bundle: **1.2.0**
+Current bundle: **1.3.0**
 
 ---
 

@@ -57,6 +57,8 @@ Fragment: `openspec/schemas/ferspec/templates/adopters/AGENTS.md.fragment.md`
 
 Prose and template updates only. In-flight changes under `openspec/changes/` remain valid. Re-running `/opsx:continue` or `/opsx:apply` on existing artifacts uses new template wording on next overwrite of that artifact.
 
+**1.2.0 → 1.3.0:** Apply now owns delta spec reconciliation and its verify PRECHECK adds a delta-spec self-consistency row. In-flight changes stay valid; the next `/opsx:apply` run may report leftover scenario titles that earlier runs deferred — fix them in apply. Refresh `operations.apply.guidance` in `openspec/config.yaml` so the two reconciliation lines surface via `openspec instructions apply --json`.
+
 ### Graph version bump (future)
 
 When `schema.yaml` `version` increases, this section will document:

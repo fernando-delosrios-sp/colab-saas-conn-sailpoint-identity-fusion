@@ -82,6 +82,8 @@ If the user skips skills from this list, note which phases lose skill-backed beh
 
 Apply runs `/opsx:verify` as the blocking last gate before handoff. All CRITICAL, WARNING, and SUGGESTION tiers must be empty. Standalone `/opsx:verify` after a completed apply must also be empty in all three tiers.
 
+Apply also reconciles the change's own delta specs before that gate — superseded scenario titles and duplicate scenarios are apply's to fix, not archive's. See [README § Delta spec reconciliation](./README.md#delta-spec-reconciliation-apply-owns-it).
+
 **User gates** — after **setup-matt-pocock-skills**, invoke **structured-choices install** (or say `install structured-choices`) to wire User gates into `AGENTS.md` / `CLAUDE.md`. The fragment does not include User gates; Install owns that content.
 
 **Post-install setup** — run once after all skills above are installed:

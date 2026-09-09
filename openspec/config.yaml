@@ -27,5 +27,7 @@ operations:
       - "Apply is incomplete until /opsx:verify reports empty CRITICAL, WARNING, and SUGGESTION tiers on the verification ref."
       - "All tasks checked off is not handoff — run verify as the blocking last gate before reporting apply complete."
       - "Fix every verify issue autonomously; repeat until all three tiers are empty, then run a confirmation scorecard pass (scorecard-only — no new hunting)."
+      - "Apply owns delta spec reconciliation: when shipped behavior diverges from a scenario, rewrite its title and steps together and delete superseded scenarios in the change's own specs/**. Spec sync into openspec/specs/ stays archive-only."
+      - "A verify finding that recommends a later phase (e.g. 'before archive, rename or drop those leftover titles') is still apply's to fix when the fix lives inside the change directory."
       - "Worktree venue: squash apply-<name> to ORIGINAL_BRANCH on main repo before verify."
       - "Do not report apply complete while any verify tier still has issues."
