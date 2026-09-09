@@ -27,7 +27,7 @@ The `EmailService` SHALL compile localized Handlebars templates and dispatch ema
 
 ### Requirement: Localization configuration gating
 
-The connector SHALL read `enableLocalization`, `defaultLanguage`, and `identityLanguageAttribute` from `FusionConfig`. **User communications** (review emails, report delivery, and other recipient-facing messages) MUST resolve locale via `resolveEffectiveLocale(config, identityAttributes?)` with this precedence when localization is enabled: (1) recipient identity language attribute (configured `identityLanguageAttribute`, then legacy fallbacks), (2) `defaultLanguage`, (3) `'en'`. **Review forms** are excluded from recipient locale resolution; they MUST use `resolveFormLocale(config)`, which reads **`defaultLanguage` only**, then `'en'`. When localization is disabled, all surfaces MUST use `'en'`.
+The connector SHALL read `enableLocalization`, `defaultLanguage`, and `identityLanguageAttribute` from `FusionConfig`. **User communications** (review emails, report delivery, Fusion review forms, and other recipient-facing messages) MUST resolve locale via `resolveEffectiveLocale(config, identityAttributes?)` with this precedence when localization is enabled: (1) recipient identity language attribute (configured `identityLanguageAttribute`, then legacy fallbacks), (2) `defaultLanguage`, (3) `'en'`. Review forms MUST use **reviewer locale** from the same precedence (via `EmailService.getRecipientLocale`). When localization is disabled, all surfaces MUST use `'en'`.
 
 #### Scenario: Localization disabled
 
@@ -57,13 +57,13 @@ The connector SHALL read `enableLocalization`, `defaultLanguage`, and `identityL
 - **WHEN** a user communication is rendered
 - **THEN** the effective locale MUST be `'en'`
 
-#### Scenario: Review forms use defaultLanguage only
+#### Scenario: Review forms use reviewer locale
 
 - **GIVEN** `enableLocalization` is `true` and `defaultLanguage` is `ja`
-- **AND** the review email recipient resolves to locale `en` via identity attributes
-- **WHEN** `FormService` builds a review form definition
-- **THEN** form labels MUST use locale `ja` from `resolveFormLocale(config)`
-- **AND** MUST NOT use the recipient's identity language attribute
+- **AND** the reviewer identity language attribute resolves to locale `en`
+- **WHEN** `FormService` builds a review form definition for that reviewer
+- **THEN** form labels MUST use locale `en`
+- **AND** MUST NOT use `ja` solely because it is `defaultLanguage`
 
 ---
 

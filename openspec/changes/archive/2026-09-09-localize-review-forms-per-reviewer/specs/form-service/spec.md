@@ -92,14 +92,6 @@ When `enableLocalization` is true, the form service MUST translate user-facing r
 - **WHEN** `FormService` creates a fusion review form definition for that reviewer's locale group
 - **THEN** form strings MUST be Japanese
 - **AND** MUST NOT stay English solely because `defaultLanguage` is unset
-
-#### Scenario: Recipient language does not override form locale
-
-- **GIVEN** `enableLocalization` is true and `defaultLanguage` is unset (English fallback)
-- **AND** the reviewer identity has a supported language attribute set to `ja`
-- **WHEN** `FormService` creates a fusion review form definition for that reviewer's locale group
-- **THEN** form strings MUST be Japanese
-- **AND** MUST NOT stay English solely because `defaultLanguage` is unset
 - **AND** the Fusion review email for that reviewer MUST also be Japanese via the same reviewer locale
 
 #### Scenario: Localization disabled

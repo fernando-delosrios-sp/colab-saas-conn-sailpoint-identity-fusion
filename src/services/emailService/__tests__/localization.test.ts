@@ -62,7 +62,7 @@ describe('localization', () => {
             expect(resolveEffectiveLocale({ enableLocalization: true, defaultLanguage: 'xx' })).toBe('en')
         })
 
-        it('uses defaultLanguage as the form locale when identity attributes are absent', () => {
+        it('uses defaultLanguage as reviewer locale when identity attributes are absent', () => {
             expect(resolveEffectiveLocale({ enableLocalization: true, defaultLanguage: 'ja' })).toBe('ja')
             expect(resolveEffectiveLocale({ enableLocalization: true, defaultLanguage: 'fr' })).toBe('fr')
         })
