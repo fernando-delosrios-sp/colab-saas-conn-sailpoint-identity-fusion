@@ -476,8 +476,9 @@ export class FusionLayers {
             const account = queue.get(accountId)
             if (!account) continue
 
+            // A declared key may still be explicitly missing after an authorized blend.
+            // Only verified identity matching or a correlation PATCH may clear that state.
             this.collections.accounts.add(accountId)
-            this.collections.accounts.removeMissing(accountId)
             const blended = this.setManagedAccount(
                 account,
                 addBlendHistory,

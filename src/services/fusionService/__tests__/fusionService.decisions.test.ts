@@ -127,8 +127,14 @@ describe('FusionService — decisions', () => {
             } as any
 
             const result = await ctx.fusionService.processFusionIdentityDecision(decision)
-            expect(result?.statuses).toContain('auto')
-            expect(result?.statuses).not.toContain('authorized')
+            ctx.mockDefinitionService.getSimpleKey.mockReturnValue({ simple: { id: 'identity-2' } })
+            ctx.mockSchemas.getFusionAttributeSubset.mockImplementation((attributes) => ({ ...attributes }))
+            const output = await ctx.fusionService.getISCAccount(result!)
+
+            expect(output?.attributes.statuses).toContain('auto')
+            expect(output?.attributes.statuses).not.toContain('authorized')
+            expect(output?.attributes['missing-accounts']).toContain(managedKeyAuto)
+            expect(output?.attributes.actions).not.toContain('correlated')
             expect(result?.history.some((h) => h.includes('Auto-merged LH2 User [LH2] into Existing Identity Two'))).toBe(
                 true
             )
