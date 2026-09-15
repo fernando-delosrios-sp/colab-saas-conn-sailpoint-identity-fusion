@@ -165,7 +165,7 @@ sequenceDiagram
 
 Use **Aggregate before processing** to synchronize with other aggregation schedules. Use **Delayed aggregation** when slightly stale data is acceptable.
 
-Conditional PAT scopes apply: `idn:task-management:read` for **before** mode, `idn:accounts-state:manage` for **delayed** mode and orphan disable. See [ISC PAT scopes](../../reference/pat-scopes.md).
+Conditional PAT scopes apply: `idn:task-management:read` for **before** mode; `sp:workflow:manage` and `sp:workflow-execute:external` for **delayed** mode; `idn:accounts-state:manage` only for Orphan **Disable non-matching accounts**. See [ISC PAT scopes](../../reference/pat-scopes.md).
 
 ## Reviewers
 
