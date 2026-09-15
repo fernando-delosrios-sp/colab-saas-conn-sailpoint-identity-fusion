@@ -20,25 +20,15 @@ const CORE_MINIMUM = [
     'idn:source-schema:manage',
 ]
 
-const FULL_MINIMAL = [
-    ...CORE_MINIMUM,
-    'idn:accounts-state:manage',
-    'sp:forms:manage',
-    'sp:workflow:manage',
-    'sp:workflow-execute:external',
-    'idn:workgroup:read',
-    'idn:task-management:read',
-    'idn:identity-profile:manage',
-    'idn:identity-profile-attribute:manage',
-]
-
 const CONDITIONAL = {
-    'idn:accounts-state:manage': 'Orphan disable or delayed aggregation side effects',
+    'idn:accounts-state:manage': 'Orphan disable non-matching accounts',
+    'idn:identity:read': 'Match review, report email, or global reviewers (GET /identities/{id} for email)',
+    'idn:identity-profile-attribute:read': 'Include identities in the scope (Discover Schema lists identity attributes)',
     'idn:task-management:read': 'aggregationMode: before on any managed source',
     'sp:forms:manage': 'Match step enabled (matching rules configured)',
-    'sp:workflow:manage': 'Review email notifications or delayed aggregation',
-    'sp:workflow-execute:external': 'Review email notifications or delayed aggregation',
-    'idn:workgroup:read': 'Global reviewers or Fusion source management workgroup',
+    'sp:workflow:manage': 'Review or report email, or delayed aggregation',
+    'sp:workflow-execute:external': 'Review or report email, or delayed aggregation',
+    'idn:workgroup:read': 'Global reviewers, report recipients, or Fusion source governance group / workgroup',
     'idn:identity-profile:manage': 'correlationMode: reverse on any managed source',
     'idn:identity-profile-attribute:manage': 'correlationMode: reverse on any managed source',
 }
@@ -99,14 +89,26 @@ function orphanDisableEnabled(sources) {
     return sources.some((s) => s && s.disableNonMatchingAccounts === true)
 }
 
+function reportEmailEnabled(config) {
+    return config.fusionReportOnAggregation === true
+}
+
 function workflowFeaturesEnabled(config, sources) {
-    const reportEmail = config.fusionReportOnAggregation === true
-    const matchReview = matchEnabled(config)
-    return reportEmail || matchReview || delayedAggregationEnabled(sources)
+    return reportEmailEnabled(config) || matchEnabled(config) || delayedAggregationEnabled(sources)
 }
 
 function globalReviewerEnabled(config) {
     return config.fusionOwnerIsGlobalReviewer === true || config.ownersAreGlobalReviewers === true
+}
+
+function identitiesInScope(config) {
+    return config.includeIdentities !== false
+}
+
+function addConditional(conditional, reasons, scope) {
+    if (conditional.has(scope)) return
+    conditional.add(scope)
+    reasons.push([scope, CONDITIONAL[scope]])
 }
 
 function recommend(configPath) {
@@ -117,33 +119,30 @@ function recommend(configPath) {
     const conditional = new Set()
     const reasons = []
 
-    if (orphanDisableEnabled(sources) || delayedAggregationEnabled(sources)) {
-        conditional.add('idn:accounts-state:manage')
-        reasons.push(['idn:accounts-state:manage', CONDITIONAL['idn:accounts-state:manage']])
+    if (orphanDisableEnabled(sources)) {
+        addConditional(conditional, reasons, 'idn:accounts-state:manage')
     }
     if (beforeAggregationEnabled(sources)) {
-        conditional.add('idn:task-management:read')
-        reasons.push(['idn:task-management:read', CONDITIONAL['idn:task-management:read']])
+        addConditional(conditional, reasons, 'idn:task-management:read')
     }
     if (matchEnabled(config)) {
-        conditional.add('sp:forms:manage')
-        reasons.push(['sp:forms:manage', CONDITIONAL['sp:forms:manage']])
+        addConditional(conditional, reasons, 'sp:forms:manage')
     }
     if (workflowFeaturesEnabled(config, sources)) {
-        conditional.add('sp:workflow:manage')
-        conditional.add('sp:workflow-execute:external')
-        reasons.push(['sp:workflow:manage', CONDITIONAL['sp:workflow:manage']])
-        reasons.push(['sp:workflow-execute:external', CONDITIONAL['sp:workflow-execute:external']])
+        addConditional(conditional, reasons, 'sp:workflow:manage')
+        addConditional(conditional, reasons, 'sp:workflow-execute:external')
     }
-    if (globalReviewerEnabled(config)) {
-        conditional.add('idn:workgroup:read')
-        reasons.push(['idn:workgroup:read', CONDITIONAL['idn:workgroup:read']])
+    if (globalReviewerEnabled(config) || reportEmailEnabled(config)) {
+        addConditional(conditional, reasons, 'idn:workgroup:read')
+    }
+    if (matchEnabled(config) || reportEmailEnabled(config) || globalReviewerEnabled(config)) {
+        addConditional(conditional, reasons, 'idn:identity:read')
     }
     if (reverseCorrelationEnabled(sources)) {
-        conditional.add('idn:identity-profile:manage')
-        conditional.add('idn:identity-profile-attribute:manage')
-        reasons.push(['idn:identity-profile:manage', CONDITIONAL['idn:identity-profile:manage']])
-        reasons.push(['idn:identity-profile-attribute:manage', CONDITIONAL['idn:identity-profile-attribute:manage']])
+        addConditional(conditional, reasons, 'idn:identity-profile:manage')
+        addConditional(conditional, reasons, 'idn:identity-profile-attribute:manage')
+    } else if (identitiesInScope(config)) {
+        addConditional(conditional, reasons, 'idn:identity-profile-attribute:read')
     }
 
     const mapDefineOnly =
@@ -152,13 +151,12 @@ function recommend(configPath) {
         !beforeAggregationEnabled(sources) &&
         !reverseCorrelationEnabled(sources) &&
         !orphanDisableEnabled(sources) &&
-        !globalReviewerEnabled(config)
+        !globalReviewerEnabled(config) &&
+        !reportEmailEnabled(config)
 
-    const recommended = mapDefineOnly
-        ? [...CORE_MINIMUM]
-        : [...new Set([...FULL_MINIMAL, ...conditional])].sort()
+    const recommended = [...new Set([...CORE_MINIMUM, ...conditional])]
 
-    return { configPath, mapDefineOnly, recommended, conditional: [...conditional].sort(), reasons }
+    return { configPath, mapDefineOnly, recommended, conditional: [...conditional], reasons }
 }
 
 function main() {
@@ -178,9 +176,9 @@ function main() {
     console.log(`# PAT scope recommendation for ${path.basename(resolved)}`)
     console.log('')
     if (result.mapDefineOnly) {
-        console.log('Deployment pattern: Map/Define side-car (core minimum)')
+        console.log('Deployment pattern: Map/Define side-car (core minimum plus identity-attribute list when identities are in scope)')
     } else {
-        console.log('Deployment pattern: Match or extended features (full minimal + conditional)')
+        console.log('Deployment pattern: Match or extended features (core minimum + detected conditionals)')
     }
     console.log('')
     console.log('## Recommended scopes')

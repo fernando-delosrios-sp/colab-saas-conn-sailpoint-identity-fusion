@@ -113,6 +113,7 @@ See [Managing reviewers](managing-reviewers.md) for entitlement and access-profi
 | Match rules and thresholds | [Matching identities](matching-identities.md) |
 | Review decisions that drive merge correlation | [Match flow reference](../../reference/match-flow.md) · [Review forms and reviewers](review-forms-and-reviewers.md) |
 | First aggregation setup | [Getting started — Setup checklist](../../getting-started/index.md#setup-checklist) |
+| Reverse correlation PAT scopes | [ISC PAT scopes](../../reference/pat-scopes.md) |
 
 
 
