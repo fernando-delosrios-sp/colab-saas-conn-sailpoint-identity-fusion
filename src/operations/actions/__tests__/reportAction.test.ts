@@ -1,11 +1,11 @@
 import { AttributeChangeOp } from '@sailpoint/connector-sdk'
 import { reportAction } from '../reportAction'
 
-vi.mock('../../../services/reportPipeline', () => ({
+vi.mock('../../helpers/reportPipeline', () => ({
     runReportPipeline: vi.fn(),
 }))
 
-import { runReportPipeline } from '../../../services/reportPipeline'
+import { runReportPipeline } from '../../helpers/reportPipeline'
 
 describe('reportAction', () => {
     beforeEach(() => {

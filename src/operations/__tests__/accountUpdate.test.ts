@@ -13,12 +13,12 @@ vi.mock('../actions', () => ({
     executeActions: vi.fn(),
 }))
 
-vi.mock('../../services/reportPipeline', () => ({
+vi.mock('../helpers/reportPipeline', () => ({
     runReportPipeline: vi.fn(),
 }))
 
 import { createTestRegistry } from './harness/testRegistry'
-import { runReportPipeline } from '../../services/reportPipeline'
+import { runReportPipeline } from '../helpers/reportPipeline'
 
 function createRegistry() {
     const registry = createTestRegistry({

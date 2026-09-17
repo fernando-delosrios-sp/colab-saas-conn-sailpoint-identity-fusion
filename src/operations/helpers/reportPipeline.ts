@@ -1,7 +1,7 @@
-import { ServiceRegistry } from '../serviceRegistry'
-import { buildReportAggregationStats } from '../../operations/helpers/accountListHelpers'
-import { buildReportContext } from '../../operations/helpers/accountListOrchestration'
-import { generateReport } from '../../operations/helpers/generateReport'
+import { ServiceRegistry } from '../../services/serviceRegistry'
+import { buildReportAggregationStats } from './accountListHelpers'
+import { buildReportContext } from './accountListOrchestration'
+import { generateReport } from './generateReport'
 
 /**
  * Fusion report trigger from the `report` action: dry-run Match preview (writes inhibited),
@@ -16,4 +16,3 @@ export async function runReportPipeline(
     const stats = buildReportAggregationStats(fetchResult, timer, serviceRegistry.identities)
     await generateReport(includeNonMatches, serviceRegistry, stats, 'fusion')
 }
-
