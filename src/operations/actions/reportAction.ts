@@ -1,7 +1,7 @@
 import { AttributeChangeOp } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { ServiceRegistry } from '../../services/serviceRegistry'
-import { runReportPipeline } from '../../services/reportPipeline'
+import { runReportPipeline } from '../helpers/reportPipeline'
 import { ActionChange } from './types'
 
 /**

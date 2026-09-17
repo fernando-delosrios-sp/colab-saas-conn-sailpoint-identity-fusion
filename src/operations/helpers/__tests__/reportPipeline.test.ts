@@ -1,12 +1,12 @@
-import { ClientService } from '../../clientService'
-import { DryRunApiAdapter } from '../../clientService/dryRunApiAdapter'
-import { IscApiAdapter } from '../../clientService/iscApiAdapter'
-import { ServiceRegistry } from '../../serviceRegistry'
+import { ClientService } from '../../../services/clientService'
+import { DryRunApiAdapter } from '../../../services/clientService/dryRunApiAdapter'
+import { IscApiAdapter } from '../../../services/clientService/iscApiAdapter'
+import { ServiceRegistry } from '../../../services/serviceRegistry'
 import { FusionConfig } from '../../../model/config'
-import { runReportPipeline } from '../index'
-import { createOperationTestRegistry } from '../../../operations/__tests__/harness/operationTestRegistry'
+import { runReportPipeline } from '../reportPipeline'
+import { createOperationTestRegistry } from '../../__tests__/harness/operationTestRegistry'
 
-vi.mock('../../clientService/sdkApiAdapter', () => ({
+vi.mock('../../../services/clientService/sdkApiAdapter', () => ({
     SdkApiAdapter: class MockSdkApiAdapter {
         config = {}
         accountsApi = {}
