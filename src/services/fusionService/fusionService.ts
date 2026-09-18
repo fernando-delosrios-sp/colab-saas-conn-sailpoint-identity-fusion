@@ -41,6 +41,7 @@ import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { addFusionAccountLinkedKeysToIndex, isManagedAccountLinkedInFusion } from '../../model/managedAccountLink'
 import { StatusEntitlement } from '../../model/statusEntitlement'
 import { trimStr } from '../../utils/safeRead'
+import { resolveManagedAccountIscIdForReport } from './reportAccountResolver'
 import { IdentityProcessor } from './identityProcessor'
 import { CorrelationManager } from '../correlationManager'
 import { DecisionProcessor } from './decisionProcessor'
@@ -1454,10 +1455,17 @@ export class FusionService {
         const sourceName = account.sourceName ?? ''
         const nativeIdentity = trimStr(account.nativeIdentity) ?? ''
         const blendedAccountName = trimStr(account.name) || nativeIdentity || account.id || ''
+        const blendedAccountId = resolveManagedAccountIscIdForReport(
+            getManagedAccountKeyFromAccount(account),
+            this.sources,
+            this.run,
+            { storedIscAccountId: account.id }
+        )
         return {
             accountName: fusionAccount.name ?? fusionAccount.identityId ?? 'Unknown',
             accountUrl: fusionAccount.identityId ? this.urlContext.identity(fusionAccount.identityId) : undefined,
             blendedAccountName,
+            blendedAccountUrl: blendedAccountId ? this.urlContext.humanAccount(blendedAccountId) : undefined,
             blendedSource: sourceName,
         }
     }

@@ -674,6 +674,34 @@ describe('ReportService', () => {
         expect(sendEmail.mock.calls[0][1]).not.toContain('Identity Fusion Aggregation Report')
     })
 
+    it('labels Fusion Blends with Identity and links the blended account', () => {
+        const { service } = createService()
+        const html = service.renderFusionReportHtml(
+            {
+                accounts: [],
+                matches: 0,
+                fusionBlends: [
+                    {
+                        accountName: 'john.williams',
+                        accountUrl: 'https://example.identitynow.com/ui/a/admin/identities/id-1',
+                        blendedAccountName: 'john.williams',
+                        blendedAccountUrl: 'https://example.identitynow.com/ui/a/admin/identities/id-1/accounts/acct-1',
+                        blendedSource: 'MelonHRM',
+                    },
+                ],
+            } as any,
+            'aggregation'
+        )
+
+        expect(html).toContain('Identity</td>')
+        expect(html).toContain('href="https://example.identitynow.com/ui/a/admin/identities/id-1"')
+        expect(html).toContain('Blended Account</td>')
+        expect(html).toContain(
+            'href="https://example.identitynow.com/ui/a/admin/identities/id-1/accounts/acct-1"'
+        )
+        expect(html).toContain('john.williams</a> [MelonHRM]')
+    })
+
     it('renders the same potential-match cards for Fusion report and dry-run report from one tracker', () => {
         const { service } = createService()
         const report = {

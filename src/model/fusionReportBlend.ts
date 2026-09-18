@@ -5,5 +5,6 @@ export type FusionReportBlend = {
     accountName: string
     accountUrl?: string
     blendedAccountName: string
+    blendedAccountUrl?: string
     blendedSource: string
 }
