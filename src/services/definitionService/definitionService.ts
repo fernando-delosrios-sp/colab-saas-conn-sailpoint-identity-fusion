@@ -830,15 +830,11 @@ export class DefinitionService {
                 return
             }
 
-            if (this.shouldApplyDisplayAttributeOverride(fusionAccount) && isFusionDisplayAttribute) {
-                const label = fusionAccount.identityAlias
-                if (label) {
-                    this.log.info(`Setting identity alias for attribute: ${name} for account: ${fusionAccount.name}`)
-                    fusionAccount.attributes[name] = label
-                    return
-                }
-                // No alias resolved: fall through so the Unique definition and the
-                // core-schema safe default still produce a display value.
+            if (
+                isFusionDisplayAttribute &&
+                this.applyDisplayAttributeOverrideIfApplicable(fusionAccount, name)
+            ) {
+                return
             }
 
             if (hasValue) {
@@ -1144,8 +1140,8 @@ export class DefinitionService {
      * accounts keep display values from attribute mapping/definitions.
      *
      * Eligibility is independent of identity scope (`includeIdentities`): the alias is a
-     * naming contract for an identity the account already belongs to, not identity context
-     * fetched because identity scope was enabled.
+     * naming contract for an identity the account already belongs to, not identity data
+     * exposed to Velocity because identity scope was enabled.
      */
     private shouldApplyDisplayAttributeOverride(fusionAccount: FusionAccount): boolean {
         if (fusionAccount.fromIdentity || fusionAccount.type === FusionAccountKind.Identity) {

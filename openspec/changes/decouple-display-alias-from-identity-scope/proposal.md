@@ -1,6 +1,6 @@
 ## Why
 
-Aggregating an authoritative source whose managed source accounts are already correlated produces Fusion accounts labelled by an attribute definition instead of the identity alias, whenever **Include identities in the scope?** is off. The alias is available at that moment — it arrives on the managed source account payload and through the unconditional orphan-identity hydration phase — so the connector is discarding a name it already holds in favour of a generated one.
+Aggregating an authoritative source whose managed source accounts are already correlated produces Fusion accounts labelled by an attribute definition instead of the identity alias, whenever **Include identities in the scope?** is off. The alias is available at that moment — it arrives on the managed source account payload and through the unconditional correlated-account identity hydration phase — so the connector is discarding a name it already holds in favour of a generated one.
 
 The cause is that `identityInputsEnabled` gates two unrelated concerns behind one setting: what Velocity may read, and how a Fusion account is labelled. Identity scope should govern the first only. Splitting them makes display names stable for correlated populations without widening identity scope or adding API calls.
 
