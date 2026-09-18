@@ -543,7 +543,7 @@ describe('DefinitionService.refreshNormalAttributes clearing', () => {
         expect(acc.attributeBag.current.full).toBe('Ada Lovelace')
     })
 
-    it('does not expose identity attributes when identity scope is disabled', async () => {
+    it('Normal definition cannot read identity attributes when identity scope is disabled', async () => {
         const service = createService(
             [{ name: 'identityDepartment', expression: '$!identity.department' }],
             { includeIdentities: false }
@@ -996,5 +996,247 @@ describe('refresh flag semantics', () => {
         expect(copySpy).toHaveBeenCalledTimes(1)
         expect(acc.attributeBag.current.first).toBe('alpha')
         expect(acc.attributeBag.current.second).toBe('alpha-beta')
+    })
+})
+
+describe('Disabled identity scope excludes identity data from Define', () => {
+    const mockLog = {
+        debug: vi.fn(),
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        getLogLevel: vi.fn(() => 'info'),
+    } as any
+    const mockLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
+    const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
+
+    beforeAll(() => {
+        FusionAccount.configure({
+            sources: [
+                { name: 'Source A', id: 'src-a', type: 'authoritative' },
+                { name: 'Source B', id: 'src-b', type: 'record' },
+            ],
+            fusionAccountRefreshThresholdInSeconds: 3600,
+            maxHistoryMessages: 50,
+            resetAccounts: false,
+            resetForms: false,
+        } as unknown as FusionConfig)
+    })
+
+    const createService = (configOverrides: Record<string, unknown> = {}) => {
+        const service = new DefinitionService(
+            {
+                normalAttributeDefinitions: [],
+                uniqueAttributeDefinitions: [],
+                attributeMaps: [],
+                skipAccountsWithMissingId: false,
+                forceAttributeRefresh: false,
+                maxAttempts: 20,
+                includeIdentities: false,
+                ...configOverrides,
+            } as any,
+            mockSchemas,
+            mockLog,
+            mockLocks
+        )
+        service.setStateWrapper({})
+        return service
+    }
+
+    /** Managed-origin account whose originating managed source account is correlated (`uncorrelated === false`). */
+    const createCorrelatedManagedAccount = (attrs: Record<string, any> = {}) =>
+        FusionAccount.fromManagedAccount({
+            id: 'src-a::acc-1',
+            name: 'source-name',
+            sourceId: 'src-a',
+            nativeIdentity: 'acc-1',
+            uncorrelated: false,
+            identityId: 'identity-1',
+            attributes: { ...attrs },
+        } as any)
+
+    const createUncorrelatedManagedAccount = (attrs: Record<string, any> = {}) =>
+        FusionAccount.fromManagedAccount({
+            id: 'src-a::acc-2',
+            name: 'other-source-name',
+            sourceId: 'src-a',
+            nativeIdentity: 'acc-2',
+            uncorrelated: true,
+            attributes: { ...attrs },
+        } as any)
+
+    const applyIdentityLayer = (acc: FusionAccount, alias = 'aanderson') =>
+        acc.addIdentityLayer({
+            id: 'identity-1',
+            name: alias,
+            displayName: 'Alice Anderson',
+            attributes: { displayName: 'Alice Anderson', department: 'Identity HR' },
+        } as any)
+
+    it('Identities origin snapshot stays excluded from Velocity when identity scope is disabled', async () => {
+        const definitions = [{ name: 'snapshotDepartment', expression: '$!{sources.Identities[0].department}' }]
+        const excluded = createCorrelatedManagedAccount()
+        excluded.attributeBag.sources.set('Identities', [{ department: 'Identity HR' }])
+        const included = createCorrelatedManagedAccount()
+        included.attributeBag.sources.set('Identities', [{ department: 'Identity HR' }])
+
+        await createService({ normalAttributeDefinitions: definitions }).refreshNormalAttributes(excluded)
+        await createService({
+            normalAttributeDefinitions: definitions,
+            includeIdentities: true,
+        }).refreshNormalAttributes(included)
+
+        expect(included.attributes.snapshotDepartment).toBe('Identity HR')
+        expect(excluded.attributes.snapshotDepartment).toBeUndefined()
+    })
+
+    it('Identity alias is not a Velocity value for managed-origin accounts when identity scope is disabled', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [{ name: 'aliasFromContext', expression: '$!{identity.name}' }],
+        })
+        const acc = createCorrelatedManagedAccount()
+        applyIdentityLayer(acc)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributes.aliasFromContext).not.toBe('aanderson')
+        expect(acc.attributes.aliasFromContext).toBeUndefined()
+    })
+
+    it('Alias overrides a Unique display definition when identity scope is disabled', async () => {
+        const service = createService({
+            uniqueAttributeDefinitions: [
+                { name: 'name', expression: 'generated-display', useIncrementalCounter: false, digits: 1 },
+            ],
+        })
+        const acc = createCorrelatedManagedAccount()
+        applyIdentityLayer(acc)
+
+        await service.refreshUniqueAttributes(acc)
+
+        expect(acc.attributes.name).toBe('aanderson')
+    })
+
+    it('Alias overrides a Normal display definition when identity scope is disabled', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [{ name: 'name', expression: 'Definition Display Name' }],
+        })
+        const acc = createCorrelatedManagedAccount()
+        applyIdentityLayer(acc)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributes.name).toBe('aanderson')
+    })
+
+    it('Unavailable alias falls through to a non-empty Normal definition', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [{ name: 'name', expression: 'Definition Display Name' }],
+        })
+        const acc = createCorrelatedManagedAccount()
+
+        expect(acc.isIdentity).toBe(true)
+        expect(acc.identityAlias).toBeUndefined()
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributes.name).toBe('Definition Display Name')
+    })
+
+    it('Unavailable alias falls through to the safe default when the Normal definition is empty', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [{ name: 'name', expression: '$!{missingAttribute}' }],
+        })
+        const acc = createCorrelatedManagedAccount()
+
+        expect(acc.identityAlias).toBeUndefined()
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributes.name).toBe('source-name')
+    })
+
+    it('Unavailable alias does not skip Unique display generation', async () => {
+        const service = createService({
+            uniqueAttributeDefinitions: [
+                { name: 'name', expression: 'generated-display', useIncrementalCounter: false, digits: 1 },
+            ],
+        })
+        const acc = createCorrelatedManagedAccount()
+
+        expect(acc.identityAlias).toBeUndefined()
+
+        await service.refreshUniqueAttributes(acc)
+
+        expect(acc.attributes.name).toBe('generated-display')
+    })
+
+    it('Uncorrelated managed origin still uses definition output when identity scope is disabled', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [{ name: 'name', expression: 'Definition Display Name' }],
+        })
+        const acc = createUncorrelatedManagedAccount()
+        applyIdentityLayer(acc)
+
+        expect(acc.isIdentity).toBe(false)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributes.name).toBe('Definition Display Name')
+    })
+
+    it('Persisted managed-origin Fusion account stays override-ineligible while identity flag follows identity origin', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [{ name: 'name', expression: 'New Definition Value' }],
+        })
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-native-1',
+            name: 'Persisted Name',
+            sourceName: 'Identity Fusion NG',
+            uncorrelated: false,
+            identityId: 'identity-1',
+            attributes: {
+                name: 'Definition Display Name',
+                identityId: 'identity-1',
+            },
+        } as any)
+        applyIdentityLayer(acc)
+        acc.setNeedsRefresh(true)
+
+        expect(acc.isIdentity).toBe(false)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributes.name).toBe('Definition Display Name')
+    })
+
+    it('Identity scope enabled still applies the alias on a correlated managed origin', () => {
+        const service = createService({ includeIdentities: true })
+        const acc = createCorrelatedManagedAccount()
+        applyIdentityLayer(acc)
+
+        service.applyDisplayAttributeOverride(acc)
+
+        expect(acc.attributes.name).toBe('aanderson')
+    })
+
+    it('Identity-origin support account retains identity context when identity scope is disabled', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [{ name: 'identityDepartment', expression: '$!identity.department' }],
+        })
+        const reviewerIdentity = {
+            id: 'identity-reviewer',
+            name: 'greviewer',
+            displayName: 'Global Reviewer',
+            attributes: { department: 'Identity HR' },
+        } as any
+        const acc = FusionAccount.fromIdentity(reviewerIdentity)
+        acc.addIdentityLayer(reviewerIdentity)
+
+        await service.refreshNormalAttributes(acc)
+        service.applyDisplayAttributeOverride(acc)
+
+        expect(acc.attributes.identityDepartment).toBe('Identity HR')
+        expect(acc.attributes.name).toBe('greviewer')
     })
 })

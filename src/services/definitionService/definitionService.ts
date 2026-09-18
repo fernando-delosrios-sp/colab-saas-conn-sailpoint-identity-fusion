@@ -260,6 +260,11 @@ export class DefinitionService {
         this.applyDisplayAttributeOverrideIfApplicable(fusionAccount, fusionDisplayAttribute)
     }
 
+    /**
+     * Writes the identity alias into the Fusion display attribute when the account is
+     * override-eligible. Returns false when the override did not take ownership of the
+     * attribute — including when no alias resolves — so Normal definitions still evaluate.
+     */
     private applyDisplayAttributeOverrideIfApplicable(
         fusionAccount: FusionAccount,
         attributeName: string
@@ -275,10 +280,9 @@ export class DefinitionService {
         }
 
         const label = fusionAccount.identityAlias
-        if (label) {
-            this.log.info(`Setting identity alias for attr: ${attributeName} for account: ${fusionAccount.name}`)
-            fusionAccount.attributes[attributeName] = label
-        }
+        if (!label) return false
+        this.log.info(`Setting identity alias for attr: ${attributeName} for account: ${fusionAccount.name}`)
+        fusionAccount.attributes[attributeName] = label
         return true
     }
 
@@ -831,8 +835,10 @@ export class DefinitionService {
                 if (label) {
                     this.log.info(`Setting identity alias for attribute: ${name} for account: ${fusionAccount.name}`)
                     fusionAccount.attributes[name] = label
+                    return
                 }
-                return
+                // No alias resolved: fall through so the Unique definition and the
+                // core-schema safe default still produce a display value.
             }
 
             if (hasValue) {
@@ -1136,9 +1142,12 @@ export class DefinitionService {
      * Identity alias override applies to identity-origin accounts and managed-source
      * correlated origins (source account uncorrelated === false). Uncorrelated managed
      * accounts keep display values from attribute mapping/definitions.
+     *
+     * Eligibility is independent of identity scope (`includeIdentities`): the alias is a
+     * naming contract for an identity the account already belongs to, not identity context
+     * fetched because identity scope was enabled.
      */
     private shouldApplyDisplayAttributeOverride(fusionAccount: FusionAccount): boolean {
-        if (!this.identityInputsEnabled(fusionAccount)) return false
         if (fusionAccount.fromIdentity || fusionAccount.type === FusionAccountKind.Identity) {
             return true
         }
