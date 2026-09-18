@@ -24,9 +24,9 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Confirm canonical test command: `npm test`
-- [ ] 4.2 All delta spec scenarios covered by named automated tests (coverage evidence for `/opsx:verify`)
-- [ ] 4.3 Run `npm run lint` and fix issues
+- [x] 4.1 Confirm canonical test command: `npm test`
+- [x] 4.2 All delta spec scenarios covered by named automated tests (coverage evidence for `/opsx:verify`)
+- [x] 4.3 Run `npm run lint` and fix issues
 
 ## 5. Documentation
 
