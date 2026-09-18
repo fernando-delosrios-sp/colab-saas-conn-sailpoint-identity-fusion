@@ -166,7 +166,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
               </div>
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:8px; border-collapse:collapse;">
                 <tr>
-                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700; width:140px;">{{i18n "account"}}</td>
+                  <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700; width:140px;">{{i18n "identity"}}</td>
                   <td style="padding:3px 0; font-size:12px; color:#0f172a;">
                     {{#if accountUrl}}
                     <a href="{{accountUrl}}" style="color:#0b5cab; text-decoration:underline;">{{accountName}}</a>
@@ -177,7 +177,13 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                 </tr>
                 <tr>
                   <td style="padding:3px 0; font-size:12px; color:#5f6b7a; font-weight:700;">{{i18n "blended_account"}}</td>
-                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">{{blendedAccountName}} [{{blendedSource}}]</td>
+                  <td style="padding:3px 0; font-size:12px; color:#0f172a;">
+                    {{#if blendedAccountUrl}}
+                    <a href="{{blendedAccountUrl}}" style="color:#0b5cab; text-decoration:underline;">{{blendedAccountName}}</a> [{{blendedSource}}]
+                    {{else}}
+                    {{blendedAccountName}} [{{blendedSource}}]
+                    {{/if}}
+                  </td>
                 </tr>
               </table>
             </div>
@@ -646,6 +652,13 @@ export type FusionReportEmailData = {
         comments?: string
         formUrl?: string
         automaticMerge?: boolean
+    }>
+    fusionBlends?: Array<{
+        accountName: string
+        accountUrl?: string
+        blendedAccountName: string
+        blendedAccountUrl?: string
+        blendedSource: string
     }>
     stats?: {
         totalFusionAccounts?: number

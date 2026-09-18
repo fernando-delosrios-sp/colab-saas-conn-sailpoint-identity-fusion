@@ -17,7 +17,7 @@ The system SHALL track blending events during processing to populate the aggrega
 #### Scenario: Recording a blending event
 - **WHEN** a managed account is successfully set/absorbed into a Fusion account
 - **AND** history recording is not skipped for that account key
-- **THEN** the system SHALL record a blending event containing the target Fusion account name, link, and the blended account's name and source
+- **THEN** the system SHALL record a blending event containing the target Fusion identity name, identity link, and the blended account's name, source, and account link
 
 ### Requirement: missing-accounts attribute MUST restore uncorrelated account references
 
