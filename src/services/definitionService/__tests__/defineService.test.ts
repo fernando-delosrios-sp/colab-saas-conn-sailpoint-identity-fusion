@@ -1222,7 +1222,10 @@ describe('Disabled identity scope excludes identity data from Define', () => {
 
     it('Identity-origin support account retains identity context when identity scope is disabled', async () => {
         const service = createService({
-            normalAttributeDefinitions: [{ name: 'identityDepartment', expression: '$!identity.department' }],
+            normalAttributeDefinitions: [
+                { name: 'identityDepartment', expression: '$!identity.department' },
+                { name: 'name', expression: 'Definition Display Name' },
+            ],
         })
         const reviewerIdentity = {
             id: 'identity-reviewer',
@@ -1234,7 +1237,6 @@ describe('Disabled identity scope excludes identity data from Define', () => {
         acc.addIdentityLayer(reviewerIdentity)
 
         await service.refreshNormalAttributes(acc)
-        service.applyDisplayAttributeOverride(acc)
 
         expect(acc.attributes.identityDepartment).toBe('Identity HR')
         expect(acc.attributes.name).toBe('greviewer')
