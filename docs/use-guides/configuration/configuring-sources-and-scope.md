@@ -105,6 +105,8 @@ When disabled:
 
 - Baseline consists of managed source accounts previously processed by Fusion that became identities, plus correlated managed source accounts and existing Fusion accounts.
 - `$identity` is unavailable unless an identity is loaded through another path (for example a global reviewer).
+- The display attribute override still uses the identity alias for newly created Fusion accounts from correlated managed source accounts.
+- Persisted Fusion accounts keep their existing display values; later aggregations do not relabel them from this setting.
 
 ## Configuring managed sources
 

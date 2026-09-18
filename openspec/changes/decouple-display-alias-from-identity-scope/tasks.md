@@ -30,10 +30,10 @@
 
 ## 5. Documentation
 
-- [ ] 5.1 Update `docs/use-guides/configuration/configuring-sources-and-scope.md` “When disabled” list: display attribute override still uses the identity alias for correlated managed source accounts (D4)
-- [ ] 5.2 Update `docs/use-guides/configuration/defining-attributes.md`: a display-attribute definition does not win over the alias on correlated accounts, independently of identity scope
-- [ ] 5.3 Note in those guides that persisted Fusion accounts keep their existing display values (Q6 out of scope; D5 carve-out not presented as fixed)
-- [ ] 5.4 Run `npm run lint:docs-guides` and `npm run lint:markdown` if those files changed
+- [x] 5.1 Update `docs/use-guides/configuration/configuring-sources-and-scope.md` “When disabled” list: display attribute override still uses the identity alias for correlated managed source accounts (D4)
+- [x] 5.2 Update `docs/use-guides/configuration/defining-attributes.md`: a display-attribute definition does not win over the alias on correlated accounts, independently of identity scope
+- [x] 5.3 Note in those guides that persisted Fusion accounts keep their existing display values (Q6 out of scope; D5 carve-out not presented as fixed)
+- [x] 5.4 Run `npm run lint:docs-guides` and `npm run lint:markdown` if those files changed
 
 ## 6. Changelog
 

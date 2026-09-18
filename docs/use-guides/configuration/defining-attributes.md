@@ -344,6 +344,8 @@ Understanding the sequence helps design correct configurations:
 
 The `nativeIdentity` (account identifier) and account `name` (display attribute) are **set at creation time and never changed afterwards**, even if an attribute definition would otherwise overwrite them.
 
+A Normal or Unique definition that targets the display attribute does not beat the identity alias on newly created Fusion accounts from correlated managed source accounts, regardless of identity scope. Persisted Fusion accounts keep their existing display values; they are not relabelled by later aggregations.
+
 - If you define a **unique attribute** that maps to the same schema attribute as the fusion identity attribute, it will only be generated once (at account creation). Subsequent aggregations and enable/disable cycles will not change it for identity-linked accounts.
 - Use a **UUID** unique attribute as native identity when you need a truly immutable, stable reference.
 
