@@ -37,5 +37,5 @@
 
 ## 6. Changelog
 
-- [ ] 6.1 Create or update changelog entry for this change via **changelog-generator**
-- [ ] 6.2 Confirm entry covers newly created correlated Fusion accounts taking the identity alias when identity scope is off, and that persisted accounts are unchanged
+- [x] 6.1 Create or update changelog entry for this change via **changelog-generator**
+- [x] 6.2 Confirm entry covers newly created correlated Fusion accounts taking the identity alias when identity scope is off, and that persisted accounts are unchanged
