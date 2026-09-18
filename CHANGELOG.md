@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-09-18 · v2.2.0
+
+### 🐛 Fixes
+
+- **Correlated accounts keep the identity alias when identity scope is off** — Newly created Fusion accounts from correlated managed source accounts now use the identity alias for their display attribute instead of Normal or Unique definition output. Identity data remains unavailable to Define, and persisted Fusion accounts keep their existing display values.
+
+---
+
 ## 2026-09-09 · v2.2.2
 
 ### 🔧 Improvements
