@@ -49,6 +49,7 @@ describe('ReportService', () => {
         const email = {
             sendEmail: vi.fn(async () => undefined),
             getRecipientEmails: vi.fn(async () => ['owner@example.com']),
+            buildEmailHeaderSubtitle: vi.fn(() => 'example.identitynow.com - Fusion-NG'),
         }
         const run = {
             getTracker: vi.fn(() => ({})),
@@ -574,6 +575,12 @@ describe('ReportService', () => {
         expect(hydrateMissingIdentitiesById).toHaveBeenCalledWith(['owner-1'])
         expect(getRecipientEmails).toHaveBeenCalledWith(['owner-1'])
         expect(sendEmail).toHaveBeenCalledTimes(1)
+    })
+
+    it('includes tenant host and fusion source in the aggregation report header', () => {
+        const { service } = createService()
+        const html = service.renderFusionReportHtml({ accounts: [], matches: 0 } as any, 'aggregation')
+        expect(html).toContain('example.identitynow.com - Fusion-NG')
     })
 
     it('selects the aggregation title from reportType when override is omitted', () => {

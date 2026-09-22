@@ -231,6 +231,7 @@ export class ReportService {
             matches: matchAccountCount,
             reportDate: report.reportDate || new Date(),
             reportTitle,
+            headerSubtitle: this.email.buildEmailHeaderSubtitle(locale),
             locale,
         }
         const templates = compileEmailTemplates()
