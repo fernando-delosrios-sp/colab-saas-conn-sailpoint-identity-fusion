@@ -28,7 +28,7 @@ describe('FusionAccount', () => {
             const identity: IdentityDocument = {
                 id: 'id-1',
                 name: 'test-identity',
-                attributes: { email: 'test@example.com', displayName: 'Test Identity' }
+                attributes: { email: 'test@example.com', displayName: 'Test Identity' },
             }
             const acc = FusionAccount.fromIdentity(identity)
             expect(acc.type).toBe(FusionAccountKind.Identity)
@@ -40,7 +40,13 @@ describe('FusionAccount', () => {
         })
 
         it('fromManagedAccount initializes correctly', () => {
-            const account: Account = { id: 'isc-acc-1', sourceId: 'src-a', nativeIdentity: 'nat-1', sourceName: 'Source A', attributes: {} } as any
+            const account: Account = {
+                id: 'isc-acc-1',
+                sourceId: 'src-a',
+                nativeIdentity: 'nat-1',
+                sourceName: 'Source A',
+                attributes: {},
+            } as any
             const acc = FusionAccount.fromManagedAccount(account)
             expect(acc.type).toBe(FusionAccountKind.Managed)
             expect(acc.sourceName).toBe('Source A')
@@ -52,12 +58,17 @@ describe('FusionAccount', () => {
 
         it('fromFusionDecision initializes correctly', () => {
             const decision: FusionDecision = {
-                account: { id: 'src-a::native-1', sourceName: 'Source A', sourceId: 'src-a', nativeIdentity: 'native-1' },
+                account: {
+                    id: 'src-a::native-1',
+                    sourceName: 'Source A',
+                    sourceId: 'src-a',
+                    nativeIdentity: 'native-1',
+                },
                 identityId: 'id-1',
                 identityName: 'Test Identity',
                 newIdentity: true,
                 submitter: { name: 'admin' },
-                sourceType: SourceType.Authoritative
+                sourceType: SourceType.Authoritative,
             } as any
             const acc = FusionAccount.fromFusionDecision(decision)
             expect(acc.type).toBe(FusionAccountKind.Decision)
@@ -94,9 +105,7 @@ describe('FusionAccount', () => {
                 id: 'id-1',
                 name: 'test-identity',
                 attributes: { email: 'test@test.com' },
-                accounts: [
-                    { source: { name: 'Source A', id: 'src-a' }, nativeIdentity: 'native-1' } as any
-                ]
+                accounts: [{ source: { name: 'Source A', id: 'src-a' }, nativeIdentity: 'native-1' } as any],
             }
             const acc = FusionAccount.fromIdentity(identity)
             acc.addIdentityLayer(identity)
@@ -108,9 +117,15 @@ describe('FusionAccount', () => {
         it('addManagedAccountLayer merges managed account', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
             const run = new FusionRun()
-            run.managedAccountsById.set('src-a::native-1', { id: 'isc-acc-1', sourceId: 'src-a', nativeIdentity: 'native-1', sourceName: 'Source A', attributes: {} } as any)
+            run.managedAccountsById.set('src-a::native-1', {
+                id: 'isc-acc-1',
+                sourceId: 'src-a',
+                nativeIdentity: 'native-1',
+                sourceName: 'Source A',
+                attributes: {},
+            } as any)
             run.managedAccountsByIdentityId.set('id-1', new Set(['src-a::native-1']))
-            
+
             acc.addManagedAccountLayer(run)
             expect(acc.accountIds).toContain('src-a::native-1')
             expect(acc.sources).toContain('Source A')
@@ -123,7 +138,7 @@ describe('FusionAccount', () => {
                 account: { id: 'src-b::nat-2', sourceId: 'src-b', nativeIdentity: 'nat-2', sourceName: 'Source B' },
                 newIdentity: true,
                 submitter: { name: 'admin' },
-                sourceType: SourceType.Authoritative
+                sourceType: SourceType.Authoritative,
             } as any
             const acc = FusionAccount.fromFusionDecision(decision)
             acc.layers.addFusionDecisionLayer(decision)
@@ -148,12 +163,12 @@ describe('FusionAccount', () => {
             acc.collections.actions.add('testAction')
             expect(acc.actions).toContain('testAction')
             acc.collections.actions.remove('testAction')
-            
+
             acc.collections.actions.setSourceReviewer('src-a')
             expect(acc.actions).toContain('reviewer:src-a')
             expect(acc.collections.statuses.has('reviewer')).toBe(true)
             expect(acc.collections.actions.listReviewerSources()).toEqual(['src-a'])
-            
+
             acc.collections.actions.removeSourceReviewer('src-a')
             expect(acc.actions).not.toContain('reviewer:src-a')
             expect(acc.collections.statuses.has('reviewer')).toBe(false)
@@ -166,18 +181,18 @@ describe('FusionAccount', () => {
             acc.collections.reviews.add('url1')
             expect(acc.reviews).toContain('url1')
             acc.collections.reviews.remove('url1')
-            
+
             acc.collections.reviews.addFusionReview('url2')
             expect(acc.reviews).toContain('url2')
             expect(acc.collections.statuses.has('activeReviews')).toBe(true)
-            
+
             acc.collections.reviews.removeFusionReview('url2')
             expect(acc.collections.statuses.has('activeReviews')).toBe(false)
-            
+
             acc.collections.reviews.addFusionReview('url3')
             acc.collections.reviews.clearFusionReviews()
             expect(acc.reviews.length).toBe(0)
-            
+
             acc.collections.reviews.addPendingUrl('url4')
             acc.correlation.resolvePendingReviewUrls()
             expect(acc.reviews).toContain('url4')
@@ -190,7 +205,7 @@ describe('FusionAccount', () => {
             acc.collections.accounts.add('acc-1')
             expect(acc.accountIds).toContain('acc-1')
             acc.collections.accounts.remove('acc-1')
-            
+
             acc.collections.accounts.addMissing('missing-1')
             expect(acc.missingAccountIds).toContain('missing-1')
             acc.collections.accounts.removeMissing('missing-1')
@@ -204,7 +219,7 @@ describe('FusionAccount', () => {
             acc.correlation.markCorrelated('acc-1', Promise.resolve('ok'))
             expect(acc.accountIds).toContain('acc-1')
             expect(acc.missingAccountIds).not.toContain('acc-1')
-            
+
             await acc.correlation.resolvePendingOperations()
         })
     })
@@ -216,10 +231,10 @@ describe('FusionAccount', () => {
             expect(acc.disabled).toBe(true)
             acc.enable()
             expect(acc.disabled).toBe(false)
-            
+
             acc.setNeedsRefresh(true)
             expect(acc.needsRefresh).toBe(true)
-            
+
             acc.setNeedsReset(true)
             expect(acc.needsReset).toBe(true)
         })
@@ -357,7 +372,12 @@ describe('FusionAccount', () => {
 
     describe('12. Fusion matches', () => {
         it('buildIdentityInfo from decision', () => {
-            const decision = { account: { sourceId: 'src1', nativeIdentity: 'nat1' }, identityId: 'a1', identityName: 'S1', newIdentity: true } as any
+            const decision = {
+                account: { sourceId: 'src1', nativeIdentity: 'nat1' },
+                identityId: 'a1',
+                identityName: 'S1',
+                newIdentity: true,
+            } as any
             expect(FusionAccount.buildIdentityInfo(decision)).toEqual({ id: 'a1', name: 'S1', displayName: 'S1' })
         })
 
@@ -366,7 +386,7 @@ describe('FusionAccount', () => {
             acc.layers.addFusionMatch({ fusionIdentity: {} as any, score: 100 } as any)
             expect(acc.isMatch).toBe(true)
             expect(acc.fusionMatches.length).toBe(1)
-            
+
             acc.layers.clearFusionIdentityReferences()
             expect((acc.fusionMatches[0] as any).fusionIdentity).toBeUndefined()
         })
@@ -374,7 +394,11 @@ describe('FusionAccount', () => {
 
     describe('13. buildIdentityInfo', () => {
         it('builds identity info', () => {
-            const info = FusionAccount.buildIdentityInfo({ id: 'id-1', name: 'Name', displayName: 'Display Name' } as any)
+            const info = FusionAccount.buildIdentityInfo({
+                id: 'id-1',
+                name: 'Name',
+                displayName: 'Display Name',
+            } as any)
             expect(info).toEqual({ id: 'id-1', name: 'Name', displayName: 'Display Name' })
         })
     })
@@ -428,27 +452,21 @@ describe('FusionAccount', () => {
         })
 
         it('re-asserts baseline when the persisted statuses array is empty (identity-origin)', () => {
-            const acc = FusionAccount.fromFusionAccount(
-                buildPersistedAccount({ statuses: [] })
-            )
+            const acc = FusionAccount.fromFusionAccount(buildPersistedAccount({ statuses: [] }))
             expect(acc.fromIdentity).toBe(true)
             expect(acc.statuses).toContain('baseline')
             expect(acc.sources).toContain(IDENTITIES_SOURCE_NAME)
         })
 
         it('re-asserts baseline when the persisted statuses key is missing (identity-origin)', () => {
-            const acc = FusionAccount.fromFusionAccount(
-                buildPersistedAccount({ statuses: undefined })
-            )
+            const acc = FusionAccount.fromFusionAccount(buildPersistedAccount({ statuses: undefined }))
             expect(acc.fromIdentity).toBe(true)
             expect(acc.statuses).toContain('baseline')
             expect(acc.sources).toContain(IDENTITIES_SOURCE_NAME)
         })
 
         it('coexists with orphan when persisted statuses only carries orphan (identity-origin)', () => {
-            const acc = FusionAccount.fromFusionAccount(
-                buildPersistedAccount({ statuses: ['orphan'] })
-            )
+            const acc = FusionAccount.fromFusionAccount(buildPersistedAccount({ statuses: ['orphan'] }))
             expect(acc.fromIdentity).toBe(true)
             expect(acc.statuses).toContain('baseline')
             expect(acc.statuses).toContain('orphan')
@@ -777,10 +795,7 @@ describe('FusionAccount', () => {
     describe('managed-account modified vs fusion modified', () => {
         const fusionModified = '2024-06-01T12:00:00.000Z'
 
-        const persistedFusionWithQueuedManaged = (options: {
-            fusionModified?: string
-            managedModified: string
-        }) => {
+        const persistedFusionWithQueuedManaged = (options: { fusionModified?: string; managedModified: string }) => {
             const fusionAccountPayload: Record<string, unknown> = {
                 nativeIdentity: 'fusion-1',
                 id: 'isc-1',
@@ -882,7 +897,10 @@ describe('FusionAccount', () => {
                 sourceId,
                 nativeIdentity,
                 sourceName: sourceId === 'src-a' ? 'Source A' : 'Source B',
-                attributes: { [distinctAttributeName]: distinctAttributeValue, ...((extras.attributes as object) ?? {}) },
+                attributes: {
+                    [distinctAttributeName]: distinctAttributeValue,
+                    ...((extras.attributes as object) ?? {}),
+                },
                 ...Object.fromEntries(Object.entries(extras).filter(([key]) => key !== 'attributes')),
             }) as Account
 
@@ -1013,6 +1031,176 @@ describe('FusionAccount', () => {
 
             expect(sourceHasDistinctSnapshot(acc, 'Source A')).toBe(true)
             expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
+        })
+    })
+
+    describe('foreign-owned previous/missing keys', () => {
+        const managedAccount = (
+            nativeIdentity: string,
+            identityId?: string,
+            attributes: Record<string, unknown> = {}
+        ): Account =>
+            ({
+                id: `isc-${nativeIdentity}`,
+                sourceId: 'src-a',
+                nativeIdentity,
+                sourceName: 'Source A',
+                identityId,
+                modified: '2024-01-01T00:00:00.000Z',
+                attributes,
+            }) as Account
+
+        const persistedFusion = (
+            accountKeys: string[],
+            missingKeys: string[] = [],
+            identityId?: string
+        ): FusionAccount =>
+            FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-target',
+                id: 'isc-fusion-target',
+                name: 'Target Fusion Account',
+                sourceName: 'Identity Fusion NG',
+                identityId,
+                modified: '2024-06-01T12:00:00.000Z',
+                attributes: {
+                    accounts: accountKeys,
+                    'missing-accounts': missingKeys,
+                },
+            } as unknown as Account)
+
+        const registerFusionIdentity = (run: FusionRun, identityId: string): void => {
+            run.registerFusionAccount(
+                FusionAccount.fromIdentity({
+                    id: identityId,
+                    name: identityId,
+                    attributes: {},
+                } as IdentityDocument)
+            )
+        }
+
+        it('drops a queue hit owned by another Fusion identity without claiming it', () => {
+            const key = 'src-a::foreign-1'
+            const acc = persistedFusion([key, 'src-b::remaining-1'], [key])
+            const run = new FusionRun()
+            registerFusionIdentity(run, 'owner-id')
+            run.setManagedAccount(key, managedAccount('foreign-1', 'owner-id'))
+            run.setManagedAccount('src-b::remaining-1', {
+                ...managedAccount('remaining-1'),
+                sourceId: 'src-b',
+                sourceName: 'Source B',
+            } as Account)
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.accountIds).not.toContain(key)
+            expect(acc.missingAccountIds).not.toContain(key)
+            expect(acc.previousAccountIdsSet.has(key)).toBe(false)
+            expect(acc.needsRefresh).toBe(true)
+            expect(run.managedAccountsById.has(key)).toBe(true)
+        })
+
+        it('drops an already-claimed foreign-owned key despite inventory presence', () => {
+            const key = 'src-a::foreign-2'
+            const acc = persistedFusion([key], [key])
+            const run = new FusionRun()
+            registerFusionIdentity(run, 'owner-id')
+            run.setManagedAccount(key, managedAccount('foreign-2', 'owner-id'))
+            run.claimAccount(key, 'owner-id')
+
+            acc.addManagedAccountLayer(run, { pruneDeleted: true })
+
+            expect(run.managedAccountInventory.has(key)).toBe(true)
+            expect(acc.accountIds).not.toContain(key)
+            expect(acc.missingAccountIds).not.toContain(key)
+            expect(acc.previousAccountIdsSet.has(key)).toBe(false)
+            expect(acc.statuses).toContain('orphan')
+            expect(acc.needsRefresh).toBe(false)
+        })
+
+        it('drops a key listed by another Fusion identity when ISC identityId is absent', () => {
+            const key = 'src-a::foreign-listed'
+            const acc = persistedFusion([key, 'src-b::remaining-listed'])
+            const run = new FusionRun()
+            run.registerFusionAccount(
+                FusionAccount.fromFusionAccount({
+                    nativeIdentity: 'fusion-owner',
+                    id: 'isc-fusion-owner',
+                    name: 'Owner Fusion Identity',
+                    sourceName: 'Identity Fusion NG',
+                    identityId: 'owner-id',
+                    attributes: { accounts: [key] },
+                } as unknown as Account)
+            )
+            run.setManagedAccount(key, managedAccount('foreign-listed'))
+            run.setManagedAccount('src-b::remaining-listed', {
+                ...managedAccount('remaining-listed'),
+                sourceId: 'src-b',
+                sourceName: 'Source B',
+            } as Account)
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.accountIds).not.toContain(key)
+            expect(run.managedAccountsById.has(key)).toBe(true)
+        })
+
+        it('still absorbs an uncorrelated key with no other Fusion identity', () => {
+            const key = 'src-a::unowned-1'
+            const acc = persistedFusion([key])
+            const run = new FusionRun()
+            run.setManagedAccount(key, managedAccount('unowned-1', 'not-loaded'))
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.accountIds).toContain(key)
+            expect(acc.missingAccountIds).toContain(key)
+            expect(run.managedAccountsById.has(key)).toBe(false)
+        })
+
+        it('keeps this Fusion identity identity-matched key', () => {
+            const key = 'src-a::owned-1'
+            const acc = persistedFusion([key], [], 'current-id')
+            const run = new FusionRun()
+            registerFusionIdentity(run, 'current-id')
+            run.setManagedAccount(key, managedAccount('owned-1', 'current-id'))
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.accountIds).toContain(key)
+            expect(acc.missingAccountIds).not.toContain(key)
+            expect(run.managedAccountsById.has(key)).toBe(false)
+        })
+
+        it('materializes a live sibling when a foreign-owned key is dropped', () => {
+            const foreignKey = 'src-a::foreign-3'
+            const siblingKey = 'src-b::sibling-1'
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-target',
+                id: 'isc-fusion-target',
+                name: 'Target Fusion Account',
+                sourceName: 'Identity Fusion NG',
+                modified: '2024-06-01T12:00:00.000Z',
+                attributes: {
+                    accounts: [foreignKey, siblingKey],
+                },
+            } as unknown as Account)
+            const run = new FusionRun()
+            registerFusionIdentity(run, 'owner-id')
+            run.setManagedAccount(foreignKey, managedAccount('foreign-3', 'owner-id'))
+            run.setManagedAccount(siblingKey, {
+                ...managedAccount('sibling-1', undefined, { siblingMarker: 'materialized' }),
+                sourceId: 'src-b',
+                sourceName: 'Source B',
+            } as Account)
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.accountIds).not.toContain(foreignKey)
+            expect(run.managedAccountsById.has(foreignKey)).toBe(true)
+            expect(acc.attributeBag.sources.get('Source B')).toEqual([
+                expect.objectContaining({ siblingMarker: 'materialized' }),
+            ])
+            expect(run.managedAccountsById.has(siblingKey)).toBe(false)
         })
     })
 
@@ -1148,7 +1336,12 @@ describe('FusionAccount', () => {
 
         it('returns undefined when identityInfo is not set', () => {
             const acc = FusionAccount.fromFusionDecision({
-                account: { id: 'src-a::native-1', sourceId: 'src-a', nativeIdentity: 'native-1', sourceName: 'Source A' },
+                account: {
+                    id: 'src-a::native-1',
+                    sourceId: 'src-a',
+                    nativeIdentity: 'native-1',
+                    sourceName: 'Source A',
+                },
                 newIdentity: true,
                 submitter: { name: 'test' },
             } as any)

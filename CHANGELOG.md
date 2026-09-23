@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-09-23 · v2.2.0
+
+### 🔧 Improvements
+
+- **Refresh drops managed links owned by another Fusion identity** — When a Fusion account still references a managed source account that now belongs to another Fusion identity, Refresh removes the stale local link and leaves the account available for the owning identity to claim. Remaining contributors are remapped; a managed-origin Fusion account that loses its last managed link becomes orphan.
+
+---
+
 ## 2026-09-18 · v2.2.0
 
 ### 🐛 Fixes
