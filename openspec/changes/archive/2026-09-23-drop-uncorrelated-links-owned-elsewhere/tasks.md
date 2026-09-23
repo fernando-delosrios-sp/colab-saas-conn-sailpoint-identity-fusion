@@ -5,6 +5,9 @@
 - [x] 1.3 Already claimed last link: key absent from queue, still in inventory with the other Fusion identity’s `identityId`, prune-deleted enabled. After layer, this managed-origin Fusion account no longer lists the key, is orphan, and has `needsRefresh` false.
 - [x] 1.4 Not foreign-owned (uncorrelated, no other Fusion identity): previous-run key still absorbed and claimed.
 - [x] 1.5 This Fusion identity’s `identityId` matches the queued account: identity matcher absorbs and claims; key is not dropped as foreign-owned.
+- [x] 1.5a Competing listing: this identity currently holds the managed account (`identityId` match) while another loaded Fusion identity still lists the key; holder blends and claims.
+- [x] 1.5b Missing-only listing is not ownership: uncorrelated queued account is still absorbed when another Fusion identity lists the key only as missing.
+- [x] 1.5c Uncorrelated key listed on another Fusion identity is still absorbed when ISC `identityId` is unset.
 - [x] 1.6 Sibling materialize: one foreign-owned previous/missing key plus one stale previously correlated key still on the queue. Remaining live account is materialized; foreign-owned key is dropped without claim.
 - [x] 1.7 Run the new tests — expect RED until previous/missing lookup ignores Fusion identity ownership.
 
@@ -23,7 +26,7 @@
 ## 3. Verification
 
 - [x] 3.1 Confirm canonical test command: `npm test` (global Vitest; do not pipe to `tail`). Focused files above are the apply loop.
-- [x] 3.2 All delta spec scenarios covered by named automated tests (queue drop without claim, inventory ghost drop, non-foreign absorb, identity-matched keep, sibling materialize, claim-only unchanged when no foreign-owned key).
+- [x] 3.2 All delta spec scenarios covered by named automated tests (queue drop without claim, inventory ghost drop, non-foreign absorb, identity-matched keep, competing listing keep, missing-only listing is not ownership, uncorrelated listing on another identity still absorbed, sibling materialize, claim-only unchanged when no foreign-owned key).
 - [x] 3.3 `npm run typecheck` exit 0
 - [x] 3.4 `npm run lint` exit 0
 

@@ -5,7 +5,7 @@ In: During Refresh `addManagedAccountLayer`, when a Fusion account looks up prev
 ## Language
 
 **Foreign-owned managed account** (`promote`):
-A managed source account already linked to a different **Fusion identity** than the Fusion account currently under Refresh, or whose ISC `identityId` is that other Fusion identity.
+A managed source account whose current ISC `identityId` is a different loaded **Fusion identity** than the Fusion account currently under Refresh. A Fusion listing does not establish ownership by itself.
 _Avoid_: stolen account, duplicate link, gone account (gone is prune-deleted for inventory absence)
 
 **Uncorrelated previous-run lookup** (`draft` — describe in spec, do not promote):
@@ -28,7 +28,7 @@ Q1: Detect by inventory absence vs Fusion identity ownership?
 Chosen: **Fusion identity ownership.** Inventory presence means the managed account still exists on the source; another Fusion identity owning it must not keep this identity’s link.
 
 Q2: What counts as “part of another Fusion identity”?
-Chosen: The managed account’s ISC `identityId` matches a loaded Fusion identity **other than** the current Fusion account’s identity, **or** another loaded Fusion identity already lists the managed account key. A different `identityId` with **no** loaded Fusion identity is not foreign-owned (keep today’s uncorrelated re-absorb).
+Chosen: **Current managed-account ISC `identityId`.** If that `identityId` matches a loaded Fusion identity **other than** the current Fusion account, the leftover previous/missing link is foreign-owned. The identity that currently holds the account blends it; the identity that only has it as missing treats it as gone. A Fusion listing does not override an unset or matching `identityId`. A different `identityId` with **no** loaded Fusion identity is not foreign-owned (keep today’s uncorrelated re-absorb).
 
 Q3: Claim from the work queue when dropping?
 Chosen: **Do not claim.** Leave the account on the queue so the owning Fusion identity can identity-match it. If it is already claimed, only drop the local link.

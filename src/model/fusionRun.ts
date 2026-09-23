@@ -409,12 +409,7 @@ export class FusionRun {
     }
 
     private addFusionIdentityOwnership(identityId: string, fusionAccount: FusionAccount): void {
-        const keys = new Set([
-            ...fusionAccount.accountIdsSet,
-            ...fusionAccount.missingAccountIdsSet,
-            ...fusionAccount.previousAccountIdsSet,
-        ])
-        for (const key of keys) {
+        for (const key of fusionAccount.accountIdsSet) {
             this.fusionIdentityOwnerIdByManagedKey.set(key, identityId)
         }
     }
@@ -489,12 +484,16 @@ export class FusionRun {
     }
 
     /**
-     * True when a managed source account belongs to a loaded Fusion identity other
-     * than the Fusion account currently under Refresh. NonMatched Fusion accounts
-     * and prune-deleted inventory absence do not establish ownership.
+     * True when a managed source account currently belongs to a loaded Fusion identity
+     * other than the Fusion account under Refresh. Current ISC `identityId` is
+     * authoritative. A missing or previous listing does not establish ownership.
+     * NonMatched Fusion accounts and prune-deleted inventory absence do not either.
      */
     isManagedAccountForeignOwned(accountKey: string, currentIdentityId?: string): boolean {
         const inventoryIdentityId = this.managedAccountInventory.get(accountKey)?.identityId
+        if (hasValue(inventoryIdentityId) && inventoryIdentityId === currentIdentityId) {
+            return false
+        }
         if (
             hasValue(inventoryIdentityId) &&
             inventoryIdentityId !== currentIdentityId &&

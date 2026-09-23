@@ -1117,7 +1117,7 @@ describe('FusionAccount', () => {
             expect(acc.needsRefresh).toBe(false)
         })
 
-        it('drops a key listed by another Fusion identity when ISC identityId is absent', () => {
+        it('still absorbs an uncorrelated key listed on another Fusion identity', () => {
             const key = 'src-a::foreign-listed'
             const acc = persistedFusion([key, 'src-b::remaining-listed'])
             const run = new FusionRun()
@@ -1140,8 +1140,8 @@ describe('FusionAccount', () => {
 
             acc.addManagedAccountLayer(run)
 
-            expect(acc.accountIds).not.toContain(key)
-            expect(run.managedAccountsById.has(key)).toBe(true)
+            expect(acc.accountIds).toContain(key)
+            expect(run.managedAccountsById.has(key)).toBe(false)
         })
 
         it('still absorbs an uncorrelated key with no other Fusion identity', () => {
@@ -1183,6 +1183,55 @@ describe('FusionAccount', () => {
 
             expect(acc.accountIds).toContain(key)
             expect(acc.missingAccountIds).not.toContain(key)
+            expect(run.managedAccountsById.has(key)).toBe(false)
+        })
+
+        it('keeps this Fusion identity identity-matched key when another identity still lists it', () => {
+            const key = 'src-a::owned-shared'
+            const acc = persistedFusion([key], [], 'current-id')
+            const run = new FusionRun()
+            registerFusionIdentity(run, 'current-id')
+            run.registerFusionAccount(
+                FusionAccount.fromFusionAccount({
+                    nativeIdentity: 'fusion-stale',
+                    id: 'isc-fusion-stale',
+                    name: 'Stale Fusion Identity',
+                    sourceName: 'Identity Fusion NG',
+                    identityId: 'stale-id',
+                    attributes: {
+                        accounts: [key],
+                        'missing-accounts': [key],
+                    },
+                } as unknown as Account)
+            )
+            run.setManagedAccount(key, managedAccount('owned-shared', 'current-id'))
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.accountIds).toContain(key)
+            expect(acc.missingAccountIds).not.toContain(key)
+            expect(run.managedAccountsById.has(key)).toBe(false)
+        })
+
+        it('still absorbs when another Fusion identity only lists the key as missing', () => {
+            const key = 'src-a::unowned-missing-listed'
+            const acc = persistedFusion([key])
+            const run = new FusionRun()
+            run.registerFusionAccount(
+                FusionAccount.fromFusionAccount({
+                    nativeIdentity: 'fusion-stale-missing',
+                    id: 'isc-fusion-stale-missing',
+                    name: 'Stale missing listing',
+                    sourceName: 'Identity Fusion NG',
+                    identityId: 'stale-id',
+                    attributes: { 'missing-accounts': [key] },
+                } as unknown as Account)
+            )
+            run.setManagedAccount(key, managedAccount('unowned-missing-listed'))
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.accountIds).toContain(key)
             expect(run.managedAccountsById.has(key)).toBe(false)
         })
 
