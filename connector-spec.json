@@ -835,7 +835,7 @@
                                             "label": "Attribute",
                                             "type": "text",
                                             "required": true,
-                                            "helpKey": "Identity attribute to compare when looking for matches."
+                                            "helpKey": "Account attribute to compare when looking for matches."
                                         },
                                         {
                                             "key": "algorithm",
