@@ -1157,6 +1157,21 @@ describe('FusionAccount', () => {
             expect(run.managedAccountsById.has(key)).toBe(false)
         })
 
+        it('does not treat a NonMatched Fusion account as the owner by itself', () => {
+            const key = 'src-a::nonmatched-1'
+            const account = managedAccount('nonmatched-1')
+            const acc = persistedFusion([key])
+            const run = new FusionRun()
+            run.registerFusionAccount(FusionAccount.fromManagedAccount(account))
+            run.setManagedAccount(key, account)
+
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.accountIds).toContain(key)
+            expect(acc.missingAccountIds).toContain(key)
+            expect(run.managedAccountsById.has(key)).toBe(false)
+        })
+
         it('keeps this Fusion identity identity-matched key', () => {
             const key = 'src-a::owned-1'
             const acc = persistedFusion([key], [], 'current-id')
