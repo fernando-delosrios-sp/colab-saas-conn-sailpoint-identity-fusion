@@ -2,7 +2,7 @@
 
 ### Requirement: Previous and missing keys that are foreign-owned are dropped as gone
 
-When `FusionLayers.addManagedAccountLayer` resolves leftover `previousAccountIds` and `missingAccountIds` after identity matching for this Fusion account, it SHALL treat each **foreign-owned managed account** as gone for this Fusion account. The connector SHALL remove the key from accounts, missing-accounts, previous keys, and `managedAccountInfo` using the same bookkeeping as prune-deleted, including history and refresh/orphan semantics. It SHALL NOT absorb that managed source account into this Fusion account. It SHALL NOT `claimAccount` for that key, so the owning Fusion identity can still identity-match it. A previous or missing key whose ISC `identityId` is unset, matches this Fusion account, or belongs to an identity that is not a loaded Fusion identity SHALL keep existing uncorrelated absorb and claim behavior. Identity matching for this Fusion account’s own `identityId` SHALL remain unchanged.
+When `FusionLayers.addManagedAccountLayer` resolves leftover `previousAccountIds` and `missingAccountIds` after identity matching for this Fusion account, it SHALL treat each **foreign-owned managed account** as gone for this Fusion account. Current managed-account state determines ownership: the Fusion identity whose ISC `identityId` currently holds the managed account SHALL blend and claim it; a Fusion identity that only has the key as previous or missing SHALL drop the link. The connector SHALL remove the key from accounts, missing-accounts, previous keys, and `managedAccountInfo` using the same bookkeeping as prune-deleted, including history and refresh/orphan semantics. It SHALL NOT absorb that managed source account into this Fusion account. It SHALL NOT `claimAccount` for that key, so the owning Fusion identity can still identity-match it. A previous or missing key whose ISC `identityId` is unset, matches this Fusion account, or belongs to an identity that is not a loaded Fusion identity SHALL keep existing uncorrelated absorb and claim behavior. A Fusion listing in accounts, missing-accounts, or previous keys SHALL NOT override an unset or matching ISC `identityId`. Identity matching for this Fusion account’s own `identityId` SHALL remain unchanged.
 
 #### Scenario: Queue hit owned by another Fusion identity is dropped without claim
 
@@ -42,6 +42,30 @@ When `FusionLayers.addManagedAccountLayer` resolves leftover `previousAccountIds
 - **WHEN** `addManagedAccountLayer` runs
 - **THEN** identity matching SHALL absorb and claim that key for this Fusion account
 - **AND** the previous/missing path SHALL NOT drop that key as foreign-owned
+
+#### Scenario: Identity-matched holder keeps the key when another Fusion identity still lists it
+
+- **GIVEN** a Fusion account whose identity id matches a managed source account on the work queue
+- **AND** another loaded Fusion identity still lists that key in accounts or missing-accounts
+- **WHEN** `addManagedAccountLayer` runs for the identity that currently holds the managed account
+- **THEN** identity matching SHALL absorb and claim that key for the holding Fusion identity
+- **AND** the previous/missing path SHALL NOT drop that key as foreign-owned
+
+#### Scenario: Missing-only listing does not own an uncorrelated managed account
+
+- **GIVEN** a Fusion account whose `previousAccountIds` contains a managed account key present on the work queue
+- **AND** the managed source account has no ISC `identityId`
+- **AND** another loaded Fusion identity lists that key only in missing-accounts
+- **WHEN** `addManagedAccountLayer` runs
+- **THEN** the account SHALL be absorbed and claimed as in existing previous-run uncorrelated behavior
+
+#### Scenario: Uncorrelated key listed on another Fusion identity is still absorbed
+
+- **GIVEN** a Fusion account whose `previousAccountIds` contains a managed account key present on the work queue
+- **AND** the managed source account has no ISC `identityId`
+- **AND** another loaded Fusion identity lists that key in persisted accounts
+- **WHEN** `addManagedAccountLayer` runs
+- **THEN** the account SHALL be absorbed and claimed as in existing previous-run uncorrelated behavior
 
 ---
 

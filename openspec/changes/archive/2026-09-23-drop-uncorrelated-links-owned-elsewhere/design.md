@@ -25,9 +25,9 @@ Fewer than three containers; no C4 diagram.
 
 ### D1: Foreign-owned detection
 
-- **Choice**: A previous/missing key is foreign-owned when (a) the live Account or inventory `identityId` is set, differs from this Fusion account’s identity id, and `FusionRun.hasFusionIdentity(identityId)` is true, or (b) another loaded Fusion identity already lists the key in accounts / missing-accounts / previous keys.
-- **Reason**: Matches “part of another Fusion identity.” A different ISC identity with no Fusion identity is not an owner yet; today’s uncorrelated re-absorb remains.
-- **Considered alternatives**: Inventory miss only — keeps ghost links. Any other Fusion _account_ (including NonMatched) as owner — over-drops vs canonical Fusion identity. Linked-key index built after Refresh — too late for this path unless rebuilt mid-Refresh; prefer identity map + optional identity `accountIds` check.
+- **Choice**: Current managed-account ISC `identityId` determines ownership. A previous/missing key is foreign-owned when inventory `identityId` is set, differs from this Fusion account, and that identity is a loaded Fusion identity. If inventory `identityId` matches this Fusion account, the key is not foreign-owned: this identity blends it. The Fusion identity that only has the key as missing/previous treats it as gone. A Fusion listing (accounts, missing, or previous) does not override an unset or matching ISC `identityId`.
+- **Reason**: The live managed account is the owner. A leftover missing listing must not steal the account from the identity that currently holds it, and must not block uncorrelated re-absorb when nobody currently holds it.
+- **Considered alternatives**: Inventory miss only — keeps ghost links. Any other Fusion _account_ (including NonMatched) as owner — over-drops vs canonical Fusion identity. Treating Fusion listings as ownership — last-writer can drop the identity that currently holds the account. Linked-key index built after Refresh — too late for this path unless rebuilt mid-Refresh.
 
 ### D2: Previous/missing path only
 
