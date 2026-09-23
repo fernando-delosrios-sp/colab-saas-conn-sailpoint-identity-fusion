@@ -86,6 +86,7 @@ export class FusionRun {
     readonly managedAccountsByIdentityId = new Map<string, Set<string>>()
     private readonly fusionAccountMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityMapValue = new Map<string, FusionAccount>()
+    private readonly fusionIdentityOwnerIdByManagedKey = new Map<string, string>()
     private readonly identityMapValue = new Map<string, IdentityDocument>()
     /** Non-protected identity IDs loaded from ISC during this run (survives cache clears). */
     private readonly identitiesLoadedIds = new Set<string>()
@@ -383,8 +384,10 @@ export class FusionRun {
             const existingFusionAccount = this.fusionIdentityMapValue.get(identityId!)
             if (existingFusionAccount) {
                 this.trackConflictingFusionIdentity(identityId!, existingFusionAccount, fusionAccount, tracker)
+                this.removeFusionIdentityOwnership(identityId!)
             }
             this.fusionIdentityMapValue.set(identityId!, fusionAccount)
+            this.addFusionIdentityOwnership(identityId!, fusionAccount)
         } else {
             assert(fusionAccount.managedKey, 'Fusion account must have a managedKey to be added to fusion account map')
             this.fusionAccountMapValue.set(fusionAccount.managedKey, fusionAccount)
@@ -398,10 +401,30 @@ export class FusionRun {
         }
         for (const [id, account] of this.fusionIdentityMapValue.entries()) {
             if (account === fa) {
+                this.removeFusionIdentityOwnership(id)
                 return this.fusionIdentityMapValue.delete(id)
             }
         }
         return false
+    }
+
+    private addFusionIdentityOwnership(identityId: string, fusionAccount: FusionAccount): void {
+        const keys = new Set([
+            ...fusionAccount.accountIdsSet,
+            ...fusionAccount.missingAccountIdsSet,
+            ...fusionAccount.previousAccountIdsSet,
+        ])
+        for (const key of keys) {
+            this.fusionIdentityOwnerIdByManagedKey.set(key, identityId)
+        }
+    }
+
+    private removeFusionIdentityOwnership(identityId: string): void {
+        for (const [key, ownerIdentityId] of this.fusionIdentityOwnerIdByManagedKey) {
+            if (ownerIdentityId === identityId) {
+                this.fusionIdentityOwnerIdByManagedKey.delete(key)
+            }
+        }
     }
 
     getFusionIdentity(identityId: string): FusionAccount | undefined {
@@ -463,6 +486,25 @@ export class FusionRun {
 
     hasFusionIdentity(identityId: string): boolean {
         return this.fusionIdentityMapValue.has(identityId)
+    }
+
+    /**
+     * True when a managed source account belongs to a loaded Fusion identity other
+     * than the Fusion account currently under Refresh. NonMatched Fusion accounts
+     * and prune-deleted inventory absence do not establish ownership.
+     */
+    isManagedAccountForeignOwned(accountKey: string, currentIdentityId?: string): boolean {
+        const inventoryIdentityId = this.managedAccountInventory.get(accountKey)?.identityId
+        if (
+            hasValue(inventoryIdentityId) &&
+            inventoryIdentityId !== currentIdentityId &&
+            this.fusionIdentityMapValue.has(inventoryIdentityId!)
+        ) {
+            return true
+        }
+
+        const ownerIdentityId = this.fusionIdentityOwnerIdByManagedKey.get(accountKey)
+        return ownerIdentityId !== undefined && ownerIdentityId !== currentIdentityId
     }
 
     get totalFusionAccountCount(): number {

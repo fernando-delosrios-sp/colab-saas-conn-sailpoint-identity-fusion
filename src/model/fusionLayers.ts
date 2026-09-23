@@ -231,6 +231,7 @@ export class FusionLayers {
             modified,
             materializeSourceSnapshots
         )
+        this.dropForeignOwnedManagedAccounts(workQueue, identityInfo?.id)
         this.processDeclaredAccountIds(
             workQueue,
             attributeBag,
@@ -556,6 +557,14 @@ export class FusionLayers {
         if (options.refreshMapping || options.refreshDefinition || options.resetDefinition) return true
         if (options.hasEligibleAlwaysRecalculate) return true
 
+        const previousOrMissingKeys = new Set([
+            ...this.collections.previousAccountIds,
+            ...this.collections.missingAccountIds,
+        ])
+        for (const key of previousOrMissingKeys) {
+            if (queue.isManagedAccountForeignOwned(key, identityId)) return true
+        }
+
         const linkedKeys = new Set<string>()
         if (identityId !== undefined) {
             for (const key of queue.getKeysForIdentity(identityId) ?? []) {
@@ -591,6 +600,14 @@ export class FusionLayers {
         return false
     }
 
+    private dropForeignOwnedManagedAccounts(queue: FusionRun, identityId?: string): void {
+        const candidateIds = new Set([...this.collections.previousAccountIds, ...this.collections.missingAccountIds])
+        for (const accountId of candidateIds) {
+            if (!queue.isManagedAccountForeignOwned(accountId, identityId)) continue
+            this.removeManagedAccountReference(accountId)
+        }
+    }
+
     private preserveMissingAccountContext(inventory: ReadonlyMap<string, ManagedAccountInfo>): void {
         for (const accountId of this.collections.missingAccountIds) {
             if (this.collections.managedAccountInfo.has(accountId)) continue
@@ -615,20 +632,26 @@ export class FusionLayers {
 
         for (const accountId of trackedIds) {
             if (inventory.has(accountId)) continue
-
-            const removedFromAccounts = this.collections.accounts.remove(accountId)
-            const removedFromMissing = this.collections.accounts.removeMissing(accountId)
-            if (removedFromAccounts || removedFromMissing) {
-                removedAnyReference = true
-                this.collections.addHistoryMessage(`Removed managed account missing reference: ${accountId}`)
-            }
-            const prev = new Set(this.collections.previousAccountIds)
-            prev.delete(accountId)
-            this.collections.setPreviousAccountIds(prev)
-            this.collections.deleteManagedAccountInfo(accountId)
+            removedAnyReference = this.removeManagedAccountReference(accountId) || removedAnyReference
         }
         if (removedAnyReference) {
             this.needsRefreshValue = true
         }
+    }
+
+    private removeManagedAccountReference(accountId: string): boolean {
+        const removedFromAccounts = this.collections.accounts.remove(accountId)
+        const removedFromMissing = this.collections.accounts.removeMissing(accountId)
+        const previousAccountIds = new Set(this.collections.previousAccountIds)
+        const removedFromPrevious = previousAccountIds.delete(accountId)
+        this.collections.setPreviousAccountIds(previousAccountIds)
+        this.collections.deleteManagedAccountInfo(accountId)
+
+        const removed = removedFromAccounts || removedFromMissing || removedFromPrevious
+        if (removed) {
+            this.needsRefreshValue = true
+            this.collections.addHistoryMessage(`Removed managed account missing reference: ${accountId}`)
+        }
+        return removed
     }
 }
