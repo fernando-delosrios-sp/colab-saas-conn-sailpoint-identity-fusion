@@ -364,7 +364,7 @@ For each **Fusion attribute match**, configure:
 
 | Field                          | Purpose                                   | Options / Notes                                                                                      |
 | ------------------------------ | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| **Attribute**                  | Identity attribute name to compare        | Must exist on identities in scope; examples: `name`, `email`, `firstname`, `lastname`, `displayName` |
+| **Attribute**                  | Account attribute name to compare         | Must exist on Fusion accounts; examples: `name`, `email`, `firstname`, `lastname`, `displayName` |
 | **Matching algorithm**         | Algorithm to calculate similarity         | Enhanced Name Matcher, Jaro-Winkler, Dice, Double Metaphone, Binary (Exact Match), Custom Algorithm (Velocity) |
 | **Custom match score (Velocity)** | Template when algorithm is Custom      | Apache Velocity; must output 0–100. Context: `$accountValue`, `$candidateValue`, `$attribute`                    |
 | **Minimum similarity [0-100]** | Threshold and blend weight for this rule  | Higher values are stricter and count more in the **combined match score**                            |

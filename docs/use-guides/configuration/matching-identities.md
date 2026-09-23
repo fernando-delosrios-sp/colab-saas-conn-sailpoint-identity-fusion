@@ -47,7 +47,7 @@ Configure **Attribute Matching Settings → Matching Settings**:
 | **Enable manual review** | Route borderline matches to review forms when reviewers are configured | Yes (default) |
 | **Manual review match score [0-100]** | Global floor for weighted combined score | 80 (start); tune with false positive/negative rate |
 | **Enable automatic merge** | Skip review when combined score meets automatic merge threshold | No initially; enable after tuning |
-| **Fusion attribute matches** | Identity attributes to compare | At least 2 (e.g. name + email) |
+| **Fusion attribute matches** | Account attributes to compare | At least 2 (e.g. name + email) |
 
 ![Fusion matching settings - Configuration](../../assets/images/match-fusion-matching.png)
 
@@ -57,7 +57,7 @@ For each **Fusion attribute match**:
 
 | Field | Purpose |
 | --- | --- |
-| **Attribute** | Identity attribute name (`name`, `email`, `displayName`, …) |
+| **Attribute** | Account attribute name (`name`, `email`, `displayName`, …) |
 | **Matching algorithm** | Similarity method — see [Tuning matching algorithms](tuning-matching-algorithms.md) |
 | **Minimum similarity [0-100]** | Rule threshold; also its weight in the combined score |
 | **Mandatory match?** | Rule must pass its minimum for a potential match |
