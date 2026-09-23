@@ -77,6 +77,13 @@ function registerFormatHelpers(): void {
         return translate(key, locale)
     })
 
+    /** Same as `i18n`, but the label can never wrap even when a mail client drops `white-space:nowrap`. */
+    Handlebars.registerHelper('i18nNoWrap', function (this: any, key: string, options: any) {
+        const locale = options?.data?.root?.locale
+        const escaped = Handlebars.escapeExpression(translate(key, locale))
+        return new Handlebars.SafeString(escaped.replace(/\s+/g, '&nbsp;'))
+    })
+
     /** Renders attribute values; long text is shortened with a character budget; emails become mailto links (triple braces in templates). */
     Handlebars.registerHelper('formatAccountAttributeValue', function (this: any, _attributeKey: unknown, value: unknown, options: any) {
         const locale = options?.data?.root?.locale

@@ -574,7 +574,12 @@ export class ReportService {
         this.identities.clear()
     }
 
-    /** Builds aggregation report payload without sending (for local recording artifacts). */
+    /**
+     * Builds aggregation report payload without sending (for local recording artifacts).
+     *
+     * The tracker is preserved because the emailed aggregation report is built from it
+     * right after this snapshot.
+     */
     public async buildAggregationReportSnapshot(
         includeNonMatches: boolean,
         aggregationStats: AggregationStats
@@ -582,7 +587,7 @@ export class ReportService {
         await this.hydrateIdentitiesForReportDecisions()
         const stats = this.buildFusionReportStats(aggregationStats)
         const tracker = this.requireTracker()
-        const report = this.fusion.generateReport(tracker, includeNonMatches, stats)
+        const report = this.fusion.generateReport(tracker, includeNonMatches, stats, { clearTracker: false })
         report.fusionReviewDecisions = this.buildFusionReviewDecisions(this.email?.getDefaultEffectiveLocale?.() ?? 'en')
         report.stats = stats
         return report as Record<string, unknown>

@@ -110,6 +110,36 @@ describe('FusionService — report', () => {
             const secondReport = ctx.fusionService.generateReport(tracker)
             expect(secondReport.warnings).toBeUndefined()
         })
+
+        it('retains tracker state when clearTracker is false', () => {
+            const tracker = new AggregationTracker()
+            ctx.fusionService.setTracker(tracker)
+            const accountA = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-a',
+                identityId: 'identity-duplicate',
+                name: 'Fusion Account A',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {},
+            } as unknown as Account)
+            const accountB = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-b',
+                identityId: 'identity-duplicate',
+                name: 'Fusion Account B',
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {},
+            } as unknown as Account)
+
+            ctx.fusionService.setFusionAccount(accountA)
+            ctx.fusionService.setFusionAccount(accountB)
+
+            const snapshotReport = ctx.fusionService.generateReport(tracker, true, undefined, { clearTracker: false })
+            expect(snapshotReport.warnings?.identityConflicts?.affectedIdentities).toBe(1)
+
+            const emailReport = ctx.fusionService.generateReport(tracker)
+            expect(emailReport.warnings?.identityConflicts?.affectedIdentities).toBe(1)
+        })
     })
 
     describe('initializeManagedAccountProcessing scoring prep', () => {

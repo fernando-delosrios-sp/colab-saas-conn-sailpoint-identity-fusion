@@ -112,7 +112,7 @@ describe('EmailService.sendFusionEmail', () => {
 
         const sent = workflowsApi.testWorkflow.mock.calls[0][0].testWorkflowRequestV2025.input
         expect(sent.subject).toContain('Revisar coincidencia')
-        expect(sent.body).toContain('Abrir formulario de revisión')
+        expect(sent.body).toContain('Abrir&nbsp;formulario&nbsp;de&nbsp;revisión')
     })
 
     it('includes Open Review Form button when form instance has standAloneFormUrl', async () => {
@@ -131,7 +131,8 @@ describe('EmailService.sendFusionEmail', () => {
         })
 
         const sentBody = workflowsApi.testWorkflow.mock.calls[0][0].testWorkflowRequestV2025.input.body as string
-        expect(sentBody).toContain('Open Review Form')
+        // Non-breaking spaces keep the button on one line in clients that strip white-space:nowrap.
+        expect(sentBody).toContain('Open&nbsp;Review&nbsp;Form')
         expect(sentBody).toContain(reviewUrl)
     })
 
