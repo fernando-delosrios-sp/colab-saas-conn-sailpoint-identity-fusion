@@ -408,8 +408,14 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                             <h1 style="margin:0; color:#0b5cab; font-size:26px; letter-spacing:-0.2px; line-height:1.25;">{{i18n "review_required"}}</h1>
                                                         </td>
                                                         {{#if formUrl}}
-                                                        <td class="header-cta-col" valign="top" align="right" style="white-space:nowrap; vertical-align:top; padding:10px 0 0 16px;">
-                                                            <a href="{{formUrl}}" style="display:inline-block; padding:10px 14px; border-radius:10px; background:#0b5cab; color:#ffffff; font-weight:900; font-size:13px; text-decoration:none;">{{i18n "open_review_form"}}</a>
+                                                        <td class="header-cta-col" valign="top" align="right" nowrap="nowrap" style="white-space:nowrap; vertical-align:top; padding:4px 0 0 16px;">
+                                                            <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="right" style="border-collapse:separate;">
+                                                                <tr>
+                                                                    <td align="center" bgcolor="#0b5cab" style="border-radius:10px; background:#0b5cab; padding:10px 18px;">
+                                                                        <a href="{{formUrl}}" style="display:inline-block; color:#ffffff; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; font-weight:900; font-size:13px; line-height:18px; text-decoration:none;">{{i18nNoWrap "open_review_form"}}</a>
+                                                                    </td>
+                                                                </tr>
+                                                            </table>
                                                         </td>
                                                         {{/if}}
                                                     </tr>

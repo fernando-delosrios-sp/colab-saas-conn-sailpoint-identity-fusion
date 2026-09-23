@@ -10,6 +10,10 @@ describe('ReportService', () => {
                 warningSamples: ['w1'],
                 errorSamples: ['e1'],
             })),
+            timer: vi.fn(() => ({
+                recordElapsed: vi.fn(),
+                getPhaseBreakdown: vi.fn(() => []),
+            })),
         }
         const sources = {
             fusionAccountCount: 7,
@@ -654,6 +658,36 @@ describe('ReportService', () => {
             expect.any(String),
             expect.anything()
         )
+    })
+
+    it('keeps the tracker alive for the emailed report when a recording snapshot is built first', async () => {
+        const sendEmail = vi.fn(async () => undefined)
+        const tracker = { matchAccounts: [{ accountName: 'patti.jones [MelonHRM]' }] }
+        const generateReport = vi.fn((t: any, _includeNonMatches?: boolean, _stats?: any, options?: any) => {
+            const matches = t.matchAccounts.length
+            if (options?.clearTracker ?? true) t.matchAccounts = []
+            return { accounts: t.matchAccounts.slice(), matches }
+        })
+        const { service } = createService({
+            sources: { fetchGlobalOwnerIdentityIds: vi.fn(async () => ['owner-1']) },
+            identities: {
+                hydrateMissingIdentitiesById: vi.fn(async () => undefined),
+                getIdentityById: vi.fn(() => undefined),
+            },
+            fusion: { generateReport },
+            email: {
+                sendEmail,
+                getRecipientEmails: vi.fn(async () => ['owner@example.com']),
+            },
+            run: { getTracker: vi.fn(() => tracker) },
+        })
+
+        const snapshot = await service.buildAggregationReportSnapshot(true, {} as any)
+        await service.generateAndSendFusionReport(false, {} as any, 'aggregation')
+
+        expect(snapshot.matches).toBe(1)
+        expect(sendEmail.mock.calls[0][1]).toContain('1 match(es)')
+        expect(tracker.matchAccounts).toHaveLength(0)
     })
 
     it('emails the Fusion report title to global owners', async () => {

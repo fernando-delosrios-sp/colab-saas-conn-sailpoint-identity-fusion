@@ -1485,16 +1485,20 @@ export class FusionService {
      *
      * Memory Optimization:
      * After generating the report, this method clears the tracker to free memory.
+     * Callers that build an additional report from the same tracker afterwards must
+     * pass `clearTracker: false` so the later build still sees the match accounts.
      *
      * @param tracker - The AggregationTracker instance to build the report from
      * @param includeNonMatches - When true, append per-account rows for managed non-matches. Email reports omit these.
      * @param stats - Optional processing statistics to include in the report
+     * @param options - `clearTracker` (default true) controls tracker reset after the build
      * @returns Complete fusion report with match/non-match accounts
      */
     public generateReport(
         tracker: AggregationTracker,
         includeNonMatches: boolean = false,
-        stats?: FusionReportStats
+        stats?: FusionReportStats,
+        options?: { clearTracker?: boolean }
     ): FusionReport {
         const report = buildFusionReport(
             {
@@ -1521,7 +1525,9 @@ export class FusionService {
             report.fusionBlends = [...tracker.fusionBlends]
         }
 
-        tracker.clear()
+        if (options?.clearTracker ?? true) {
+            tracker.clear()
+        }
 
         return report
     }
