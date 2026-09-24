@@ -1,4 +1,10 @@
-import { attrSplit, attrConcat, processAttributeMapping, buildAttributeMappingConfig } from '../helpers'
+import {
+    attrSplit,
+    attrConcat,
+    processAttributeMapping,
+    buildAttributeMappingConfig,
+    DESIGNATED_SNAPSHOT_UNAVAILABLE,
+} from '../helpers'
 import { Attributes } from '@sailpoint/connector-sdk'
 import { AttributeMergeMode } from '../../../model/config'
 import { AttributeMappingConfig } from '../types'
@@ -7,7 +13,8 @@ const mappingConfig = (
     config: Omit<AttributeMappingConfig, 'lookupAttributeNames'> & { lookupAttributeNames?: string[] }
 ): AttributeMappingConfig => ({
     ...config,
-    lookupAttributeNames: config.lookupAttributeNames ?? Array.from(new Set([...config.sourceAttributes, config.attributeName])),
+    lookupAttributeNames:
+        config.lookupAttributeNames ?? Array.from(new Set([...config.sourceAttributes, config.attributeName])),
 })
 
 describe('attributeService helpers', () => {
@@ -163,6 +170,29 @@ describe('attributeService helpers', () => {
             const originSnapshot = { jobTitle: 'Engineer' } as Attributes
 
             expect(processAttributeMapping(config, map, ['IT'], mainAccount, originSnapshot)).toBe('Engineer')
+        })
+
+        it('signals designated snapshot unavailable for Main account merge', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('IT', [{ jobTitle: 'Director' }])
+            const config = mappingConfig({
+                attributeName: 'jobTitle',
+                sourceAttributes: ['jobTitle'],
+                attributeMerge: AttributeMergeMode.MainAccount,
+            })
+            expect(processAttributeMapping(config, map, ['IT'])).toBe(DESIGNATED_SNAPSHOT_UNAVAILABLE)
+        })
+
+        it('signals designated snapshot unavailable for Origin account merge', () => {
+            const map = new Map<string, Attributes[]>()
+            map.set('IT', [{ jobTitle: 'Director' }])
+            const config = mappingConfig({
+                attributeName: 'jobTitle',
+                sourceAttributes: ['jobTitle'],
+                attributeMerge: AttributeMergeMode.OriginAccount,
+            })
+            const mainAccount = { jobTitle: 'Manager' } as Attributes
+            expect(processAttributeMapping(config, map, ['IT'], mainAccount)).toBe(DESIGNATED_SNAPSHOT_UNAVAILABLE)
         })
 
         it('should return list for "list" merge', () => {

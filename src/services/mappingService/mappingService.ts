@@ -5,7 +5,7 @@ import { FusionAttribute } from '../../data/schema'
 import { FusionRun } from '../../model/fusionRun'
 import { Attributes } from '@sailpoint/connector-sdk'
 import { AttributeMappingConfig } from './types'
-import { processAttributeMapping, buildAttributeMappingConfig } from './helpers'
+import { processAttributeMapping, buildAttributeMappingConfig, DESIGNATED_SNAPSHOT_UNAVAILABLE } from './helpers'
 import { trimStr } from '../../utils/safeRead'
 import { getManagedAccountSnapshotKey } from '../../utils/velocityAccountSnapshot'
 import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
@@ -171,7 +171,13 @@ export class MappingService {
         const mappingTargets = this.mappingTargetNames
         const explicitTargetSet = new Set(mappingTargets)
 
-        const applyMappedValue = (attribute: string, processedValue: Attributes[string] | undefined): void => {
+        const applyMappedValue = (
+            attribute: string,
+            processedValue: Attributes[string] | typeof DESIGNATED_SNAPSHOT_UNAVAILABLE | undefined
+        ): void => {
+            if (processedValue === DESIGNATED_SNAPSHOT_UNAVAILABLE) {
+                return
+            }
             if (processedValue === undefined) {
                 if (fusionAccount.isIdentity && fusionAccount.attributeBag.identity[attribute] !== undefined) {
                     attributes[attribute] = fusionAccount.attributeBag.identity[attribute]

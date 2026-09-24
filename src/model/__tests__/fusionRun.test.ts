@@ -292,6 +292,63 @@ describe('FusionRun', () => {
         expect(run.getManagedAccountInfo('src-a::native-1')?.name).toBe('Test User')
     })
 
+    it('Claim moves attribute body into retention', () => {
+        const run = new FusionRun()
+        const account = {
+            id: 'isc-1',
+            sourceId: 'src-a',
+            sourceName: 'Source A',
+            nativeIdentity: 'native-1',
+            name: 'Test User',
+            attributes: { givenName: 'Nadya' },
+        } as Account
+        run.setManagedAccount('src-a::native-1', account)
+        run.claimAccount('src-a::native-1')
+
+        expect(run.get('src-a::native-1')).toBeUndefined()
+        expect(run.getRetainedAccount('src-a::native-1')?.attributes?.givenName).toBe('Nadya')
+    })
+
+    it('Retention clears with managed account state', () => {
+        const run = new FusionRun()
+        const account = {
+            id: 'isc-1',
+            sourceId: 'src-a',
+            sourceName: 'Source A',
+            nativeIdentity: 'native-1',
+            name: 'Test User',
+            attributes: { givenName: 'Nadya' },
+        } as Account
+        run.setManagedAccount('src-a::native-1', account)
+        run.claimAccount('src-a::native-1')
+        run.clearManagedAccountState()
+
+        expect(run.getRetainedAccount('src-a::native-1')).toBeUndefined()
+        expect(run.get('src-a::native-1')).toBeUndefined()
+        expect(run.hasManagedAccount('src-a::native-1')).toBe(false)
+        expect(run.managedAccountInventory.size).toBe(0)
+    })
+
+    it('Match does not consume retention as a work queue', () => {
+        const run = new FusionRun()
+        const account = {
+            id: 'isc-1',
+            sourceId: 'src-a',
+            sourceName: 'Source A',
+            nativeIdentity: 'native-1',
+            identityId: 'identity-1',
+            name: 'Test User',
+            attributes: { givenName: 'Nadya' },
+        } as Account
+        run.setManagedAccount('src-a::native-1', account)
+        run.claimAccount('src-a::native-1', 'identity-1')
+
+        expect([...run.entries()].map(([key]) => key)).not.toContain('src-a::native-1')
+        expect(run.get('src-a::native-1')).toBeUndefined()
+        expect(run.getKeysForIdentity('identity-1')).toBeUndefined()
+        expect(run.getRetainedAccount('src-a::native-1')).toBeDefined()
+    })
+
     it('inventory retains identityId after setManagedAccount and claimAccount', () => {
         const run = new FusionRun()
         const account = {

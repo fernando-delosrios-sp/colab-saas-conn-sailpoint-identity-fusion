@@ -5,8 +5,7 @@ The **Define** step controls how attributes are generated using Apache Velocity 
 **Configuration reference:** [Attribute Definition Settings](../../configuration/definition.md) · [Velocity context](../../reference/velocity-context.md)
 
 !!! note "Didactic guide"
-    This page explains **how and when** to configure settings with examples. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
-
+This page explains **how and when** to configure settings with examples. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
 
 ---
 
@@ -24,9 +23,9 @@ The **Define** step controls how attributes are generated using Apache Velocity 
 
 ## Global settings
 
-| Field                                          | Purpose                                     | Recommended value                                                                |
-| ---------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------------------- |
-| **Maximum attempts for unique definition**     | Cap on retries for generating unique values | 20 (default); increase for large datasets with high collision risk (e.g. 50–200) |
+| Field                                      | Purpose                                     | Recommended value                                                                |
+| ------------------------------------------ | ------------------------------------------- | -------------------------------------------------------------------------------- |
+| **Maximum attempts for unique definition** | Cap on retries for generating unique values | 20 (default); increase for large datasets with high collision risk (e.g. 50–200) |
 
 **Why this matters:** For **Unique** type attributes, if the generated value already exists, the connector appends a counter and retries. This setting prevents infinite loops if the expression always produces the same value.
 
@@ -36,24 +35,23 @@ The **Define** step controls how attributes are generated using Apache Velocity 
 
 Add each attribute under **Normal Attribute Definitions** or **Unique Attribute Definitions**. Look up field keys, types, and defaults in the [Configuration reference](../../configuration/definition.md).
 
-| You configure | Start here |
-| --- | --- |
-| Name, Velocity expression, static, refresh | [Normal definitions — Attribute Definition](../../configuration/definition.md#name) |
-| Case, normalize, spaces, trim, max length | [Transformations](../../configuration/definition.md#case) |
-| Unique IDs, counter, UUID, incremental counter | [Unique definitions](../../configuration/definition.md#maxattempts) |
-| Global unique retry cap | [Maximum attempts](../../configuration/definition.md#maxattempts) |
+| You configure                                  | Start here                                                                          |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Name, Velocity expression, static, refresh     | [Normal definitions — Attribute Definition](../../configuration/definition.md#name) |
+| Case, normalize, spaces, trim, max length      | [Transformations](../../configuration/definition.md#case)                           |
+| Unique IDs, counter, UUID, incremental counter | [Unique definitions](../../configuration/definition.md#maxattempts)                 |
+| Global unique retry cap                        | [Maximum attempts](../../configuration/definition.md#maxattempts)                   |
 
 **Common patterns:**
 
-| Goal | Section | Expression hint |
-| --- | --- | --- |
-| Full name (dynamic) | Normal | `$firstname $lastname` with **Always recalculate?** = Yes |
-| Username with collision handling | Unique | `#set($i=$firstname.substring(0,1))$i$lastname` + transforms |
-| Immutable UUID | Unique | `$UUID` |
-| Sequential employee number | Unique | `EMP-$counter` with **Use incremental counter?** = Yes |
+| Goal                             | Section | Expression hint                                              |
+| -------------------------------- | ------- | ------------------------------------------------------------ |
+| Full name (dynamic)              | Normal  | `$firstname $lastname` with **Always recalculate?** = Yes    |
+| Username with collision handling | Unique  | `#set($i=$firstname.substring(0,1))$i$lastname` + transforms |
+| Immutable UUID                   | Unique  | `$UUID`                                                      |
+| Sequential employee number       | Unique  | `EMP-$counter` with **Use incremental counter?** = Yes       |
 
 ![Attribute definition example](../../assets/images/attribute-management-mapping-merge.png)
-
 
 ---
 
@@ -63,16 +61,16 @@ Add each attribute under **Normal Attribute Definitions** or **Unique Attribute 
 
 **Behavior:** Standard computed attribute; recalculated based on **Always recalculate?** and **Static** settings.
 
-| Static | Always recalculate | Behavior                                                                   | Use case                                                            |
-| ------ | ------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Static | Always recalculate | Behavior                                                                                                            | Use case                                                            |
+| ------ | ------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | No     | Yes                | Recalculated every aggregation even if source data is unchanged; falsy or failed output **clears** the stored value | Dynamic values that should update (full name, age, formatted dates) |
-| No     | No                 | Recalculated only when underlying source data changes; falsy or failed output **clears** the stored value | Standard values that update only when source data updates           |
-| Yes    | (Ignored)          | Calculated only when it has no value; existing values are never recalculated | Immutable values (initial assignment, one-time calculations)        |
+| No     | No                 | Recalculated only when underlying source data changes; falsy or failed output **clears** the stored value           | Standard values that update only when source data updates           |
+| Yes    | (Ignored)          | Calculated only when it has no value; existing values are never recalculated                                        | Immutable values (initial assignment, one-time calculations)        |
 
 Underlying source data has changed when a managed account is newly blended or removed, or when a managed account’s `modified` timestamp is newer than the Fusion account’s by more than a short grace period.
 
 !!! warning "Breaking behavior"
-    When a Normal definition runs and the Velocity expression fails or renders empty output, the connector removes the attribute from the Fusion account. Use `$previous` in the expression to retain the last value when source input is temporarily missing, or enable **Static** for write-once attributes.
+When a Normal definition runs and the Velocity expression fails or renders empty output, the connector removes the attribute from the Fusion account. Use `$previous` in the expression to retain the last value when source input is temporarily missing, or enable **Static** for write-once attributes.
 
 **Examples:**
 
@@ -103,12 +101,12 @@ $Math.floor($Datefns.differenceInDays($Datefns.now(), $hireDate) / 365)
 **Zero-padding:** Use **Minimum counter digits** to pad counter (e.g. digits=3 → `jsmith001`)
 
 !!! note "Maximum length"
-    If a **Maximum length** is configured, the connector intelligently truncates the surrounding text to ensure the `$counter` is perfectly preserved without being chopped off, even if the counter is injected in the middle of a string.
+If a **Maximum length** is configured, the connector intelligently truncates the surrounding text to ensure the `$counter` is perfectly preserved without being chopped off, even if the counter is injected in the middle of a string.
 
 **`$isUnique(value)` helper:** Unique definitions can call `$isUnique(...)` inside the Velocity expression to test whether a candidate value is currently free after the same trim/case/spaces/normalize/maxLength rules are applied. Use this to choose between candidate formats before the connector falls back to automatic `$counter` disambiguation.
 
 !!! tip "Template safety"
-    The connector auto-appends `$counter` to unique expressions that do not already reference `$counter` or `$UUID`, but the auto-append is **skipped when the expression contains Velocity directives** (`#if`, `#set`, `#else`, `#end`, etc.) because appending after `#end` would break parsing. In that case include `$counter` explicitly in your expression (or use `$UUID`).
+The connector auto-appends `$counter` to unique expressions that do not already reference `$counter` or `$UUID`, but the auto-append is **skipped when the expression contains Velocity directives** (`#if`, `#set`, `#else`, `#end`, etc.) because appending after `#end` would break parsing. In that case include `$counter` explicitly in your expression (or use `$UUID`).
 
 **Examples:**
 
@@ -213,15 +211,15 @@ flowchart LR
 
 #### Quick reference
 
-| Access | Use it for | Example |
-| --- | --- | --- |
-| `$firstname`, `$email` | Mapped (or raw source) attributes | `$firstname $lastname` |
-| `$identity.*` | Identity fields when scope includes identities | `$identity.name` |
-| `$accounts[n]` | Managed accounts in source order | `$accounts[0].schema.id` |
-| `$sources.SourceName` | Accounts grouped by source | `$sources.Workday[0].jobTitle` |
-| `$account` | The **origin** snapshot only | `$account.schema.name` |
-| `$originAccount` | Origin key string | Managed: `sourceId::nativeId` |
-| `$previous.*` | Last generated Fusion state | `$previous.username` |
+| Access                 | Use it for                                     | Example                        |
+| ---------------------- | ---------------------------------------------- | ------------------------------ |
+| `$firstname`, `$email` | Mapped (or raw source) attributes              | `$firstname $lastname`         |
+| `$identity.*`          | Identity fields when scope includes identities | `$identity.name`               |
+| `$accounts[n]`         | Managed accounts in source order               | `$accounts[0].schema.id`       |
+| `$sources.SourceName`  | Accounts grouped by source                     | `$sources.Workday[0].jobTitle` |
+| `$account`             | The **origin** snapshot only                   | `$account.schema.name`         |
+| `$originAccount`       | Origin key string                              | Managed: `sourceId::nativeId`  |
+| `$previous.*`          | Last generated Fusion state                    | `$previous.username`           |
 
 #### Mapped attributes
 
@@ -231,27 +229,27 @@ Reference mapped names after **Map** is configured: `$jobTitle`, `$department`, 
 
 When **Include identities in the scope** is on:
 
-| Variable | Meaning |
-| --- | --- |
-| `$identity.name` | Root identity name |
-| `$identity.<attr>` | Any identity attribute |
-| `$name` | Falls back to identity name when no mapped `name` exists (identity-origin Fusion accounts) |
+| Variable           | Meaning                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------ |
+| `$identity.name`   | Root identity name                                                                         |
+| `$identity.<attr>` | Any identity attribute                                                                     |
+| `$name`            | Falls back to identity name when no mapped `name` exists (identity-origin Fusion accounts) |
 
 #### `$accounts` — all linked managed accounts
 
 Each entry includes source attributes plus nested metadata:
 
-| Part | Key fields |
-| --- | --- |
-| Attributes | All fields from the managed account |
+| Part                        | Key fields                                               |
+| --------------------------- | -------------------------------------------------------- |
+| Attributes                  | All fields from the managed account                      |
 | `source.id` / `source.name` | Source identifier (`id` absent for Identities snapshots) |
-| `schema.id` / `schema.name` | Native identity and display name |
-| `IIQDisabled` | Disabled flag when present |
+| `schema.id` / `schema.name` | Native identity and display name                         |
+| `IIQDisabled`               | Disabled flag when present                               |
 
-**Order:** configured sources → insertion order within each source → unknown sources last. When `mainAccount` is set, that account moves to index `0`. Always recalculate and `needsRefresh` still read this run's managed snapshots (`$accounts` / `$sources`); unchanged Fusion accounts may not copy those snapshots during Refresh.
+**Order:** configured sources → insertion order within each source → unknown sources last. When `mainAccount` is set, that account moves to index `0`. Always recalculate and `needsRefresh` still read this run's managed snapshots (`$accounts` / `$sources`); unchanged Fusion accounts may not copy those snapshots during Refresh. If that Fusion account later becomes refresh-eligible in the same run, previously claim-only accounts rematerialize from claimed account retention so `$sources` is complete again.
 
 !!! tip "$accounts[0] is not always the origin"
-    `$accounts[0]` follows **source configuration order**. `$account` is always the **origin snapshot**. When `mainAccount` differs from the origin, use `$account` for origin-specific logic.
+    `$accounts[0]`follows **source configuration order**.`$account` is always the **origin snapshot**. When `mainAccount` differs from the origin, use `$account` for origin-specific logic.
 
 ```velocity
 $accounts[0].source.name
@@ -267,11 +265,11 @@ $sources.ActiveDirectory.size()
 
 #### Origin fields
 
-| Variable | Description |
-| --- | --- |
-| `$originSource` | Source that created the Fusion account (`Identities`, `Workday`, …) |
-| `$originAccount` | Key string — managed: `sourceId::nativeIdentity`; identity: identity id |
-| `$account` | Full origin snapshot (same shape as `$accounts[]`); for Identities origin use `$account.name` and `source.name = Identities` |
+| Variable         | Description                                                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `$originSource`  | Source that created the Fusion account (`Identities`, `Workday`, …)                                                          |
+| `$originAccount` | Key string — managed: `sourceId::nativeIdentity`; identity: identity id                                                      |
+| `$account`       | Full origin snapshot (same shape as `$accounts[]`); for Identities origin use `$account.name` and `source.name = Identities` |
 
 #### `$previous`
 
@@ -279,11 +277,11 @@ Prior Fusion account values — useful for one-time assignments or change detect
 
 #### Unique-only helpers
 
-| Variable | Behavior |
-| --- | --- |
-| `$counter` | Collision suffix for Unique definitions (auto-appended unless you use `#if` / `#set` directives) |
-| `$UUID` | Fresh v4 UUID per attempt |
-| `$isUnique(value)` | Test whether a candidate value is already taken |
+| Variable           | Behavior                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| `$counter`         | Collision suffix for Unique definitions (auto-appended unless you use `#if` / `#set` directives) |
+| `$UUID`            | Fresh v4 UUID per attempt                                                                        |
+| `$isUnique(value)` | Test whether a candidate value is already taken                                                  |
 
 See [Unique type](#unique-type) above for collision and `$isUnique` examples.
 
@@ -291,14 +289,14 @@ See [Unique type](#unique-type) above for collision and `$isUnique` examples.
 
 Helper objects are injected into every expression. Common patterns:
 
-| Helper | Typical use | Example |
-| --- | --- | --- |
-| `$Math` | Numeric operations | `$Math.floor(x)` |
-| `$Datefns` | Format and compare dates | `$Datefns.format($hireDate, 'yyyy-MM-dd')` |
-| `$Normalize` | Phone, date, name, address, ASCII | `$Normalize.phone($phone, "GB")` |
-| `$AddressParse` | State/region code lookup | `$AddressParse.getStateCode("California", "US")` |
-| `$JSON` | Parse or stringify JSON | `$JSON.parse($payload)` |
-| `$MD5` | Deterministic hash id | `$MD5($email)` |
+| Helper          | Typical use                       | Example                                          |
+| --------------- | --------------------------------- | ------------------------------------------------ |
+| `$Math`         | Numeric operations                | `$Math.floor(x)`                                 |
+| `$Datefns`      | Format and compare dates          | `$Datefns.format($hireDate, 'yyyy-MM-dd')`       |
+| `$Normalize`    | Phone, date, name, address, ASCII | `$Normalize.phone($phone, "GB")`                 |
+| `$AddressParse` | State/region code lookup          | `$AddressParse.getStateCode("California", "US")` |
+| `$JSON`         | Parse or stringify JSON           | `$JSON.parse($payload)`                          |
+| `$MD5`          | Deterministic hash id             | `$MD5($email)`                                   |
 
 #### Examples you will use often
 
@@ -317,7 +315,7 @@ $Normalize.address("$city, $state $zip", "US")
 ```
 
 !!! note "Full helper API"
-    Method signatures, optional parameters, and edge-case behavior for every helper are documented in [Velocity context reference](../../reference/velocity-context.md#available-utilities).
+Method signatures, optional parameters, and edge-case behavior for every helper are documented in [Velocity context reference](../../reference/velocity-context.md#available-utilities).
 
 ---
 
@@ -372,7 +370,3 @@ One can purposely generate an **empty** `nativeIdentity` in conjunction with the
   $email
 #end
 ```
-
-
-
-

@@ -27,6 +27,9 @@ import type { IdentityInfo } from './fusionAccountTypes'
  * `attributeBag.sources` so Map and Velocity `$accounts` / `$sources` can read this run.
  * **Claim-only absorb** still claims the work-queue key and updates bookkeeping
  * (`managedAccountInfo`, uncorrelated/status, source names) without that copy.
+ * Claim still fills **claimed account retention** on FusionRun. When live sources become
+ * required later in the same run, missing linked keys rematerialize from retention
+ * without returning those keys to the Match work queue.
  * Prelude flags below are ORed with Fusion-account-local new-blend, over-threshold `modified`,
  * and prune-deleted before any `claimAccount`.
  */
@@ -252,6 +255,17 @@ export class FusionLayers {
             materializeSourceSnapshots
         )
 
+        if (materializeSourceSnapshots) {
+            this.rematerializeMissingLinkedSnapshots(
+                workQueue,
+                attributeBag,
+                addBlendHistory,
+                skipBlendHistoryForManagedKeys,
+                onBlend,
+                modified
+            )
+        }
+
         if (pruneDeleted) {
             this.pruneDeletedManagedAccounts(workQueue.managedAccountInventory)
         }
@@ -342,7 +356,8 @@ export class FusionLayers {
      * Absorbs a work-queue managed account: bookkeeping always, and **source snapshot
      * materialization** when `materializeSourceSnapshots` is true. Claim-only absorb
      * updates keys / uncorrelated / `managedAccountInfo` / source names without copying
-     * `account.attributes` onto `attributeBag.sources`.
+     * `account.attributes` onto `attributeBag.sources`. Attribute bodies still move into
+     * FusionRun claimed account retention on `claimAccount` for possible later rematerialization.
      */
     setManagedAccount(
         account: Account,
@@ -394,26 +409,92 @@ export class FusionLayers {
             this.collections.sources.add(account.sourceName)
 
             if (materializeSourceSnapshots) {
-                const contextAttributes = {
-                    ...(account.attributes ?? {}),
-                    name: trimStr(account.name ?? account.nativeIdentity) || accountId,
-                    source: {
-                        id: trimStr(readString(account, 'sourceId', '')) ?? '',
-                        name: account.sourceName ?? '',
-                    },
-                    schema: {
-                        name: trimStr(account.name ?? account.nativeIdentity) || accountId,
-                        id: schemaNative,
-                    },
-                    IIQDisabled: Boolean(account.disabled),
-                } as unknown as Attributes
-
-                const existingSourceAccounts = attributeBag.sources.get(account.sourceName) || []
-                existingSourceAccounts.push(contextAttributes)
-                attributeBag.sources.set(account.sourceName, existingSourceAccounts)
+                this.copyManagedAccountSnapshot(account, accountId, attributeBag, false)
             }
         }
         return recordBlendHistory && isNewAccount
+    }
+
+    /**
+     * Copies a managed account onto `attributeBag.sources`. Retention-backed copies
+     * prepend so previously claimed origin/sibling snapshots stay ahead of new blends
+     * for Velocity `$sources.get($originSource)[0]`.
+     */
+    private copyManagedAccountSnapshot(
+        account: Account,
+        accountId: string,
+        attributeBag: { sources: Map<string, Attributes[]> },
+        prepend: boolean
+    ): void {
+        if (!account.sourceName) return
+        const parsedKey = parseManagedAccountKey(accountId)
+        const schemaNative = trimStr(account.nativeIdentity ?? parsedKey?.nativeIdentity) || accountId
+        const contextAttributes = {
+            ...(account.attributes ?? {}),
+            name: trimStr(account.name ?? account.nativeIdentity) || accountId,
+            source: {
+                id: trimStr(readString(account, 'sourceId', '')) ?? '',
+                name: account.sourceName ?? '',
+            },
+            schema: {
+                name: trimStr(account.name ?? account.nativeIdentity) || accountId,
+                id: schemaNative,
+            },
+            IIQDisabled: Boolean(account.disabled),
+        } as unknown as Attributes
+
+        const existingSourceAccounts = attributeBag.sources.get(account.sourceName) || []
+        if (prepend) {
+            existingSourceAccounts.unshift(contextAttributes)
+        } else {
+            existingSourceAccounts.push(contextAttributes)
+        }
+        attributeBag.sources.set(account.sourceName, existingSourceAccounts)
+    }
+
+    /**
+     * When live sources are required, fill snapshots for live linked keys that were
+     * claimed earlier in this run. Does not put those keys back on the Match work queue.
+     */
+    private rematerializeMissingLinkedSnapshots(
+        queue: FusionRun,
+        attributeBag: { sources: Map<string, Attributes[]> },
+        addBlendHistory: boolean,
+        skipBlendHistoryForManagedKeys?: ReadonlySet<string>,
+        onBlend?: (account: Account) => void,
+        fusionModified?: string
+    ): void {
+        const previousLinked: string[] = []
+        const remainingLinked: string[] = []
+        for (const accountId of this.collections.accountIds) {
+            if (this.collections.previousAccountIds.has(accountId)) {
+                previousLinked.push(accountId)
+            } else {
+                remainingLinked.push(accountId)
+            }
+        }
+
+        for (const accountId of [...previousLinked, ...remainingLinked]) {
+            if (this.hasSourceSnapshot(accountId, attributeBag.sources)) continue
+            const onQueue = queue.get(accountId)
+            const retained = queue.getRetainedAccount(accountId)
+            const account = onQueue ?? retained
+            if (!account) continue
+
+            const blended = this.setManagedAccount(
+                account,
+                addBlendHistory,
+                skipBlendHistoryForManagedKeys,
+                attributeBag,
+                fusionModified,
+                false
+            )
+            this.copyManagedAccountSnapshot(account, accountId, attributeBag, retained !== undefined && !onQueue)
+            if (blended && onBlend) onBlend(account)
+            if (onQueue) {
+                queue.claimAccount(accountId, account.identityId)
+            }
+        }
     }
 
     // ============================================================================
@@ -544,6 +625,8 @@ export class FusionLayers {
      * Whole-account decide-before-claim: live sources are required when any prelude flag
      * is set, `needsRefresh` is already true, any linked queue key is a new blend or
      * over-threshold newer, or prune-deleted would drop a tracked key.
+     * Already-claimed keys are recovered from claimed account retention later in this
+     * invocation; they are not expected to still sit on the Match work queue.
      */
     private computeRequireLiveSourceSnapshots(
         queue: FusionRun,

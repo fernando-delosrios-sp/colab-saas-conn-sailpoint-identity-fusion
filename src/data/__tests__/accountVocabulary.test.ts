@@ -49,7 +49,13 @@ function isAllowedAccountRowUsage(repositoryPath: string, line: string): boolean
         )
     }
     if (repositoryPath === 'openspec/specs/ubiquitous-language/spec.md') {
-        return /^\| `/.test(line) || /\bSHALL NOT\b/.test(line) || /Retired terms/.test(line) || /not ["']/.test(line) || /not as domain/.test(line)
+        return (
+            /^\| `/.test(line) ||
+            /\bSHALL NOT\b/.test(line) ||
+            /Retired terms/.test(line) ||
+            /not ["']/.test(line) ||
+            /not as domain/.test(line)
+        )
     }
     return false
 }
@@ -102,7 +108,10 @@ describe('canonical account vocabulary', () => {
     })
 
     it('rowsSent counts streamed Fusion accounts', () => {
-        const accountListSpec = readFileSync(join(repositoryRoot, 'openspec/specs/account-list-operation/spec.md'), 'utf8')
+        const accountListSpec = readFileSync(
+            join(repositoryRoot, 'openspec/specs/account-list-operation/spec.md'),
+            'utf8'
+        )
         expect(accountListSpec).toMatch(/`rowsSent`[^.\n]*(?:Fusion accounts|`StdAccountListOutput` objects)/i)
         expect(ubiquitousLanguage).toMatch(/`rowsSent`[^.\n]*(?:Fusion accounts|`StdAccountListOutput` objects)/i)
     })
@@ -124,10 +133,29 @@ describe('canonical account vocabulary', () => {
 })
 
 describe('Map glossary terms', () => {
-    it('Vanished snapshot key entry', () => {
-        expect(glossary).toMatch(/\*\*Vanished snapshot key\*\*/)
-        expect(glossary).toMatch(/deletes it from `attributeBag\.current`/)
-        expect(glossary).not.toMatch(/orphaned attribute.*synonym/i)
+    it('Designated snapshot unavailable entry', () => {
+        expect(glossary).toMatch(/\*\*Designated snapshot unavailable\*\*/)
+        expect(glossary).toMatch(/not present in this invocation/)
+        expect(glossary).toMatch(/Distinct from a snapshot that is present but lacks the mapped attribute/)
+        expect(glossary).not.toMatch(/Designated snapshot unavailable[^|\n]*vanished snapshot key/)
+    })
+
+    it('Claimed account retention entry', () => {
+        expect(glossary).toMatch(/\*\*Claimed account retention\*\*/)
+        expect(glossary).toMatch(/after `claimAccount` removes them from the Match work queue/)
+        expect(glossary).toMatch(/Not a second Match work queue/)
+        expect(glossary).toMatch(/not metadata-only inventory/)
+    })
+
+    it('Source snapshot materialization entry', () => {
+        expect(glossary).toMatch(/\*\*Source snapshot materialization\*\*/)
+        expect(glossary).toMatch(/claimed account retention/)
+    })
+
+    it('Claim-only absorb entry', () => {
+        expect(glossary).toMatch(/\*\*Claim-only absorb\*\*/)
+        expect(glossary).toMatch(/claimed account retention/)
+        expect(glossary).not.toMatch(/Claim-only absorb[^|\n]*skip Refresh/)
     })
 
     it('Definition-owned name entry', () => {

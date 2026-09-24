@@ -6,6 +6,7 @@ import { FusionDecision } from '../form'
 import { FusionAccountKind } from '../fusionAccountTypes'
 import { StatusEntitlement } from '../statusEntitlement'
 import { FusionRun } from '../fusionRun'
+import { getManagedAccountSnapshotKey } from '../../utils/velocityAccountSnapshot'
 
 describe('FusionAccount', () => {
     const minimalConfig = {
@@ -940,6 +941,9 @@ describe('FusionAccount', () => {
             expect(acc.needsRefresh).toBe(false)
             expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
             expect(sourceHasDistinctSnapshot(acc, 'Source A')).toBe(false)
+            expect(run.getRetainedAccount('src-a::keep-1')?.attributes?.[distinctAttributeName]).toBe(
+                distinctAttributeValue
+            )
         })
 
         it('new blend materializes snapshots for the Fusion account', () => {
@@ -1031,6 +1035,101 @@ describe('FusionAccount', () => {
 
             expect(sourceHasDistinctSnapshot(acc, 'Source A')).toBe(true)
             expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
+        })
+
+        const snapshotForKey = (acc: FusionAccount, key: string) => {
+            for (const snapshots of acc.attributeBag.sources.values()) {
+                for (const snapshot of snapshots) {
+                    if (getManagedAccountSnapshotKey(snapshot) === key) return snapshot
+                }
+            }
+            return undefined
+        }
+
+        it('Prior claim-only origin rematerializes when a new blend requires live sources', () => {
+            const originKey = 'src-a::keep-1'
+            const blendKey = 'src-a::blend-2'
+            const acc = persistedFusion([originKey])
+            const run = new FusionRun()
+            run.setManagedAccount(
+                originKey,
+                queueManaged('src-a', 'keep-1', {
+                    modified: '2024-01-01T00:00:00.000Z',
+                    attributes: { [distinctAttributeName]: 'ORIGIN-BODY', givenName: 'Nadya' },
+                })
+            )
+            acc.addManagedAccountLayer(run)
+            expect(sourceHasDistinctSnapshot(acc, 'Source A')).toBe(false)
+            expect(run.get(originKey)).toBeUndefined()
+
+            acc.collections.accounts.add(blendKey)
+            run.setManagedAccount(
+                blendKey,
+                queueManaged('src-a', 'blend-2', {
+                    modified: '2024-06-01T14:00:00.000Z',
+                    attributes: { [distinctAttributeName]: 'BLEND-BODY', givenName: 'Nadia' },
+                })
+            )
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.needsRefresh).toBe(true)
+            expect(snapshotForKey(acc, originKey)?.[distinctAttributeName]).toBe('ORIGIN-BODY')
+            expect(snapshotForKey(acc, blendKey)?.[distinctAttributeName]).toBe('BLEND-BODY')
+            expect(run.get(originKey)).toBeUndefined()
+            const sourceA = acc.attributeBag.sources.get('Source A') ?? []
+            expect(getManagedAccountSnapshotKey(sourceA[0])).toBe(originKey)
+        })
+
+        it('Authorized merge onto a claim-only-preprocessed Fusion account rematerializes linked keys', () => {
+            const originKey = 'src-a::keep-1'
+            const blendKey = 'src-b::blend-2'
+            const acc = persistedFusion([originKey])
+            const run = new FusionRun()
+            run.setManagedAccount(originKey, queueManaged('src-a', 'keep-1', { modified: '2024-01-01T00:00:00.000Z' }))
+            acc.addManagedAccountLayer(run)
+
+            acc.collections.accounts.add(blendKey)
+            run.setManagedAccount(blendKey, queueManaged('src-b', 'blend-2', { modified: '2024-06-01T14:00:00.000Z' }))
+            acc.addManagedAccountLayer(run)
+
+            expect(snapshotForKey(acc, originKey)?.[distinctAttributeName]).toBe(distinctAttributeValue)
+            expect(snapshotForKey(acc, blendKey)?.[distinctAttributeName]).toBe(distinctAttributeValue)
+        })
+
+        it('Missing retention leaves only queue-backed snapshots', () => {
+            const originKey = 'src-a::keep-1'
+            const blendKey = 'src-a::blend-2'
+            const acc = persistedFusion([originKey])
+            acc.collections.accounts.add(blendKey)
+            const run = new FusionRun()
+            run.setManagedAccount(
+                blendKey,
+                queueManaged('src-a', 'blend-2', {
+                    modified: '2024-06-01T14:00:00.000Z',
+                    attributes: { [distinctAttributeName]: 'BLEND-ONLY' },
+                })
+            )
+            acc.addManagedAccountLayer(run)
+
+            expect(snapshotForKey(acc, blendKey)?.[distinctAttributeName]).toBe('BLEND-ONLY')
+            expect(snapshotForKey(acc, originKey)).toBeUndefined()
+        })
+
+        it('New blend rematerializes a previously claim-only sibling from retention', () => {
+            const keyA = 'src-a::keep-1'
+            const keyB = 'src-b::blend-2'
+            const acc = persistedFusion([keyA])
+            const run = new FusionRun()
+            run.setManagedAccount(keyA, queueManaged('src-a', 'keep-1', { modified: '2024-01-01T00:00:00.000Z' }))
+            acc.addManagedAccountLayer(run)
+
+            acc.collections.accounts.add(keyB)
+            run.setManagedAccount(keyB, queueManaged('src-b', 'blend-2', { modified: '2024-06-01T14:00:00.000Z' }))
+            acc.addManagedAccountLayer(run)
+
+            expect(acc.needsRefresh).toBe(true)
+            expect(snapshotForKey(acc, keyB)?.[distinctAttributeName]).toBe(distinctAttributeValue)
+            expect(snapshotForKey(acc, keyA)?.[distinctAttributeName]).toBe(distinctAttributeValue)
         })
     })
 
