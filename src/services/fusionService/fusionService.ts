@@ -691,10 +691,8 @@ export class FusionService {
     }
 
     /**
-     * Process all Fusion identity decisions (new identity).
-     * A Fusion identity is a Fusion account that became an identity.
-     * Candidate status is handled by processFusionAccounts, since pending form
-     * candidates are always existing fusion accounts.
+     * Process queued Fusion identity decisions, including authorized merges that
+     * were not applied during refresh because no persisted Fusion account existed.
      *
      * @returns The fusion accounts produced by the new identity decisions
      */

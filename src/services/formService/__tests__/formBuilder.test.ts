@@ -59,14 +59,34 @@ describe('formBuilder HTML restyle', () => {
             )
         ).toBe(true)
         const descriptions = all.filter((el) => el.elementType === 'DESCRIPTION')
-        expect(descriptions).toHaveLength(2)
+        expect(descriptions).toHaveLength(4)
         for (const el of descriptions) {
             expect(String(el.config?.label ?? '').trim().length).toBeGreaterThan(0)
         }
+        expect(
+            descriptions.some(
+                (el) => el.id === 'identityDetails0' && el.config?.description === '{{$.form.input.identityHtml0}}'
+            )
+        ).toBe(true)
+        expect(
+            descriptions.some(
+                (el) => el.id === 'identityDetails1' && el.config?.description === '{{$.form.input.identityHtml1}}'
+            )
+        ).toBe(true)
+        const identitiesSection = fields.find((field) => field.id === 'identitiesSection')
+        expect((identitiesSection?.config as any)?.formElements?.map((element: any) => element.id)).toEqual([
+            'decisionsColumnSet',
+            'identityDetails0',
+            'identityDetails1',
+        ])
 
         const input = buildFormInput(fusionAccount, candidates, ['Email'])
         expect(input[FORM_HTML_ACCOUNT_INPUT]).toContain('User One')
         expect(input[FORM_HTML_CANDIDATES_INPUT]).toContain('Alice Doe')
+        expect(input.identityHtml0).toContain('Alice Doe details')
+        expect(input.identityHtml0).toContain('alice@example.com')
+        expect(input.identityHtml1).toContain('Bob Smith details')
+        expect(input.identityHtml1).toContain('bob@example.com')
         expect(input.account).toBe('src-1::native-1')
         expect(input.candidates).toBe('identity-1,identity-2')
     })
@@ -77,12 +97,77 @@ describe('formBuilder HTML restyle', () => {
         expect(all.some((el) => el.elementType === 'SECTION' && String(el.id).includes('selectionsection'))).toBe(false)
 
         const conditions = buildFormConditions(candidates, ['Email'])
-        expect(conditions).toHaveLength(0)
-        expect(conditions.some((c) => c.effects?.some((e) => e.effectType === 'HIDE'))).toBe(false)
+        expect(conditions).toHaveLength(2)
+        expect(
+            conditions.some((c) => c.effects?.some((e) => e.config?.element === 'candidatesDisplay'))
+        ).toBe(false)
 
         const html = buildFormInput(fusionAccount, candidates, ['Email'])[FORM_HTML_CANDIDATES_INPUT]
         expect(html).toContain('Alice Doe')
         expect(html).toContain('Bob Smith')
+    })
+
+    it('Unselected candidate identity details are hidden', () => {
+        const conditions = buildFormConditions(candidates, ['Email'])
+
+        expect(conditions).toEqual([
+            expect.objectContaining({
+                ruleOperator: 'OR',
+                rules: expect.arrayContaining([
+                    {
+                        sourceType: 'ELEMENT',
+                        source: 'identities',
+                        operator: 'NE',
+                        valueType: 'STRING',
+                        value: 'Alice Doe',
+                    },
+                ]),
+                effects: [{ effectType: 'HIDE', config: { element: 'identityDetails0' } }],
+            }),
+            expect.objectContaining({
+                ruleOperator: 'OR',
+                rules: expect.arrayContaining([
+                    {
+                        sourceType: 'ELEMENT',
+                        source: 'identities',
+                        operator: 'NE',
+                        valueType: 'STRING',
+                        value: 'Bob Smith',
+                    },
+                ]),
+                effects: [{ effectType: 'HIDE', config: { element: 'identityDetails1' } }],
+            }),
+        ])
+    })
+
+    it('Empty identities SELECT hides identity details', () => {
+        const conditions = buildFormConditions(candidates)
+
+        expect(conditions).toHaveLength(2)
+        expect(
+            conditions.every((condition) =>
+                condition.rules.some(
+                    (rule) => rule.source === 'identities' && rule.operator === 'NE' && rule.valueType === 'STRING'
+                )
+            )
+        ).toBe(true)
+    })
+
+    it('New-identity toggle hides identity details', () => {
+        const conditions = buildFormConditions(candidates)
+
+        expect(conditions).toHaveLength(2)
+        expect(
+            conditions.every((condition) =>
+                condition.rules.some(
+                    (rule) =>
+                        rule.source === 'newIdentity' &&
+                        rule.operator === 'EQ' &&
+                        rule.valueType === 'BOOLEAN' &&
+                        rule.value === 'true'
+                )
+            )
+        ).toBe(true)
     })
 
     it('Per-account definition naming unchanged', () => {
@@ -182,14 +267,16 @@ describe('buildFormInputs candidates alignment', () => {
 
     it('declares candidates input matching buildFormInput for multiple candidates', () => {
         const candidates = [
-            { id: 'id-a', name: 'A', attributes: {}, scores: [] },
-            { id: 'id-b', name: 'B', attributes: {}, scores: [] },
+            { id: 'id-a', name: 'A', attributes: { email: 'a@example.com' }, scores: [] },
+            { id: 'id-b', name: 'B', attributes: { email: 'b@example.com' }, scores: [] },
         ] as any
-        const flat = buildFormInput(fusionAccount, candidates)
-        const defs = buildFormInputs(fusionAccount, candidates)
+        const flat = buildFormInput(fusionAccount, candidates, ['email'])
+        const defs = buildFormInputs(fusionAccount, candidates, ['email'])
         const def = defs.find((i) => i.id === 'candidates')
         expect(def!.description).toBe(flat.candidates)
         expect(flat.candidates).toBe('id-a,id-b')
+        expect(defs.find((i) => i.id === 'identityHtml0')?.description).toBe(flat.identityHtml0)
+        expect(defs.find((i) => i.id === 'identityHtml1')?.description).toBe(flat.identityHtml1)
     })
 
     it('uses empty string for candidates when list is empty', () => {

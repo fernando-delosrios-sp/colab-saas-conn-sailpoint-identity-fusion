@@ -111,13 +111,13 @@ export class DecisionProcessor {
     }
 
     /**
-     * Process all fusion identity decisions (new identity).
-     * Candidate status is handled by processFusionAccounts, since pending form
-     * candidates are always existing fusion accounts.
+     * Process queued fusion identity decisions, plus authorized merges that
+     * never reached a persisted Fusion account (still in the managed-account queue).
      *
-     * @returns The fusion accounts produced by the new identity decisions
+     * @returns The fusion accounts produced by those decisions
      */
     public async processFusionIdentityDecisions(): Promise<FusionAccount[]> {
+        this.enqueueUnappliedAuthorizedMerges()
         const fusionIdentityDecisions = [...this.run.fusionIdentityDecisions]
         this.log.detail({
             action: 'processing fusion identity decisions',
@@ -145,6 +145,30 @@ export class DecisionProcessor {
             ),
         })
         return applied
+    }
+
+    /**
+     * Authorized merges are only queued at fetch when they create a new identity.
+     * A completed merge whose managed account is still in the work queue was not
+     * applied during refresh — typically because no persisted Fusion account exists
+     * (reviewer-gated unique id). Enqueue it so correlation runs before rematch.
+     */
+    private enqueueUnappliedAuthorizedMerges(): void {
+        const queuedKeys = new Set<string>()
+        for (const queued of this.run.fusionIdentityDecisions) {
+            const key = normalizeCompositeManagedAccountKey(trimStr(queued.account?.id) ?? '')
+            if (key) queuedKeys.add(key)
+        }
+
+        for (const decision of this.run.finishedFusionDecisions) {
+            if (decision.newIdentity) continue
+            if (!trimStr(decision.identityId)) continue
+            const key = normalizeCompositeManagedAccountKey(trimStr(decision.account?.id) ?? '')
+            if (!key || queuedKeys.has(key)) continue
+            if (!this.run.managedAccountsById.has(key)) continue
+            this.run.addDecision(decision)
+            queuedKeys.add(key)
+        }
     }
 
     /**

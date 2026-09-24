@@ -175,6 +175,7 @@ describe('Processor ignores display HTML keys', () => {
                 candidates: 'identity-123',
                 accountHtml: '<p><b>Account One</b></p>',
                 candidatesHtml: '<table><tr><td>email</td></tr></table>',
+                identityHtml0: '<p>Identity 123 details</p>',
             },
             formData: {
                 newIdentity: false,

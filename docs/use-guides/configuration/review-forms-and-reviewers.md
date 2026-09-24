@@ -28,7 +28,7 @@ For localization (**Default Language**, **Identity Language Attribute**, **revie
 
 ### What reviewers see
 
-The Fusion review form display is **DESCRIPTION HTML** aligned with the Fusion review email: account context, configured form attributes, identity and account links (when ISC URLs can be built), and a score table for every candidate (columns: attribute, value, algorithm, threshold, result, score; match/miss/combined row colors). Reviewers still decide with the **new identity / no match** toggle and the identities SELECT. Display is not a stack of TEXT fields.
+The Fusion review form display is **DESCRIPTION HTML** aligned with the Fusion review email: account context, configured form attributes, identity and account links (when ISC URLs can be built), and a score table for every candidate (columns: attribute, value, algorithm, threshold, result, score; match/miss/combined row colors). All candidate score tables remain visible for comparison. When a reviewer chooses an identity in the identities SELECT, an identity details panel appears below it with that identity's configured form attributes, laid out like the account context panel. The **new identity / no match** toggle and the identities SELECT remain the decision controls. Display is not a stack of TEXT fields.
 
 A form layout change does not rewrite in-flight reviews. To recut open reviews onto this layout, run **Reset forms?** once on a persistent aggregation — see [Reset Fusion state](../operation/reset-fusion-state.md). There is no per-account review reset flag.
 
@@ -60,8 +60,6 @@ Include attributes that help reviewers decide if identities are matches:
 | **hireDate** | Temporal context | Hired same day → suspicious |
 | **phone** | Contact verification | Same phone → likely match |
 | **employeeId** | Business key | Same ID → investigate if different |
-
-![Match review form - Example](../../assets/images/match-review-form.png)
 
 ---
 
