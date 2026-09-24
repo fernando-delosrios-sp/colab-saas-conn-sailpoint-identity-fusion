@@ -74,8 +74,10 @@ export interface RunStateSnapshot {
 
 /**
  * Run-scoped managed account state:
- * - `managedAccountsById`: mutable work queue; entries removed via `claimAccount()`
+ * - `managedAccountsById`: mutable Match work queue; entries removed via `claimAccount()`
  * - `managedAccountInventory`: lightweight metadata for every loaded key until output phase
+ * - claimed account retention: post-claim attribute bodies for FusionLayers rematerialization
+ *   (not a second Match work queue; not inventory)
  */
 export class FusionRun {
     public readonly isRecordMode: boolean
@@ -84,6 +86,8 @@ export class FusionRun {
     readonly managedAccountsById = new Map<string, Account>()
     readonly managedAccountInventory = new Map<string, ManagedAccountInfo>()
     readonly managedAccountsByIdentityId = new Map<string, Set<string>>()
+    /** Post-claim Account bodies keyed by managed account key. Not Match work. */
+    private readonly claimedAccountRetention = new Map<string, Account>()
     private readonly fusionAccountMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityOwnerIdByManagedKey = new Map<string, string>()
@@ -240,6 +244,13 @@ export class FusionRun {
         })
     }
 
+    private retainClaimedAccount(accountKey: string): void {
+        const account = this.managedAccountsById.get(accountKey)
+        if (account) {
+            this.claimedAccountRetention.set(accountKey, account)
+        }
+    }
+
     setManagedAccount(accountKey: string, account: Account): void {
         this.managedAccountsById.set(accountKey, account)
         this.managedAccountInventory.set(accountKey, toManagedAccountInfo(account))
@@ -254,6 +265,7 @@ export class FusionRun {
     }
 
     claimAccount(accountKey: string, identityId?: string): boolean {
+        this.retainClaimedAccount(accountKey)
         const deleted = this.managedAccountsById.delete(accountKey)
         if (identityId) {
             const idSet = this.managedAccountsByIdentityId.get(identityId)
@@ -272,6 +284,7 @@ export class FusionRun {
         if (!idSet) return 0
         let deleted = 0
         for (const key of idSet) {
+            this.retainClaimedAccount(key)
             if (this.managedAccountsById.delete(key)) {
                 deleted++
             }
@@ -282,6 +295,14 @@ export class FusionRun {
 
     get(key: string): Account | undefined {
         return this.managedAccountsById.get(key)
+    }
+
+    /**
+     * Returns a claimed managed account’s attribute body for FusionLayers rematerialization.
+     * Match and uncorrelated sweeps must keep using {@link get} / {@link entries} only.
+     */
+    getRetainedAccount(accountKey: string): Account | undefined {
+        return this.claimedAccountRetention.get(accountKey)
     }
 
     getKeysForIdentity(identityId: string): ReadonlySet<string> | undefined {
@@ -303,6 +324,7 @@ export class FusionRun {
     clearWorkQueue(): void {
         this.managedAccountsById.clear()
         this.managedAccountsByIdentityId.clear()
+        this.claimedAccountRetention.clear()
     }
 
     clearManagedAccountState(): void {

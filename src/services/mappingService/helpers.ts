@@ -3,6 +3,9 @@ import { AttributeMap, AttributeMergeMode, DefaultAttributeMergeMode } from '../
 import { hasValue, compact } from '../../utils/safeRead'
 import { AttributeMappingConfig } from './types'
 
+/** Merge result when Main/Origin designated snapshot was not loaded this invocation. */
+export const DESIGNATED_SNAPSHOT_UNAVAILABLE = Symbol('designatedSnapshotUnavailable')
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -69,7 +72,7 @@ export const processAttributeMapping = (
     if (attributeMerge === AttributeMergeMode.MainAccount || attributeMerge === AttributeMergeMode.OriginAccount) {
         const account =
             attributeMerge === AttributeMergeMode.MainAccount ? (prioritizedAccount ?? originSnapshot) : originSnapshot
-        if (!account) return undefined
+        if (!account) return DESIGNATED_SNAPSHOT_UNAVAILABLE
 
         return findFirstAttributeValue([account], config.lookupAttributeNames)
     }

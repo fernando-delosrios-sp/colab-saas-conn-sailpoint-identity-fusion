@@ -781,6 +781,25 @@ describe('MappingService vanished snapshot keys', () => {
 
         service.mapAttributes(fusionAccount, new FusionRun())
 
+        expect(fusionAccount.attributeBag.current.title).toBe('Reader')
+    })
+
+    it('Designated snapshot present without the attribute clears', () => {
+        const mainConfig = { ...baseConfig, attributeMerge: AttributeMergeMode.MainAccount } as any
+        const service = new MappingService(mainConfig, mockLog)
+        const fusionAccount = buildManagedAccount()
+        fusionAccount.attributeBag.current.title = 'Reader'
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            originSnapshot({ emp_id: 'E123' }),
+            {
+                source: { id: 'src-other', name: 'Record Source' },
+                nativeIdentity: 'native-other',
+                department: 'Other',
+            },
+        ])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
         expect(fusionAccount.attributeBag.current.title).toBeUndefined()
     })
 
@@ -875,5 +894,186 @@ describe('MappingService vanished snapshot keys', () => {
         second.attributeBag.sources.set('Record Source', [originSnapshot({ STUDENT_ID: 'fresh-id' })])
         service.mapAttributes(second, new FusionRun())
         expect(second.attributeBag.current.STUDENT_ID).toBe('fresh-id')
+    })
+})
+
+describe('MappingService designated snapshot unavailable', () => {
+    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any
+    const baseConfig = {
+        attributeMaps: [],
+        attributeMerge: AttributeMergeMode.MainAccount,
+        sources: [{ name: 'Record Source' }, { name: 'Sibling Source' }],
+        fusionAccountRefreshThresholdInSeconds: 3600,
+        maxHistoryMessages: 50,
+        resetAccounts: false,
+        resetForms: false,
+        normalAttributeDefinitions: [],
+        uniqueAttributeDefinitions: [],
+    } as any
+
+    beforeAll(() => {
+        FusionAccount.configure(baseConfig)
+    })
+
+    function siblingSnapshot(extra: Record<string, unknown> = {}) {
+        return {
+            source: { id: 'src-sib', name: 'Sibling Source' },
+            nativeIdentity: 'native-sib',
+            ...extra,
+        }
+    }
+
+    it('Unavailable origin snapshot preserves firstname under Main account merge', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                attributeMaps: [{ newAttribute: 'firstname', existingAttributes: ['givenName'] }],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'src-1::native-1',
+            name: 'User One',
+            sourceId: 'src-1',
+            nativeIdentity: 'native-1',
+            sourceName: 'Record Source',
+            attributes: { givenName: 'Nadya' },
+            uncorrelated: true,
+        } as any)
+        fusionAccount.setNeedsRefresh(true)
+        fusionAccount.attributeBag.current.firstname = 'Nadya'
+        fusionAccount.attributeBag.sources.set('Sibling Source', [siblingSnapshot({ givenName: 'Nadia' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.firstname).toBe('Nadya')
+    })
+
+    it('Present origin snapshot without the attribute still clears', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                attributeMaps: [{ newAttribute: 'firstname', existingAttributes: ['givenName'] }],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'src-1::native-1',
+            name: 'User One',
+            sourceId: 'src-1',
+            nativeIdentity: 'native-1',
+            sourceName: 'Record Source',
+            attributes: {},
+            uncorrelated: true,
+        } as any)
+        fusionAccount.setNeedsRefresh(true)
+        fusionAccount.attributeBag.current.firstname = 'Nadya'
+        fusionAccount.attributeBag.sources.set('Record Source', [
+            {
+                source: { id: 'src-1', name: 'Record Source' },
+                nativeIdentity: 'native-1',
+            },
+        ])
+        fusionAccount.attributeBag.sources.set('Sibling Source', [siblingSnapshot({ givenName: 'Nadia' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.firstname).toBeUndefined()
+    })
+
+    it('Unavailable designated snapshot under Origin account merge preserves current', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                attributeMaps: [
+                    {
+                        newAttribute: 'department',
+                        existingAttributes: ['department'],
+                        attributeMerge: AttributeMergeMode.OriginAccount,
+                    },
+                ],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'src-1::native-1',
+            name: 'User One',
+            sourceId: 'src-1',
+            nativeIdentity: 'native-1',
+            sourceName: 'Record Source',
+            attributes: { department: 'Human Resources' },
+            uncorrelated: true,
+        } as any)
+        fusionAccount.setNeedsRefresh(true)
+        fusionAccount.attributeBag.current.department = 'Human Resources'
+        fusionAccount.attributeBag.sources.set('Sibling Source', [siblingSnapshot({ department: 'Finance' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.department).toBe('Human Resources')
+    })
+
+    it('Main account merge preserves current when designated snapshot is unavailable', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                attributeMaps: [
+                    {
+                        newAttribute: 'jobTitle',
+                        existingAttributes: ['jobTitle'],
+                        attributeMerge: AttributeMergeMode.MainAccount,
+                    },
+                ],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'src-1::native-1',
+            name: 'User One',
+            sourceId: 'src-1',
+            nativeIdentity: 'native-1',
+            sourceName: 'Record Source',
+            attributes: { jobTitle: 'Engineer' },
+            uncorrelated: true,
+        } as any)
+        fusionAccount.setNeedsRefresh(true)
+        fusionAccount.attributeBag.current.jobTitle = 'Engineer'
+        fusionAccount.attributeBag.sources.set('Sibling Source', [siblingSnapshot({ jobTitle: 'Manager' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.jobTitle).toBe('Engineer')
+    })
+
+    it('Origin account merge preserves current when origin snapshot is unavailable', () => {
+        const service = new MappingService(
+            {
+                ...baseConfig,
+                attributeMaps: [
+                    {
+                        newAttribute: 'email',
+                        existingAttributes: ['email'],
+                        attributeMerge: AttributeMergeMode.OriginAccount,
+                    },
+                ],
+            } as any,
+            mockLog
+        )
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'src-1::native-1',
+            name: 'User One',
+            sourceId: 'src-1',
+            nativeIdentity: 'native-1',
+            sourceName: 'Record Source',
+            attributes: { email: 'kept@acme.com' },
+            uncorrelated: true,
+        } as any)
+        fusionAccount.setNeedsRefresh(true)
+        fusionAccount.attributeBag.current.email = 'kept@acme.com'
+        fusionAccount.attributeBag.sources.set('Sibling Source', [siblingSnapshot({ email: 'other@acme.com' })])
+
+        service.mapAttributes(fusionAccount, new FusionRun())
+
+        expect(fusionAccount.attributeBag.current.email).toBe('kept@acme.com')
     })
 })

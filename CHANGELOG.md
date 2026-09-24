@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-09-24 · v2.2.0
+
+### 🐛 Fixes
+
+- **Fusion attributes stay intact after a quiet Refresh then a same-run merge** — When a Fusion account absorbs linked managed accounts without copying live snapshots, then later merges another account in the same aggregation, Map no longer wipes names and other Main-account attributes, and Define still sees the original source snapshot for expressions such as `$sources.MelonHRM[0].employeeId`. Operators can re-run aggregation after upgrade to restore accounts already wiped.
+
+---
+
 ## 2026-09-23 · v2.2.0
 
 ### 🔧 Improvements

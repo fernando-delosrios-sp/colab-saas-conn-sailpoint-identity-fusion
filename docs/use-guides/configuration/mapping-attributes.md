@@ -32,7 +32,9 @@ The **Default attribute merge from multiple sources** setting applies globally t
 | **Keep a list of values**        | Array of all distinct non-null values                            | Array of strings      | Need all values (roles, groups, entitlements)       |
 | **Concatenate different values** | Distinct values in brackets, space-separated                     | Single string         | Human-readable combined view                        |
 
-**Main account and Origin account do not fall back to other accounts.** If the selected snapshot does not contain a mapped value, the result is empty. Choose **First found** when missing values should fall through to configured source order.
+**Main account and Origin account do not fall back to other accounts.** If the selected snapshot is present and does not contain a mapped value, the result is empty. If that designated snapshot was **not loaded** this Map invocation (**designated snapshot unavailable**), Map keeps the value already on the Fusion account instead of deleting it. Choose **First found** when missing values should fall through to configured source order.
+
+When a Fusion account becomes refresh-eligible mid-run after a prior **claim-only absorb**, Map and Define need complete live snapshots. Previously claimed managed accounts rematerialize from **claimed account retention** onto `attributeBag.sources` before Map and Define run. A missing designated snapshot is a last-resort preserve, not a substitute for rematerializing origin and sibling accounts.
 
 **Origin** and **main** are pointers into the snapshot-key index. When the identity bag is present, **Identities** is a contributing snapshot indexed under the identity id, so `originAccount` or `mainAccount` may name either a managed account or that identity. Identity-origin is not a separate merge path.
 
