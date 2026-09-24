@@ -429,7 +429,7 @@ describe('FusionService — aggregation', () => {
     })
 
     describe('FusionAccount identity reference hydration', () => {
-        it('hydrates identity alias from prior fusion account identity reference when Identity document is unavailable', () => {
+        it('leaves the identity alias unresolved from a prior fusion account identity reference when the Identity document is unavailable', () => {
             const prior = {
                 nativeIdentity: 'fusion-identity-1',
                 sourceId: 'mock-source',
@@ -447,10 +447,11 @@ describe('FusionService — aggregation', () => {
 
             const fusionAccount = FusionAccount.fromFusionAccount(prior)
 
-            // name is the source title (account.name) and is empty here; alias chain picks up the identity ref name
+            // name is the source title (account.name) and is empty here; the account reference carries
+            // the identity display name, so it labels the account without standing in for the alias
             expect(fusionAccount.name).toBeUndefined()
             expect(fusionAccount.displayName).toBeUndefined()
-            expect(fusionAccount.identityAlias).toBe('Jane Identity (from ref)')
+            expect(fusionAccount.identityAlias).toBeUndefined()
             expect(fusionAccount.identityDisplayName).toBe('Jane Identity (from ref)')
             expect((fusionAccount.attributeBag.identity as any)?.name).toBeUndefined()
         })

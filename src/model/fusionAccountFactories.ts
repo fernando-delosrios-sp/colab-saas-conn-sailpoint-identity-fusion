@@ -18,7 +18,23 @@ import {
     normalizeCompositeManagedAccountKey,
 } from './managedAccountKey'
 import { StatusEntitlement } from './statusEntitlement'
+import { SourceType } from './config'
 import { FusionAccount, IDENTITIES_SOURCE_NAME } from './fusionAccount'
+
+/**
+ * Identity alias of a correlated managed account from an authoritative source. ISC derives an
+ * identity's alias from its authoritative account name, so that account is itself the alias source
+ * when the IdentityDocument cannot be read — Search has not indexed a freshly created identity.
+ * Record and orphan account names bear no relation to the alias, and an unknown or untyped source
+ * is left unresolved rather than assumed authoritative.
+ */
+function correlatedAuthoritativeIdentityAlias(account: Account): string | undefined {
+    if (account.uncorrelated !== false) return undefined
+    if (FusionAccount.configuredSourceType(account.sourceName ?? undefined) !== SourceType.Authoritative) {
+        return undefined
+    }
+    return trimStr(account.name)
+}
 
 function applyAttributeCollections(fa: FusionAccount, account: Account): void {
     const statuses = attributeToSet(account.attributes!, FusionAttribute.Statuses)
@@ -195,7 +211,12 @@ export function buildFromManagedAccount(account: Account): FusionAccount {
             ConnectorErrorType.Generic
         )
     }
-    const identityInfo = buildIdentityInfo(account)
+    const accountIdentityInfo = buildIdentityInfo(account)
+    const correlatedAlias = correlatedAuthoritativeIdentityAlias(account)
+    const identityInfo =
+        accountIdentityInfo && correlatedAlias
+            ? { ...accountIdentityInfo, name: correlatedAlias }
+            : accountIdentityInfo
 
     fa.applyFactorySeed({
         type: FusionAccountKind.Managed,

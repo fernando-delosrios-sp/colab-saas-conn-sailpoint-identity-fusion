@@ -56,7 +56,10 @@ function identityDisplayNameFromAccount(account: Account): string | undefined {
  *
  * Rules:
  * - `id` is mandatory and non-empty. Without it, no IdentityInfo is returned.
- * - `name` is the identity alias chain: identity.name || account.identity?.name || decision.identityName.
+ * - `name` is the identity alias and comes only from `IdentityDocument.name`. Account references
+ *   (`account.identity.name`) and `FusionDecision.identityName` carry the identity display name,
+ *   not the alias, so they never populate it. Correlated authoritative managed accounts recover the
+ *   alias from their own account name in `buildFromManagedAccount`.
  * - `displayName` is the identity display name chain:
  *   identity.attributes.displayName || identity.displayName || identity.name || account.identity?.name || account.name.
  */
@@ -71,14 +74,13 @@ export function buildIdentityInfo(
     if ('account' in source && ('identityName' in source || 'identityId' in source)) {
         const decision = source as FusionDecision
         id = trimStr(decision.identityId)
-        name = trimStr(decision.identityName)
-        displayName = name ?? trimStr(decision.account.name) ?? trimStr(decision.account.id)
+        displayName =
+            trimStr(decision.identityName) ?? trimStr(decision.account.name) ?? trimStr(decision.account.id)
     }
     // Account
     else if ('sourceId' in source || 'nativeIdentity' in source || 'accountId' in source || 'identityId' in source || 'identity' in source) {
         const account = source as Account
         id = trimStr(account.identityId)
-        name = trimStr((account as { identity?: { name?: string } }).identity?.name)
         displayName = identityDisplayNameFromAccount(account)
     }
     // IdentityDocument

@@ -2,7 +2,7 @@ import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { trimStr } from '../utils/safeRead'
 import { Attributes, ConnectorError, ConnectorErrorType, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { FusionDecision } from './form'
-import { FusionConfig } from './config'
+import { FusionConfig, SourceType } from './config'
 import { FusionMatch } from '../services/matchingService'
 import { FusionAccountKind } from './fusionAccountTypes'
 import { StatusEntitlement } from './statusEntitlement'
@@ -75,6 +75,13 @@ export class FusionAccount {
         source: Parameters<typeof buildIdentityInfo>[0]
     ): ReturnType<typeof buildIdentityInfo> {
         return buildIdentityInfo(source)
+    }
+
+    /** Configured type of a managed source; `undefined` when the source is unknown or untyped. */
+    static configuredSourceType(sourceName: string | undefined): SourceType | undefined {
+        if (!sourceName) return undefined
+        const { sources } = FusionAccount.ensureConfig()
+        return sources.find((source) => source.name === sourceName)?.sourceType
     }
 
     private static ensureConfig(): FusionConfig {

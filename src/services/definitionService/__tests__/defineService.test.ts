@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
 import { DefinitionService } from '../definitionService'
 import { FusionAccount } from '../../../model/account'
-import { FusionConfig } from '../../../model/config'
+import { FusionConfig, SourceType } from '../../../model/config'
 import { FusionAction } from '../../../model/fusionAction'
 import { StatusEntitlement } from '../../../model/statusEntitlement'
 import { InMemoryLockService } from '../../lockService'
@@ -1012,17 +1012,19 @@ describe('Disabled identity scope excludes identity data from Define', () => {
     const mockLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
     const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
 
+    const identityScopeConfig = {
+        sources: [
+            { name: 'Source A', id: 'src-a', type: 'authoritative' },
+            { name: 'Source B', id: 'src-b', type: 'record' },
+        ],
+        fusionAccountRefreshThresholdInSeconds: 3600,
+        maxHistoryMessages: 50,
+        resetAccounts: false,
+        resetForms: false,
+    } as unknown as FusionConfig
+
     beforeAll(() => {
-        FusionAccount.configure({
-            sources: [
-                { name: 'Source A', id: 'src-a', type: 'authoritative' },
-                { name: 'Source B', id: 'src-b', type: 'record' },
-            ],
-            fusionAccountRefreshThresholdInSeconds: 3600,
-            maxHistoryMessages: 50,
-            resetAccounts: false,
-            resetForms: false,
-        } as unknown as FusionConfig)
+        FusionAccount.configure(identityScopeConfig)
     })
 
     const createService = (configOverrides: Record<string, unknown> = {}) => {
@@ -1171,6 +1173,42 @@ describe('Disabled identity scope excludes identity data from Define', () => {
         await service.refreshUniqueAttributes(acc)
 
         expect(acc.attributes.name).toBe('generated-display')
+    })
+
+    it('Correlated authoritative account name beats a Unique display definition without an identity document', async () => {
+        FusionAccount.configure({
+            ...identityScopeConfig,
+            sources: [{ name: 'HR', id: 'src-hr', sourceType: SourceType.Authoritative }],
+        } as unknown as FusionConfig)
+
+        try {
+            const service = createService({
+                uniqueAttributeDefinitions: [
+                    {
+                        name: 'name',
+                        expression: '$account.schema.name [$account.source.name]',
+                        useIncrementalCounter: false,
+                        digits: 1,
+                    },
+                ],
+            })
+            const acc = FusionAccount.fromManagedAccount({
+                id: 'src-hr::1018',
+                name: 'vincent.mccoy',
+                sourceId: 'src-hr',
+                sourceName: 'HR',
+                nativeIdentity: '1018',
+                uncorrelated: false,
+                identityId: 'identity-vincent',
+                attributes: {},
+            } as any)
+
+            await service.refreshUniqueAttributes(acc)
+
+            expect(acc.attributes.name).toBe('vincent.mccoy')
+        } finally {
+            FusionAccount.configure(identityScopeConfig)
+        }
     })
 
     it('Uncorrelated managed origin still uses definition output when identity scope is disabled', async () => {
