@@ -493,6 +493,14 @@ export class DefinitionService {
     // Private — Velocity Context Builder
     // ========================================================================
 
+    /**
+     * Builds the Velocity caller context as `Object.create(attributeBag.current)` plus
+     * own-property shadows. `statuses`, `actions`, and `reviews` are live
+     * FusionCollections arrays for this run — they shadow any persisted snapshot
+     * inherited from the bag. `previous` remains `attributeBag.previous` (prior-run view).
+     * Account-id sets, missing-accounts, sources, and history are not bound here;
+     * `accounts` and `sources` keep their managed-snapshot meaning.
+     */
     private buildVelocityContext(fusionAccount: FusionAccount): Record<string, any> {
         const context: Record<string, any> = Object.create(fusionAccount.attributeBag.current)
         const identityInputsEnabled = this.identityInputsEnabled(fusionAccount)
@@ -531,6 +539,10 @@ export class DefinitionService {
         if (fusionAccount.originAccountId) {
             context.originAccount = fusionAccount.originAccountId
         }
+
+        context.statuses = fusionAccount.statuses
+        context.actions = fusionAccount.actions
+        context.reviews = fusionAccount.reviews
 
         return context
     }

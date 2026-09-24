@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
 import { DefinitionService } from '../definitionService'
 import { FusionAccount } from '../../../model/account'
 import { FusionConfig } from '../../../model/config'
+import { FusionAction } from '../../../model/fusionAction'
+import { StatusEntitlement } from '../../../model/statusEntitlement'
 import { InMemoryLockService } from '../../lockService'
 import * as templateEvaluator from '../templateEvaluator'
 import * as formatting from '../formatting'
@@ -1240,5 +1242,233 @@ describe('Disabled identity scope excludes identity data from Define', () => {
 
         expect(acc.attributes.identityDepartment).toBe('Identity HR')
         expect(acc.attributes.name).toBe('greviewer')
+    })
+})
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const REVIEWER_GATED_ID = '#if($statuses.includes("reviewer"))$UUID#end'
+
+describe('DefinitionService live collection state in Velocity context', () => {
+    const mockLog = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), getLogLevel: vi.fn(() => 'info') } as any
+    const mockLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
+    const mockSchemas = { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' } as any
+
+    beforeAll(() => {
+        FusionAccount.configure({
+            sources: [{ name: 'HR', id: 'src-hr', type: 'authoritative' }],
+            fusionAccountRefreshThresholdInSeconds: 3600,
+            maxHistoryMessages: 50,
+            resetAccounts: false,
+            resetForms: false,
+        } as unknown as FusionConfig)
+    })
+
+    const createService = (configOverrides: Record<string, unknown> = {}) => {
+        const service = new DefinitionService(
+            {
+                normalAttributeDefinitions: [],
+                uniqueAttributeDefinitions: [],
+                attributeMaps: [],
+                skipAccountsWithMissingId: false,
+                forceAttributeRefresh: false,
+                maxAttempts: 20,
+                ...configOverrides,
+            } as any,
+            mockSchemas,
+            mockLog,
+            mockLocks
+        )
+        service.setStateWrapper({})
+        return service
+    }
+
+    const createIdentityOriginAccount = () =>
+        FusionAccount.fromIdentity({
+            id: 'identity-1',
+            name: 'ada.lovelace',
+            displayName: 'Ada Lovelace',
+            attributes: {},
+        } as any)
+
+    it('Unique definition reads a status applied during the current run', async () => {
+        const service = createService({
+            uniqueAttributeDefinitions: [{ name: 'id', expression: REVIEWER_GATED_ID }],
+        })
+        const acc = createIdentityOriginAccount()
+        acc.collections.statuses.add(StatusEntitlement.Reviewer)
+
+        await service.refreshUniqueAttributes(acc)
+
+        expect(acc.attributes.id).toMatch(UUID_PATTERN)
+    })
+
+    it('Unique definition renders empty for an account without the status', async () => {
+        const service = createService({
+            uniqueAttributeDefinitions: [{ name: 'id', expression: REVIEWER_GATED_ID }],
+            skipAccountsWithMissingId: true,
+        })
+        const acc = createIdentityOriginAccount()
+
+        await service.refreshUniqueAttributes(acc)
+
+        expect(acc.attributes.id).toBeUndefined()
+    })
+
+    it('Reset regenerates a unique value from live collection state', async () => {
+        const service = createService({
+            uniqueAttributeDefinitions: [{ name: 'id', expression: REVIEWER_GATED_ID }],
+        })
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-native-1',
+            name: 'Persisted Reviewer',
+            sourceName: 'Identity Fusion NG',
+            attributes: {
+                id: 'old-id',
+                name: 'Persisted Reviewer',
+                statuses: [StatusEntitlement.Reviewer],
+            },
+        } as any)
+        acc.setNeedsReset(true)
+
+        await service.refreshUniqueAttributes(acc)
+
+        expect(acc.attributes.id).toMatch(UUID_PATTERN)
+        expect(acc.attributes.id).not.toBe('old-id')
+    })
+
+    it('Reviews with no pending forms render as an empty list', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [{ name: 'reviewCount', expression: '$reviews.size()' }],
+        })
+        const acc = createIdentityOriginAccount()
+        expect(acc.attributes.reviews).toBeUndefined()
+        expect(acc.reviews).toEqual([])
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributes.reviewCount).toBe('0')
+    })
+
+    it('Define does not persist collection state into the attribute bag', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [{ name: 'statusCount', expression: '$statuses.size()' }],
+            uniqueAttributeDefinitions: [{ name: 'id', expression: REVIEWER_GATED_ID }],
+        })
+        const acc = createIdentityOriginAccount()
+        acc.collections.statuses.add(StatusEntitlement.Reviewer)
+        expect(acc.attributes.statuses).toBeUndefined()
+
+        await service.refreshNormalAttributes(acc)
+        await service.refreshUniqueAttributes(acc)
+
+        expect(acc.attributes.statuses).toBeUndefined()
+        expect(acc.attributes.statusCount).toBeDefined()
+        expect(acc.attributes.id).toMatch(UUID_PATTERN)
+    })
+
+    it('Previous attributes still expose the prior collection snapshot', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [{ name: 'priorStatusCount', expression: '$previous.statuses.size()' }],
+        })
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-native-1',
+            name: 'Persisted',
+            sourceName: 'Identity Fusion NG',
+            attributes: {
+                name: 'Persisted',
+                statuses: [StatusEntitlement.Baseline],
+            },
+        } as any)
+        acc.setNeedsRefresh(true)
+        acc.collections.statuses.add(StatusEntitlement.Reviewer)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributes.priorStatusCount).toBe('1')
+        expect(acc.statuses).toEqual(expect.arrayContaining([StatusEntitlement.Baseline, StatusEntitlement.Reviewer]))
+    })
+
+    it('Live collection keys override the persisted collection snapshot', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [{ name: 'liveStatusCount', expression: '$statuses.size()' }],
+        })
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-native-1',
+            name: 'Persisted',
+            sourceName: 'Identity Fusion NG',
+            attributes: {
+                name: 'Persisted',
+                statuses: [StatusEntitlement.Baseline],
+            },
+        } as any)
+        acc.setNeedsRefresh(true)
+        acc.attributeBag.current.statuses = [StatusEntitlement.Baseline]
+        acc.collections.statuses.add(StatusEntitlement.Reviewer)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributes.liveStatusCount).toBe('2')
+    })
+
+    it('Normal definition named after a live collection key wins for later definitions', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [
+                { name: 'statuses', expression: 'custom' },
+                { name: 'copy', expression: '$statuses' },
+            ],
+        })
+        const acc = createIdentityOriginAccount()
+        acc.collections.statuses.add(StatusEntitlement.Reviewer)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributes.copy).toBe('custom')
+    })
+
+    it('Normal definition sees a persisted reviewer action', async () => {
+        const reviewerAction = `${FusionAction.ReviewerPrefix}src-hr`
+        const service = createService({
+            normalAttributeDefinitions: [
+                {
+                    name: 'hasReviewerAction',
+                    expression: `#if($actions.includes("${reviewerAction}"))present#{else}absent#end`,
+                },
+            ],
+        })
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-native-1',
+            name: 'Persisted Reviewer',
+            sourceName: 'Identity Fusion NG',
+            attributes: {
+                name: 'Persisted Reviewer',
+                actions: [reviewerAction],
+            },
+        } as any)
+        acc.setNeedsRefresh(true)
+
+        await service.refreshNormalAttributes(acc)
+
+        expect(acc.attributes.hasReviewerAction).toBe('present')
+    })
+
+    it('Normal definition does not see global reviewer status on the creating run', async () => {
+        const service = createService({
+            normalAttributeDefinitions: [
+                {
+                    name: 'sawReviewer',
+                    expression: '#if($statuses.includes("reviewer"))present#{else}absent#end',
+                },
+            ],
+            uniqueAttributeDefinitions: [{ name: 'id', expression: REVIEWER_GATED_ID }],
+        })
+        const acc = createIdentityOriginAccount()
+
+        await service.refreshNormalAttributes(acc)
+        expect(acc.attributes.sawReviewer).toBe('absent')
+
+        acc.collections.statuses.add(StatusEntitlement.Reviewer)
+        await service.refreshUniqueAttributes(acc)
+
+        expect(acc.attributes.id).toMatch(UUID_PATTERN)
     })
 })

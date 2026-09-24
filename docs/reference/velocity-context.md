@@ -13,6 +13,7 @@ flowchart LR
         I["$identity"]
         A["$accounts / $account"]
         S["$sources"]
+        C["$statuses / $actions / $reviews"]
         P["$previous"]
     end
     inputs --> V[Velocity template]
@@ -31,6 +32,7 @@ flowchart LR
 | `$originAccount` | Origin key string | `sourceId::nativeIdentity` or identity id |
 | `$originSource` | Origin source name | `Identities`, `Workday` |
 | `$previous.*` | Prior Fusion account state | `$previous.username` |
+| `$statuses`, `$actions`, `$reviews` | Live collection state for this run | `$statuses.includes("reviewer")` |
 | `$counter`, `$UUID`, `$isUnique()` | Unique-definition helpers | See [Unique-only variables](#unique-only-variables) |
 
 ### Mapped and source attributes
@@ -135,6 +137,26 @@ Previous generated Fusion account state — useful for change detection or prese
   $newUsername
 #end
 ```
+
+### Live collection state
+
+`$statuses`, `$actions`, and `$reviews` are this aggregation's live FusionCollections arrays. They shadow any same-named values persisted on the account from the last run. `$previous.statuses`, `$previous.actions`, and `$previous.reviews` remain the prior snapshot.
+
+These keys are not written back into `fusionAccount.attributes` during Define. Collection state is persisted only at output.
+
+```velocity
+#if($statuses.includes("reviewer"))
+$UUID
+#end
+```
+
+```velocity
+$reviews.size()
+$previous.statuses.size()
+```
+
+!!! warning "Array methods in this Velocity engine"
+    `contains()` always renders false on these arrays, and `isEmpty()` renders the unresolved literal. Use `includes()`, `indexOf() >= 0`, `size()`, or `#foreach`. Do not write `$statuses.contains("reviewer")`.
 
 ### Unique-only variables
 
