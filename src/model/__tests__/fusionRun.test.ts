@@ -275,7 +275,7 @@ describe('FusionRun', () => {
         })
     })
 
-    it('inventory retains key after claimAccount', () => {
+    it('Inventory retains keys after work queue claim', () => {
         const run = new FusionRun()
         const account = {
             id: 'isc-1',
@@ -327,6 +327,25 @@ describe('FusionRun', () => {
         expect(run.get('src-a::native-1')).toBeUndefined()
         expect(run.hasManagedAccount('src-a::native-1')).toBe(false)
         expect(run.managedAccountInventory.size).toBe(0)
+    })
+
+    it('Output phase clears managed account state', () => {
+        const run = new FusionRun()
+        const account = {
+            id: 'isc-1',
+            sourceId: 'src-a',
+            sourceName: 'Source A',
+            nativeIdentity: 'native-1',
+            name: 'Test User',
+            attributes: { givenName: 'Nadya' },
+        } as Account
+        run.setManagedAccount('src-a::native-1', account)
+        run.claimAccount('src-a::native-1')
+        run.clearManagedAccountState()
+
+        expect(run.get('src-a::native-1')).toBeUndefined()
+        expect(run.hasManagedAccount('src-a::native-1')).toBe(false)
+        expect(run.getRetainedAccount('src-a::native-1')).toBeUndefined()
     })
 
     it('Match does not consume retention as a work queue', () => {

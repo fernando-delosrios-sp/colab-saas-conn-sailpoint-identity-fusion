@@ -144,7 +144,7 @@ describe('attributeService helpers', () => {
             expect(processAttributeMapping(config, map, ['IT'], undefined, originSnapshot)).toBe('Engineer')
         })
 
-        it('does not fall through when Main account merge snapshot lacks the attribute', () => {
+        it('Main account merge does not fall through when the chosen snapshot lacks the attribute', () => {
             const map = new Map<string, Attributes[]>()
             map.set('IT', [{ jobTitle: 'Director' }])
             const config = mappingConfig({
@@ -158,7 +158,7 @@ describe('attributeService helpers', () => {
             expect(processAttributeMapping(config, map, ['IT'], mainAccount, originSnapshot)).toBeUndefined()
         })
 
-        it('uses only the origin snapshot when Origin account merge is selected', () => {
+        it('Origin account merge ignores mainAccount', () => {
             const map = new Map<string, Attributes[]>()
             map.set('IT', [{ jobTitle: 'Director' }])
             const config = mappingConfig({
