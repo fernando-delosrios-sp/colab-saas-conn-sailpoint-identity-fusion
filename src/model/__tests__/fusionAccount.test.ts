@@ -20,6 +20,28 @@ describe('FusionAccount', () => {
         resetForms: false,
     } as unknown as FusionConfig
 
+    const aliasConfig = {
+        ...minimalConfig,
+        sources: [
+            { name: 'HR', id: 'src-hr', sourceType: SourceType.Authoritative },
+            { name: 'CRM', id: 'src-crm', sourceType: SourceType.Record },
+        ],
+    } as unknown as FusionConfig
+
+    const correlatedHrAccount = (overrides: Record<string, unknown> = {}) =>
+        ({
+            id: 'isc-acc-vincent',
+            sourceId: 'src-hr',
+            sourceName: 'HR',
+            nativeIdentity: '1018',
+            name: 'vincent.mccoy',
+            uncorrelated: false,
+            identityId: 'identity-vincent',
+            identity: { id: 'identity-vincent', name: 'Vincent McCoy' },
+            attributes: {},
+            ...overrides,
+        }) as unknown as Account
+
     beforeAll(() => {
         FusionAccount.configure(minimalConfig)
     })
@@ -379,7 +401,51 @@ describe('FusionAccount', () => {
                 identityName: 'S1',
                 newIdentity: true,
             } as any
-            expect(FusionAccount.buildIdentityInfo(decision)).toEqual({ id: 'a1', name: 'S1', displayName: 'S1' })
+            expect(FusionAccount.buildIdentityInfo(decision)).toEqual({ id: 'a1', name: '', displayName: 'S1' })
+        })
+
+        it('takes the alias of a correlated authoritative account from the account name', () => {
+            FusionAccount.configure(aliasConfig)
+            try {
+                const acc = FusionAccount.fromManagedAccount(correlatedHrAccount())
+                expect(acc.identityAlias).toBe('vincent.mccoy')
+                expect(acc.identityDisplayName).toBe('Vincent McCoy')
+            } finally {
+                FusionAccount.configure(minimalConfig)
+            }
+        })
+
+        it('leaves the alias unresolved for correlated record, uncorrelated, and untyped-source accounts', () => {
+            FusionAccount.configure(aliasConfig)
+            try {
+                const record = FusionAccount.fromManagedAccount(
+                    correlatedHrAccount({ sourceId: 'src-crm', sourceName: 'CRM' })
+                )
+                const uncorrelated = FusionAccount.fromManagedAccount(correlatedHrAccount({ uncorrelated: true }))
+                const untyped = FusionAccount.fromManagedAccount(correlatedHrAccount({ sourceName: 'Unlisted' }))
+
+                expect(record.identityAlias).toBeUndefined()
+                expect(uncorrelated.identityAlias).toBeUndefined()
+                expect(untyped.identityAlias).toBeUndefined()
+            } finally {
+                FusionAccount.configure(minimalConfig)
+            }
+        })
+
+        it('prefers the IdentityDocument alias once the identity layer is applied', () => {
+            FusionAccount.configure(aliasConfig)
+            try {
+                const acc = FusionAccount.fromManagedAccount(correlatedHrAccount())
+                acc.addIdentityLayer({
+                    id: 'identity-vincent',
+                    name: 'vmccoy',
+                    attributes: { displayName: 'Vincent McCoy' },
+                } as unknown as IdentityDocument)
+
+                expect(acc.identityAlias).toBe('vmccoy')
+            } finally {
+                FusionAccount.configure(minimalConfig)
+            }
         })
 
         it('adds fusion match', () => {
