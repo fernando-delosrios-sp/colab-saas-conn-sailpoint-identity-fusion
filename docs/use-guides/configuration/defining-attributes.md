@@ -203,6 +203,7 @@ flowchart LR
         I["$identity"]
         A["$accounts / $account"]
         S["$sources"]
+        C["$statuses / $actions / $reviews"]
         P["$previous"]
     end
     inputs --> V[Your expression]
@@ -220,6 +221,7 @@ flowchart LR
 | `$account`             | The **origin** snapshot only                   | `$account.schema.name`         |
 | `$originAccount`       | Origin key string                              | Managed: `sourceId::nativeId`  |
 | `$previous.*`          | Last generated Fusion state                    | `$previous.username`           |
+| `$statuses`, `$actions`, `$reviews` | Live collection state for this run     | `$statuses.includes("reviewer")` |
 
 #### Mapped attributes
 
@@ -370,3 +372,27 @@ One can purposely generate an **empty** `nativeIdentity` in conjunction with the
   $email
 #end
 ```
+
+### Reviewer-only Fusion accounts
+
+Pair a Unique `id` definition with **Skip accounts with a missing identifier** so Fusion emits accounts only for reviewers. `$statuses` is this run's live collection state — not last aggregation's persisted copy — so a reviewer created in the same run still sees `reviewer`.
+
+**Accounts JMESPath filter** (on the managed source, e.g. Active Directory). Drops disabled accounts after fetch. See [Configuring sources and scope](configuring-sources-and-scope.md).
+
+```
+accounts[?disabled == `false`]
+```
+
+**Unique `id` expression.** Emits a UUID when the account has the `reviewer` status; otherwise empty so the skip option suppresses the account.
+
+```velocity
+#if($statuses.includes("reviewer"))
+$UUID
+#end
+```
+
+Use `$statuses.includes("reviewer")` or `$statuses.indexOf("reviewer") >= 0`. Do not use `contains()` — in this Velocity engine it always renders false for arrays. See [Velocity context](../../reference/velocity-context.md#live-collection-state).
+
+`$previous.statuses` is still last run's snapshot if you need it.
+
+Normal definitions on a **newly created** identity-origin global reviewer stay one aggregation behind: reviewer registration runs after that account's Normal Define pass. Unique definitions run later in the same aggregation and do see `reviewer`. Persisted reviewer accounts already have the action, so their Normal definitions see live `$actions` / `$statuses` on every later run.

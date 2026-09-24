@@ -145,6 +145,12 @@ When disabled:
     2. Accounts JMESPath filter (client-side, page-wise)
     3. Built-in machine account exclusion
 
+**Example — skip disabled Active Directory accounts** (Accounts JMESPath filter):
+
+```
+accounts[?disabled == `false`]
+```
+
 ## Aggregation timing
 
 ```mermaid
