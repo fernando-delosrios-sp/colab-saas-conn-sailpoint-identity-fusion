@@ -536,21 +536,43 @@ The ubiquitous-language glossary SHALL define **New** as a status entitlement wh
 - **THEN** a **New** entry SHALL define wire value `new` as the status on a Fusion account created in this aggregation rather than reconstructed from a previous Fusion account
 - **AND** the entry SHALL state that reconstruction from a previous Fusion account removes `new`
 
+### Requirement: Glossary defines designated snapshot unavailable and claimed account retention
+
+The ubiquitous-language glossary SHALL define **Designated snapshot unavailable** and **Claimed account retention** as Map / FusionRun terms. Documentation and specs SHALL NOT use “vanished snapshot key” for an unloaded designated snapshot, and SHALL NOT call claimed account retention a second Match work queue or confuse it with lightweight `managedAccountInventory`.
+
+#### Scenario: Designated snapshot unavailable entry
+
+- **GIVEN** a reader consults the ubiquitous-language glossary
+- **WHEN** they look up Main account or Origin account merge when the chosen snapshot was not loaded
+- **THEN** a **Designated snapshot unavailable** entry SHALL define it as a Main account or Origin account merge whose chosen snapshot key is not present in this invocation’s `attributeBag.sources` (or per-invocation snapshot index) at all
+- **AND** it SHALL state that this is distinct from a snapshot that is present but lacks the mapped attribute
+- **AND** it SHALL NOT use “vanished snapshot key” as a synonym
+
+#### Scenario: Claimed account retention entry
+
+- **GIVEN** a reader consults the glossary
+- **WHEN** they look up keeping managed account attributes after work-queue claim
+- **THEN** a **Claimed account retention** entry SHALL define it as keeping managed account attribute bodies after `claimAccount` removes them from the work queue, long enough that mid-run rematerialization can copy them onto `attributeBag.sources`
+- **AND** it SHALL NOT call retention a Match work queue
+- **AND** it SHALL NOT equate retention with metadata-only inventory
+
 ### Requirement: Glossary defines source snapshot materialization and claim-only absorb
 
-The ubiquitous-language glossary SHALL define **Source snapshot materialization** and **Claim-only absorb** as FusionLayers managed-account layer terms. Documentation and specs SHALL NOT call claim-only absorb “skip Refresh” or “skip blend” when report fusionBlends or Map merge is meant.
+The ubiquitous-language glossary SHALL define **Source snapshot materialization** and **Claim-only absorb** as FusionLayers managed-account layer terms. Documentation and specs SHALL NOT call claim-only absorb “skip Refresh” or “skip blend” when report fusionBlends or Map merge is meant. The glossary SHALL state that claim-only absorb still populates **claimed account retention** so a later same-run rematerialization can recover attribute bodies after the work-queue entry is gone.
 
 #### Scenario: Source snapshot materialization entry
 
 - **GIVEN** a reader consults the ubiquitous-language glossary
 - **WHEN** they look up copying managed source attributes onto the Fusion account for Map and Velocity
 - **THEN** a **Source snapshot materialization** entry SHALL define it as copying a managed source account’s attributes onto `attributeBag.sources` during FusionLayers absorb so Map and Velocity `$accounts` / `$sources` can read this run’s live snapshots
+- **AND** it SHALL state that rematerialization MAY copy from claimed account retention for keys claimed earlier in the same run
 
 #### Scenario: Claim-only absorb entry
 
 - **GIVEN** a reader consults the glossary
-- **WHEN** they look up Refresh work-queue depletion without copying attributes
-- **THEN** a **Claim-only absorb** entry SHALL define it as absorbing a work-queue managed account by claiming it and updating Fusion account bookkeeping without source snapshot materialization
+- **WHEN** they look up Refresh work-queue depletion without copying attributes onto `attributeBag.sources`
+- **THEN** a **Claim-only absorb** entry SHALL define it as absorbing a work-queue managed account by claiming it and updating Fusion account bookkeeping without source snapshot materialization onto `attributeBag.sources`
+- **AND** it SHALL state that attribute bodies remain available via claimed account retention for possible mid-run rematerialization
 
 ### Requirement: Glossary defines foreign-owned managed account
 
@@ -712,8 +734,9 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **Fusion account collaborators** | The three behavior-rich parts of a `FusionAccount`: **FusionCollections**, **FusionCorrelation**, and **FusionLayers**. Exposed as readonly `collections`, `correlation`, and `layers` on `FusionAccount`. |
 | **FusionCollections** | The collaborator that owns account-id sets, missing-accounts, statuses, actions, reviews, sources, fusion matches, history, and related collection sync-to-bag behavior. |
 | **FusionLayers** | The collaborator that owns identity / managed-account / fusion-decision enrichment methods and layer-related flags (for example needsRefresh, disabled, origin metadata). |
-| **Source snapshot materialization** | Copying a managed source account’s attributes onto `attributeBag.sources` during FusionLayers absorb so Map and Velocity `$accounts` / `$sources` can read this run’s live snapshots. |
-| **Claim-only absorb** | Absorbing a work-queue managed account by claiming it and updating Fusion account bookkeeping (keys, uncorrelated, `managedAccountInfo`) without source snapshot materialization. Not skip Refresh, skip blend, or skip Map merge. |
+| **Source snapshot materialization** | Copying a managed source account’s attributes onto `attributeBag.sources` during FusionLayers absorb so Map and Velocity `$accounts` / `$sources` can read this run’s live snapshots. Rematerialization MAY copy from **claimed account retention** for keys claimed earlier in the same run. |
+| **Claim-only absorb** | Absorbing a work-queue managed account by claiming it and updating Fusion account bookkeeping (keys, uncorrelated, `managedAccountInfo`) without source snapshot materialization. Attribute bodies remain available via **claimed account retention**. Not skip Refresh, skip blend, or skip Map merge. |
+| **Claimed account retention** | Keeping managed account attribute bodies after `claimAccount` removes them from the Match work queue, long enough that a later rematerialization can copy them onto `attributeBag.sources`. Not a second Match work queue and not metadata-only inventory. |
 | **FusionCorrelation** | The collaborator that owns correlation promises and mark-correlated helpers on a single Fusion account. Distinct from business **correlation** (linking managed source accounts to an ISC identity). |
 
 ### Operations, phases, and sweeps
@@ -932,6 +955,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Main account merge** | A Map strategy that reads mapped values from the `mainAccount` snapshot when that key is found in the current run, otherwise from the origin snapshot. Stored as `mainAccount`. It does not fall through to another account when the selected snapshot lacks a value. |
 | **Origin account merge** | A Map strategy that reads mapped values only from the origin snapshot and ignores `mainAccount`. Stored as `originAccount`. It does not fall through to another account. |
 | **Origin snapshot** | The managed account whose key equals `originAccount`, or the Identities identity bag for an identity-origin Fusion account. The same object Velocity exposes as `$account`. |
+| **Designated snapshot unavailable** | A Main account or Origin account merge whose chosen snapshot key is not present in this invocation’s `attributeBag.sources` (or per-invocation snapshot index) at all. Distinct from a snapshot that is present but lacks the mapped attribute. Not a vanished snapshot key. |
 | **$originSource Source-name token** | A per-attribute Source name value that resolves to the prioritized (`mainAccount`) source name, then selects the first account on that source. It is source-level and is not **Origin account merge**. In Velocity, `$originSource` remains the origin source name string. |
 | **Definition-owned name** | An attribute name configured as a `normalAttributeDefinitions` or `uniqueAttributeDefinitions` entry name. Map behavior splits by definition kind: a Normal definition name is merged as an implicit candidate when a live snapshot carries it and is never cleared; a Unique definition name is neither merged nor cleared as an implicit candidate. An explicit attribute mapping row still applies to either kind. |
 | **Attribute Definition Settings** | The top-level configuration menu for the Define step. Contains Normal Attribute Definitions and Unique Attribute Definitions. |
