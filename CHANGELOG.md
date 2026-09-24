@@ -10,10 +10,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### 🔧 Improvements
 
+- **Fusion review forms restore selected identity details** — Selecting an identity now shows its configured form attributes beneath the identities dropdown, using the same layout as the account context panel. Score tables for all candidates remain visible for comparison. Existing in-flight reviews keep their current layout until **Reset forms?** runs.
 - **Attribute definitions can read this run's statuses, actions, and reviews** — `$statuses`, `$actions`, and `$reviews` in Velocity now use live collection state, including values applied after a Fusion account is created in the same aggregation. `$previous.statuses` (and the same for actions/reviews) is still last run's snapshot. Expressions that already referenced `$statuses`, `$actions`, or `$reviews` now see current-run values instead of the previous aggregation.
 
 ### 🐛 Fixes
 
+- **Accepted merge without a persisted Fusion account still correlates** — When a reviewer merges an orphan account and the unique-id expression suppresses a Fusion account for the target identity, the next aggregation no longer rematches that account and reissues a review. Correlation runs from the completed decision before the uncorrelated sweep.
 - **Fusion attributes stay intact after a quiet Refresh then a same-run merge** — When a Fusion account absorbs linked managed accounts without copying live snapshots, then later merges another account in the same aggregation, Map no longer wipes names and other Main-account attributes, and Define still sees the original source snapshot for expressions such as `$sources.MelonHRM[0].employeeId`. Operators can re-run aggregation after upgrade to restore accounts already wiped.
 
 ---

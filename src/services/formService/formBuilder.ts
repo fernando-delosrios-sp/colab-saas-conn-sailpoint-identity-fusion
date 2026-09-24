@@ -13,6 +13,7 @@ import {
     formInputInterpolation,
     renderCandidatesDisplayHtml,
     renderFusionAccountHtml,
+    renderIdentityDetailsHtml,
 } from './formHtml'
 
 type ToggleConfig = {
@@ -111,6 +112,9 @@ function descriptionElement(id: string, interpolationKey: string, label: string)
     }
 }
 
+const identityHtmlInputKey = (index: number): string => `identityHtml${index}`
+const identityDetailsElementId = (index: number): string => `identityDetails${index}`
+
 /**
  * Build form input data structure
  */
@@ -143,6 +147,15 @@ export const buildFormInput = (
         [FORM_HTML_CANDIDATES_INPUT]: renderCandidatesDisplayHtml(candidates, locale, urlContext),
     }
 
+    candidates.forEach((candidate, index) => {
+        formInput[identityHtmlInputKey(index)] = renderIdentityDetailsHtml(
+            candidate,
+            fusionFormAttributes,
+            locale,
+            urlContext
+        )
+    })
+
     if (fusionAccount.identityId) {
         formInput.identityId = fusionAccount.identityId
     }
@@ -161,6 +174,13 @@ export const buildFormFields = (
     locale = 'en'
 ): FormElementV2025[] => {
     const identitySearchQuery = candidates.map((c) => `id:${c.id}`).join(' OR ')
+    const identityDetailsElements = candidates.map((candidate, index) =>
+        descriptionElement(
+            identityDetailsElementId(index),
+            identityHtmlInputKey(index),
+            translateWithParams('form_candidate_details', locale, { name: candidate.name })
+        )
+    )
 
     return [
         {
@@ -249,6 +269,7 @@ export const buildFormFields = (
                         },
                         validations: [],
                     },
+                    ...identityDetailsElements,
                 ],
                 label: translate('form_fusion_decision', locale),
                 labelStyle: 'h3',
@@ -260,12 +281,35 @@ export const buildFormFields = (
 }
 
 /**
- * Review form conditions. Display is DESCRIPTION HTML, so per-candidate HIDE and
- * TEXT disable-when-not-empty rules are not used.
+ * Hides each identity details panel unless its candidate is selected, or when
+ * the reviewer chooses the new-identity / no-match outcome.
  */
-export const buildFormConditions = (_candidates?: Candidate[], _fusionFormAttributes?: string[]): FormCondition[] => {
-    return []
-}
+export const buildFormConditions = (candidates: Candidate[] = [], _fusionFormAttributes?: string[]): FormCondition[] =>
+    candidates.map((candidate, index) => ({
+        ruleOperator: 'OR',
+        rules: [
+            {
+                sourceType: 'ELEMENT',
+                source: 'identities',
+                operator: 'NE',
+                valueType: 'STRING',
+                value: candidate.name,
+            },
+            {
+                sourceType: 'ELEMENT',
+                source: 'newIdentity',
+                operator: 'EQ',
+                valueType: 'BOOLEAN',
+                value: 'true',
+            },
+        ],
+        effects: [
+            {
+                effectType: 'HIDE',
+                config: { element: identityDetailsElementId(index) },
+            },
+        ],
+    }))
 
 /**
  * Build form inputs for fusion form definition
@@ -325,6 +369,16 @@ export const buildFormInputs = (
             description: renderCandidatesDisplayHtml(candidates, locale, urlContext),
         },
     ]
+
+    candidates.forEach((candidate, index) => {
+        const inputKey = identityHtmlInputKey(index)
+        formInputs.push({
+            id: inputKey,
+            type: 'STRING',
+            label: inputKey,
+            description: renderIdentityDetailsHtml(candidate, fusionFormAttributes, locale, urlContext),
+        })
+    })
 
     if (fusionAccount.identityId) {
         formInputs.push({

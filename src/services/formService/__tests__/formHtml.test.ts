@@ -1,8 +1,81 @@
 import { createUrlContext } from '../../../utils/url'
-import { escapeHtml, renderAccountDisplayHtml, renderCandidatesDisplayHtml, renderIscUiLink } from '../formHtml'
+import {
+    escapeHtml,
+    renderAccountDisplayHtml,
+    renderCandidatesDisplayHtml,
+    renderIdentityDetailsHtml,
+    renderIscUiLink,
+} from '../formHtml'
 import { Candidate } from '../types'
 
 describe('form HTML helpers', () => {
+    it('Selected candidate identity details are shown', () => {
+        const html = renderIdentityDetailsHtml(
+            {
+                id: 'ident-1',
+                name: 'Sam User',
+                attributes: { email: 'sam@example.com', department: 'Engineering' },
+                scores: [],
+            },
+            ['email', 'department'],
+            'en'
+        )
+
+        expect(html).toContain('Sam User details')
+        expect(html).toContain('>Email<')
+        expect(html).toContain('>sam@example.com<')
+        expect(html).toContain('>Department<')
+        expect(html).toContain('>Engineering<')
+    })
+
+    it('Identity details omit the attribute table when no form attributes are configured', () => {
+        const html = renderIdentityDetailsHtml(
+            { id: 'ident-1', name: 'Sam User', attributes: { email: 'sam@example.com' }, scores: [] },
+            [],
+            'en'
+        )
+
+        expect(html).toContain('Sam User details')
+        expect(html).not.toContain('<table')
+        expect(html).not.toContain('sam@example.com')
+    })
+
+    it('Identity details escape untrusted values and use an identity link when available', () => {
+        const urlContext = createUrlContext('https://example.api.identitynow.com')
+        const html = renderIdentityDetailsHtml(
+            {
+                id: 'ident-99',
+                name: 'Sam <User>',
+                attributes: { email: '<script>x</script>' },
+                scores: [],
+            },
+            ['email'],
+            'en',
+            urlContext
+        )
+
+        expect(html).toContain(
+            'href="https://example.identitynow.com/ui/a/admin/identities/ident-99/details/attributes"'
+        )
+        expect(html).toContain('Sam &lt;User&gt;')
+        expect(html).toContain('&lt;script&gt;x&lt;/script&gt;')
+        expect(html).not.toContain('<script>')
+        expect(html).toContain('target="_blank"')
+        expect(html).toContain('rel="noopener noreferrer"')
+    })
+
+    it('Identity details fall back to escaped text when the identity URL is missing', () => {
+        const html = renderIdentityDetailsHtml(
+            { id: 'ident-1', name: 'Sam <User>', attributes: {}, scores: [] },
+            [],
+            'en',
+            createUrlContext(undefined)
+        )
+
+        expect(html).toContain('Sam &lt;User&gt; details')
+        expect(html).not.toContain('href=')
+    })
+
     it('Untrusted values are HTML-escaped', () => {
         expect(escapeHtml('<script>alert("x")</script>')).toBe('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;')
 

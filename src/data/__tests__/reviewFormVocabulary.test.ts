@@ -32,6 +32,10 @@ describe('review form documentation', () => {
         expect(reviewFormsGuide).toMatch(
             /columns: attribute, value, algorithm, threshold, result, score; match\/miss\/combined row colors/
         )
+        expect(reviewFormsGuide).toMatch(/All candidate score tables remain visible/)
+        expect(reviewFormsGuide).toMatch(
+            /identity details panel appears below it with that identity's configured form attributes/
+        )
         expect(reviewFormsGuide).toMatch(/\*\*new identity \/ no match\*\* toggle and the identities SELECT/)
     })
 

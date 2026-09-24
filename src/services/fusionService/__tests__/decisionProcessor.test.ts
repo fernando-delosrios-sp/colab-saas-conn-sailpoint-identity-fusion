@@ -79,4 +79,92 @@ describe('DecisionProcessor', () => {
 
         expect(forms.fetchFormData).toHaveBeenCalled()
     })
+
+    it('processes an authorized merge still sitting in the work queue when no Fusion account exists', async () => {
+        const managedKey = 'src-ad::CN=OAM Edward Bakers'
+        const assembleAccount = vi.fn().mockResolvedValue(undefined)
+        const registerFusionAccount = vi.fn()
+        const applyPerSourceCorrelationIfNeeded = vi.fn().mockResolvedValue(undefined)
+        processor = new DecisionProcessor({} as FusionConfig, log, run, {
+            forms: { fetchFormData: vi.fn() } as any,
+            identities: {
+                getIdentityById: vi.fn().mockReturnValue({
+                    id: 'identity-edward',
+                    name: 'Edward Baker',
+                    attributes: {},
+                }),
+            } as any,
+            correlationManager: { applyPerSourceCorrelationIfNeeded } as any,
+            definitionService: {} as any,
+            mappingService: {} as any,
+            accountAssembly: {
+                assembleAccount,
+                registerFusionAccount,
+                isAggregationAccountListMode: () => true,
+            } as any,
+        })
+
+        run.setManagedAccount(managedKey, {
+            id: 'acct-bakers',
+            name: 'oam.bakers',
+            sourceId: 'src-ad',
+            nativeIdentity: 'CN=OAM Edward Bakers',
+            sourceName: 'AD',
+            attributes: {},
+        } as Account)
+        run.addFinishedFusionDecision({
+            submitter: { id: 'reviewer-1', email: 'r@example.com', name: 'Reviewer' },
+            account: {
+                id: managedKey,
+                name: 'oam.bakers',
+                sourceName: 'AD',
+                sourceId: 'src-ad',
+                nativeIdentity: 'CN=OAM Edward Bakers',
+            },
+            newIdentity: false,
+            identityId: 'identity-edward',
+            comments: 'Merge',
+            finished: true,
+            sourceType: 'orphan' as any,
+        })
+
+        const applied = await processor.processFusionIdentityDecisions()
+
+        expect(applied).toHaveLength(1)
+        expect(applyPerSourceCorrelationIfNeeded).toHaveBeenCalledWith(
+            expect.any(FusionAccount),
+            expect.objectContaining({ identityId: 'identity-edward', newIdentity: false }),
+            'merge'
+        )
+        expect(registerFusionAccount).toHaveBeenCalled()
+    })
+
+    it('does not reprocess an authorized merge after the managed account left the work queue', async () => {
+        const assembleAccount = vi.fn().mockResolvedValue(undefined)
+        processor = new DecisionProcessor({} as FusionConfig, log, run, {
+            forms: { fetchFormData: vi.fn() } as any,
+            identities: { getIdentityById: vi.fn() } as any,
+            correlationManager: { applyPerSourceCorrelationIfNeeded: vi.fn() } as any,
+            definitionService: {} as any,
+            mappingService: {} as any,
+            accountAssembly: {
+                assembleAccount,
+                registerFusionAccount: vi.fn(),
+                isAggregationAccountListMode: () => true,
+            } as any,
+        })
+        run.addFinishedFusionDecision({
+            submitter: { id: 'reviewer-1', email: 'r@example.com', name: 'Reviewer' },
+            account: { id: 'src-ad::already-claimed', name: 'claimed', sourceName: 'AD' },
+            newIdentity: false,
+            identityId: 'identity-1',
+            comments: '',
+            finished: true,
+        })
+
+        const applied = await processor.processFusionIdentityDecisions()
+
+        expect(applied).toHaveLength(0)
+        expect(assembleAccount).not.toHaveBeenCalled()
+    })
 })

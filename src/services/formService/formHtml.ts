@@ -263,6 +263,23 @@ export function renderCandidatesDisplayHtml(candidates: Candidate[], locale = 'e
 }
 
 /**
+ * Selected identity DESCRIPTION HTML with the identity link and configured form attributes.
+ */
+export function renderIdentityDetailsHtml(
+    candidate: Candidate,
+    fusionFormAttributes: string[] | undefined,
+    locale = 'en',
+    urlContext?: UrlContext
+): string {
+    const nameLink = renderIscUiLink(candidate.name, urlContext?.identity(candidate.id))
+    const heading = translateWithParams('form_candidate_details', locale, { name: nameLink })
+    return (
+        `<p style="${CANDIDATE_NAME_P_STYLE}">${heading}</p>` +
+        renderAttributeTable(candidate.attributes, fusionFormAttributes, locale)
+    )
+}
+
+/**
  * Account-context DESCRIPTION HTML for a Fusion review, including UrlContext links when available.
  */
 export function renderFusionAccountHtml(
