@@ -925,7 +925,7 @@ describe('FusionAccount', () => {
             return snapshots.some((snapshot) => snapshot[distinctAttributeName] === distinctAttributeValue)
         }
 
-        it('stale previously correlated accounts are claim-only', () => {
+        it('Stale previously correlated accounts are claim-only', () => {
             const acc = persistedFusion(['src-a::keep-1'])
             expect(acc.previousAccountIdsSet.has('src-a::keep-1')).toBe(true)
             expect(acc.attributeBag.current[distinctAttributeName]).toBeUndefined()
@@ -946,7 +946,7 @@ describe('FusionAccount', () => {
             )
         })
 
-        it('new blend materializes snapshots for the Fusion account', () => {
+        it('New blend materializes snapshots for the Fusion account', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-new-blend' } as any)
             const run = new FusionRun()
             run.setManagedAccount(
@@ -962,7 +962,7 @@ describe('FusionAccount', () => {
             expect(run.managedAccountsById.has('src-a::native-1')).toBe(false)
         })
 
-        it('over-threshold modified materializes all live linked accounts on the Fusion account', () => {
+        it('Over-threshold modified materializes all live linked accounts on the Fusion account', () => {
             const acc = persistedFusion(['src-a::keep-1', 'src-b::keep-2'])
             const run = new FusionRun()
             run.setManagedAccount(
@@ -987,7 +987,7 @@ describe('FusionAccount', () => {
             expect(sourceHasDistinctSnapshot(acc, 'Source B')).toBe(true)
         })
 
-        it('prune-deleted requires materializing remaining live accounts', () => {
+        it('Prune-deleted requires materializing remaining live accounts', () => {
             const acc = persistedFusion(['src-a::keep-1'], {
                 attributes: {
                     accounts: ['src-a::keep-1'],
@@ -1009,7 +1009,7 @@ describe('FusionAccount', () => {
             expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
         })
 
-        it('force attribute refresh materializes before Map', () => {
+        it('Force attribute refresh materializes before Map', () => {
             const acc = persistedFusion(['src-a::keep-1'])
             const run = new FusionRun()
             run.setManagedAccount(
@@ -1023,7 +1023,7 @@ describe('FusionAccount', () => {
             expect(run.managedAccountsById.has('src-a::keep-1')).toBe(false)
         })
 
-        it('eligible Always recalculate materializes when timestamps are stale', () => {
+        it('Eligible Always recalculate materializes when timestamps are stale', () => {
             const acc = persistedFusion(['src-a::keep-1'])
             const run = new FusionRun()
             run.setManagedAccount(
@@ -1334,7 +1334,7 @@ describe('FusionAccount', () => {
             expect(run.managedAccountsById.has(key)).toBe(false)
         })
 
-        it('materializes a live sibling when a foreign-owned key is dropped', () => {
+        it('Foreign-owned drop requires materializing remaining live accounts', () => {
             const foreignKey = 'src-a::foreign-3'
             const siblingKey = 'src-b::sibling-1'
             const acc = FusionAccount.fromFusionAccount({

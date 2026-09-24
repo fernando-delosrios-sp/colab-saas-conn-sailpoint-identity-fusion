@@ -76,7 +76,7 @@ describe('MappingService selective targets', () => {
         service.mapAttributes(account, run, { onlyTargets: new Set(['employeeId']) })
     })
 
-    it('pins Origin account merge to originAccount rather than the first account on its source', () => {
+    it('Origin account merge pins the origin account key not the first account on originSource', () => {
         const originConfig = {
             ...config,
             attributeMaps: [
@@ -108,7 +108,7 @@ describe('MappingService selective targets', () => {
         expect(fusionAccount.attributes.email).toBe('origin@example.com')
     })
 
-    it('uses the identity bag as origin snapshot for an identity-origin Fusion account', () => {
+    it('Origin account merge uses the Identities identity bag for identity-origin Fusion accounts', () => {
         const originConfig = {
             ...config,
             attributeMaps: [
@@ -145,7 +145,7 @@ describe('MappingService selective targets', () => {
         expect(fusionAccount.attributes.department).toBe('HR')
     })
 
-    it('uses the mainAccount snapshot for Main account merge when that key is found', () => {
+    it('Main account merge uses mainAccount snapshot when found', () => {
         const mainConfig = {
             ...config,
             attributeMaps: [
@@ -177,7 +177,7 @@ describe('MappingService selective targets', () => {
         expect(fusionAccount.attributes.jobTitle).toBe('Manager')
     })
 
-    it('uses the origin snapshot for Main account merge when mainAccount is unset', () => {
+    it('Main account merge falls back to origin snapshot when mainAccount is unset', () => {
         const mainConfig = {
             ...config,
             attributeMaps: [
