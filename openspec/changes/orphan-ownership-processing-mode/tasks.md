@@ -51,5 +51,5 @@
 
 ## 8. Changelog
 
-- [ ] 8.1 Create or update changelog entry for this change
-- [ ] 8.2 Confirm entry covers user-visible changes from proposal Capabilities
+- [x] 8.1 Create or update changelog entry for this change
+- [x] 8.2 Confirm entry covers user-visible changes from proposal Capabilities

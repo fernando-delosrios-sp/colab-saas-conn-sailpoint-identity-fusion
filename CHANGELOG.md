@@ -6,6 +6,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-09-28 · v2.2.0
+
+### ✨ New Features
+
+- **Orphan sources can assign an owner to unowned machine accounts** — Source Settings shows Orphan processing mode when Source type is Orphan accounts. Assignment stays the default and keeps today's correlation behavior, including discarding machine accounts. Ownership scores machine accounts that do not already have an owner identity, including accounts that are already correlated or linked on a Fusion account, and writes the selected identity as that account's owner. It does not correlate the account or attach it to a Fusion account.
+- **Ownership non-matches follow the existing disable toggle** — When no identity matches, Ownership drops the account and does not set an owner. Disable non-matching accounts still queues a disable, including after a reviewer says there is no match.
+- **Ownership reviews ask for an owner identity** — Review forms for Ownership mode describe choosing an owner identity. Assignment-mode orphan forms still describe merging the account into an identity.
+
+---
+
 ## 2026-09-24 · v2.2.0
 
 ### 🔧 Improvements
