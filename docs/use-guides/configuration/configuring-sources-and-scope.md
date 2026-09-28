@@ -123,8 +123,9 @@ When disabled:
 | **Source name** | Exact ISC source name | Yes | Case-sensitive |
 | **Enabled** | Include in processing | No | Default on |
 | **Source type** | Authoritative accounts, Records, or Orphan accounts | Yes | See [Source types](source-types.md) |
+| **Orphan processing mode** | Assignment or Ownership | No (Orphan only) | Default Assignment. See [Source types](source-types.md#orphan-accounts) |
 | **Include record accounts in Match** | Match scoring for Records sources | No (Records only) | Default on |
-| **Disable non-matching accounts** | Disable orphan non-matches | No (Orphan only) | Background disable on managed source |
+| **Disable non-matching accounts** | Disable orphan non-matches | No (Orphan only) | Background disable on managed source. Applies in Assignment mode and Ownership mode |
 | **[Deferred candidate matching](../../glossary.md#candidates)** | Same-run deferred-candidate comparison | No (Authoritative only) | Same source only; never cross-source |
 | **Accounts API filter** | Server-side account list filter | No | ISC `filters` parameter |
 | **Accounts JMESPath filter** | Client-side page filter | No | Applied to `{ "accounts": [...] }` |
@@ -138,12 +139,12 @@ When disabled:
 | **Correlation display name** | Reverse-correlation display name | Yes (reverse) | |
 
 !!! note "Machine accounts"
-    Accounts with `isMachine=true` are excluded client-side after fetch. This is not an ISC account-list filter.
+    Accounts with `isMachine=true` are excluded client-side after fetch, except on an Orphan source in **Ownership mode**. Ownership mode keeps machine accounts that have no established owner identity and skips the rest. This is not an ISC account-list filter. See [Source types](source-types.md#ownership-mode).
 
 !!! note "Filter execution order"
     1. Accounts API filter (server-side)
     2. Accounts JMESPath filter (client-side, page-wise)
-    3. Built-in machine account exclusion
+    3. Built-in machine account exclusion (Ownership mode keeps unowned machine accounts)
 
 **Example — skip disabled Active Directory accounts** (Accounts JMESPath filter):
 

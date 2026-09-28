@@ -94,16 +94,30 @@ Register unique attribute values **without** emitting Fusion accounts for non-ma
 
 Supplemental data used **only** to improve Match — never to create identities from non-matched managed source accounts.
 
-**Processing:**
+**Orphan processing mode** applies only to Orphan sources. The default is **Assignment mode**. Omitted values and non-Orphan sources behave as Assignment mode.
+
+### Assignment mode
+
+Keeps orphan Match and correlation behavior. Machine accounts (`isMachine=true`) are discarded and are not scored.
 
 1. Map and Define run to prepare attributes for scoring.
 2. Match compares against baseline.
 3. **Match found** — managed account links to existing identity (same as authoritative).
 4. **No match** — account is **dropped** from Fusion output (not emitted as a Fusion account).
 
+### Ownership mode
+
+Scores machine accounts that have no [established owner identity](../../glossary.md#source-types) (a non-empty `ownerIdentity.id`), including accounts that are already correlated or already linked on a Fusion account. Human accounts, and machine accounts that already have an owner, are skipped. Skipped accounts are not disabled.
+
+1. Match scores the eligible machine account.
+2. **Match found** — automatic merge or a reviewer selection writes the selected identity to `ownerIdentity`. The correlated identity (`identityId`) is unchanged, and the machine account is not attached to a Fusion account.
+3. **No match**, including a reviewer no-match — the account is dropped and no owner identity is written.
+
+Review forms for this mode ask the reviewer to choose an owner identity. They do not describe a merge or a correlation.
+
 **Optional: Disable non-matching accounts**
 
-When enabled, triggers a background `POST /accounts/{id}/disable` on the managed source for orphan accounts that fail to match. Requires `idn:accounts-state:manage` on the connector PAT.
+When enabled, triggers a background `POST /accounts/{id}/disable` on the managed source for accounts that fail to match, in both Assignment mode and Ownership mode. Requires `idn:accounts-state:manage` on the connector PAT. A reviewer no-match uses the same toggle.
 
 **Typical use cases:**
 

@@ -56,7 +56,7 @@ Phase 4 (`Process`) emits `STEP` sub-step markers in log order: `process-identit
         - Delayed aggregation sender workflow.
         - Current form data, including forms and associated form instances.
     - Finished review forms emit **decision discovery** log lines (`… DECISION DISCOVERED`) and a `DETAIL action=fusion decisions discovered from forms` summary with a `decisions(…)` segment.
-    - Managed machine accounts (`isMachine=true`) are discarded after fetch and never enter the work queue.
+    - Managed machine accounts (`isMachine=true`) are discarded after fetch and never enter the work queue, except on an Orphan source in Ownership mode. Ownership mode registers machine accounts that have no established owner identity.
     - A warning is logged with discarded machine-account counts (per source and total).
         - If `fusionReportOnAggregation` is enabled and the fusion owner identity was not loaded in the parallel fetch, it is fetched separately.
     - Identity documents and existing Fusion accounts are **bulk-ingested** into operation-run caches page by page. Registration yields to the event loop at least every 250 records so STATUS and platform keep-alive timers continue running.
@@ -212,7 +212,7 @@ Before the managed account scoring loop begins, each managed source is validated
 
 ### Machine account exclusion
 
-Managed machine accounts (`isMachine=true`) are not supported by Identity Fusion NG. The connector fetches managed-source accounts first, then excludes machine accounts client-side (the ISC account-list API does not support filtering by `isMachine`), logs warning counts, and continues processing only non-machine accounts.
+Managed machine accounts (`isMachine=true`) are discarded after fetch, except on an Orphan source in Ownership mode. The connector fetches managed-source accounts first, then excludes machine accounts client-side (the ISC account-list API does not support filtering by `isMachine`) and logs warning counts. Ownership mode is the exception: it registers machine accounts that have no established owner identity (`ownerIdentity.id` non-empty means the owner is already established, and that account is skipped). A selected identity is written to `ownerIdentity` and is not a correlation. See [Ownership mode](../use-guides/configuration/source-types.md#ownership-mode).
 
 ### Preventing Fusion account creation (empty nativeIdentity skip pattern)
 
