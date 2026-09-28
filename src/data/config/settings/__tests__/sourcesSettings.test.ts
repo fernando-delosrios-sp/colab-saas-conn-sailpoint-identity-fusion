@@ -141,4 +141,31 @@ describe('sourcesSettings readSettings', () => {
 
         expect(result.sources![0].disableNonMatchingAccounts).toBe(false)
     })
+
+    it('omitted processing mode is Assignment', () => {
+        const raw = {
+            sources: [{ name: 'A', enabled: true, sourceType: 'orphan' }],
+        }
+
+        const result = readSettings(raw)
+
+        expect(result.sources![0].orphanProcessingMode).toBe('assignment')
+    })
+
+    it('Ownership is selected explicitly', () => {
+        const raw = {
+            sources: [
+                {
+                    name: 'A',
+                    enabled: true,
+                    sourceType: 'orphan',
+                    orphanProcessingMode: 'ownership' as const,
+                },
+            ],
+        }
+
+        const result = readSettings(raw)
+
+        expect(result.sources![0].orphanProcessingMode).toBe('ownership')
+    })
 })

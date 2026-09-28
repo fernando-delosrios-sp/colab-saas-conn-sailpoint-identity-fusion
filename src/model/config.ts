@@ -196,6 +196,12 @@ export enum SourceType {
     Orphan = 'orphan',
 }
 
+/** How an Orphan accounts source processes accounts. Omitted values are Assignment. */
+export enum OrphanProcessingMode {
+    Assignment = 'assignment',
+    Ownership = 'ownership',
+}
+
 type CorrelationMode = 'correlate' | 'reverse' | 'none'
 
 /** Configuration for a single managed source that feeds into fusion. */
@@ -203,6 +209,13 @@ export interface SourceConfig {
     name: string
     enabled?: boolean
     sourceType?: SourceType
+    /**
+     * Orphan sources only. Assignment scores uncorrelated non-machine accounts and correlates
+     * a selected identity. Ownership scores machine accounts with no established owner identity
+     * and writes that identity as `ownerIdentity`. Omitted values, and any value on a
+     * non-Orphan source, read as Assignment.
+     */
+    orphanProcessingMode?: OrphanProcessingMode
     disableNonMatchingAccounts?: boolean
     aggregationMode?: 'none' | 'before' | 'delayed'
     /**
