@@ -6,10 +6,10 @@
 
 ## 2. Fetch eligibility
 
-- [ ] 2.1 In `collectAccountsFromBatch`, register Ownership-mode accounts only when `isMachine` is true and `ownerIdentity.id` is missing or blank, including correlated accounts
-- [ ] 2.2 Do not register non-machine accounts or machine accounts with an established owner identity on an Ownership-mode source, and do not count those skips toward the aggregation batch size or queue a disable
-- [ ] 2.3 Keep discarding every machine account for Assignment-mode Orphan sources, Authoritative sources, and Records sources
-- [ ] 2.4 Test fetch registration for: correlated unowned machine account, uncorrelated unowned machine account, owned machine account, non-machine account, Assignment-mode machine account, and Authoritative machine account
+- [x] 2.1 In `collectAccountsFromBatch`, register Ownership-mode accounts only when `isMachine` is true and `ownerIdentity.id` is missing or blank, including correlated accounts
+- [x] 2.2 Do not register non-machine accounts or machine accounts with an established owner identity on an Ownership-mode source, and do not count those skips toward the aggregation batch size or queue a disable
+- [x] 2.3 Keep discarding every machine account for Assignment-mode Orphan sources, Authoritative sources, and Records sources
+- [x] 2.4 Test fetch registration for: correlated unowned machine account, uncorrelated unowned machine account, owned machine account, non-machine account, Assignment-mode machine account, and Authoritative machine account
 
 ## 3. Match scoring and non-match
 
