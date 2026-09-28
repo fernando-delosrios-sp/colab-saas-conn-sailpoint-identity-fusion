@@ -1,7 +1,7 @@
 /**
  * connector-spec.json -> Source Settings -> Sources
  */
-import type { SourceConfig, SourcesSection } from '../../../model/config'
+import { OrphanProcessingMode, SourceType, type SourceConfig, type SourcesSection } from '../../../model/config'
 import { assert, softAssert } from './assertLite'
 import { extractBoolean } from '../../../utils/attributes'
 import { readBoolean } from '../../../utils/safeRead'
@@ -23,8 +23,18 @@ export const runtimeDefaults = {
         deferredMatching: true,
         includeRecordAccountsForMatching: true,
         disableNonMatchingAccounts: false,
+        orphanProcessingMode: OrphanProcessingMode.Assignment,
     },
 } as const
+
+function readOrphanProcessingMode(sourceConfig: SourceConfig): OrphanProcessingMode {
+    if (sourceConfig.sourceType !== SourceType.Orphan) {
+        return OrphanProcessingMode.Assignment
+    }
+    return sourceConfig.orphanProcessingMode === OrphanProcessingMode.Ownership
+        ? OrphanProcessingMode.Ownership
+        : OrphanProcessingMode.Assignment
+}
 
 export function readSettings(raw: Record<string, unknown>): SourcesSection {
     const rawSources = (raw.sources as SourceConfig[]) ?? []
@@ -57,6 +67,7 @@ export function readSettings(raw: Record<string, unknown>): SourcesSection {
                     extractBoolean(sourceConfig, 'includeRecordAccountsForMatching') ?? runtimeDefaults.source.includeRecordAccountsForMatching,
                 disableNonMatchingAccounts:
                     extractBoolean(sourceConfig, 'disableNonMatchingAccounts') ?? runtimeDefaults.source.disableNonMatchingAccounts,
+                orphanProcessingMode: readOrphanProcessingMode(sourceConfig),
             }
         })
         .filter((sourceConfig: SourceConfig) => sourceConfig.enabled)

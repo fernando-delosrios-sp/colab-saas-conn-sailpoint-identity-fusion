@@ -181,6 +181,26 @@
                                             ]
                                         },
                                         {
+                                            "key": "orphanProcessingMode",
+                                            "label": "Orphan processing mode",
+                                            "type": "radio",
+                                            "required": false,
+                                            "value": "assignment",
+                                            "parentKey": "sourceType",
+                                            "parentValue": "orphan",
+                                            "helpKey": "Assignment correlates uncorrelated accounts; Ownership assigns an owner identity to unowned machine accounts.",
+                                            "options": [
+                                                {
+                                                    "label": "Assignment",
+                                                    "value": "assignment"
+                                                },
+                                                {
+                                                    "label": "Ownership",
+                                                    "value": "ownership"
+                                                }
+                                            ]
+                                        },
+                                        {
                                             "key": "disableNonMatchingAccounts",
                                             "label": "Disable non-matching accounts",
                                             "type": "toggle",
