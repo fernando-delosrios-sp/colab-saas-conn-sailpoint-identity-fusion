@@ -101,6 +101,10 @@ export const locales: Record<string, TranslationDictionary> = {
             'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
         form_section_desc_orphan:
             'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
+        form_section_desc_ownership:
+            'A potential owner has been detected for a machine account. Please review the candidate identities below and either select an existing identity as the owner identity, or confirm there is no match.',
+        form_toggle_help_no_match_ownership:
+            'Select this if no existing identity should be the owner identity for this machine account',
         form_review_required_header: 'Fusion review required for {{sourceName}}',
         form_existing_identity: 'Existing identity',
         form_existing_identity_help: 'Select the identity the account is part of',
@@ -212,6 +216,10 @@ export const locales: Record<string, TranslationDictionary> = {
             'Se detectó un posible registro coincidente. Revise las identidades candidatas a continuación y seleccione una identidad existente para fusionar esta cuenta o confirme que no hay coincidencia.',
         form_section_desc_orphan:
             'Se detectó una posible coincidencia para una cuenta huérfana. Revise las identidades candidatas a continuación y seleccione una identidad existente para fusionar esta cuenta o confirme que no hay coincidencia.',
+        form_section_desc_ownership:
+            'Se detectó un posible propietario para una cuenta de máquina. Revise las identidades candidatas a continuación y seleccione una identidad existente como identidad propietaria, o confirme que no hay coincidencia.',
+        form_toggle_help_no_match_ownership:
+            'Seleccione esto si ninguna identidad existente debe ser la identidad propietaria de esta cuenta de máquina',
         form_review_required_header: 'Revisión Fusion requerida para {{sourceName}}',
         form_existing_identity: 'Identidad existente',
         form_existing_identity_help: 'Seleccione la identidad de la que forma parte la cuenta',
@@ -323,6 +331,10 @@ export const locales: Record<string, TranslationDictionary> = {
             'Un enregistrement correspondant potentiel a été détecté. Veuillez examiner les identités candidates ci-dessous et sélectionner une identité existante pour fusionner ce compte, ou confirmer qu’il n’y a pas de correspondance.',
         form_section_desc_orphan:
             'Une correspondance potentielle pour un compte orphelin a été détectée. Veuillez examiner les identités candidates ci-dessous et sélectionner une identité existante pour fusionner ce compte, ou confirmer qu’il n’y a pas de correspondance.',
+        form_section_desc_ownership:
+            'Un propriétaire potentiel a été détecté pour un compte machine. Examinez les identités candidates ci-dessous et sélectionnez une identité existante comme identité propriétaire, ou confirmez qu’il n’y a pas de correspondance.',
+        form_toggle_help_no_match_ownership:
+            'Sélectionnez cette option si aucune identité existante ne doit être l’identité propriétaire de ce compte machine',
         form_review_required_header: 'Révision Fusion requise pour {{sourceName}}',
         form_existing_identity: 'Identité existante',
         form_existing_identity_help: 'Sélectionnez l’identité dont fait partie le compte',
@@ -434,6 +446,10 @@ export const locales: Record<string, TranslationDictionary> = {
             'Ein potenziell übereinstimmender Datensatz wurde erkannt. Bitte prüfen Sie die Kandidatenidentitäten unten und wählen Sie entweder eine bestehende Identität zum Zusammenführen oder bestätigen Sie, dass keine Übereinstimmung vorliegt.',
         form_section_desc_orphan:
             'Eine potenzielle Übereinstimmung für ein verwaistes Konto wurde erkannt. Bitte prüfen Sie die Kandidatenidentitäten unten und wählen Sie entweder eine bestehende Identität zum Zusammenführen oder bestätigen Sie, dass keine Übereinstimmung vorliegt.',
+        form_section_desc_ownership:
+            'Ein möglicher Besitzer wurde für ein Maschinenkonto erkannt. Prüfen Sie die Kandidatenidentitäten unten und wählen Sie eine vorhandene Identität als Besitzeridentität, oder bestätigen Sie, dass es keine Übereinstimmung gibt.',
+        form_toggle_help_no_match_ownership:
+            'Wählen Sie dies, wenn keine vorhandene Identität die Besitzeridentität dieses Maschinenkontos sein soll',
         form_review_required_header: 'Fusion-Überprüfung erforderlich für {{sourceName}}',
         form_existing_identity: 'Bestehende Identität',
         form_existing_identity_help: 'Wählen Sie die Identität, zu der das Konto gehört',
@@ -543,6 +559,9 @@ export const locales: Record<string, TranslationDictionary> = {
             'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
         form_section_desc_orphan:
             'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
+        form_section_desc_ownership:
+            '已检测到计算机帐户的潜在所有者。请查看下面的候选身份，选择一个现有身份作为所有者身份，或确认没有匹配项。',
+        form_toggle_help_no_match_ownership: '如果不应将任何现有身份作为此计算机帐户的所有者身份，请选择此项',
         form_review_required_header: 'Fusion review required for {{sourceName}}',
         form_existing_identity: 'Existing identity',
         form_existing_identity_help: 'Select the identity the account is part of',
@@ -653,6 +672,10 @@ export const locales: Record<string, TranslationDictionary> = {
             '潜在的な一致するレコードが検出されました。以下の候補アイデンティティを確認し、既存のアイデンティティを選択してこのアカウントをマージするか、一致がないことを確認してください。',
         form_section_desc_orphan:
             '孤立アカウントの潜在的な一致が検出されました。以下の候補アイデンティティを確認し、既存のアイデンティティを選択してこのアカウントをマージするか、一致がないことを確認してください。',
+        form_section_desc_ownership:
+            'マシンアカウントの潜在的な所有者が検出されました。以下の候補アイデンティティを確認し、既存のアイデンティティを所有者アイデンティティとして選択するか、一致しないことを確認してください。',
+        form_toggle_help_no_match_ownership:
+            '既存のアイデンティティをこのマシンアカウントの所有者アイデンティティにしない場合は、これを選択してください',
         form_review_required_header: '{{sourceName}} の Fusion レビューが必要です',
         form_existing_identity: '既存のアイデンティティ',
         form_existing_identity_help: 'アカウントが属するアイデンティティを選択してください',
@@ -763,6 +786,10 @@ export const locales: Record<string, TranslationDictionary> = {
             'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
         form_section_desc_orphan:
             'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
+        form_section_desc_ownership:
+            'Foi detetado um possível proprietário para uma conta de máquina. Reveja as identidades candidatas abaixo e selecione uma identidade existente como identidade proprietária, ou confirme que não há correspondência.',
+        form_toggle_help_no_match_ownership:
+            'Selecione isto se nenhuma identidade existente deve ser a identidade proprietária desta conta de máquina',
         form_review_required_header: 'Fusion review required for {{sourceName}}',
         form_existing_identity: 'Existing identity',
         form_existing_identity_help: 'Select the identity the account is part of',
@@ -872,6 +899,10 @@ export const locales: Record<string, TranslationDictionary> = {
             'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
         form_section_desc_orphan:
             'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
+        form_section_desc_ownership:
+            'È stato rilevato un possibile proprietario per un account macchina. Esamina le identità candidate qui sotto e seleziona un’identità esistente come identità proprietaria, oppure conferma che non c’è corrispondenza.',
+        form_toggle_help_no_match_ownership:
+            'Seleziona questa opzione se nessuna identità esistente deve essere l’identità proprietaria di questo account macchina',
         form_review_required_header: 'Fusion review required for {{sourceName}}',
         form_existing_identity: 'Existing identity',
         form_existing_identity_help: 'Select the identity the account is part of',
@@ -981,6 +1012,10 @@ export const locales: Record<string, TranslationDictionary> = {
             'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
         form_section_desc_orphan:
             'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
+        form_section_desc_ownership:
+            'Обнаружен возможный владелец для учетной записи компьютера. Просмотрите кандидатов ниже и выберите существующую личность в качестве личности-владельца или подтвердите отсутствие совпадения.',
+        form_toggle_help_no_match_ownership:
+            'Выберите это, если ни одна существующая личность не должна быть личностью-владельцем этой учетной записи компьютера',
         form_review_required_header: 'Fusion review required for {{sourceName}}',
         form_existing_identity: 'Existing identity',
         form_existing_identity_help: 'Select the identity the account is part of',
@@ -1090,6 +1125,9 @@ export const locales: Record<string, TranslationDictionary> = {
             'A potential matching record has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
         form_section_desc_orphan:
             'A potential match for an orphan account has been detected. Please review the candidate identities below and either select an existing identity to merge this account with, or confirm there is no match.',
+        form_section_desc_ownership:
+            'تم اكتشاف مالك محتمل لحساب آلة. راجع الهويات المرشحة أدناه واختر هوية موجودة بصفتها هوية المالك، أو أكّد عدم وجود تطابق.',
+        form_toggle_help_no_match_ownership: 'حدد هذا إذا لم يجب أن تكون أي هوية موجودة هي هوية المالك لحساب الآلة هذا',
         form_review_required_header: 'Fusion review required for {{sourceName}}',
         form_existing_identity: 'Existing identity',
         form_existing_identity_help: 'Select the identity the account is part of',

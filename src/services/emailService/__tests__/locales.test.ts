@@ -9,4 +9,15 @@ describe('locales dictionary parity', () => {
             expect(missing, `${code} missing keys`).toEqual([])
         }
     })
+
+    it('Ownership review copy exists in every locale', () => {
+        for (const [code, dict] of Object.entries(locales)) {
+            const section = dict.form_section_desc_ownership
+            const toggle = dict.form_toggle_help_no_match_ownership
+            expect(section, `${code} section`).toBeTruthy()
+            expect(toggle, `${code} toggle`).toBeTruthy()
+            const combined = `${section} ${toggle}`.toLowerCase()
+            expect(combined, code).not.toMatch(/correlat|merge|fusionar|fusionner|zusammenführ/)
+        }
+    })
 })

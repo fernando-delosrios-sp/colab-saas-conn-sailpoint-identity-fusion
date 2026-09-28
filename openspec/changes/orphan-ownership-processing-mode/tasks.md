@@ -31,9 +31,9 @@
 
 ## 5. Review form copy
 
-- [ ] 5.1 Add Ownership-mode form strings that describe choosing an owner identity, and do not describe correlation or merge, in all ten locales
-- [ ] 5.2 Select those strings when the source is Ownership mode. Leave Assignment-mode orphan merge wording unchanged
-- [ ] 5.3 Test Ownership form copy, Assignment-mode orphan merge copy, and that the new keys exist in all ten locales
+- [x] 5.1 Add Ownership-mode form strings that describe choosing an owner identity, and do not describe correlation or merge, in all ten locales
+- [x] 5.2 Select those strings when the source is Ownership mode. Leave Assignment-mode orphan merge wording unchanged
+- [x] 5.3 Test Ownership form copy, Assignment-mode orphan merge copy, and that the new keys exist in all ten locales
 
 ## 6. Verification
 

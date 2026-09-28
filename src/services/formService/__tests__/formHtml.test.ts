@@ -1,3 +1,4 @@
+import { OrphanProcessingMode, SourceType } from '../../../model/config'
 import { createUrlContext } from '../../../utils/url'
 import {
     escapeHtml,
@@ -229,5 +230,29 @@ describe('form HTML helpers', () => {
         expect(html).toContain('50%')
         expect(html).toContain('92%')
         expect(html).toContain('18%')
+    })
+
+    it('Ownership review describes choosing an owner identity', () => {
+        const html = renderAccountDisplayHtml({
+            accountLabel: 'svc-backup',
+            sourceName: 'Machines',
+            attributes: {},
+            sourceType: SourceType.Orphan,
+            orphanProcessingMode: OrphanProcessingMode.Ownership,
+        })
+        expect(html).toContain('owner identity')
+        expect(html.toLowerCase()).not.toContain('merge')
+        expect(html.toLowerCase()).not.toContain('correlat')
+    })
+
+    it('Assignment orphan review still describes merging the account', () => {
+        const html = renderAccountDisplayHtml({
+            accountLabel: 'jdoe',
+            sourceName: 'Orphans',
+            attributes: {},
+            sourceType: SourceType.Orphan,
+            orphanProcessingMode: OrphanProcessingMode.Assignment,
+        })
+        expect(html).toContain('merge this account')
     })
 })
