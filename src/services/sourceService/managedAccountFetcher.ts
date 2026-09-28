@@ -95,8 +95,13 @@ function hasEstablishedOwnerIdentity(account: Account): boolean {
     return typeof id === 'string' && id.trim().length > 0
 }
 
-function isOwnershipModeSource(source: SourceInfo): boolean {
-    return source.sourceType === SourceType.Orphan && source.config?.orphanProcessingMode === OrphanProcessingMode.Ownership
+export function isOwnershipModeSource(source: SourceInfo | undefined): boolean {
+    return source?.sourceType === SourceType.Orphan && source.config?.orphanProcessingMode === OrphanProcessingMode.Ownership
+}
+
+/** Machine account on an Ownership-mode source with no established owner identity. */
+export function isOwnershipEligibleManagedAccount(account: Account, source: SourceInfo | undefined): boolean {
+    return isOwnershipModeSource(source) && isMachineManagedAccount(account) && !hasEstablishedOwnerIdentity(account)
 }
 
 /**

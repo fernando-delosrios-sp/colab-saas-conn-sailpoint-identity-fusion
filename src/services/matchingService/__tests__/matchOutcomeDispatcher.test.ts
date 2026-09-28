@@ -1,7 +1,7 @@
 import { StandardCommand } from '@sailpoint/connector-sdk'
 import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { FusionAccount } from '../../../model/account'
-import { FusionConfig, SourceType } from '../../../model/config'
+import { FusionConfig, OrphanProcessingMode, SourceType } from '../../../model/config'
 import { FusionRun } from '../../../model/fusionRun'
 import { AggregationTracker } from '../../../model/aggregationTracker'
 import { AccountAssembly } from '../../accountAssembly'
@@ -1192,6 +1192,115 @@ describe('MatchOutcomeDispatcher', () => {
             expect(result.nonMatch).toBe(1)
             expect(disableSpy).toHaveBeenCalledWith(account)
             expect(run.getFusionAccountByManagedKey('source-a-id::native-1')).toBeUndefined()
+        })
+
+        function ownershipSource(config: Record<string, unknown> = {}) {
+            return sourceInfo({
+                sourceType: SourceType.Orphan,
+                config: { orphanProcessingMode: OrphanProcessingMode.Ownership, ...config },
+            })
+        }
+
+        it('scores a correlated unowned machine account', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, ownershipSource())
+            seedReviewers(run)
+            const scoreSpy = vi.spyOn(matchingService, 'scoreFusionAccount')
+            stubPartialIdentityMatches(matchingService)
+
+            const account = managedAccount({
+                uncorrelated: false,
+                identityId: 'ident-1',
+                isMachine: true,
+            })
+            run.managedAccountsById.set('source-a-id::native-1', account)
+
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(scoreSpy).toHaveBeenCalled()
+            expect(result.nonMatch).toBe(0)
+            expect(result.partial).toBe(1)
+            expect(run.managedAccountsById.has('source-a-id::native-1')).toBe(false)
+        })
+
+        it('scores a Fusion-linked unowned machine account', async () => {
+            const { dispatcher, matchingService, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, ownershipSource())
+            seedReviewers(run)
+            run.initLinkedAccountIndex()
+            run.addToLinkedAccountIndex('source-a-id::native-1')
+            const scoreSpy = vi.spyOn(matchingService, 'scoreFusionAccount')
+            stubPartialIdentityMatches(matchingService)
+
+            const account = managedAccount({
+                uncorrelated: false,
+                identityId: 'ident-1',
+                isMachine: true,
+            })
+            run.managedAccountsById.set('source-a-id::native-1', account)
+
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(scoreSpy).toHaveBeenCalled()
+            expect(result.resolved).toHaveLength(1)
+            expect(result.partial).toBe(1)
+            expect(run.managedAccountsById.has('source-a-id::native-1')).toBe(false)
+        })
+
+        it('does not set an owner identity or disable an Ownership non-match', async () => {
+            const { dispatcher, matchingService, decisionProcessor, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(SOURCE_NAME, ownershipSource())
+            const disableSpy = vi.fn().mockResolvedValue(undefined)
+            run.setDisableOperationFactory(async (account) => disableSpy(account))
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)
+
+            const account = managedAccount({
+                uncorrelated: false,
+                identityId: 'ident-1',
+                isMachine: true,
+            })
+            run.managedAccountsById.set('source-a-id::native-1', account)
+
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(result.nonMatch).toBe(1)
+            expect(disableSpy).not.toHaveBeenCalled()
+            expect(decisionProcessor.processFusionIdentityDecision).not.toHaveBeenCalled()
+            expect(run.getFusionAccountByManagedKey('source-a-id::native-1')).toBeUndefined()
+            expect(run.managedAccountsById.has('source-a-id::native-1')).toBe(false)
+        })
+
+        it('queues disable for an Ownership non-match when configured', async () => {
+            const { dispatcher, matchingService, decisionProcessor, run } = createDispatcher({
+                commandType: StandardCommand.StdAccountList,
+            })
+            run.sourcesByName.set(
+                SOURCE_NAME,
+                ownershipSource({ disableNonMatchingAccounts: true })
+            )
+            const disableSpy = vi.fn().mockResolvedValue(undefined)
+            run.setDisableOperationFactory(async (account) => disableSpy(account))
+            vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)
+
+            const account = managedAccount({
+                uncorrelated: false,
+                identityId: 'ident-1',
+                isMachine: true,
+            })
+            run.managedAccountsById.set('source-a-id::native-1', account)
+
+            const result = await dispatcher.runMatchSweep([account], 1)
+
+            expect(result.nonMatch).toBe(1)
+            expect(disableSpy).toHaveBeenCalledWith(account)
+            expect(decisionProcessor.processFusionIdentityDecision).not.toHaveBeenCalled()
+            expect(run.managedAccountsById.has('source-a-id::native-1')).toBe(false)
         })
 
         it('applies identity layer to correlated orphan accounts when identity is in cache', async () => {

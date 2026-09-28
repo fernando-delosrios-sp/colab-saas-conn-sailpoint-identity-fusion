@@ -35,6 +35,7 @@ import {
     getFusionParallelBatchSize,
     getManagedAccountEventLoopYieldEvery,
 } from '../fusionService/collections'
+import { isOwnershipEligibleManagedAccount } from '../sourceService/managedAccountFetcher'
 import { resolveAccountBeforeScoring } from './preScoreGate'
 import { resolveIdentityMatchOutcome } from './identityMatchResolution'
 import { resolveLiveDeferredMatchOutcome, tryAutoMergeFromMatches } from './deferredMatchResolution'
@@ -759,6 +760,17 @@ export class MatchOutcomeDispatcher {
         return this.finalizeAuthoritativeNonMatch(fusionAccount)
     }
 
+    private claimScoredOwnershipAccount(account: Account): void {
+        const sourceInfo = account.sourceName ? this.deps.run.sourcesByName.get(account.sourceName) : undefined
+        if (!isOwnershipEligibleManagedAccount(account, sourceInfo)) {
+            return
+        }
+        const managedAccountKey = getManagedAccountKeyFromAccount(account)
+        if (managedAccountKey) {
+            this.deps.run.claimAccount(managedAccountKey, account.identityId)
+        }
+    }
+
     private async dispatchOutcome(
         scored: ManagedAccountMatchingResult,
         serializeExactMatch?: (work: () => Promise<FusionAccount | undefined>) => Promise<FusionAccount | undefined>
@@ -766,6 +778,21 @@ export class MatchOutcomeDispatcher {
         const { analysis } = scored
         const { fusionAccount, account, sourceInfo, sourceType } = analysis
 
+        try {
+            return await this.dispatchScoredOutcome(scored, fusionAccount, account, sourceInfo, sourceType, serializeExactMatch)
+        } finally {
+            this.claimScoredOwnershipAccount(account)
+        }
+    }
+
+    private async dispatchScoredOutcome(
+        scored: ManagedAccountMatchingResult,
+        fusionAccount: FusionAccount,
+        account: Account,
+        sourceInfo: SourceInfo | undefined,
+        sourceType: SourceType,
+        serializeExactMatch?: (work: () => Promise<FusionAccount | undefined>) => Promise<FusionAccount | undefined>
+    ): Promise<ResolvedMatch | undefined> {
         if (scored.resolution === 'identity-match') {
             return resolveIdentityMatchOutcome(
                 fusionAccount,
