@@ -117,5 +117,8 @@ export class DryRunApiAdapter implements IscApiAdapter {
     get identityAttributesApi() {
         return this.createApiProxy('identityAttributes', this.inner.identityAttributesApi)
     }
+    get machineAccountsApi() {
+        return this.createApiProxy('machineAccounts', this.inner.machineAccountsApi)
+    }
 }
 

@@ -189,6 +189,7 @@ export class FusionService {
             definitionService: this.definitionService,
             mappingService: this.mappingService,
             accountAssembly: this.accountAssembly,
+            sources: this.sources,
         })
         this.resetAccounts = config.resetAccounts
         this.resetForms = config.resetForms

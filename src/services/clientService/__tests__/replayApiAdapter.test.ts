@@ -149,6 +149,7 @@ describe('ReplayApiAdapter', () => {
         expect(adapter.taskManagementApi).toBeDefined()
         expect(adapter.identityProfilesApi).toBeDefined()
         expect(adapter.identityAttributesApi).toBeDefined()
+        expect(adapter.machineAccountsApi).toBeDefined()
     })
 })
 

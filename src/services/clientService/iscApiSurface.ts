@@ -11,6 +11,7 @@ import type {
     TaskManagementV2025Api,
     IdentityProfilesV2025Api,
     IdentityAttributesV2025Api,
+    MachineAccountsV2025Api,
 } from 'sailpoint-api-client'
 
 /**
@@ -31,4 +32,5 @@ export interface IscApiSurface {
     readonly taskManagement: TaskManagementV2025Api
     readonly identityProfiles: IdentityProfilesV2025Api
     readonly identityAttributes: IdentityAttributesV2025Api
+    readonly machineAccounts: MachineAccountsV2025Api
 }

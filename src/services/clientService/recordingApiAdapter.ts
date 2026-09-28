@@ -68,5 +68,6 @@ export class RecordingApiAdapter implements IscApiAdapter {
     get taskManagementApi() { return this.createApiProxy('taskManagement', this.inner.taskManagementApi) }
     get identityProfilesApi() { return this.createApiProxy('identityProfiles', this.inner.identityProfilesApi) }
     get identityAttributesApi() { return this.createApiProxy('identityAttributes', this.inner.identityAttributesApi) }
+    get machineAccountsApi() { return this.createApiProxy('machineAccounts', this.inner.machineAccountsApi) }
 }
 

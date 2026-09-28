@@ -1,6 +1,6 @@
 import https from 'https'
 import axios, { AxiosInstance } from 'axios'
-import { Configuration, AccountsV2025Api, IdentitiesV2025Api, SearchApi, SourcesV2025Api, CustomFormsV2025Api, WorkflowsV2025Api, EntitlementsV2025Api, TransformsApi, GovernanceGroupsV2025Api, TaskManagementV2025Api, IdentityProfilesV2025Api, IdentityAttributesV2025Api } from 'sailpoint-api-client'
+import { Configuration, AccountsV2025Api, IdentitiesV2025Api, SearchApi, SourcesV2025Api, CustomFormsV2025Api, WorkflowsV2025Api, EntitlementsV2025Api, TransformsApi, GovernanceGroupsV2025Api, TaskManagementV2025Api, IdentityProfilesV2025Api, IdentityAttributesV2025Api, MachineAccountsV2025Api } from 'sailpoint-api-client'
 import { IscApiAdapter } from './iscApiAdapter'
 import { FusionConfig } from '../../model/config'
 import { createRetriesConfig, getRequestAbortSignal } from './helpers'
@@ -26,6 +26,7 @@ export class SdkApiAdapter implements IscApiAdapter {
     private taskManagementApiValue?: TaskManagementV2025Api
     private identityProfilesApiValue?: IdentityProfilesV2025Api
     private identityAttributesApiValue?: IdentityAttributesV2025Api
+    private machineAccountsApiValue?: MachineAccountsV2025Api
 
     constructor(
         fusionConfig: FusionConfig,
@@ -108,6 +109,10 @@ export class SdkApiAdapter implements IscApiAdapter {
 
     public get identityAttributesApi(): IdentityAttributesV2025Api {
         return (this.identityAttributesApiValue ??= new IdentityAttributesV2025Api(this.config, undefined, this.axiosInstance))
+    }
+
+    public get machineAccountsApi(): MachineAccountsV2025Api {
+        return (this.machineAccountsApiValue ??= new MachineAccountsV2025Api(this.config, undefined, this.axiosInstance))
     }
 }
 

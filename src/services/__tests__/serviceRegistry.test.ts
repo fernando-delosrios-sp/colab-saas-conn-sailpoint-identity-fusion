@@ -94,6 +94,7 @@ describe('ServiceRegistry.activateDryRunMode', () => {
             taskManagementApi: {} as any,
             identityProfilesApi: {} as any,
             identityAttributesApi: {} as any,
+            machineAccountsApi: {} as any,
         }
         const client = new ClientService(inner, null, minimalConfig(), {
             info: vi.fn(),

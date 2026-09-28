@@ -27,6 +27,7 @@ function createInnerMock() {
         taskManagementApi: {},
         identityProfilesApi: {},
         identityAttributesApi: {},
+        machineAccountsApi: {},
     } satisfies IscApiAdapter
 }
 
@@ -101,6 +102,7 @@ describe('DryRunApiAdapter', () => {
         expect(adapter.taskManagementApi).toBeDefined()
         expect(adapter.identityProfilesApi).toBeDefined()
         expect(adapter.identityAttributesApi).toBeDefined()
+        expect(adapter.machineAccountsApi).toBeDefined()
     })
 
     it('records zero inner writes when wrapped by RecordingApiAdapter', async () => {

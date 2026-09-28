@@ -337,6 +337,7 @@ export class ClientService {
             get taskManagement() { return a.taskManagementApi },
             get identityProfiles() { return a.identityProfilesApi },
             get identityAttributes() { return a.identityAttributesApi },
+            get machineAccounts() { return a.machineAccountsApi },
         }
     }
 

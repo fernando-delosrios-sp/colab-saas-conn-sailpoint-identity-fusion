@@ -39,6 +39,7 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
                 governanceGroups: client.governanceGroupsApi,
                 identityProfiles: client.identityProfilesApi,
                 identityAttributes: client.identityAttributesApi,
+                machineAccounts: client.machineAccountsApi,
                 search: client.searchApi,
                 identities: client.identitiesApi,
                 customForms: client.customFormsApi,
@@ -71,6 +72,10 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         taskManagementApi: { getTaskStatus: vi.fn() },
         identityProfilesApi: {},
         identityAttributesApi: {},
+        machineAccountsApi: {
+            updateMachineAccount: vi.fn().mockResolvedValue({ data: {} }),
+            listMachineAccounts: vi.fn().mockResolvedValue({ data: [] }),
+        },
     }
 
     const run = new FusionRun()
@@ -1111,5 +1116,68 @@ describe('SourceService fetchGlobalOwnerIdentityIds', () => {
 
         expect(ids).toEqual(['owner-identity'])
         expect(client.governanceGroupsApi.listWorkgroupMembers).not.toHaveBeenCalled()
+    })
+})
+
+describe('SourceService.setMachineAccountOwnerIdentity', () => {
+    const target = { id: 'src-m::machine-1', sourceId: 'src-m', nativeIdentity: 'machine-1' }
+
+    it('patches ownerIdentity on the fetched account id', async () => {
+        const { service, client, log } = createService()
+        service.run.setManagedAccount('src-m::machine-1', {
+            id: 'fetched-id',
+            sourceId: 'src-m',
+            nativeIdentity: 'machine-1',
+        } as any)
+
+        await service.setMachineAccountOwnerIdentity(target, 'identity-9')
+
+        expect(client.machineAccountsApi.updateMachineAccount).toHaveBeenCalledTimes(1)
+        expect(client.machineAccountsApi.updateMachineAccount).toHaveBeenCalledWith({
+            id: 'fetched-id',
+            requestBody: [{ op: 'replace', path: '/ownerIdentity', value: { type: 'IDENTITY', id: 'identity-9' } }],
+        })
+        expect(client.machineAccountsApi.updateMachineAccount.mock.calls[0]).toHaveLength(1)
+        expect(JSON.stringify(client.machineAccountsApi.updateMachineAccount.mock.calls[0][0])).not.toContain('identityId')
+        expect(log.error).not.toHaveBeenCalled()
+    })
+
+    it('resolves an unknown id by source id and nativeIdentity', async () => {
+        const { service, client } = createService()
+        service.run.setManagedAccount('src-m::machine-1', {
+            id: 'fetched-id',
+            sourceId: 'src-m',
+            nativeIdentity: 'machine-1',
+        } as any)
+        client.machineAccountsApi.updateMachineAccount
+            .mockRejectedValueOnce({ response: { status: 404 } })
+            .mockResolvedValueOnce({ data: { id: 'resolved-id' } })
+        client.machineAccountsApi.listMachineAccounts.mockResolvedValue({ data: [{ id: 'resolved-id' }] })
+
+        await service.setMachineAccountOwnerIdentity(target, 'identity-9')
+
+        expect(client.machineAccountsApi.listMachineAccounts).toHaveBeenCalledWith({
+            filters: 'source.id eq "src-m" and nativeIdentity eq "machine-1"',
+            limit: 1,
+        })
+        expect(client.machineAccountsApi.updateMachineAccount).toHaveBeenNthCalledWith(2, {
+            id: 'resolved-id',
+            requestBody: [{ op: 'replace', path: '/ownerIdentity', value: { type: 'IDENTITY', id: 'identity-9' } }],
+        })
+    })
+
+    it('logs a failed owner write and does not fail the caller', async () => {
+        const { service, client, log } = createService()
+        service.run.setManagedAccount('src-m::machine-1', {
+            id: 'fetched-id',
+            sourceId: 'src-m',
+            nativeIdentity: 'machine-1',
+        } as any)
+        client.machineAccountsApi.updateMachineAccount.mockRejectedValue(new Error('boom'))
+
+        await expect(service.setMachineAccountOwnerIdentity(target, 'identity-9')).resolves.toBeUndefined()
+
+        expect(log.error).toHaveBeenCalled()
+        expect(client.machineAccountsApi.listMachineAccounts).not.toHaveBeenCalled()
     })
 })
