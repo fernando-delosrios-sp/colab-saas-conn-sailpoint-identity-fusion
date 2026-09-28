@@ -241,7 +241,7 @@ export class DefinitionService {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(
                         `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                            `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
                     )
                 }
             } else {
@@ -394,7 +394,7 @@ export class DefinitionService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} managed source account(s) ` +
-                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
 
@@ -410,12 +410,12 @@ export class DefinitionService {
         if (isNullish(uniqueId) && this.skipAccountsWithMissingId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
-                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
 
-        assert(uniqueId, `Unique ID is required for simple key`)
+        assert(uniqueId, `Account ID is required for simple key`)
 
         return SimpleKey(uniqueId)
     }
@@ -470,7 +470,7 @@ export class DefinitionService {
         // SourceService.patchSourceConfig(fusionSourceId, FUSION_STATE_CONFIG_PATH, stateObject).
         this.log.debug(
             `State save requested for ${Object.keys(stateObject).length} counter(s). ` +
-                `Persist via SourceService.patchSourceConfig with path: ${FUSION_STATE_CONFIG_PATH}`
+            `Persist via SourceService.patchSourceConfig with path: ${FUSION_STATE_CONFIG_PATH}`
         )
     }
 
@@ -615,10 +615,10 @@ export class DefinitionService {
         const sources = this.identityInputsEnabled(fusionAccount)
             ? fusionAccount.attributeBag.sources
             : new Map(
-                  [...fusionAccount.attributeBag.sources.entries()].filter(
-                      ([sourceName]) => sourceName !== IDENTITIES_SOURCE_NAME
-                  )
-              )
+                [...fusionAccount.attributeBag.sources.entries()].filter(
+                    ([sourceName]) => sourceName !== IDENTITIES_SOURCE_NAME
+                )
+            )
         if (sources.size === 0) return sourceAccountContexts
 
         const ordered = this.buildOrderedAccountList(sources)
@@ -958,8 +958,8 @@ export class DefinitionService {
 
         this.log.error(
             `DefinitionService: Failed to generate unique value for attribute ${definition.name} ` +
-                `for account: ${fusionAccount.name ?? fusionAccount.managedKey ?? 'unknown'} ` +
-                `(${fusionAccount.sourceName}) after ${maxAttempts} attempts (incremental counter)`
+            `for account: ${fusionAccount.name ?? fusionAccount.managedKey ?? 'unknown'} ` +
+            `(${fusionAccount.sourceName}) after ${maxAttempts} attempts (incremental counter)`
         )
         return undefined
     }
@@ -1010,8 +1010,8 @@ export class DefinitionService {
 
         this.log.error(
             `DefinitionService: Failed to generate unique value for attribute ${definition.name} ` +
-                `for account: ${fusionAccount.name ?? fusionAccount.managedKey ?? 'unknown'} ` +
-                `(${fusionAccount.sourceName}) after ${maxAttempts} attempts (collision disambiguation)`
+            `for account: ${fusionAccount.name ?? fusionAccount.managedKey ?? 'unknown'} ` +
+            `(${fusionAccount.sourceName}) after ${maxAttempts} attempts (collision disambiguation)`
         )
         return undefined
     }
