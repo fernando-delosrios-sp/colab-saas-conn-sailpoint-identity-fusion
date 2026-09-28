@@ -13,10 +13,10 @@
 
 ## 3. Match scoring and non-match
 
-- [ ] 3.1 In `resolveAccountBeforeScoring`, enqueue Ownership-eligible accounts instead of the already-linked skip and the correlated non-match shortcut
-- [ ] 3.2 Claim a scored Ownership-eligible account off the managed-account work queue so the uncorrelated sweep does not score it again
-- [ ] 3.3 Keep Ownership non-match on the orphan drop path: no owner identity write; queue disable only when Disable non-matching accounts is on
-- [ ] 3.4 Test correlated scoring, Fusion-linked scoring, non-match without disable, and non-match with disable
+- [x] 3.1 In `resolveAccountBeforeScoring`, enqueue Ownership-eligible accounts instead of the already-linked skip and the correlated non-match shortcut
+- [x] 3.2 Claim a scored Ownership-eligible account off the managed-account work queue so the uncorrelated sweep does not score it again
+- [x] 3.3 Keep Ownership non-match on the orphan drop path: no owner identity write; queue disable only when Disable non-matching accounts is on
+- [x] 3.4 Test correlated scoring, Fusion-linked scoring, non-match without disable, and non-match with disable
 
 ## 4. Owner identity write
 

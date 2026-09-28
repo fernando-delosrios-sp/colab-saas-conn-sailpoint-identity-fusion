@@ -3,6 +3,7 @@ import { SourceType } from '../../model/config'
 import { FusionAccount } from '../../model/account'
 import { SourceInfo } from '../sourceService'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
+import { isOwnershipEligibleManagedAccount, isOwnershipModeSource } from '../sourceService/managedAccountFetcher'
 import type { MatchOutcomeDispatcherDeps, PreScoreOutcome } from './matchOutcomeDispatcher'
 
 export interface PreScoreGateCallbacks {
@@ -28,6 +29,19 @@ export async function resolveAccountBeforeScoring(
 ): Promise<PreScoreOutcome> {
     const { run, log, accountAssembly } = deps
     const managedAccountKey = getManagedAccountKeyFromAccount(account)
+    const sourceInfo = account.sourceName ? run.sourcesByName.get(account.sourceName) : undefined
+    const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
+
+    if (isOwnershipEligibleManagedAccount(account, sourceInfo)) {
+        return { action: 'enqueue' }
+    }
+
+    if (isOwnershipModeSource(sourceInfo)) {
+        if (managedAccountKey) {
+            run.claimAccount(managedAccountKey, account.identityId)
+        }
+        return { action: 'skip-linked' }
+    }
 
     if (callbacks.isCorrelatedManagedAccountLinkedInFusion(account)) {
         if (log.getLogLevel() === 'debug') {
@@ -38,9 +52,6 @@ export async function resolveAccountBeforeScoring(
         run.claimAccount(managedAccountKey!, account.identityId)
         return { action: 'skip-linked' }
     }
-
-    const sourceInfo = account.sourceName ? run.sourcesByName.get(account.sourceName) : undefined
-    const sourceType = sourceInfo?.sourceType ?? SourceType.Authoritative
 
     if (account.sourceName && run.sourcesWithoutReviewers.has(account.sourceName)) {
         const fusionAccount = await accountAssembly.assembleManagedAccount(account)
