@@ -1380,16 +1380,25 @@ export class FormService {
             )
             return
         }
-        const sourceType =
-            this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType ?? SourceType.Authoritative
-        const formFields = buildFormFields(fusionAccount, candidates, this.fusionFormAttributes, sourceType, formLocale)
+        const source = this.sources.getSourceByNameSafe(fusionAccount.sourceName)
+        const sourceType = source?.sourceType ?? SourceType.Authoritative
+        const orphanProcessingMode = source?.config?.orphanProcessingMode
+        const formFields = buildFormFields(
+            fusionAccount,
+            candidates,
+            this.fusionFormAttributes,
+            sourceType,
+            formLocale,
+            orphanProcessingMode
+        )
         const formInputs = buildFormInputs(
             fusionAccount,
             candidates,
             this.fusionFormAttributes,
             formLocale,
             this.urlContext,
-            sourceType
+            sourceType,
+            orphanProcessingMode
         )
         const formConditions = buildFormConditions(candidates, this.fusionFormAttributes)
 

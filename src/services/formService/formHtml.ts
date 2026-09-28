@@ -1,5 +1,5 @@
 import { FusionAccount } from '../../model/account'
-import { SourceType } from '../../model/config'
+import { OrphanProcessingMode, SourceType } from '../../model/config'
 import { UrlContext } from '../../utils/url'
 import { capitalizeFirst } from '../../utils/attributes'
 import { translate, translateWithParams, scoreAttributeLabel } from '../emailService/localization'
@@ -45,6 +45,7 @@ export type AccountDisplayHtmlArgs = {
     urlContext?: UrlContext
     accountIscId?: string
     sourceType?: SourceType
+    orphanProcessingMode?: OrphanProcessingMode
 }
 
 const lowerFirst = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1)
@@ -192,9 +193,11 @@ export function renderAccountDisplayHtml(args: AccountDisplayHtmlArgs): string {
     const sectionKey =
         args.sourceType === SourceType.Record
             ? 'form_section_desc_record'
-            : args.sourceType === SourceType.Orphan
-              ? 'form_section_desc_orphan'
-              : 'form_section_desc_authoritative'
+            : args.sourceType === SourceType.Orphan && args.orphanProcessingMode === OrphanProcessingMode.Ownership
+              ? 'form_section_desc_ownership'
+              : args.sourceType === SourceType.Orphan
+                ? 'form_section_desc_orphan'
+                : 'form_section_desc_authoritative'
     const header = escapeHtml(
         translateWithParams('form_review_required_header', locale, { sourceName: args.sourceName })
     )
@@ -287,7 +290,8 @@ export function renderFusionAccountHtml(
     fusionFormAttributes: string[] | undefined,
     locale: string,
     urlContext?: UrlContext,
-    sourceType?: SourceType
+    sourceType?: SourceType,
+    orphanProcessingMode?: OrphanProcessingMode
 ): string {
     const managedKey = fusionAccount.managedAccountId ?? fusionAccount.managedKey ?? ''
     const accountLabel =
@@ -301,5 +305,6 @@ export function renderFusionAccountHtml(
         urlContext,
         accountIscId: fusionAccount.iscAccountId,
         sourceType,
+        orphanProcessingMode,
     })
 }

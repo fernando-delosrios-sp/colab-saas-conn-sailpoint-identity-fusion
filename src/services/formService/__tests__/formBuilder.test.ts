@@ -1,5 +1,5 @@
 import { buildFormConditions, buildFormFields, buildFormInput, buildFormInputs } from '../formBuilder'
-import { SourceType } from '../../../model/config'
+import { OrphanProcessingMode, SourceType } from '../../../model/config'
 import { resolveEffectiveLocale } from '../../emailService/localization'
 import { buildCandidateList, buildFormName } from '../helpers'
 import { FORM_HTML_ACCOUNT_INPUT, FORM_HTML_CANDIDATES_INPUT } from '../formHtml'
@@ -98,9 +98,7 @@ describe('formBuilder HTML restyle', () => {
 
         const conditions = buildFormConditions(candidates, ['Email'])
         expect(conditions).toHaveLength(2)
-        expect(
-            conditions.some((c) => c.effects?.some((e) => e.config?.element === 'candidatesDisplay'))
-        ).toBe(false)
+        expect(conditions.some((c) => c.effects?.some((e) => e.config?.element === 'candidatesDisplay'))).toBe(false)
 
         const html = buildFormInput(fusionAccount, candidates, ['Email'])[FORM_HTML_CANDIDATES_INPUT]
         expect(html).toContain('Alice Doe')
@@ -348,5 +346,49 @@ describe('buildFormFields localization', () => {
         const decisions = fields.find((f) => f.key === 'identitiesSection')
         const toggle = (decisions?.config as any)?.formElements?.[0]?.config?.columns?.[0]?.[0]
         expect(toggle?.config?.label).toBe('New identity')
+    })
+})
+
+describe('Ownership review form copy', () => {
+    const fusionAccount = {
+        managedAccountId: 'src-1::native-1',
+        identityDisplayName: 'svc-backup',
+        name: 'svc-backup',
+        sourceName: 'Machines',
+        attributes: {},
+    } as any
+
+    const candidates = [{ id: 'identity-1', name: 'Alice Doe', attributes: {}, scores: [] }]
+
+    it('Ownership review uses owner-identity no-match help', () => {
+        const fields = buildFormFields(
+            fusionAccount,
+            candidates,
+            [],
+            SourceType.Orphan,
+            'en',
+            OrphanProcessingMode.Ownership
+        )
+        const toggle = collectElements(fields).find((el) =>
+            String(el.config?.helpText ?? '').includes('owner identity')
+        )
+        expect(toggle?.config?.helpText).toContain('owner identity')
+        expect(String(toggle?.config?.helpText).toLowerCase()).not.toContain('merge')
+        expect(String(toggle?.config?.helpText).toLowerCase()).not.toContain('correlat')
+    })
+
+    it('Assignment orphan review keeps merge no-match help', () => {
+        const fields = buildFormFields(
+            fusionAccount,
+            candidates,
+            [],
+            SourceType.Orphan,
+            'en',
+            OrphanProcessingMode.Assignment
+        )
+        const toggle = collectElements(fields).find((el) =>
+            String(el.config?.helpText ?? '').includes('does not match any existing identity')
+        )
+        expect(toggle).toBeDefined()
     })
 })

@@ -1,7 +1,7 @@
 import { FormElementV2025, FormDefinitionInputV2025 } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
-import { SourceType } from '../../model/config'
+import { OrphanProcessingMode, SourceType } from '../../model/config'
 import { FusionAttribute } from '../../data/schema'
 import { UrlContext } from '../../utils/url'
 import { trimStr } from '../../utils/safeRead'
@@ -58,7 +58,11 @@ function getManagedAccountIdentifier(fusionAccount: FusionAccount): string {
  * Returns the TOGGLE element config for the "New identity" / "No match" decision,
  * which varies by source type.
  */
-function getToggleConfig(sourceType: SourceType, locale = 'en'): ToggleConfig {
+function getToggleConfig(
+    sourceType: SourceType,
+    locale = 'en',
+    orphanProcessingMode?: OrphanProcessingMode
+): ToggleConfig {
     if (sourceType === SourceType.Authoritative) {
         return {
             label: translate('form_toggle_new_identity', locale),
@@ -76,7 +80,9 @@ function getToggleConfig(sourceType: SourceType, locale = 'en'): ToggleConfig {
         helpText:
             sourceType === SourceType.Record
                 ? translate('form_toggle_help_no_match_record', locale)
-                : translate('form_toggle_help_no_match_orphan', locale),
+                : sourceType === SourceType.Orphan && orphanProcessingMode === OrphanProcessingMode.Ownership
+                  ? translate('form_toggle_help_no_match_ownership', locale)
+                  : translate('form_toggle_help_no_match_orphan', locale),
     }
 }
 
@@ -124,7 +130,8 @@ export const buildFormInput = (
     fusionFormAttributes?: string[],
     sourceType: SourceType = SourceType.Authoritative,
     locale = 'en',
-    urlContext?: UrlContext
+    urlContext?: UrlContext,
+    orphanProcessingMode?: OrphanProcessingMode
 ): Record<string, string> => {
     const managedAccountIdentifier = getManagedAccountIdentifier(fusionAccount)
 
@@ -142,7 +149,8 @@ export const buildFormInput = (
             fusionFormAttributes,
             locale,
             urlContext,
-            sourceType
+            sourceType,
+            orphanProcessingMode
         ),
         [FORM_HTML_CANDIDATES_INPUT]: renderCandidatesDisplayHtml(candidates, locale, urlContext),
     }
@@ -171,7 +179,8 @@ export const buildFormFields = (
     candidates: Candidate[],
     _fusionFormAttributes?: string[],
     sourceType: SourceType = SourceType.Authoritative,
-    locale = 'en'
+    locale = 'en',
+    orphanProcessingMode?: OrphanProcessingMode
 ): FormElementV2025[] => {
     const identitySearchQuery = candidates.map((c) => `id:${c.id}`).join(' OR ')
     const identityDetailsElements = candidates.map((candidate, index) =>
@@ -231,7 +240,7 @@ export const buildFormFields = (
                                         id: 'newIdentity',
                                         key: 'newIdentity',
                                         elementType: 'TOGGLE',
-                                        config: getToggleConfig(sourceType, locale),
+                                        config: getToggleConfig(sourceType, locale, orphanProcessingMode),
                                         validations: [],
                                     },
                                 ],
@@ -320,7 +329,8 @@ export const buildFormInputs = (
     fusionFormAttributes?: string[],
     locale = 'en',
     urlContext?: UrlContext,
-    sourceType?: SourceType
+    sourceType?: SourceType,
+    orphanProcessingMode?: OrphanProcessingMode
 ): FormDefinitionInputV2025[] => {
     const managedAccountIdentifier = getManagedAccountIdentifier(fusionAccount)
     warnMissingAccountLabel(fusionAccount, managedAccountIdentifier, ' in form inputs')
@@ -360,7 +370,14 @@ export const buildFormInputs = (
             id: FORM_HTML_ACCOUNT_INPUT,
             type: 'STRING',
             label: FORM_HTML_ACCOUNT_INPUT,
-            description: renderFusionAccountHtml(fusionAccount, fusionFormAttributes, locale, urlContext, sourceType),
+            description: renderFusionAccountHtml(
+                fusionAccount,
+                fusionFormAttributes,
+                locale,
+                urlContext,
+                sourceType,
+                orphanProcessingMode
+            ),
         },
         {
             id: FORM_HTML_CANDIDATES_INPUT,
