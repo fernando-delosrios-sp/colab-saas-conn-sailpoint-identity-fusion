@@ -216,6 +216,12 @@ These products share a Handlebars template family but are not interchangeable. *
 | **Authoritative accounts** | Managed source accounts that create new ISC identities when they do not match an existing identity. Fusion typically owns correlation decisions for these sources. |
 | **Records**                | Managed source accounts that run **Map** and **Define** and may register unique attributes, but do not create Fusion accounts when they do not match.              |
 | **Orphan accounts**        | Managed source accounts whose non-matched accounts are dropped; optionally, stale orphan accounts can be disabled.                                                 |
+| **Orphan processing mode** | Per-source setting on an Orphan accounts source that chooses **Assignment mode** or **Ownership mode**. Omitted values and non-Orphan sources read as Assignment mode. |
+| **Assignment mode**        | The Orphan processing mode that keeps orphan Match behavior: uncorrelated non-machine accounts are scored, and a selected identity is correlated. This is not **Automatic merge** (the Match threshold decision, also called automatic assignment). |
+| **Ownership mode**         | The Orphan processing mode whose eligible population is machine accounts with no owner identity. The selected identity becomes that account's owner identity. The account is not correlated and is not attached to a Fusion account. |
+| **Machine account**        | A managed source account with `isMachine` true.                                                                                                                    |
+| **Owner identity**         | The ISC identity referenced by a machine account's `ownerIdentity`. Distinct from the correlated identity (`identityId`) and from the Fusion source owner.         |
+| **Established owner identity** | An owner identity whose `id` is a non-empty string. A missing `ownerIdentity`, or one without an id, is not established.                                        |
 
 ## Processing states and outcomes
 

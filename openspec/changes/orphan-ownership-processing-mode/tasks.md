@@ -37,17 +37,17 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Confirm canonical test command: `npm test` (global Vitest suite). Run the targeted suites touched above with `npx vitest run` on those files before the full suite
-- [ ] 6.2 All delta spec scenarios covered by named automated tests (coverage evidence for `/opsx:verify`)
+- [x] 6.1 Confirm canonical test command: `npm test` (global Vitest suite). Run the targeted suites touched above with `npx vitest run` on those files before the full suite
+- [x] 6.2 All delta spec scenarios covered by named automated tests (coverage evidence for `/opsx:verify`)
 
 ## 7. Documentation
 
-- [ ] 7.1 Add Orphan processing mode, Assignment mode, Ownership mode, Machine account, Owner identity, and Established owner identity to `docs/glossary.md`, kept distinct from Automatic assignment, Orphan, and the Fusion source owner
-- [ ] 7.2 Document both modes in `docs/use-guides/configuration/source-types.md`, including eligibility, owner write versus correlation, and the existing no-match disable toggle
-- [ ] 7.3 Update the machine-account notes in `docs/use-guides/configuration/configuring-sources-and-scope.md` and `docs/operations/account-list.md` so Ownership mode is the exception to discarding `isMachine` accounts
-- [ ] 7.4 Add the processing-mode field to the per-source table in `docs/use-guides/configuration/configuring-sources-and-scope.md`
-- [ ] 7.5 If task 4.3 found a new PAT scope, add it to `docs/reference/pat-scopes.md` as required only for Ownership mode. Otherwise leave that page unchanged
-- [ ] 7.6 Add JSDoc on the owner-identity write stating it updates `ownerIdentity` and does not correlate
+- [x] 7.1 Add Orphan processing mode, Assignment mode, Ownership mode, Machine account, Owner identity, and Established owner identity to `docs/glossary.md`, kept distinct from Automatic assignment, Orphan, and the Fusion source owner
+- [x] 7.2 Document both modes in `docs/use-guides/configuration/source-types.md`, including eligibility, owner write versus correlation, and the existing no-match disable toggle
+- [x] 7.3 Update the machine-account notes in `docs/use-guides/configuration/configuring-sources-and-scope.md` and `docs/operations/account-list.md` so Ownership mode is the exception to discarding `isMachine` accounts
+- [x] 7.4 Add the processing-mode field to the per-source table in `docs/use-guides/configuration/configuring-sources-and-scope.md`
+- [x] 7.5 If task 4.3 found a new PAT scope, add it to `docs/reference/pat-scopes.md` as required only for Ownership mode. Otherwise leave that page unchanged
+- [x] 7.6 Add JSDoc on the owner-identity write stating it updates `ownerIdentity` and does not correlate
 
 ## 8. Changelog
 
