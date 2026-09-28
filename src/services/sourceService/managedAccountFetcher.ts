@@ -1,4 +1,5 @@
 import { AccountV2025 as Account } from 'sailpoint-api-client'
+import { OrphanProcessingMode, SourceType } from '../../model/config'
 import { FusionRun } from '../../model/fusionRun'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { wrapConnectorError } from '../../utils/error'
@@ -87,6 +88,18 @@ export function isMachineManagedAccount(account: Account): boolean {
 }
 
 /**
+ * An established owner identity has a non-empty id. A missing `ownerIdentity`, or one whose id is blank, is not established.
+ */
+function hasEstablishedOwnerIdentity(account: Account): boolean {
+    const id = account.ownerIdentity?.id
+    return typeof id === 'string' && id.trim().length > 0
+}
+
+function isOwnershipModeSource(source: SourceInfo): boolean {
+    return source.sourceType === SourceType.Orphan && source.config?.orphanProcessingMode === OrphanProcessingMode.Ownership
+}
+
+/**
  * Remove machine accounts from managed-source batches before further processing.
  */
 export function filterManagedMachineAccounts(accounts: Account[]): {
@@ -138,7 +151,11 @@ function collectAccountsFromBatch(
         if (effectiveLimit !== undefined && nextCollected >= effectiveLimit) {
             return { collectedCount: nextCollected, discardedMachineCount, reachedLimit: true }
         }
-        if (isMachineManagedAccount(account)) {
+        if (isOwnershipModeSource(source)) {
+            if (!isMachineManagedAccount(account) || hasEstablishedOwnerIdentity(account)) {
+                continue
+            }
+        } else if (isMachineManagedAccount(account)) {
             discardedMachineCount++
             continue
         }

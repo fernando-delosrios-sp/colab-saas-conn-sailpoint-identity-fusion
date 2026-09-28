@@ -1,7 +1,7 @@
 import { SourceService } from '../sourceService'
 import { buildIdentityAttributeCreateErrorMessage } from '../sourceReverseCorrelationErrors'
 import { SourceInfo } from '../types'
-import { SourceType } from '../../../model/config'
+import { OrphanProcessingMode, SourceType } from '../../../model/config'
 import { FusionRun } from '../../../model/fusionRun'
 
 const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
@@ -231,6 +231,147 @@ describe('SourceService Accounts JMESPath filter', () => {
         expect(() => service.validateAccountJmespathFilters()).toThrow(
             'Invalid Accounts JMESPath filter for source "HR Source"'
         )
+    })
+})
+
+describe('SourceService Ownership fetch registration', () => {
+    const ownershipSource = {
+        sourceType: SourceType.Orphan,
+        orphanProcessingMode: OrphanProcessingMode.Ownership,
+        accountLimit: 1,
+    }
+
+    function mockBatch(service: SourceService, accounts: Record<string, unknown>[]) {
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* () {
+            yield accounts as any
+        })
+    }
+
+    it('registers a correlated unowned machine account', async () => {
+        const { service } = createService(ownershipSource)
+        mockBatch(service, [
+            {
+                id: 'owned-first',
+                sourceId: 'managed-source-id',
+                nativeIdentity: 'owned-1',
+                isMachine: true,
+                ownerIdentity: { type: 'IDENTITY', id: 'owner-1' },
+            },
+            {
+                id: 'correlated',
+                sourceId: 'managed-source-id',
+                nativeIdentity: 'machine-1',
+                isMachine: true,
+                identityId: 'ident-1',
+                uncorrelated: false,
+            },
+        ])
+
+        await service.fetchManagedAccounts()
+
+        expect(service.run.managedAccountsById.has('managed-source-id::machine-1')).toBe(true)
+        expect(service.run.managedAccountsById.has('managed-source-id::owned-1')).toBe(false)
+    })
+
+    it('registers an unowned uncorrelated machine account', async () => {
+        const { service } = createService(ownershipSource)
+        mockBatch(service, [
+            {
+                id: 'uncorrelated',
+                sourceId: 'managed-source-id',
+                nativeIdentity: 'machine-2',
+                isMachine: true,
+                uncorrelated: true,
+                ownerIdentity: { type: 'IDENTITY', id: '   ' },
+            },
+        ])
+
+        await service.fetchManagedAccounts()
+
+        expect(service.run.managedAccountsById.has('managed-source-id::machine-2')).toBe(true)
+    })
+
+    it('skips a machine account with an established owner identity', async () => {
+        const { service } = createService(ownershipSource)
+        const disableSpy = vi.spyOn(service.run, 'queueDisableOperation')
+        mockBatch(service, [
+            {
+                id: 'owned',
+                sourceId: 'managed-source-id',
+                nativeIdentity: 'owned-1',
+                isMachine: true,
+                ownerIdentity: { type: 'IDENTITY', id: 'owner-1' },
+            },
+        ])
+
+        await service.fetchManagedAccounts()
+
+        expect(service.run.managedAccountsById.size).toBe(0)
+        expect(disableSpy).not.toHaveBeenCalled()
+    })
+
+    it('skips a non-machine account on an Ownership source', async () => {
+        const { service } = createService(ownershipSource)
+        const disableSpy = vi.spyOn(service.run, 'queueDisableOperation')
+        mockBatch(service, [
+            {
+                id: 'human',
+                sourceId: 'managed-source-id',
+                nativeIdentity: 'human-1',
+                isMachine: false,
+            },
+            {
+                id: 'eligible',
+                sourceId: 'managed-source-id',
+                nativeIdentity: 'machine-3',
+                isMachine: true,
+            },
+        ])
+
+        await service.fetchManagedAccounts()
+
+        expect(service.run.managedAccountsById.has('managed-source-id::human-1')).toBe(false)
+        expect(service.run.managedAccountsById.has('managed-source-id::machine-3')).toBe(true)
+        expect(disableSpy).not.toHaveBeenCalled()
+    })
+
+    it('discards a machine account on an Assignment-mode Orphan source', async () => {
+        const { service } = createService({ sourceType: SourceType.Orphan })
+        mockBatch(service, [
+            {
+                id: 'machine',
+                sourceId: 'managed-source-id',
+                nativeIdentity: 'machine-4',
+                isMachine: true,
+            },
+            {
+                id: 'human',
+                sourceId: 'managed-source-id',
+                nativeIdentity: 'human-2',
+                isMachine: false,
+            },
+        ])
+
+        await service.fetchManagedAccounts()
+
+        expect(service.run.managedAccountsById.has('managed-source-id::machine-4')).toBe(false)
+        expect(service.run.managedAccountsById.has('managed-source-id::human-2')).toBe(true)
+    })
+
+    it('discards a machine account on an Authoritative source', async () => {
+        const { service } = createService()
+        mockBatch(service, [
+            {
+                id: 'machine',
+                sourceId: 'managed-source-id',
+                nativeIdentity: 'machine-5',
+                isMachine: true,
+            },
+        ])
+
+        await service.fetchManagedAccounts()
+
+        expect(service.run.managedAccountsById.has('managed-source-id::machine-5')).toBe(false)
     })
 })
 
