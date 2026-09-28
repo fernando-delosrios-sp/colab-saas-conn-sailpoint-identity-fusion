@@ -24,6 +24,7 @@ describe('DecisionProcessor', () => {
             definitionService: {} as any,
             mappingService: {} as any,
             accountAssembly: {} as any,
+            sources: { setMachineAccountOwnerIdentity: vi.fn().mockResolvedValue(undefined) } as any,
         })
     })
 
@@ -73,6 +74,7 @@ describe('DecisionProcessor', () => {
             definitionService: {} as any,
             mappingService: {} as any,
             accountAssembly: {} as any,
+            sources: { setMachineAccountOwnerIdentity: vi.fn().mockResolvedValue(undefined) } as any,
         })
 
         await processor.normalizePendingFormStateForOutput()
@@ -97,6 +99,7 @@ describe('DecisionProcessor', () => {
             correlationManager: { applyPerSourceCorrelationIfNeeded } as any,
             definitionService: {} as any,
             mappingService: {} as any,
+            sources: { setMachineAccountOwnerIdentity: vi.fn().mockResolvedValue(undefined) } as any,
             accountAssembly: {
                 assembleAccount,
                 registerFusionAccount,
@@ -147,6 +150,7 @@ describe('DecisionProcessor', () => {
             correlationManager: { applyPerSourceCorrelationIfNeeded: vi.fn() } as any,
             definitionService: {} as any,
             mappingService: {} as any,
+            sources: { setMachineAccountOwnerIdentity: vi.fn().mockResolvedValue(undefined) } as any,
             accountAssembly: {
                 assembleAccount,
                 registerFusionAccount: vi.fn(),

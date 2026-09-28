@@ -65,6 +65,12 @@ import {
  * Handles all source-related operations including finding the fusion source,
  * managing managed sources, and coordinating aggregations.
  */
+function isUnknownMachineAccountId(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false
+    const withStatus = error as { status?: number; response?: { status?: number } }
+    return (withStatus.response?.status ?? withStatus.status) === 404
+}
+
 export class SourceService {
     // Unified source storage - both managed and fusion sources
     private sourcesById: Map<string, SourceInfo> = new Map()
@@ -556,6 +562,95 @@ export class SourceService {
             return undefined
         }
         return candidate
+    }
+
+    /**
+     * Sets `ownerIdentity` on a machine account to the selected identity.
+     * This updates `ownerIdentity` and does not correlate the account: it does not PATCH `/identityId`.
+     * The machine-account update operation does not define an experimental header, so none is sent.
+     * A failed write is logged and does not fail aggregation. No local owned flag is stored, so the next run retries.
+     */
+    public async setMachineAccountOwnerIdentity(
+        account: { id: string; iscAccountId?: string; sourceId?: string; nativeIdentity?: string },
+        identityId: string
+    ): Promise<void> {
+        const ownerIdentity = { type: 'IDENTITY' as const, id: identityId }
+        const fetchedId = this.resolveFetchedMachineAccountId(account)
+        if (fetchedId) {
+            try {
+                await this.patchMachineAccountOwnerIdentity(fetchedId, ownerIdentity)
+                return
+            } catch (error) {
+                if (!isUnknownMachineAccountId(error)) {
+                    this.logOwnerIdentityWriteFailure(account, error)
+                    return
+                }
+            }
+        }
+
+        try {
+            const resolvedId = await this.findMachineAccountIdByNativeIdentity(account)
+            if (!resolvedId || resolvedId === fetchedId) {
+                this.logOwnerIdentityWriteFailure(account, new Error(`Machine account id not found for "${account.id}"`))
+                return
+            }
+            await this.patchMachineAccountOwnerIdentity(resolvedId, ownerIdentity)
+        } catch (error) {
+            this.logOwnerIdentityWriteFailure(account, error)
+        }
+    }
+
+    private resolveFetchedMachineAccountId(account: {
+        id: string
+        iscAccountId?: string
+    }): string | undefined {
+        return trimStr(account.iscAccountId) ?? this.resolveIscAccountIdForManagedKey(account.id)
+    }
+
+    private patchMachineAccountOwnerIdentity(
+        id: string,
+        ownerIdentity: { type: 'IDENTITY'; id: string }
+    ): Promise<unknown> {
+        return this.client.call(
+            (api) =>
+                api.machineAccounts
+                    .updateMachineAccount({
+                        id,
+                        requestBody: [{ op: 'replace', path: '/ownerIdentity', value: ownerIdentity }],
+                    })
+                    .then((response) => response.data),
+            { priority: QueuePriority.LOW, context: 'SourceService>setMachineAccountOwnerIdentity' }
+        )
+    }
+
+    private async findMachineAccountIdByNativeIdentity(account: {
+        sourceId?: string
+        nativeIdentity?: string
+    }): Promise<string | undefined> {
+        const sourceId = trimStr(account.sourceId)
+        const nativeIdentity = trimStr(account.nativeIdentity)
+        if (!sourceId || !nativeIdentity) return undefined
+        const accounts = await this.client.call(
+            (api) =>
+                api.machineAccounts
+                    .listMachineAccounts({
+                        filters: `source.id eq "${sourceId}" and nativeIdentity eq "${nativeIdentity}"`,
+                        limit: 1,
+                    })
+                    .then((response) => response.data ?? []),
+            { priority: QueuePriority.LOW, context: 'SourceService>findMachineAccountIdByNativeIdentity' }
+        )
+        return trimStr(accounts?.[0]?.id)
+    }
+
+    private logOwnerIdentityWriteFailure(
+        account: { id: string; nativeIdentity?: string },
+        error: unknown
+    ): void {
+        const detail = error instanceof Error ? error.message : String(error)
+        this.log.error(
+            `Failed to set owner identity for machine account "${account.nativeIdentity ?? account.id}": ${detail}`
+        )
     }
 
     // ------------------------------------------------------------------------

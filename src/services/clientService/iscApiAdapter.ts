@@ -1,4 +1,4 @@
-import { Configuration, AccountsV2025Api, IdentitiesV2025Api, SearchApi, SourcesV2025Api, CustomFormsV2025Api, WorkflowsV2025Api, EntitlementsV2025Api, TransformsApi, GovernanceGroupsV2025Api, TaskManagementV2025Api, IdentityProfilesV2025Api, IdentityAttributesV2025Api } from 'sailpoint-api-client'
+import { Configuration, AccountsV2025Api, IdentitiesV2025Api, SearchApi, SourcesV2025Api, CustomFormsV2025Api, WorkflowsV2025Api, EntitlementsV2025Api, TransformsApi, GovernanceGroupsV2025Api, TaskManagementV2025Api, IdentityProfilesV2025Api, IdentityAttributesV2025Api, MachineAccountsV2025Api } from 'sailpoint-api-client'
 
 /**
  * Interface defining the ISC API communication seam.
@@ -18,4 +18,5 @@ export interface IscApiAdapter {
     readonly taskManagementApi: TaskManagementV2025Api
     readonly identityProfilesApi: IdentityProfilesV2025Api
     readonly identityAttributesApi: IdentityAttributesV2025Api
+    readonly machineAccountsApi: MachineAccountsV2025Api
 }

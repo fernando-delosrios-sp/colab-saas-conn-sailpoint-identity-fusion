@@ -31,6 +31,7 @@ vi.mock('../clientService/sdkApiAdapter', () => ({
         taskManagementApi = {}
         identityProfilesApi = {}
         identityAttributesApi = {}
+        machineAccountsApi = {}
     },
 }))
 

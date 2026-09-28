@@ -20,14 +20,14 @@
 
 ## 4. Owner identity write
 
-- [ ] 4.1 Add a SourceService method that sets owner identity through `MachineAccountsApi.updateMachineAccount`, JSON Patch `/ownerIdentity` to `{ type: 'IDENTITY', id }`, using the fetched account id, via the existing client queue
-- [ ] 4.2 If that call reports an unknown id, resolve the machine account by source id and `nativeIdentity` and patch that id. Do not PATCH `/identityId`
-- [ ] 4.3 Pass the SDK experimental header only if a call without it is rejected. If the API requires a PAT scope other than `idn:accounts:manage`, record that scope for the documentation task
-- [ ] 4.4 On a failed owner write, log the error, do not fail the aggregation, and do not store a local owned flag so the next run retries
-- [ ] 4.5 In `DecisionProcessor.processFusionIdentityDecision`, branch Ownership-mode authorized decisions (automatic merge and reviewer selection) to the owner write. Do not call `CorrelationManager`, do not change `identityId`, and do not attach the machine account as a contributing or missing account on a Fusion account. Ignore correlation mode for that write
-- [ ] 4.6 Keep Assignment-mode reviewer selection on the existing correlation path
-- [ ] 4.7 Apply the same owner-write branch for a reviewer no-match only as a drop: no owner write, and disable only when Disable non-matching accounts is on
-- [ ] 4.8 Test automatic merge owner write, reviewer selection owner write, Assignment-mode reviewer selection still correlating, reviewer no-match without disable, and reviewer no-match with disable
+- [x] 4.1 Add a SourceService method that sets owner identity through `MachineAccountsApi.updateMachineAccount`, JSON Patch `/ownerIdentity` to `{ type: 'IDENTITY', id }`, using the fetched account id, via the existing client queue
+- [x] 4.2 If that call reports an unknown id, resolve the machine account by source id and `nativeIdentity` and patch that id. Do not PATCH `/identityId`
+- [x] 4.3 Pass the SDK experimental header only if a call without it is rejected. If the API requires a PAT scope other than `idn:accounts:manage`, record that scope for the documentation task
+- [x] 4.4 On a failed owner write, log the error, do not fail the aggregation, and do not store a local owned flag so the next run retries
+- [x] 4.5 In `DecisionProcessor.processFusionIdentityDecision`, branch Ownership-mode authorized decisions (automatic merge and reviewer selection) to the owner write. Do not call `CorrelationManager`, do not change `identityId`, and do not attach the machine account as a contributing or missing account on a Fusion account. Ignore correlation mode for that write
+- [x] 4.6 Keep Assignment-mode reviewer selection on the existing correlation path
+- [x] 4.7 Apply the same owner-write branch for a reviewer no-match only as a drop: no owner write, and disable only when Disable non-matching accounts is on
+- [x] 4.8 Test automatic merge owner write, reviewer selection owner write, Assignment-mode reviewer selection still correlating, reviewer no-match without disable, and reviewer no-match with disable
 
 ## 5. Review form copy
 

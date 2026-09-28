@@ -32,6 +32,7 @@ describe('ClientService', () => {
             taskManagementApi: {} as any,
             identityProfilesApi: {} as any,
             identityAttributesApi: {} as any,
+            machineAccountsApi: {} as any,
         }
 
         mockQueue = {

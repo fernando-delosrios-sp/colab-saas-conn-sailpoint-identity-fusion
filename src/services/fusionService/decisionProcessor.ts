@@ -15,6 +15,8 @@ import type { CorrelationManager } from '../correlationManager'
 import type { DefinitionService } from '../definitionService'
 import type { MappingService } from '../mappingService'
 import { applyNonAuthoritativeNoMatch } from '../matchingService/matchOutcomeDispatcher'
+import { isOwnershipModeSource } from '../sourceService/managedAccountFetcher'
+import type { SourceService } from '../sourceService'
 import { AccountAssembly } from '../accountAssembly'
 import {
     formatDecisionCountsSegment,
@@ -29,6 +31,7 @@ export interface DecisionProcessorDeps {
     definitionService: DefinitionService
     mappingService: MappingService
     accountAssembly: AccountAssembly
+    sources: SourceService
 }
 
 export class DecisionProcessor {
@@ -181,12 +184,19 @@ export class DecisionProcessor {
      */
     public async processFusionIdentityDecision(fusionDecision: FusionDecision): Promise<FusionAccount | undefined> {
         const sourceType = fusionDecision.sourceType ?? SourceType.Authoritative
+        const sourceInfo = this.run.sourcesByName.get(fusionDecision.account.sourceName)
+        const isAuthorizedDecision = !fusionDecision.newIdentity
+
+        const selectedIdentityId = trimStr(fusionDecision.identityId)
+        if (isAuthorizedDecision && isOwnershipModeSource(sourceInfo) && selectedIdentityId) {
+            await this.deps.sources.setMachineAccountOwnerIdentity(fusionDecision.account, selectedIdentityId)
+            return undefined
+        }
 
         // Enrich submitter and selected identity display names for user-facing output.
         await this.enrichDecisionSubmitter(fusionDecision)
         let selectedIdentity = await this.enrichDecisionIdentityName(fusionDecision)
 
-        const isAuthorizedDecision = !fusionDecision.newIdentity
         const existingIdentityAccount =
             isAuthorizedDecision && fusionDecision.identityId
                 ? this.resolveAuthorizedMergeTarget(fusionDecision.identityId)
@@ -233,7 +243,6 @@ export class DecisionProcessor {
         }
 
         if (fusionDecision.newIdentity) {
-            const sourceInfo = this.run.sourcesByName.get(fusionDecision.account.sourceName)
             if (await applyNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccountForNoMatch, {
                 definitionService: this.deps.definitionService,
                 mappingService: this.deps.mappingService,

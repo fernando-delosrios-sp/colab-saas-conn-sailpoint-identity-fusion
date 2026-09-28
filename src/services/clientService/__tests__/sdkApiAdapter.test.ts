@@ -76,6 +76,7 @@ vi.mock('sailpoint-api-client', () => ({
     TaskManagementV2025Api: mockApiCtor(),
     IdentityProfilesV2025Api: mockApiCtor(),
     IdentityAttributesV2025Api: mockApiCtor(),
+    MachineAccountsV2025Api: mockApiCtor(),
 }))
 
 import { SdkApiAdapter } from '../sdkApiAdapter'

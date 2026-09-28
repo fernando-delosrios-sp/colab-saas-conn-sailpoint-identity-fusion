@@ -130,6 +130,7 @@ export class ReplayApiAdapter implements IscApiAdapter {
     get taskManagementApi() { return this.createApiProxy('taskManagement') as any }
     get identityProfilesApi() { return this.createApiProxy('identityProfiles') as any }
     get identityAttributesApi() { return this.createApiProxy('identityAttributes') as any }
+    get machineAccountsApi() { return this.createApiProxy('machineAccounts') as any }
 }
 
 export function loadApiLog(fileOrDirPath: string): ApiLogEntry[] {

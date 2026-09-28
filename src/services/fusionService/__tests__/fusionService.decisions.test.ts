@@ -1,5 +1,6 @@
 import { createFusionServiceTestContext, seedRunInventory, type FusionServiceTestContext } from './fusionService.testFixtures'
 import { FusionAccount } from '../../../model/account'
+import { OrphanProcessingMode, SourceType } from '../../../model/config'
 import { StatusEntitlement } from '../../../model/statusEntitlement'
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 
@@ -574,6 +575,159 @@ describe('FusionService — decisions', () => {
                     h.includes('Merged Unknown account [Unknown source] into existing identity by Unknown reviewer')
                 )
             ).toBe(true)
+        })
+    })
+
+    describe('Ownership mode decisions', () => {
+        function ownershipDecision(overrides: Record<string, unknown> = {}) {
+            return {
+                submitter: { id: 'reviewer-1', email: 'reviewer@example.com', name: 'Reviewer' },
+                account: {
+                    id: 'src-m::machine-1',
+                    iscAccountId: 'fetched-id',
+                    name: 'Build Bot',
+                    sourceName: 'Machines',
+                    sourceId: 'src-m',
+                    nativeIdentity: 'machine-1',
+                },
+                newIdentity: false,
+                identityId: 'identity-1',
+                comments: 'Choose owner',
+                finished: true,
+                sourceType: 'orphan',
+                ...overrides,
+            } as any
+        }
+
+        function seedOwnershipSource(disableNonMatchingAccounts = false) {
+            ctx.fusionService.run.sourcesByName.set('Machines', {
+                id: 'src-m',
+                name: 'Machines',
+                isManaged: true,
+                sourceType: SourceType.Orphan,
+                config: {
+                    orphanProcessingMode: OrphanProcessingMode.Ownership,
+                    correlationMode: 'correlate',
+                    disableNonMatchingAccounts,
+                },
+            })
+        }
+
+        it('writes the owner identity for an automatic merge', async () => {
+            seedOwnershipSource()
+            const setOwner = vi.spyOn(ctx.mockSources, 'setMachineAccountOwnerIdentity').mockResolvedValue(undefined)
+            ctx.mockIdentities.correlateAccounts.mockResolvedValue(true)
+
+            const decision = ownershipDecision({
+                submitter: { id: 'system', email: '', name: 'System (automatic merge)' },
+                automaticMerge: true,
+            })
+            const result = await ctx.fusionService.processFusionIdentityDecision(decision)
+
+            expect(result).toBeUndefined()
+            expect(setOwner).toHaveBeenCalledWith(decision.account, 'identity-1')
+            expect(ctx.mockIdentities.correlateAccounts).not.toHaveBeenCalled()
+        })
+
+        it('writes the owner identity for a reviewer selection', async () => {
+            const existingIdentity = {
+                id: 'identity-1',
+                name: 'Existing Identity',
+                accounts: [],
+                attributes: {},
+            } as unknown as IdentityDocument
+            const existingFusionAccount = FusionAccount.fromIdentity(existingIdentity)
+            ctx.fusionService.setFusionAccount(existingFusionAccount)
+            seedOwnershipSource()
+            const setOwner = vi.spyOn(ctx.mockSources, 'setMachineAccountOwnerIdentity').mockResolvedValue(undefined)
+            ctx.mockIdentities.correlateAccounts.mockResolvedValue(true)
+
+            const decision = ownershipDecision()
+            const result = await ctx.fusionService.processFusionIdentityDecision(decision)
+
+            expect(result).toBeUndefined()
+            expect(setOwner).toHaveBeenCalledWith(decision.account, 'identity-1')
+            expect(ctx.mockIdentities.correlateAccounts).not.toHaveBeenCalled()
+            expect(ctx.fusionService.getFusionIdentity('identity-1')).toBe(existingFusionAccount)
+        })
+
+        it('still correlates an Assignment-mode reviewer selection', async () => {
+            ctx.fusionService.run.sourcesByName.set('Orphans', {
+                id: 'src-o',
+                name: 'Orphans',
+                isManaged: true,
+                sourceType: SourceType.Orphan,
+                config: { orphanProcessingMode: OrphanProcessingMode.Assignment, correlationMode: 'correlate' },
+            })
+            const setOwner = vi.spyOn(ctx.mockSources, 'setMachineAccountOwnerIdentity').mockResolvedValue(undefined)
+            ctx.mockIdentities.correlateAccounts.mockResolvedValue(true)
+            vi.spyOn(ctx.mockSources, 'getSourceConfig').mockReturnValue({
+                name: 'Orphans',
+                correlationMode: 'correlate',
+                sourceType: SourceType.Orphan,
+                orphanProcessingMode: OrphanProcessingMode.Assignment,
+            } as any)
+            const managedKey = 'src-o::human-1'
+            seedRunInventory(ctx.run, new Map([[managedKey, { id: 'acct-h', nativeIdentity: 'human-1', sourceId: 'src-o' } as Account]]))
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+
+            const decision = ownershipDecision({
+                account: {
+                    id: managedKey,
+                    name: 'Human',
+                    sourceName: 'Orphans',
+                    sourceId: 'src-o',
+                    nativeIdentity: 'human-1',
+                },
+            })
+            await ctx.fusionService.processFusionIdentityDecision(decision)
+
+            expect(setOwner).not.toHaveBeenCalled()
+            expect(ctx.mockIdentities.correlateAccounts).toHaveBeenCalled()
+        })
+
+        function seedManagedAccount(account: Account) {
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(
+                new Map([['src-m::machine-1', account]])
+            )
+        }
+
+        it('does not set an owner identity or disable a reviewer no-match', async () => {
+            seedOwnershipSource(false)
+            const setOwner = vi.spyOn(ctx.mockSources, 'setMachineAccountOwnerIdentity').mockResolvedValue(undefined)
+            const disableSpy = vi.spyOn(ctx.fusionService.run, 'queueDisableOperation')
+            seedManagedAccount({
+                id: 'fetched-id',
+                nativeIdentity: 'machine-1',
+                sourceId: 'src-m',
+                sourceName: 'Machines',
+            } as Account)
+
+            const result = await ctx.fusionService.processFusionIdentityDecision(ownershipDecision({ newIdentity: true, identityId: undefined }))
+
+            expect(result).toBeUndefined()
+            expect(setOwner).not.toHaveBeenCalled()
+            expect(disableSpy).not.toHaveBeenCalled()
+        })
+
+        it('queues disable for a reviewer no-match when configured', async () => {
+            seedOwnershipSource(true)
+            const setOwner = vi.spyOn(ctx.mockSources, 'setMachineAccountOwnerIdentity').mockResolvedValue(undefined)
+            const disableSpy = vi.spyOn(ctx.fusionService.run, 'queueDisableOperation').mockImplementation(() => {})
+            const account = {
+                id: 'fetched-id',
+                nativeIdentity: 'machine-1',
+                sourceId: 'src-m',
+                sourceName: 'Machines',
+            } as Account
+            seedManagedAccount(account)
+
+            const result = await ctx.fusionService.processFusionIdentityDecision(ownershipDecision({ newIdentity: true, identityId: undefined }))
+
+            expect(result).toBeUndefined()
+            expect(setOwner).not.toHaveBeenCalled()
+            expect(disableSpy).toHaveBeenCalledWith(account)
         })
     })
 
