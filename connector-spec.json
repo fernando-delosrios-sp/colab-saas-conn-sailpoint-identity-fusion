@@ -479,7 +479,7 @@
                                             "label": "Existing attributes",
                                             "type": "list",
                                             "required": true,
-                                            "helpKey": "Source attribute names to pull values from."
+                                            "helpKey": "Names to pull values from, tried in order. Explicit maps run in list order, so a later map can read an earlier new attribute, that prior mapped value wins over the same snapshot name, and a selective map does not use maps it did not request."
                                         }
                                     ]
                                 },
