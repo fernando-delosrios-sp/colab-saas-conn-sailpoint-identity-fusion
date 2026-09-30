@@ -1767,6 +1767,51 @@ describe('FormService finished decision reporting metadata', () => {
 
         expect((service as any).finishedFusionDecisionsValue[0].account.iscAccountId).toBe('isc-report-1')
     })
+
+    it('stores isMachine when registering a finished machine-account decision', () => {
+        const managedKey = 'source-a-id::machine-report-1'
+        const managedAccountInventory = new Map<string, any>([
+            [managedKey, { id: 'isc-machine-1', name: 'Batch Bot', sourceName: 'Source A', isMachine: true }],
+        ])
+        const run = {
+            fusionIdentityDecisions: [],
+            addFinishedFusionDecision: vi.fn(),
+            addDecision: vi.fn(),
+            managedAccountsById: new Map(),
+            managedAccountInventory,
+            hasManagedAccount: (key: string) => managedAccountInventory.has(key),
+            getManagedAccountInfo: (key: string) => managedAccountInventory.get(key),
+            getFusionAccountByManagedKey: vi.fn(() => undefined),
+            getFusionIdentity: vi.fn(() => undefined),
+            allFusionAccounts: [],
+            allFusionIdentities: [],
+        }
+        const sources = {
+            resolveIscAccountIdForManagedKey: vi.fn((key: string) => managedAccountInventory.get(key)?.id),
+        }
+        const service = new FormService(
+            { fusionFormNamePattern: 'Fusion Review', fusionFormExpirationDays: 1 } as any,
+            { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() } as any,
+            {} as any,
+            sources as any,
+            undefined,
+            undefined,
+            run as any
+        )
+
+        ;(service as any).registerFinishedDecision({
+            submitter: { id: 'system', email: '', name: 'System (automatic merge)' },
+            account: { id: managedKey, name: 'Batch Bot', sourceName: 'Source A' },
+            newIdentity: false,
+            identityId: 'identity-report-1',
+            comments: 'Automatically merged',
+            finished: true,
+            automaticMerge: true,
+        })
+
+        expect((service as any).finishedFusionDecisionsValue[0].account.isMachine).toBe(true)
+        expect((service as any).finishedFusionDecisionsValue[0].account.iscAccountId).toBe('isc-machine-1')
+    })
 })
 describe('FormService finished decision reviewer metadata', () => {
     it('stores submitter display name when registering finished decisions', () => {

@@ -30,7 +30,10 @@ import {
 } from './collections'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { measureMs } from '../../utils/measureMs'
-import { buildFusionReport, buildMatchingResultsSnapshot as buildMatchingResultsSnapshotFromState } from './fusionReportBuilder'
+import {
+    buildFusionReport,
+    buildMatchingResultsSnapshot as buildMatchingResultsSnapshotFromState,
+} from './fusionReportBuilder'
 import { skipBlendHistoryKeysForDecisionAccountId } from './helpers'
 import { ManagedAccountAnalysisRecorder } from './managedAccountAnalysisRecorder'
 import { AggregationTracker } from './aggregationTracker'
@@ -498,7 +501,7 @@ export class FusionService {
         const fusionAccount = FusionAccount.fromFusionAccount(account)
         this.log.debug(
             `Pre-processing fusion account: ${fusionAccount.name} (${fusionAccount.managedKey}), ` +
-            `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
+                `identityId=${fusionAccount.identityId ?? 'none'}, disabled=${fusionAccount.disabled}, uncorrelated=${fusionAccount.uncorrelated}`
         )
 
         assert(this.run.managedAccountsById, 'Managed accounts have not been loaded')
@@ -517,8 +520,7 @@ export class FusionService {
         this.log.recordRefreshSubStep('prelude', preludeMs)
 
         const managedLayerMs = await measureMs(async () => {
-            const hasEligibleAlwaysRecalculate =
-                this.definitionService.hasEligibleAlwaysRecalculate(fusionAccount)
+            const hasEligibleAlwaysRecalculate = this.definitionService.hasEligibleAlwaysRecalculate(fusionAccount)
             await this.accountAssembly.addManagedAccountLayer(fusionAccount, {
                 addBlendHistory: true,
                 skipBlendHistoryForManagedKeys,
@@ -553,7 +555,11 @@ export class FusionService {
         this.log.recordRefreshSubStep('uniqueRegister', uniqueRegisterMs)
 
         fusionAccount.setNeedsRefresh(
-            fusionAccount.needsRefresh || resetDefinition || refreshDefinition || refreshMapping || this.config.forceAttributeRefresh
+            fusionAccount.needsRefresh ||
+                resetDefinition ||
+                refreshDefinition ||
+                refreshMapping ||
+                this.config.forceAttributeRefresh
         )
         fusionAccount.setNeedsReset(resetDefinition)
 
@@ -629,9 +635,9 @@ export class FusionService {
             originIdentityInScope !== undefined
                 ? originIdentityInScope
                 : await this.identities.resolveOriginIdentityInScope(
-                    originIdentityId,
-                    this.identities.getIdentityById(originIdentityId)
-                )
+                      originIdentityId,
+                      this.identities.getIdentityById(originIdentityId)
+                  )
         fusionAccount.setOriginIdentityInScope(inScope)
     }
 
@@ -645,7 +651,7 @@ export class FusionService {
 
         this.log.debug(
             `Completed processing fusion account: ${fusionAccount.name}, ` +
-            `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
+                `needsRefresh=${fusionAccount.needsRefresh}, sources=[${fusionAccount.sources.join(', ')}]`
         )
 
         this.accountAssembly.registerFusionAccount(fusionAccount)
@@ -1001,7 +1007,9 @@ export class FusionService {
         let count = 0
 
         const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
-        const eligibleAccounts = this.deleteEmpty ? allAccounts.filter((account) => !account.collections.statuses.isOrphan()) : allAccounts
+        const eligibleAccounts = this.deleteEmpty
+            ? allAccounts.filter((account) => !account.collections.statuses.isOrphan())
+            : allAccounts
 
         const totalEligible = eligibleAccounts.length
         const totalBatches = Math.ceil(totalEligible / batchSize)
@@ -1282,7 +1290,7 @@ export class FusionService {
         if (globalOwnerIds.length === 0) {
             this.log.warn(
                 'Owners are global reviewers is enabled but no Fusion source owner identity IDs were resolved. ' +
-                'Configure a Fusion source owner (or governance group) or assign per-source reviewer entitlements.'
+                    'Configure a Fusion source owner (or governance group) or assign per-source reviewer entitlements.'
             )
             return
         }
@@ -1292,7 +1300,7 @@ export class FusionService {
             if (!reviewer) {
                 this.log.warn(
                     `Global reviewer identity ${reviewerId} is not available as a Fusion identity; ` +
-                    'skipping global reviewer registration for this identity.'
+                        'skipping global reviewer registration for this identity.'
                 )
                 continue
             }
@@ -1464,7 +1472,9 @@ export class FusionService {
             accountName: fusionAccount.name ?? fusionAccount.identityId ?? 'Unknown',
             accountUrl: fusionAccount.identityId ? this.urlContext.identity(fusionAccount.identityId) : undefined,
             blendedAccountName,
-            blendedAccountUrl: blendedAccountId ? this.urlContext.humanAccount(blendedAccountId) : undefined,
+            blendedAccountUrl: blendedAccountId
+                ? this.urlContext.accountManagement(blendedAccountId, account.isMachine === true)
+                : undefined,
             blendedSource: sourceName,
         }
     }

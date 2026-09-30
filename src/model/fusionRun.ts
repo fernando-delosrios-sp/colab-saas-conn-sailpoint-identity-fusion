@@ -21,6 +21,8 @@ export type ManagedAccountInfo = {
     sourceId?: string
     nativeIdentity?: string
     identityId?: string
+    /** Set when the managed account is a machine account (`Account.isMachine`). */
+    isMachine?: boolean
 }
 
 export function toManagedAccountInfo(account: Account): ManagedAccountInfo {
@@ -31,6 +33,7 @@ export function toManagedAccountInfo(account: Account): ManagedAccountInfo {
         sourceId: account.sourceId,
         nativeIdentity: account.nativeIdentity,
         identityId: account.identityId,
+        ...(account.isMachine === true ? { isMachine: true } : {}),
     }
 }
 

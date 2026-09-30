@@ -132,13 +132,16 @@ export function buildAccountUrl(uiOrigin: string | undefined, accountId: string 
 }
 
 /**
- * Builds a URL to a human account in Accounts Management in the ISC UI.
+ * Builds a URL to an account in Accounts Management in the ISC UI.
+ * Machine accounts use `machine-accounts`; every other account uses `human-accounts`.
  */
-function buildHumanAccountManagementUrl(
+export function buildAccountManagementUrl(
     uiOrigin: string | undefined,
-    accountId: string | undefined
+    accountId: string | undefined,
+    isMachine?: boolean
 ): string | undefined {
-    return buildAdminUrl(uiOrigin, accountId, (encodedId) => `accounts-management/human-accounts/${encodedId}`)
+    const segment = isMachine ? 'machine-accounts' : 'human-accounts'
+    return buildAdminUrl(uiOrigin, accountId, (encodedId) => `accounts-management/${segment}/${encodedId}`)
 }
 
 // ============================================================================
@@ -214,6 +217,8 @@ export interface UrlContext {
     source: (id: string | undefined) => string | undefined
     sourceAccounts: (id: string | undefined) => string | undefined
     account: (id: string | undefined) => string | undefined
+    /** Accounts Management link. `isMachine` selects `machine-accounts`; otherwise `human-accounts`. */
+    accountManagement: (id: string | undefined, isMachine?: boolean) => string | undefined
     humanAccount: (id: string | undefined) => string | undefined
     workflow: (id: string | undefined) => string | undefined
     form: (id: string | undefined) => string | undefined
@@ -229,9 +234,9 @@ export function createUrlContext(baseUrl: string | undefined): UrlContext {
         source: (id) => buildSourceUrl(uiOrigin, id),
         sourceAccounts: (id) => buildSourceAccountsUrl(uiOrigin, id),
         account: (id) => buildAccountUrl(uiOrigin, id),
-        humanAccount: (id) => buildHumanAccountManagementUrl(uiOrigin, id),
+        accountManagement: (id, isMachine) => buildAccountManagementUrl(uiOrigin, id, isMachine),
+        humanAccount: (id) => buildAccountManagementUrl(uiOrigin, id, false),
         workflow: (id) => buildWorkflowUrl(uiOrigin, id),
         form: (id) => buildFormDefinitionUrl(uiOrigin, id),
     }
 }
-

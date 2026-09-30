@@ -384,6 +384,22 @@ describe('FusionRun', () => {
         expect(run.getManagedAccountInfo('src-a::native-1')?.identityId).toBe('identity-1')
     })
 
+    it('inventory retains isMachine for a machine account', () => {
+        const run = new FusionRun()
+        const account = {
+            id: 'isc-machine',
+            sourceId: 'src-a',
+            sourceName: 'Source A',
+            nativeIdentity: 'machine-1',
+            name: 'Batch Bot',
+            isMachine: true,
+        } as any
+        run.setManagedAccount('src-a::machine-1', account)
+        run.claimAccount('src-a::machine-1')
+
+        expect(run.getManagedAccountInfo('src-a::machine-1')?.isMachine).toBe(true)
+    })
+
     it('snapshot includes identity-linked fusion accounts separately from managed-key map', () => {
         const run = new FusionRun()
         ;(run as any).fusionAccountMapValue.set('managed-key', { name: 'managed-fa', managedKey: 'managed-key' } as any)

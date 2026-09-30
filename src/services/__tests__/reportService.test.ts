@@ -64,13 +64,17 @@ describe('ReportService', () => {
                     (overrides.sources as any)?.managedAccountInventory ??
                     new Map<string, any>(),
                 hasManagedAccount: (key: string) =>
-                    ((overrides.run as any)?.managedAccountInventory ??
+                    (
+                        (overrides.run as any)?.managedAccountInventory ??
                         (overrides.sources as any)?.managedAccountInventory ??
-                        new Map<string, any>()).has(key),
+                        new Map<string, any>()
+                    ).has(key),
                 getManagedAccountInfo: (key: string) =>
-                    ((overrides.run as any)?.managedAccountInventory ??
+                    (
+                        (overrides.run as any)?.managedAccountInventory ??
                         (overrides.sources as any)?.managedAccountInventory ??
-                        new Map<string, any>()).get(key),
+                        new Map<string, any>()
+                    ).get(key),
             },
             ...(overrides.run ?? {}),
         }
@@ -133,8 +137,6 @@ describe('ReportService', () => {
             automaticMerge: undefined,
         })
     })
-
-
 
     it('resolves reviewer display name from identity.name when displayName is absent', () => {
         const reviewerId = '9d86f225e3a24b1a9e3d10d92ec12005'
@@ -229,7 +231,6 @@ describe('ReportService', () => {
         expect(decisions[0].accountUrl).not.toContain('::')
     })
 
-
     it('uses stored iscAccountId for automatic merge review decisions after managed account caches clear', () => {
         const { service } = createService({
             forms: {
@@ -254,6 +255,64 @@ describe('ReportService', () => {
 
         expect(decisions[0].accountUrl).toBe(
             'https://example.identitynow.com/ui/a/admin/accounts-management/human-accounts/isc-auto-1'
+        )
+    })
+
+    it('links a machine account to machine-accounts after managed account caches clear', () => {
+        const { service } = createService({
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        identityId: 'id-machine',
+                        newIdentity: false,
+                        submitter: { id: 'rev-m', name: 'Reviewer Machine' },
+                        account: {
+                            id: 'src-a::machine-1',
+                            iscAccountId: 'isc-machine-1',
+                            isMachine: true,
+                            name: 'Batch Bot',
+                            sourceName: 'Orphan Source',
+                        },
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+
+        expect(decisions[0].accountUrl).toBe(
+            'https://example.identitynow.com/ui/a/admin/accounts-management/machine-accounts/isc-machine-1'
+        )
+    })
+
+    it('links a machine account from managed account inventory when the decision does not store isMachine', () => {
+        const managedAccountKey = 'src-a::machine-2'
+        const managedAccountInventory = new Map<string, any>([
+            [managedAccountKey, { id: 'isc-machine-2', name: 'Nightly Job', isMachine: true }],
+        ])
+
+        const { service } = createService({
+            sources: { managedAccountInventory },
+            forms: {
+                finishedFusionDecisions: [
+                    {
+                        identityId: 'id-machine-2',
+                        newIdentity: false,
+                        submitter: { id: 'rev-m2', name: 'Reviewer Two' },
+                        account: {
+                            id: managedAccountKey,
+                            name: 'Nightly Job',
+                            sourceName: 'Orphan Source',
+                        },
+                    },
+                ],
+            },
+        })
+
+        const decisions = service.buildFusionReviewDecisions()
+
+        expect(decisions[0].accountUrl).toBe(
+            'https://example.identitynow.com/ui/a/admin/accounts-management/machine-accounts/isc-machine-2'
         )
     })
 
@@ -313,16 +372,16 @@ describe('ReportService', () => {
     })
 
     it('prefers correlated identity display name over managed account name fallback for merge-existing decisions', () => {
-        const managedAccountInventory = new Map<string, any>([
-            ['key-1', { id: 'key-1', name: 'Raw Managed Name' }],
-        ])
+        const managedAccountInventory = new Map<string, any>([['key-1', { id: 'key-1', name: 'Raw Managed Name' }]])
 
         const { service } = createService({
             sources: {
                 managedAccountInventory,
             },
             identities: {
-                getIdentityById: vi.fn((id?: string) => (id ? { id, displayName: 'Correlated Identity Name' } : undefined)),
+                getIdentityById: vi.fn((id?: string) =>
+                    id ? { id, displayName: 'Correlated Identity Name' } : undefined
+                ),
             },
             forms: {
                 finishedFusionDecisions: [
@@ -466,7 +525,6 @@ describe('ReportService', () => {
 
         expect(stats.totalFusionAccounts).toBe(42)
     })
-
 
     it('preloads reviewer identities via ensureIdentityById before rendering decisions', async () => {
         const reviewerId = 'rev-preload'
@@ -737,9 +795,7 @@ describe('ReportService', () => {
         expect(html).toContain('Identity</td>')
         expect(html).toContain('href="https://example.identitynow.com/ui/a/admin/identities/id-1"')
         expect(html).toContain('Blended Account</td>')
-        expect(html).toContain(
-            'href="https://example.identitynow.com/ui/a/admin/identities/id-1/accounts/acct-1"'
-        )
+        expect(html).toContain('href="https://example.identitynow.com/ui/a/admin/identities/id-1/accounts/acct-1"')
         expect(html).toContain('john.williams</a> [MelonHRM]')
     })
 
@@ -757,23 +813,14 @@ describe('ReportService', () => {
             nonMatchedAccounts: 4,
         } as any
 
-        const fusionHtml = service.renderFusionReportHtml(
-            report,
-            'fusion',
-            ReportService.FUSION_REPORT_EMAIL_TITLE
-        )
-        const dryRunHtml = service.renderFusionReportHtml(
-            report,
-            'aggregation',
-            ReportService.DRY_RUN_REPORT_TITLE
-        )
+        const fusionHtml = service.renderFusionReportHtml(report, 'fusion', ReportService.FUSION_REPORT_EMAIL_TITLE)
+        const dryRunHtml = service.renderFusionReportHtml(report, 'aggregation', ReportService.DRY_RUN_REPORT_TITLE)
 
         expect(fusionHtml).toContain('Pat Candidate')
         expect(dryRunHtml).toContain('Pat Candidate')
         expect(fusionHtml).toContain('Pat Identity')
         expect(dryRunHtml).toContain('Pat Identity')
-        const stripTitle = (html: string) =>
-            html.replace(/Identity Fusion (Dry Run |Aggregation )?Report/g, '')
+        const stripTitle = (html: string) => html.replace(/Identity Fusion (Dry Run |Aggregation )?Report/g, '')
         expect(stripTitle(fusionHtml)).toBe(stripTitle(dryRunHtml))
     })
 
@@ -793,8 +840,3 @@ describe('ReportService', () => {
         expect(html).toContain('Reporte de agregación de Identity Fusion')
     })
 })
-
-
-
-
-

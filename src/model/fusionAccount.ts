@@ -36,6 +36,8 @@ export class FusionAccount {
     private emailValue?: string
     private nameValue?: string
     private sourceNameValue = ''
+    /** Machine account flag from the originating managed account. Public so run snapshots keep it. */
+    isMachine?: boolean
     private typeValue: FusionAccountKind = FusionAccountKind.Fusion
     private modifiedValue?: string
     private identityInfoValue?: IdentityInfo
@@ -71,9 +73,7 @@ export class FusionAccount {
         FusionAccount.config = config
     }
 
-    static buildIdentityInfo(
-        source: Parameters<typeof buildIdentityInfo>[0]
-    ): ReturnType<typeof buildIdentityInfo> {
+    static buildIdentityInfo(source: Parameters<typeof buildIdentityInfo>[0]): ReturnType<typeof buildIdentityInfo> {
         return buildIdentityInfo(source)
     }
 
@@ -109,6 +109,7 @@ export class FusionAccount {
         if (seed.identityInfo !== undefined) this.identityInfoValue = seed.identityInfo
         if (seed.name) this.nameValue = seed.name
         if (seed.sourceName) this.sourceNameValue = seed.sourceName
+        if (seed.isMachine === true) this.isMachine = true
         if (seed.attributeBagCurrent !== undefined) {
             this.attributeBagValue.current = seed.attributeBagCurrent
         }
@@ -375,10 +376,7 @@ export class FusionAccount {
         )
     }
 
-    addManagedAccountLayer(
-        workQueue: FusionRun,
-        options: AddManagedAccountOptions = {}
-    ): void {
+    addManagedAccountLayer(workQueue: FusionRun, options: AddManagedAccountOptions = {}): void {
         this.layers.addManagedAccountLayer(
             workQueue,
             this.attributeBagValue,
@@ -467,11 +465,7 @@ export class FusionAccount {
      * Remove a source-account reference, binding origin metadata that collections alone do not own.
      */
     removeSourceAccount(id: string): void {
-        this.collections.accounts.removeSourceAccount(
-            id,
-            this.fromIdentity,
-            this.layers.originIdentityInScope
-        )
+        this.collections.accounts.removeSourceAccount(id, this.fromIdentity, this.layers.originIdentityInScope)
     }
 
     updateCorrelationStatus(onCorrelatedActionGranted?: () => void): void {
@@ -509,9 +503,3 @@ export class FusionAccount {
         }
     }
 }
-
-
-
-
-
-

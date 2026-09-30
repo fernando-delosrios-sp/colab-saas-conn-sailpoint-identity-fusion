@@ -21,6 +21,8 @@ export interface FusionEmailContext {
     accountSource: string
     sourceType?: SourceType
     accountId?: string
+    /** Machine account (`Account.isMachine`). Selects the machine-accounts link. */
+    isMachine?: boolean
     accountEmail?: string
     accountAttributes: Record<string, any>
     candidates?: Array<{
@@ -125,7 +127,9 @@ export class EmailService {
 
         const candidates = context?.candidates || []
         const accountId = context?.accountId
-        const accountUrl = accountId ? this.urlContext.humanAccount(accountId) : undefined
+        const accountUrl = accountId
+            ? this.urlContext.accountManagement(accountId, context?.isMachine === true)
+            : undefined
         const accountEmail = normalizeEmailValue(context?.accountEmail)[0]
 
         const sourceTypeInput = context?.sourceType

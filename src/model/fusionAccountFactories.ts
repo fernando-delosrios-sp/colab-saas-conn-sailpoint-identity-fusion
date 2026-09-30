@@ -214,9 +214,7 @@ export function buildFromManagedAccount(account: Account): FusionAccount {
     const accountIdentityInfo = buildIdentityInfo(account)
     const correlatedAlias = correlatedAuthoritativeIdentityAlias(account)
     const identityInfo =
-        accountIdentityInfo && correlatedAlias
-            ? { ...accountIdentityInfo, name: correlatedAlias }
-            : accountIdentityInfo
+        accountIdentityInfo && correlatedAlias ? { ...accountIdentityInfo, name: correlatedAlias } : accountIdentityInfo
 
     fa.applyFactorySeed({
         type: FusionAccountKind.Managed,
@@ -225,6 +223,7 @@ export function buildFromManagedAccount(account: Account): FusionAccount {
         sourceName: account.sourceName ?? undefined,
         identityInfo,
         iscAccountId: account.id != null ? account.id : undefined,
+        isMachine: account.isMachine === true ? true : undefined,
     })
     if (account.disabled !== undefined) fa.layers.disabled = account.disabled
     fa.layers.needsRefresh = true
@@ -308,4 +307,3 @@ export function buildFromFusionDecision(decision: FusionDecision): FusionAccount
 
     return fa
 }
-

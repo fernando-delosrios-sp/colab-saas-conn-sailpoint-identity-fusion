@@ -1,6 +1,5 @@
 import { SourceType } from './config'
 
-
 /**
  * Minimal account type for FusionDecision - only includes fields actually used.
  * Attributes are not needed since they're never accessed from FusionDecision.
@@ -10,6 +9,8 @@ type FusionDecisionAccount = {
     id: string
     /** ISC platform account id for report/deep links (distinct from {@link id}). */
     iscAccountId?: string
+    /** Machine account (`Account.isMachine`). Selects the machine-accounts report link. */
+    isMachine?: boolean
     name: string
     sourceName: string
     sourceId?: string
@@ -22,7 +23,6 @@ type User = {
     email: string
     name: string
 }
-
 
 /**
  * A reviewer's decision on a fusion (Match) form.
@@ -64,4 +64,3 @@ export type FusionDecision = {
     /** Source type of the managed source this decision pertains to. */
     sourceType?: SourceType
 }
-
