@@ -6,7 +6,7 @@ import { FusionRun } from '../../model/fusionRun'
 import { Attributes } from '@sailpoint/connector-sdk'
 import { AttributeMappingConfig } from './types'
 import { processAttributeMapping, buildAttributeMappingConfig, DESIGNATED_SNAPSHOT_UNAVAILABLE } from './helpers'
-import { trimStr } from '../../utils/safeRead'
+import { hasValue, trimStr } from '../../utils/safeRead'
 import { getManagedAccountSnapshotKey } from '../../utils/velocityAccountSnapshot'
 import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
 
@@ -116,7 +116,11 @@ export class MappingService {
     }
 
     /**
-     * Maps explicit `attributeMaps` targets onto `attributeBag.current`.
+     * Maps explicit `attributeMaps` targets onto `attributeBag.current` in configured order.
+     * A value an earlier explicit map produces in this invocation is a prior mapped value
+     * for later explicit maps, addressed by that map's new attribute name. An empty result
+     * and designated snapshot unavailable are not prior mapped values. Implicit candidates
+     * do not read them.
      * On a full invocation (`onlyTargets` omitted), also evaluates implicit candidates:
      * live-snapshot keys union bag keys, minus the control denylist and Unique definition names.
      * A vanished snapshot key resolves empty and is deleted, subject to identity-bag fallback
@@ -170,6 +174,7 @@ export class MappingService {
         let prioritizedAccount = this.getMainAccountContextAccount(fusionAccount, snapshotIndex)
         const mappingTargets = this.mappingTargetNames
         const explicitTargetSet = new Set(mappingTargets)
+        const priorMappedValues = new Map<string, unknown>()
 
         const applyMappedValue = (
             attribute: string,
@@ -211,16 +216,18 @@ export class MappingService {
             }
 
             const processingConfig = this.attributeMappingConfig.get(attribute)!
-            applyMappedValue(
-                attribute,
-                processAttributeMapping(
-                    processingConfig,
-                    sourceAttributeMap,
-                    sourceOrder,
-                    prioritizedAccount,
-                    originSnapshot
-                )
+            const processedValue = processAttributeMapping(
+                processingConfig,
+                sourceAttributeMap,
+                sourceOrder,
+                prioritizedAccount,
+                originSnapshot,
+                priorMappedValues
             )
+            applyMappedValue(attribute, processedValue)
+            if (processedValue !== DESIGNATED_SNAPSHOT_UNAVAILABLE && hasValue(processedValue)) {
+                priorMappedValues.set(attribute, processedValue)
+            }
         }
 
         if (!options?.onlyTargets) {

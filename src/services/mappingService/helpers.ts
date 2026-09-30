@@ -65,16 +65,15 @@ export const processAttributeMapping = (
     sourceAttributeMap: Map<string, Attributes[]>,
     sourceOrder: string[],
     prioritizedAccount?: Attributes,
-    originSnapshot?: Attributes
+    originSnapshot?: Attributes,
+    priorMappedValues?: ReadonlyMap<string, unknown>
 ): any => {
     const { attributeMerge } = config
 
     if (attributeMerge === AttributeMergeMode.MainAccount || attributeMerge === AttributeMergeMode.OriginAccount) {
         const account =
             attributeMerge === AttributeMergeMode.MainAccount ? (prioritizedAccount ?? originSnapshot) : originSnapshot
-        if (!account) return DESIGNATED_SNAPSHOT_UNAVAILABLE
-
-        return findFirstAttributeValue([account], config.lookupAttributeNames)
+        return resolveDesignatedSnapshot(account, config.lookupAttributeNames, priorMappedValues)
     }
 
     // Handle single-value merge strategies with early return
@@ -83,11 +82,11 @@ export const processAttributeMapping = (
         attributeMerge === AttributeMergeMode.Source ||
         attributeMerge === undefined
     ) {
-        return processSingleValueMerge(config, sourceAttributeMap, sourceOrder, prioritizedAccount)
+        return processSingleValueMerge(config, sourceAttributeMap, sourceOrder, prioritizedAccount, priorMappedValues)
     }
 
     // Handle multi-value merge strategies
-    return processMultiValueMerge(config, sourceAttributeMap, sourceOrder)
+    return processMultiValueMerge(config, sourceAttributeMap, sourceOrder, priorMappedValues)
 }
 
 /**
@@ -98,7 +97,8 @@ const processSingleValueMerge = (
     config: AttributeMappingConfig,
     sourceAttributeMap: Map<string, Attributes[]>,
     sourceOrder: string[],
-    prioritizedAccount?: Attributes
+    prioritizedAccount?: Attributes,
+    priorMappedValues?: ReadonlyMap<string, unknown>
 ): any => {
     const { lookupAttributeNames, attributeMerge, source: specifiedSource } = config
     let prioritizedSource = ''
@@ -116,7 +116,11 @@ const processSingleValueMerge = (
         const canEvaluatePrioritized =
             attributeMerge !== AttributeMergeMode.Source || !resolvedSource || prioritizedSource === resolvedSource
         if (canEvaluatePrioritized) {
-            const prioritizedValue = findFirstAttributeValue([prioritizedAccount], lookupAttributeNames)
+            const prioritizedValue = findFirstAttributeValue(
+                [prioritizedAccount],
+                lookupAttributeNames,
+                priorMappedValues
+            )
             if (prioritizedValue !== undefined) {
                 return prioritizedValue
             }
@@ -134,26 +138,69 @@ const processSingleValueMerge = (
             continue
         }
 
-        const firstValue = findFirstAttributeValue(accounts, lookupAttributeNames)
+        const firstValue = findFirstAttributeValue(accounts, lookupAttributeNames, priorMappedValues)
         if (firstValue !== undefined) {
             return firstValue
         }
     }
 
-    return undefined
+    return firstPriorMappedValue(lookupAttributeNames, priorMappedValues)
 }
 
 /**
- * Find the first attribute value from a list of accounts
+ * Find the first attribute value from a list of accounts.
+ * A lookup name with a prior mapped value is used as soon as that name is considered,
+ * and that name is not read from the account.
  */
-const findFirstAttributeValue = (accounts: Attributes[], attributeNames: string[]): any => {
+const findFirstAttributeValue = (
+    accounts: Attributes[],
+    attributeNames: string[],
+    priorMappedValues?: ReadonlyMap<string, unknown>
+): any => {
     for (const account of accounts) {
         for (const attribute of attributeNames) {
+            if (priorMappedValues?.has(attribute)) {
+                return priorMappedValues.get(attribute)
+            }
             const value = account[attribute]
             if (hasValue(value)) {
                 return value
             }
         }
+    }
+    return undefined
+}
+
+/**
+ * Main account and Origin account: a prior mapped value is used even when the
+ * designated snapshot is missing or lacks the name. With no prior mapped value,
+ * a missing snapshot stays designated-snapshot-unavailable and a present snapshot
+ * with no value stays empty.
+ */
+const resolveDesignatedSnapshot = (
+    account: Attributes | undefined,
+    attributeNames: string[],
+    priorMappedValues?: ReadonlyMap<string, unknown>
+): any => {
+    for (const attribute of attributeNames) {
+        if (priorMappedValues?.has(attribute)) {
+            return priorMappedValues.get(attribute)
+        }
+        if (!account) continue
+        const value = account[attribute]
+        if (hasValue(value)) {
+            return value
+        }
+    }
+    if (!account) return DESIGNATED_SNAPSHOT_UNAVAILABLE
+    return undefined
+}
+
+/** First prior mapped value in lookup-name order, when no snapshot account was visited. */
+const firstPriorMappedValue = (attributeNames: string[], priorMappedValues?: ReadonlyMap<string, unknown>): any => {
+    if (!priorMappedValues) return undefined
+    for (const attribute of attributeNames) {
+        if (priorMappedValues.has(attribute)) return priorMappedValues.get(attribute)
     }
     return undefined
 }
@@ -165,10 +212,16 @@ const findFirstAttributeValue = (accounts: Attributes[], attributeNames: string[
 const processMultiValueMerge = (
     config: AttributeMappingConfig,
     sourceAttributeMap: Map<string, Attributes[]>,
-    sourceOrder: string[]
+    sourceOrder: string[],
+    priorMappedValues?: ReadonlyMap<string, unknown>
 ): any => {
     const { lookupAttributeNames, attributeMerge } = config
-    const allValues = collectAllAttributeValues(sourceAttributeMap, sourceOrder, lookupAttributeNames)
+    const allValues = collectAllAttributeValues(
+        sourceAttributeMap,
+        sourceOrder,
+        lookupAttributeNames,
+        priorMappedValues
+    )
     const existingValues = compact(allValues)
 
     if (existingValues.length === 0) {
@@ -190,20 +243,46 @@ const processMultiValueMerge = (
 const collectAllAttributeValues = (
     sourceAttributeMap: Map<string, Attributes[]>,
     sourceOrder: string[],
-    attributeNames: string[]
+    attributeNames: string[],
+    priorMappedValues?: ReadonlyMap<string, unknown>
 ): any[] => {
+    const usesPrior = Boolean(priorMappedValues && attributeNames.some((name) => priorMappedValues.has(name)))
+    if (!usesPrior) {
+        const allValues: any[] = []
+        for (const sourceName of sourceOrder) {
+            const accounts = sourceAttributeMap.get(sourceName)
+            if (!accounts || accounts.length === 0) continue
+            allValues.push(...extractValuesFromAccounts(accounts, attributeNames))
+        }
+        return allValues
+    }
+
     const allValues: any[] = []
+    const consumedPrior = new Set<string>()
+    const includePriorOnce = (attribute: string): void => {
+        if (!priorMappedValues?.has(attribute) || consumedPrior.has(attribute)) return
+        allValues.push(priorMappedValues.get(attribute))
+        consumedPrior.add(attribute)
+    }
 
     for (const sourceName of sourceOrder) {
         const accounts = sourceAttributeMap.get(sourceName)
-        if (!accounts || accounts.length === 0) {
-            continue
+        if (!accounts || accounts.length === 0) continue
+        for (const account of accounts) {
+            for (const attribute of attributeNames) {
+                if (priorMappedValues?.has(attribute)) {
+                    includePriorOnce(attribute)
+                    continue
+                }
+                const value = account[attribute]
+                if (!hasValue(value)) continue
+                if (Array.isArray(value)) allValues.push(...value)
+                else allValues.push(value)
+            }
         }
-
-        const sourceValues = extractValuesFromAccounts(accounts, attributeNames)
-        allValues.push(...sourceValues)
     }
 
+    for (const attribute of attributeNames) includePriorOnce(attribute)
     return allValues
 }
 
