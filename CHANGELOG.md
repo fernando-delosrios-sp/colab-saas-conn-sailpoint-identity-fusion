@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-09-30 · v2.2.0
+
+### ⚠️ Breaking Changes
+
+- **Later explicit maps can read an earlier map's new attribute** — Explicit attribute maps run in Attribute Mapping list order. When an earlier map produces a value, a later map in the same run reads that prior mapped value instead of a live snapshot of the same name, for every merge strategy. Maps that only name raw snapshot attributes keep their current results. If a map should keep the snapshot, place it above the map that writes that name, or remove that name from Existing attributes. A selective map still evaluates only the maps it requests.
+
+---
+
 ## 2026-09-28 · v2.2.0
 
 ### ✨ New Features

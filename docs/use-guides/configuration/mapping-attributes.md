@@ -71,12 +71,12 @@ Use this pattern to normalize or reformat a source-provided value under the same
 
 For each attribute you want to expose on the Fusion account, add an **Attribute Mapping**:
 
-| Field                                  | Purpose                                                                    | Example                                            |
-| -------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------- |
-| **New attribute**                      | Name on Fusion account schema                                              | `jobTitle`, `department`, `manager`, `roles`       |
-| **Existing attributes**                | List of source attribute names (from all sources) that feed this attribute | `[title, jobTitle, position]`                      |
-| **Default attribute merge** (override) | Override global merge for this specific attribute                          | Use "Source name" to prefer Workday for `jobTitle` |
-| **Source name**                        | Specific source to use when merge = "Source name"                          | `Workday`                                          |
+| Field                                  | Purpose                                                                                                      | Example                                            |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| **New attribute**                      | Name on Fusion account schema                                                                                | `jobTitle`, `department`, `manager`, `roles`       |
+| **Existing attributes**                | Names to read, in order: live snapshot attributes, or a new attribute written by an earlier map in this list | `[title, jobTitle, position]`                      |
+| **Default attribute merge** (override) | Override global merge for this specific attribute                                                            | Use "Source name" to prefer Workday for `jobTitle` |
+| **Source name**                        | Specific source to use when merge = "Source name"                                                            | `Workday`                                          |
 
 **Per-attribute merge options:**
 
@@ -90,6 +90,30 @@ For each attribute you want to expose on the Fusion account, add an **Attribute 
 | **Source name**                  | Use the first value from one source only     | One source is authoritative for this attribute   |
 
 `$originSource` in the **Source name** field remains a source-level token: it resolves to the prioritized (`mainAccount`) source name and selects the first account on that source. It is not the same as **Origin account**, which selects the exact immutable origin account.
+
+### Explicit map order
+
+Explicit attribute maps run in the order they appear in the Attribute Mapping list. Drag a card to change that order. When an earlier map produces a value, that result is a **prior mapped value** for later maps in the same Map run, addressed by the earlier map's new attribute name. A later map reads it by listing that name under **Existing attributes**.
+
+Map uses the prior mapped value for that name and does not read live snapshots for it. The prior mapped value wins over a live snapshot attribute of the same name. This holds for **First found**, **Source name**, **Keep a list of values**, **Concatenate different values**, **Main account**, and **Origin account**. Source filtering applies only to snapshots: if the pinned source has no such attribute, the prior mapped value is still used. List and concatenate include that value once and do not also collect snapshot values for the same name.
+
+If the earlier map produces no value, that name is not a prior mapped value. The later map then uses the usual snapshot rules, including keeping the current Fusion account value when a Main account or Origin account snapshot was not loaded.
+
+A map cannot read an explicit map listed after it. A selective map evaluates only the maps it was asked for, in list order. It does not evaluate earlier maps that were left out, and it does not see values those maps would have written. Implicit candidates, such as an unmapped `department` still coming from a snapshot, do not read prior mapped values.
+
+```
+Attribute Mapping (top to bottom):
+- New attribute: NHI Admin
+  Existing attributes: [adminDisplayName]
+- New attribute: Owner
+  Existing attributes: [NHI Admin, Identity Display Name]
+  Merge: First found
+
+→ When NHI Admin is "Cole Aaronson", Owner is "Cole Aaronson"
+  even if no live snapshot has NHI Admin.
+→ If NHI Admin produced nothing, Owner falls through to
+  Identity Display Name on a live snapshot.
+```
 
 ---
 

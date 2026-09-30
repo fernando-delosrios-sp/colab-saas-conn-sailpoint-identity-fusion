@@ -162,7 +162,7 @@ const FIELD_EXPLANATIONS = {
             'Default strategy when multiple sources provide a value for the same Fusion attribute, including implicit Map candidates (live-snapshot keys and persisted bag keys that are not mapping targets or definition-owned names). Options, in order: **Main account** (`mainAccount`, the default), **Origin account** (`originAccount`), **First found** (`first`), **Keep a list of values** (`list`), and **Concatenate different values** (`concatenate`). Per-attribute mappings also offer **Source name** (`source`). Main and Origin account modes select one snapshot with no fallback to other accounts.',
         newAttribute: 'Target attribute name on the Fusion account schema.',
         existingAttributes:
-            'One or more source attribute names to pull values from. The connector tries each in order according to the merge strategy.',
+            "Names to pull values from, tried in list order for the merge strategy. Explicit maps run in list order, so a later map can name an earlier map's new attribute. A prior mapped value for that name wins over a live snapshot of the same name. A selective map does not use earlier maps that were not requested.",
         source:
             'When the per-attribute merge is **Source name**, the source whose first account supplies the value. `$originSource` is a source-level token: it resolves to the prioritized (`mainAccount`) source name, then the first account on that source. It is not **Origin account** merge, which pins the exact origin snapshot.',
     },
