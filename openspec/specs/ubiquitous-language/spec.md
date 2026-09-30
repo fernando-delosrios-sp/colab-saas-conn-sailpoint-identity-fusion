@@ -748,6 +748,19 @@ The ubiquitous-language glossary SHALL define **Machine account** as a managed s
 - **AND** the entry SHALL require a non-empty `id`
 - **AND** the entry SHALL state that a missing `ownerIdentity`, or one without an id, is not established
 
+### Requirement: Glossary defines prior mapped value
+
+The ubiquitous-language glossary SHALL define **prior mapped value** as a Map-step term: the value an earlier explicit attribute map wrote during the same Map invocation, addressed by that map's new attribute name. It SHALL state that a later explicit attribute map can read that value, and that a map cannot read an explicit attribute map listed after it. Documentation and connector help text SHALL NOT call this a mapping chain, a chained mapping, or a derived attribute. The term SHALL NOT reuse **chain**, which remains reserved for recordings. A prior mapped value SHALL NOT be described as a live snapshot attribute, a **definition-owned name**, or a **pass-through definition**.
+
+#### Scenario: Prior mapped value entry
+
+- **GIVEN** a reader consults the ubiquitous-language glossary
+- **WHEN** they look up the value a later explicit attribute map reads from an earlier one
+- **THEN** a **prior mapped value** entry SHALL define it as the value an earlier explicit attribute map wrote during the same Map invocation, addressed by that map's new attribute name
+- **AND** it SHALL state that a later explicit attribute map can read it
+- **AND** it SHALL state that a map cannot read an explicit attribute map listed after it
+- **AND** it SHALL NOT use "mapping chain", "chained mapping", or "derived attribute" as a synonym
+
 ## Canonical Terms
 
 ### Account taxonomy
@@ -1011,6 +1024,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Origin snapshot** | The managed account whose key equals `originAccount`, or the Identities identity bag for an identity-origin Fusion account. The same object Velocity exposes as `$account`. |
 | **Designated snapshot unavailable** | A Main account or Origin account merge whose chosen snapshot key is not present in this invocation’s `attributeBag.sources` (or per-invocation snapshot index) at all. Distinct from a snapshot that is present but lacks the mapped attribute. Not a vanished snapshot key. |
 | **$originSource Source-name token** | A per-attribute Source name value that resolves to the prioritized (`mainAccount`) source name, then selects the first account on that source. It is source-level and is not **Origin account merge**. In Velocity, `$originSource` remains the origin source name string. |
+| **Prior mapped value** | The value an earlier explicit attribute map wrote during the same Map invocation, addressed by that map's new attribute name. A later explicit attribute map can read it. A map cannot read an explicit attribute map listed after it. Not a live snapshot attribute, a **definition-owned name**, or a **pass-through definition**. |
 | **Definition-owned name** | An attribute name configured as a `normalAttributeDefinitions` or `uniqueAttributeDefinitions` entry name. Map behavior splits by definition kind: a Normal definition name is merged as an implicit candidate when a live snapshot carries it and is never cleared; a Unique definition name is neither merged nor cleared as an implicit candidate. An explicit attribute mapping row still applies to either kind. |
 | **Attribute Definition Settings** | The top-level configuration menu for the Define step. Contains Normal Attribute Definitions and Unique Attribute Definitions. |
 | **Normal Attribute Definitions** | The section defining Velocity expressions that compute Fusion account attributes. Each definition honors **Static** and **Always recalculate**; definitions with **Always recalculate** off do not re-evaluate unchanged accounts that already have a value. |
