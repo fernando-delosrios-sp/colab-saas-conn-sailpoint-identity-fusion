@@ -87,7 +87,7 @@ describe('attributeService helpers', () => {
             expect(processAttributeMapping(config, map, ['Jackdaw'], undefined, originSnapshot)).toBe(title)
         })
 
-        it('should return only from specified source for "source" merge', () => {
+        it('Attribute merged with source-specific strategy', () => {
             const map = new Map<string, Attributes[]>()
             map.set('HR', [{ email: 'hr@acme.com' }])
             map.set('IT', [{ email: 'it@acme.com' }])
