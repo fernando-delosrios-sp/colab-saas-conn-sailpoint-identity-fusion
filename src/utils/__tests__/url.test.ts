@@ -7,6 +7,7 @@ import {
     buildSourceUrl,
     buildSourceAccountsUrl,
     buildAccountUrl,
+    buildAccountManagementUrl,
     buildWorkflowUrl,
     buildFormDefinitionUrl,
     isValidUrl,
@@ -99,6 +100,23 @@ describe('url', () => {
         })
     })
 
+    describe('buildAccountManagementUrl', () => {
+        it('builds a human-accounts URL when the account is not a machine account', () => {
+            expect(buildAccountManagementUrl(uiOrigin, 'acc-1')).toBe(
+                `${uiOrigin}/ui/a/admin/accounts-management/human-accounts/acc-1`
+            )
+            expect(buildAccountManagementUrl(uiOrigin, 'acc-1', false)).toBe(
+                `${uiOrigin}/ui/a/admin/accounts-management/human-accounts/acc-1`
+            )
+        })
+
+        it('builds a machine-accounts URL when the account is a machine account', () => {
+            expect(buildAccountManagementUrl(uiOrigin, 'acc-1', true)).toBe(
+                `${uiOrigin}/ui/a/admin/accounts-management/machine-accounts/acc-1`
+            )
+        })
+    })
+
     describe('buildWorkflowUrl', () => {
         it('should build workflow URL', () => {
             const url = buildWorkflowUrl(uiOrigin, 'wf-1')
@@ -153,6 +171,10 @@ describe('url', () => {
             expect(ctx.identity('id1')).toBe(`${uiOrigin}/ui/a/admin/identities/id1/details/attributes`)
             expect(ctx.source('src1')).toBe(`${uiOrigin}/ui/a/admin/connections/sources/src1`)
             expect(ctx.account('acc1')).toBe(`${uiOrigin}/ui/a/admin/accounts/acc1`)
+            expect(ctx.humanAccount('acc1')).toBe(`${uiOrigin}/ui/a/admin/accounts-management/human-accounts/acc1`)
+            expect(ctx.accountManagement('acc1', true)).toBe(
+                `${uiOrigin}/ui/a/admin/accounts-management/machine-accounts/acc1`
+            )
         })
     })
 
@@ -181,4 +203,3 @@ describe('url', () => {
         })
     })
 })
-

@@ -39,6 +39,7 @@ export function createAutomaticMergeDecision(
             id: accountKey,
             ...(iscAccountId ? { iscAccountId } : {}),
             name: fusionAccount.name ?? account.name ?? '',
+            ...(account.isMachine === true || fusionAccount.isMachine === true ? { isMachine: true } : {}),
             sourceName: fusionAccount.sourceName,
             sourceId: readString(account, 'sourceId'),
             nativeIdentity: account.nativeIdentity ?? undefined,

@@ -43,14 +43,14 @@ const toReportDecision = (
     resolveAccountUrl?: (
         managedAccountKey?: string,
         identityId?: string,
-        iscAccountId?: string
+        iscAccountId?: string,
+        isMachine?: boolean
     ) => string | undefined,
     resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string },
     locale?: string
 ): FusionReportDecision => {
     const account = decision.account || ({} as any)
-    const sourceType =
-        decision.sourceType ?? resolveSourceType?.(account.sourceName) ?? SourceType.Authoritative
+    const sourceType = decision.sourceType ?? resolveSourceType?.(account.sourceName) ?? SourceType.Authoritative
     const isNoMatchSource = sourceType === SourceType.Record || sourceType === SourceType.Orphan
     const decisionType = decision.newIdentity
         ? isNoMatchSource
@@ -65,8 +65,7 @@ const toReportDecision = (
     const submitter = decision.submitter || ({} as any)
     const reviewerId = submitter.id
     const submitterNameRaw = trimStr(submitter.name)
-    const reviewerNameFromDecision =
-        submitterNameRaw && submitterNameRaw !== reviewerId ? submitterNameRaw : undefined
+    const reviewerNameFromDecision = submitterNameRaw && submitterNameRaw !== reviewerId ? submitterNameRaw : undefined
     const resolvedReviewerName = resolveReviewerName?.(reviewerId)
     const reviewerName = reviewerNameFromDecision || resolvedReviewerName || reviewerId
     const selectedIdentityName = decision.identityName || selectedIdentityContext.selectedIdentityName
@@ -74,11 +73,14 @@ const toReportDecision = (
     const correlatedAccountName = correlatedIdentityContext.selectedIdentityName
     const resolvedManagedAccountName = resolveAccountName?.(managedAccountKey)
     const accountNameFromDecision = trimStr(account.name)
-    const accountName = correlatedAccountName
-        || (accountNameFromDecision && accountNameFromDecision !== managedAccountKey ? accountNameFromDecision : undefined)
-        || resolvedManagedAccountName
-        || account.name
-        || managedAccountKey
+    const accountName =
+        correlatedAccountName ||
+        (accountNameFromDecision && accountNameFromDecision !== managedAccountKey
+            ? accountNameFromDecision
+            : undefined) ||
+        resolvedManagedAccountName ||
+        account.name ||
+        managedAccountKey
 
     const reviewerUrl = reviewerId && reviewerId !== 'system' ? resolveReviewerUrl?.(reviewerId) : undefined
 
@@ -89,7 +91,12 @@ const toReportDecision = (
         reviewerEmail: submitter.email || undefined,
         managedAccountKey,
         accountName,
-        accountUrl: resolveAccountUrl?.(managedAccountKey, decision.identityId, account.iscAccountId),
+        accountUrl: resolveAccountUrl?.(
+            managedAccountKey,
+            decision.identityId,
+            account.iscAccountId,
+            account.isMachine
+        ),
         accountSource: account.sourceName || '',
         sourceType,
         decision: decisionType,
@@ -136,9 +143,17 @@ class FusionReviewDecisionResolver {
         return name && name !== managedAccountKey ? name : undefined
     }
 
-    resolveAccountUrl(managedAccountKey?: string, identityId?: string, iscAccountId?: string): string | undefined {
+    resolveAccountUrl(
+        managedAccountKey?: string,
+        identityId?: string,
+        iscAccountId?: string,
+        isMachine?: boolean
+    ): string | undefined {
         const reportAccountId = this.resolveReportIscAccountId(managedAccountKey, identityId, iscAccountId)
-        return reportAccountId ? this.urlContext.humanAccount(reportAccountId) : undefined
+        const machineAccount =
+            isMachine === true ||
+            (managedAccountKey ? this.run?.getManagedAccountInfo?.(managedAccountKey)?.isMachine === true : false)
+        return reportAccountId ? this.urlContext.accountManagement(reportAccountId, machineAccount) : undefined
     }
 
     private resolveReportIscAccountId(
@@ -152,16 +167,13 @@ class FusionReviewDecisionResolver {
         })
     }
 
-    resolveIdentityContext(
-        identityId?: string
-    ): { selectedIdentityName?: string; selectedIdentityUrl?: string } {
+    resolveIdentityContext(identityId?: string): { selectedIdentityName?: string; selectedIdentityUrl?: string } {
         if (!identityId) return {}
         const identity = this.identities?.getIdentityById?.(identityId)
         const selectedIdentityName = resolveIdentityDocumentDisplayName(identity as any)
         return { selectedIdentityName, selectedIdentityUrl: this.urlContext.identity(identityId) }
     }
 }
-
 
 /** HTML/email product: aggregation report vs Fusion report (`report` action). */
 export type FusionHtmlReportKind = 'aggregation' | 'fusion'
@@ -197,10 +209,7 @@ export class ReportService {
     ): string {
         if (reportTitleOverride) return reportTitleOverride
         if (locale) {
-            return translate(
-                reportType === 'aggregation' ? 'aggregation_report_title' : 'fusion_report_title',
-                locale
-            )
+            return translate(reportType === 'aggregation' ? 'aggregation_report_title' : 'fusion_report_title', locale)
         }
         return reportType === 'aggregation'
             ? ReportService.AGGREGATION_REPORT_TITLE
@@ -311,7 +320,7 @@ export class ReportService {
             locale ??
             (globalOwnerIds[0] && this.email?.getRecipientLocale
                 ? await this.email.getRecipientLocale(globalOwnerIds[0])
-                : this.email?.getDefaultEffectiveLocale?.() ?? 'en')
+                : (this.email?.getDefaultEffectiveLocale?.() ?? 'en'))
         if (!report.fusionReviewDecisions?.length) {
             report.fusionReviewDecisions = this.buildFusionReviewDecisions(resolvedLocale)
         }
@@ -336,7 +345,11 @@ export class ReportService {
         if (identityIds.length === 0 || !this.identities) return
 
         if (typeof (this.identities as IdentityService).ensureIdentityById === 'function') {
-            await promiseAllBatched(identityIds, (id) => (this.identities as IdentityService).ensureIdentityById(id), 10)
+            await promiseAllBatched(
+                identityIds,
+                (id) => (this.identities as IdentityService).ensureIdentityById(id),
+                10
+            )
             return
         }
 
@@ -376,8 +389,8 @@ export class ReportService {
                 (reviewerId) => resolver.resolveReviewerName(reviewerId),
                 (reviewerId) => resolver.resolveReviewerUrl(reviewerId),
                 (managedAccountKey) => resolver.resolveAccountName(managedAccountKey),
-                (managedAccountKey, identityId, iscAccountId) =>
-                    resolver.resolveAccountUrl(managedAccountKey, identityId, iscAccountId),
+                (managedAccountKey, identityId, iscAccountId, isMachine) =>
+                    resolver.resolveAccountUrl(managedAccountKey, identityId, iscAccountId, isMachine),
                 (identityId) => resolver.resolveIdentityContext(identityId),
                 locale
             )
@@ -414,7 +427,7 @@ export class ReportService {
     }): Promise<{ reportHtmlOutputPath?: string; statsWithPhaseTiming: AggregationStats }> {
         const { report, finalDryRunStats, reportPhaseStartedAt, saveFile, sendEmail } = args
         const shouldWriteHtmlReport = saveFile ?? true
-        const recipients = Array.isArray(sendEmail) ? sendEmail : (sendEmail ? [sendEmail] : [])
+        const recipients = Array.isArray(sendEmail) ? sendEmail : sendEmail ? [sendEmail] : []
         const shouldSendReportEmail = recipients.length > 0
 
         const reportElapsedMs =
@@ -552,7 +565,7 @@ export class ReportService {
             const locale =
                 globalOwnerIds[0] && this.email?.getRecipientLocale
                     ? await this.email.getRecipientLocale(globalOwnerIds[0])
-                    : this.email?.getDefaultEffectiveLocale?.() ?? 'en'
+                    : (this.email?.getDefaultEffectiveLocale?.() ?? 'en')
             report.fusionReviewDecisions = this.buildFusionReviewDecisions(locale)
             reportPhaseTimer.recordElapsed('Report', Date.now() - reportStartedAt)
             const priorPhases = aggregationStats.phaseTiming ?? []
@@ -568,7 +581,7 @@ export class ReportService {
         const locale =
             globalOwnerIds[0] && this.email?.getRecipientLocale
                 ? await this.email.getRecipientLocale(globalOwnerIds[0])
-                : this.email?.getDefaultEffectiveLocale?.() ?? 'en'
+                : (this.email?.getDefaultEffectiveLocale?.() ?? 'en')
         report.fusionReviewDecisions = this.buildFusionReviewDecisions(locale)
         await this.sendReport(report, reportKind, locale)
         this.identities.clear()
@@ -588,7 +601,9 @@ export class ReportService {
         const stats = this.buildFusionReportStats(aggregationStats)
         const tracker = this.requireTracker()
         const report = this.fusion.generateReport(tracker, includeNonMatches, stats, { clearTracker: false })
-        report.fusionReviewDecisions = this.buildFusionReviewDecisions(this.email?.getDefaultEffectiveLocale?.() ?? 'en')
+        report.fusionReviewDecisions = this.buildFusionReviewDecisions(
+            this.email?.getDefaultEffectiveLocale?.() ?? 'en'
+        )
         report.stats = stats
         return report as Record<string, unknown>
     }
@@ -647,8 +662,7 @@ export class ReportService {
         const managedAccountsFound =
             managedAccountsFoundAuthoritative + managedAccountsFoundRecord + managedAccountsFoundOrphan
 
-        const totalFusionAccounts =
-            aggregationStats.fusionAccountsReturned ?? this.run?.totalFusionAccountCount ?? 0
+        const totalFusionAccounts = aggregationStats.fusionAccountsReturned ?? this.run?.totalFusionAccountCount ?? 0
 
         const warningSamples: string[] = []
         const errorSamples: string[] = []
@@ -717,8 +731,3 @@ export class ReportService {
         }
     }
 }
-
-
-
-
-

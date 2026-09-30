@@ -222,6 +222,7 @@ export const createFusionDecision = async (
     accountInfoOverride?: {
         id: string
         iscAccountId?: string
+        isMachine?: boolean
         name: string
         sourceName: string
         sourceId?: string
@@ -339,7 +340,10 @@ export const createFusionDecision = async (
         sourceName: normalizeScalar((accountInfo as any)?.sourceName),
         ...(sourceIdNorm ? { sourceId: sourceIdNorm } : {}),
         ...(nativeIdNorm ? { nativeIdentity: nativeIdNorm } : {}),
-        ...(trimStr((accountInfo as any)?.iscAccountId) ? { iscAccountId: trimStr((accountInfo as any)?.iscAccountId) } : {}),
+        ...(trimStr((accountInfo as any)?.iscAccountId)
+            ? { iscAccountId: trimStr((accountInfo as any)?.iscAccountId) }
+            : {}),
+        ...((accountInfo as any)?.isMachine === true ? { isMachine: true } : {}),
     }
     if (!isCompositeManagedAccountKey(accountInfo.id)) {
         logger.error(
@@ -371,13 +375,3 @@ const extractSourceType = (formInput: any): SourceType => {
     }
     return SourceType.Authoritative
 }
-
-
-
-
-
-
-
-
-
-

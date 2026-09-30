@@ -20,7 +20,6 @@ import { FusionRun } from '../../model/fusionRun'
 import { SourceService } from '../sourceService'
 import { resolveReportAccountIdValue } from './reportAccountResolver'
 
-
 /**
  * Turn in-memory {@link ScoreReport} rows into the slim payload used by fusion report / email templates.
  * Renames nothing in the wire format (`score` = raw Value %, `weightedScore` = blend partial); only rounds for stable output.
@@ -38,7 +37,6 @@ export function mapScoreReportsForFusionReport(scoreReports: ScoreReport[]): Fus
     }))
 }
 
-
 /**
  * Build review-email match rows using the same label and score mapping as dry-run reports.
  */
@@ -47,7 +45,9 @@ export function buildFusionReportMatchesForReviewEmail(
     urlContext: UrlContext,
     maxCandidates?: number
 ): FusionReportMatch[] {
-    const ordered = maxCandidates ? rankFusionMatchesForReview(matches).slice(0, maxCandidates) : rankFusionMatchesForReview(matches)
+    const ordered = maxCandidates
+        ? rankFusionMatchesForReview(matches).slice(0, maxCandidates)
+        : rankFusionMatchesForReview(matches)
 
     return ordered.map((match) => {
         const fields = fusionReportMatchCandidateAccountFields(match)
@@ -121,7 +121,9 @@ function resolveDeferredMatchCandidateUrl(
     const deferredCandidateIdentityId = fi?.identityId
     const managedKey = fi?.managedKeyOrUndefined ?? fi?.managedAccountId ?? fields.accountId
     const managedAccountReportId = resolveReportAccountIdValue(managedKey, sources)
-    if (managedAccountReportId) return urlContext.humanAccount(managedAccountReportId)
+    if (managedAccountReportId) {
+        return urlContext.accountManagement(managedAccountReportId, fi?.isMachine === true)
+    }
     if (deferredCandidateIdentityId) return urlContext.identity(deferredCandidateIdentityId)
     return undefined
 }
@@ -171,12 +173,11 @@ export function buildMinimalFusionReportAccount(
     accountIdOverride?: string
 ): FusionReportAccount {
     const reportAccountId = accountIdOverride ?? fusionAccount.managedAccountId
-    const accountUrlId = accountIdOverride && !isCompositeManagedAccountKey(accountIdOverride)
-        ? accountIdOverride
-        : undefined
+    const accountUrlId =
+        accountIdOverride && !isCompositeManagedAccountKey(accountIdOverride) ? accountIdOverride : undefined
     const row: FusionReportAccount = {
         accountName: getFusionReportAccountLabel(fusionAccount),
-        accountUrl: urlContext.humanAccount(accountUrlId),
+        accountUrl: urlContext.accountManagement(accountUrlId, fusionAccount.isMachine === true),
         accountSource: fusionAccount.sourceName,
         sourceType: (sourceType as FusionReportAccount['sourceType']) ?? SourceType.Authoritative,
         accountId: reportAccountId,
@@ -232,5 +233,3 @@ export function skipBlendHistoryKeysForDecisionAccountId(
     const normalized = normalizeCompositeManagedAccountKey(trimStr(decisionAccountId) ?? '')
     return normalized ? new Set([normalized]) : undefined
 }
-
-

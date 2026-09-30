@@ -46,6 +46,7 @@ export type AccountDisplayHtmlArgs = {
     accountIscId?: string
     sourceType?: SourceType
     orphanProcessingMode?: OrphanProcessingMode
+    isMachine?: boolean
 }
 
 const lowerFirst = (s: string): string => s.charAt(0).toLowerCase() + s.slice(1)
@@ -186,7 +187,7 @@ function renderAttributeTable(
 }
 
 /**
- * Account context HTML: header, source, optional human-account link, configured form attributes.
+ * Account context HTML: header, source, optional Accounts Management link, configured form attributes.
  */
 export function renderAccountDisplayHtml(args: AccountDisplayHtmlArgs): string {
     const locale = args.locale ?? 'en'
@@ -202,7 +203,10 @@ export function renderAccountDisplayHtml(args: AccountDisplayHtmlArgs): string {
         translateWithParams('form_review_required_header', locale, { sourceName: args.sourceName })
     )
     const sourceTypeNote = escapeHtml(translate(sectionKey, locale))
-    const accountLink = renderIscUiLink(args.accountLabel, args.urlContext?.humanAccount(args.accountIscId))
+    const accountLink = renderIscUiLink(
+        args.accountLabel,
+        args.urlContext?.accountManagement(args.accountIscId, args.isMachine)
+    )
     const sourceLabel = escapeHtml(translate('source', locale))
     const sourceValue = escapeHtml(args.sourceName)
 
@@ -306,5 +310,6 @@ export function renderFusionAccountHtml(
         accountIscId: fusionAccount.iscAccountId,
         sourceType,
         orphanProcessingMode,
+        isMachine: fusionAccount.isMachine === true,
     })
 }

@@ -134,7 +134,9 @@ describe('fusionReportHelpers', () => {
     })
 
     describe('buildFusionReportMatchesForReviewEmail', () => {
-        const urlContext = { identity: (id: string) => `https://tenant.identitynow.com/ui/a/admin/identities/${id}/details` } as UrlContext
+        const urlContext = {
+            identity: (id: string) => `https://tenant.identitynow.com/ui/a/admin/identities/${id}/details`,
+        } as UrlContext
 
         it('uses fusion account name when match.identityName is the identity id', () => {
             const matches = buildFusionReportMatchesForReviewEmail(
@@ -202,7 +204,9 @@ describe('fusionReportHelpers', () => {
 
     describe('buildMinimalFusionReportAccount', () => {
         const mockUrlContext: UrlContext = {
-            humanAccount: vi.fn((id) => (id ? `http://example.com/human/${id}` : undefined)),
+            accountManagement: vi.fn((id, isMachine) =>
+                id ? `http://example.com/${isMachine ? 'machine' : 'human'}/${id}` : undefined
+            ),
         } as any
 
         beforeEach(() => {
@@ -236,7 +240,7 @@ describe('fusionReportHelpers', () => {
                 },
                 matches: [],
             })
-            expect(mockUrlContext.humanAccount).toHaveBeenCalledWith(undefined)
+            expect(mockUrlContext.accountManagement).toHaveBeenCalledWith(undefined, false)
         })
 
         it('should handle missing sourceType by falling back to Authoritative', () => {
@@ -261,7 +265,23 @@ describe('fusionReportHelpers', () => {
             const result = buildMinimalFusionReportAccount(acc, mockUrlContext, undefined, [], undefined, 'overridden1')
 
             expect(result.accountId).toBe('overridden1')
-            expect(mockUrlContext.humanAccount).toHaveBeenCalledWith('overridden1')
+            expect(mockUrlContext.accountManagement).toHaveBeenCalledWith('overridden1', false)
+            expect(result.accountUrl).toBe('http://example.com/human/overridden1')
+        })
+
+        it('links a machine account to machine-accounts', () => {
+            const acc = { name: 'Bot', managedAccountId: 'orig1', isMachine: true } as any
+            const result = buildMinimalFusionReportAccount(
+                acc,
+                mockUrlContext,
+                undefined,
+                [],
+                undefined,
+                'isc-machine-1'
+            )
+
+            expect(result.accountUrl).toBe('http://example.com/machine/isc-machine-1')
+            expect(mockUrlContext.accountManagement).toHaveBeenCalledWith('isc-machine-1', true)
         })
     })
 
@@ -303,4 +323,3 @@ describe('fusionReportHelpers', () => {
         })
     })
 })
-

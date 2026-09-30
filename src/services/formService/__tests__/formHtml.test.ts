@@ -133,6 +133,19 @@ describe('form HTML helpers', () => {
         expect(accountHtml).toContain(
             'href="https://example.identitynow.com/ui/a/admin/accounts-management/human-accounts/isc-acct-1"'
         )
+        const machineHtml = renderAccountDisplayHtml({
+            accountLabel: 'Batch Bot',
+            sourceName: 'Orphan',
+            attributes: {},
+            fusionFormAttributes: [],
+            locale: 'en',
+            urlContext,
+            accountIscId: 'isc-machine-1',
+            isMachine: true,
+        })
+        expect(machineHtml).toContain(
+            'href="https://example.identitynow.com/ui/a/admin/accounts-management/machine-accounts/isc-machine-1"'
+        )
         expect(accountHtml).toContain('target="_blank"')
         expect(accountHtml).toContain('rel="noopener noreferrer"')
 

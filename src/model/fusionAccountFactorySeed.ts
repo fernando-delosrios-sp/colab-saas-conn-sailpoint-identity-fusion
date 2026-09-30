@@ -10,6 +10,7 @@ export type FusionAccountFactorySeed = {
     identityInfo?: IdentityInfo
     name?: string
     sourceName?: string
+    isMachine?: boolean
     attributeBagCurrent?: Attributes
     attributeBagPrevious?: Attributes
 }

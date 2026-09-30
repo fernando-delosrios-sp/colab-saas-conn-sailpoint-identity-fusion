@@ -889,6 +889,7 @@ export class FormService {
                 accountSource: fusionAccount.sourceName,
                 sourceType: this.sources.getSourceByNameSafe(fusionAccount.sourceName)?.sourceType,
                 accountId: reportAccountId,
+                isMachine: fusionAccount.isMachine === true,
                 accountEmail: fusionAccount.email,
                 accountAttributes: fusionAccount.attributes as any,
                 fusionMatches: fusionAccount.fusionMatches,
@@ -948,24 +949,36 @@ export class FormService {
      * Capture the ISC account id on the decision while managed-account caches are still warm.
      * Report rendering runs after cache clear and must not fall back to composite keys.
      */
+    private decisionAccountIsMachine(account: FusionDecision['account']): boolean {
+        if (account.isMachine === true) return true
+        const managedKey = account.id
+        if (!managedKey) return false
+        if (this.run.getManagedAccountInfo?.(managedKey)?.isMachine === true) return true
+        return this.run.getFusionAccountByManagedKey?.(managedKey)?.isMachine === true
+    }
+
     private enrichDecisionAccountIscId(decision: FusionDecision): FusionDecision {
         const account = decision.account
-        const existingId = trimStr(account.iscAccountId)
+        const isMachine = this.decisionAccountIsMachine(account)
+        const accountWithMachine = isMachine ? { ...account, isMachine: true as const } : account
+        const existingId = trimStr(accountWithMachine.iscAccountId)
         if (isReportableIscAccountId(existingId)) {
-            return decision
+            if (accountWithMachine === account) return decision
+            return { ...decision, account: accountWithMachine }
         }
 
         const resolvedId = resolveManagedAccountIscIdForReport(account.id, this.sources, this.run, {
             identityId: decision.identityId,
         })
         if (!isReportableIscAccountId(resolvedId)) {
-            return decision
+            if (accountWithMachine === account) return decision
+            return { ...decision, account: accountWithMachine }
         }
 
         return {
             ...decision,
             account: {
-                ...account,
+                ...accountWithMachine,
                 iscAccountId: resolvedId,
             },
         }
@@ -1205,6 +1218,7 @@ export class FormService {
         | {
               id: string
               iscAccountId?: string
+              isMachine?: boolean
               name: string
               sourceName: string
               sourceId?: string
@@ -1238,6 +1252,7 @@ export class FormService {
             return {
                 id: normalizedAccountId,
                 iscAccountId: trimStr(queueAccount.id),
+                ...(queueAccount.isMachine === true ? { isMachine: true } : {}),
                 name: trimStr(queueAccount.name) || '',
                 sourceName: queueAccount.sourceName || '',
                 sourceId: readString(queueAccount, 'sourceId'),
@@ -1249,6 +1264,7 @@ export class FormService {
             return {
                 id: normalizedAccountId,
                 iscAccountId: trimStr(info.id),
+                ...(info.isMachine === true ? { isMachine: true } : {}),
                 name: info.name,
                 sourceName: info.sourceName,
                 sourceId: info.sourceId,
@@ -1273,6 +1289,7 @@ export class FormService {
             | {
                   id: string
                   iscAccountId?: string
+                  isMachine?: boolean
                   name: string
                   sourceName: string
                   sourceId?: string

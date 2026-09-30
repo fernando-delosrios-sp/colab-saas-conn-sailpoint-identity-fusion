@@ -6,7 +6,16 @@ import { MatchCandidateType } from '../../matchingService/types'
 import { FusionRun } from '../../../model/fusionRun'
 
 function makeRecorder(overrides: Record<string, any> = {}) {
-    const run = overrides.run ?? new FusionRun({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), recordEvent: vi.fn(), getLogLevel: vi.fn().mockReturnValue('info') } as any)
+    const run =
+        overrides.run ??
+        new FusionRun({
+            debug: vi.fn(),
+            info: vi.fn(),
+            warn: vi.fn(),
+            error: vi.fn(),
+            recordEvent: vi.fn(),
+            getLogLevel: vi.fn().mockReturnValue('info'),
+        } as any)
     const log = {
         debug: vi.fn(),
         info: vi.fn(),
@@ -18,7 +27,7 @@ function makeRecorder(overrides: Record<string, any> = {}) {
     const tracker = new AggregationTracker()
     const urlContext = {
         identity: vi.fn(() => 'identity-url'),
-        humanAccount: vi.fn(() => 'human-url'),
+        accountManagement: vi.fn(() => 'human-url'),
     } as any
     const sources = { resolveIscAccountIdForManagedKey: vi.fn(() => 'isc-123') } as any
     return {
@@ -47,9 +56,7 @@ describe('ManagedAccountAnalysisRecorder', () => {
         const { recorder, tracker, log } = makeRecorder()
         const fusionAccount = {
             isMatch: true,
-            fusionMatches: [
-                { candidateType: 'identity', identityId: 'id-1', identityName: 'Jane', scores: [] },
-            ],
+            fusionMatches: [{ candidateType: 'identity', identityId: 'id-1', identityName: 'Jane', scores: [] }],
         } as any
         recorder.recordAnalysis({
             account: { name: 'acct', sourceName: 'HR' } as any,
@@ -141,10 +148,9 @@ describe('ManagedAccountAnalysisRecorder', () => {
         const matchRow = tracker.deferredMatchReportData[0].matches[0]
         expect(matchRow.accountId).toBe('source-a-id::native-candidate')
         expect(matchRow.identityUrl).toBe('human-url')
-        expect(urlContext.humanAccount).toHaveBeenCalledWith('isc-managed-456')
+        expect(urlContext.accountManagement).toHaveBeenCalledWith('isc-managed-456', false)
         expect(urlContext.identity).not.toHaveBeenCalled()
     })
-
 
     it('excludes pending peer matches from deferred report candidates', () => {
         const peer = {
@@ -218,6 +224,3 @@ describe('ManagedAccountAnalysisRecorder', () => {
         expect(tracker.failedMatchingAccounts.length).toBe(1)
     })
 })
-
-
-
