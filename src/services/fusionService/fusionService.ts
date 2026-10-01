@@ -702,7 +702,8 @@ export class FusionService {
     private buildLinkedAccountKeyIndex(): void {
         // Build a one-shot flat index of every account key already linked in a loaded Fusion row.
         // isManagedAccountLinkedInFusion uses this for O(1) per-account lookups instead
-        // of scanning fusionAccountMap + identity-linked Fusion account map (O(A+I)) for every correlated account.
+        // of scanning fusionAccountMap + identity-linked Fusion account map (O(A+I)) for every queued
+        // managed account in both the correlated and uncorrelated sweeps.
         this.run.initLinkedAccountIndex()
         for (const fa of this.run.fusionAccountsIterable()) {
             addFusionAccountLinkedKeysToIndex(fa, this.run)
@@ -1037,8 +1038,9 @@ export class FusionService {
      * (platform Fusion row or identity-origin Fusion row), or when its identityId matches
      * a loaded identity-origin Fusion account.
      *
-     * Uses _linkedAccountKeyIndex (O(1)) when available (set by the correlated account sweep),
-     * falling back to a linear scan of fusionAccountMap + identity-linked Fusion account map for standalone calls.
+     * Uses the linked account key index (O(1)) while managed account processing is active (built by
+     * initializeManagedAccountProcessing, released after the uncorrelated sweep), falling back to a
+     * linear scan of fusionAccountMap + identity-linked Fusion account map for standalone calls.
      */
     private isCorrelatedManagedAccountLinkedInFusion(account: Account): boolean {
         return isManagedAccountLinkedInFusion(account, this.run)
@@ -1320,7 +1322,6 @@ export class FusionService {
         this.ensureManagedAccountProcessingInitialized()
         const map = this.run.managedAccountsById
         await this.runCorrelatedAccountSweep(map)
-        this.run.clearLinkedAccountIndex()
     }
 
     /**
@@ -1341,6 +1342,9 @@ export class FusionService {
             this.run.managedAccountProcessingBatchSize,
             this.run.managedAccountProcessingBatchSize
         )
+        // Released only after the uncorrelated sweep: its pre-score gate checks every queued account
+        // for an existing Fusion link, and without the index each check scans every loaded Fusion row.
+        this.run.clearLinkedAccountIndex()
         this.run.resetManagedAccountProcessing()
         return { processed, matchScoringMs: this.run.matchScoringMs }
     }
