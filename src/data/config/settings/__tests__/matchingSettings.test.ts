@@ -55,6 +55,30 @@ describe('matchingSettings readSettings', () => {
         expect(result.fusionAutoMergeScore).toBe(95)
     })
 
+    it('preserves legacy exact-match-only automatic merging with a score of 100', () => {
+        const raw = {
+            fusionMergingExactMatch: true,
+            fusionAverageScore: 75,
+            matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher', fusionScore: 60 }],
+        }
+
+        const result = readSettings(raw)
+
+        expect(result.fusionEnableAutoMerge).toBe(true)
+        expect(result.fusionManualReviewScore).toBe(75)
+        expect(result.fusionAutoMergeScore).toBe(100)
+    })
+
+    it('still requires an automatic merge score for new configuration', () => {
+        expect(() =>
+            readSettings({
+                fusionEnableAutoMerge: true,
+                fusionManualReviewScore: 75,
+                matchingConfigs: [{ attribute: 'name', algorithm: 'name-matcher', fusionScore: 60 }],
+            })
+        ).toThrow('Automatic merge match score (fusionAutoMergeScore) is required when automatic merge is enabled')
+    })
+
     describe('empty attribute match guard', () => {
         let warn: ReturnType<typeof vi.spyOn>
 

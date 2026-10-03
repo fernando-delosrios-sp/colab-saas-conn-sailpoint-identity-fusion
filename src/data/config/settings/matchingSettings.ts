@@ -20,6 +20,11 @@ export const runtimeDefaults = {
 } as const
 
 export function readSettings(raw: Record<string, unknown>): MatchingSettingsSection & { fusionScoreMap: Map<string, number> } {
+    const migrateLegacyExactMatchThreshold =
+        !('fusionEnableAutoMerge' in raw) &&
+        !('fusionEnableAutoAssignment' in raw) &&
+        extractBoolean(raw, 'fusionMergingExactMatch') === true
+
     migrateConfigKey(raw, 'fusionAverageScore', 'fusionManualReviewScore')
     migrateConfigKey(raw, 'fusionMergingExactMatch', 'fusionEnableAutoMerge')
     migrateConfigKey(raw, 'fusionEnableAutoAssignment', 'fusionEnableAutoMerge')
@@ -30,7 +35,8 @@ export function readSettings(raw: Record<string, unknown>): MatchingSettingsSect
     const fusionEnableManualReview =
         extractBoolean(raw, 'fusionEnableManualReview') ?? runtimeDefaults.fusionEnableManualReview
     const fusionManualReviewScore = (raw.fusionManualReviewScore as number | undefined) ?? runtimeDefaults.fusionManualReviewScore
-    const fusionAutoMergeScore = raw.fusionAutoMergeScore as number | undefined
+    const fusionAutoMergeScore =
+        (raw.fusionAutoMergeScore as number | undefined) ?? (migrateLegacyExactMatchThreshold ? 100 : undefined)
 
     assert(
         fusionManualReviewScore >= 0 && fusionManualReviewScore <= 100,
