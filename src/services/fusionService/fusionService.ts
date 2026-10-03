@@ -1975,10 +1975,10 @@ export class FusionService {
      * Memory optimization: avoids accumulating the full output array - processes
      * and sends one at a time instead of building the whole array first.
      *
-     * @param send - Callback invoked with each account output (e.g. res.send)
+     * @param send - Callback for each account. Async callbacks are awaited so a slow client can apply backpressure.
      * @returns Number of accounts sent
      */
-    public async forEachISCAccount(send: (account: StdAccountListOutput) => void): Promise<number> {
+    public async forEachISCAccount(send: (account: StdAccountListOutput) => unknown): Promise<number> {
         const shouldFilter = this.deleteEmpty
         const batchSize = this.fusionParallelBatchSize()
         const forEachStartedAt = Date.now()
@@ -2002,7 +2002,7 @@ export class FusionService {
             const outputBatch = await Promise.all(batch.map((account) => this.getISCAccount(account, false)))
             for (const output of outputBatch) {
                 if (output) {
-                    send(output)
+                    await send(output)
                     count++
                 }
             }

@@ -20,7 +20,7 @@ function createRegistry() {
         registry,
         forms: registry.forms,
         fusion: registry.fusion,
-        sources: registry.sources
+        sources: registry.sources,
     }
 }
 
@@ -91,6 +91,22 @@ describe('corePipeline outputPhase', () => {
         expect(forms.cleanUpForms.mock.invocationCallOrder[0]).toBeLessThan(
             forms.awaitPendingDeleteOperations.mock.invocationCallOrder[0]
         )
+    })
+
+    it('sends each account through stream backpressure', async () => {
+        const { registry, fusion } = createRegistry()
+        fusion.forEachISCAccount.mockImplementation(async (send: (account: unknown) => Promise<void>) => {
+            await send({ key: { simple: { id: '1' } }, attributes: {}, disabled: false })
+            return 1
+        })
+
+        await outputPhase(registry, { mode: { kind: 'aggregation' } })
+
+        expect(registry.res.send).toHaveBeenCalledWith({
+            key: { simple: { id: '1' } },
+            attributes: {},
+            disabled: false,
+        })
     })
 
     it('skips form cleanup for non-persistent mode', async () => {

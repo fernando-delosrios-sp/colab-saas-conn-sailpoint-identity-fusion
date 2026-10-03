@@ -2,6 +2,7 @@ import { ServiceRegistry } from '../../services/serviceRegistry'
 import { SourceType } from '../../model/config'
 import { generateReport } from './generateReport'
 import { promiseAllBatched } from '../../services/fusionService/collections'
+import { sendWithBackpressure } from '../../utils/responseBackpressure'
 
 export type PipelineMode =
     | { kind: 'aggregation' } // full persistent run — accountList (includes optional aggregation report)
@@ -305,7 +306,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Cor
     if (isPersistent) {
         log.info('Sending accounts to platform')
         const sendAccountsStartedAt = Date.now()
-        count = await fusion.forEachISCAccount((account) => res.send(account))
+        count = await fusion.forEachISCAccount((account) => sendWithBackpressure(res, account))
         log.info(`Sent ${count} account(s) to platform`)
         log.info(
             `Performance metric: outputPhase.sendAccounts durationMs=${Date.now() - sendAccountsStartedAt} count=${count}`
