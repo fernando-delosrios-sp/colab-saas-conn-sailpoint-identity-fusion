@@ -1,0 +1,113 @@
+diff --git a/node_modules/@sailpoint/connector-sdk/dist/bin/spcx.js b/node_modules/@sailpoint/connector-sdk/dist/bin/spcx.js
+index a4c7b9d..c9f0e11 100755
+@@ -91,13 +91,25 @@
+         };
+     };
+     const app = (0, express_1.default)()
+-        .use(express_1.default.json({ strict: true }))
++        .use(express_1.default.json({ strict: true, limit: '100mb' }))
+         .post('/', async (req, res) => {
+         try {
+-            res.type('application/x-ndjson');
+             const cmd = req.body;
+             await (0, lib_1._withConfig)(cmd.config, async () => {
+                 const c = await loadConnector(connectorPath);
++                // text/event-stream (not application/x-ndjson): Caddy/nginx only disable
++                // buffering for SSE, so keepAlive chunks actually leave the reverse proxy.
++                res.status(200);
++                res.set({
++                    'Content-Type': 'text/event-stream; charset=utf-8',
++                    'Cache-Control': 'no-cache, no-transform',
++                    'Connection': 'keep-alive',
++                    'X-Accel-Buffering': 'no',
++                });
++                res.flushHeaders();
++                if (res.socket && typeof res.socket.setNoDelay === 'function') {
++                    res.socket.setNoDelay(true);
++                }
+                 const out = new stream_1.Transform({
+                     writableObjectMode: true,
+                     transform(chunk, encoding, callback) {
+@@ -110,14 +122,35 @@
+                         callback();
+                     },
+                 });
+-                (0, stream_1.pipeline)(out, res, (err) => {
+-                    if (err) {
++                // pipe() rather than pipeline(): Caddy/fetch closing the HTTP
++                // socket after a complete body is not an error, but pipeline()
++                // reports it as ERR_STREAM_PREMATURE_CLOSE.
++                const ignorePrematureClose = (err) => {
++                    if (err && err.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
+                         console.error(err);
+                     }
+-                });
++                };
++                res.on('error', ignorePrematureClose);
++                out.pipe(res, { end: true });
+                 await new Promise(async (resolve, reject) => {
+-                    out.on('finish', () => resolve());
+-                    out.on('error', (e) => reject(e));
++                    let settled = false;
++                    const finish = () => {
++                        if (!settled) {
++                            settled = true;
++                            resolve();
++                        }
++                    };
++                    out.on('finish', finish);
++                    out.on('error', (e) => {
++                        if (e && e.code === 'ERR_STREAM_PREMATURE_CLOSE') {
++                            finish();
++                            return;
++                        }
++                        if (!settled) {
++                            settled = true;
++                            reject(e);
++                        }
++                    });
+                     try {
+                         if (c.connector == null && c.connectorCustomizer == null) {
+                             return reject(new Error('Connector not found. Did you export it?'));
+@@ -134,10 +167,19 @@
+                         reject(e);
+                     }
+                     finally {
+-                        out.end();
++                        if (!out.writableEnded) {
++                            out.end();
++                        }
+                     }
+                 });
+-                res.status(200);
++                await new Promise((resolve) => {
++                    if (res.writableEnded || res.destroyed) {
++                        resolve();
++                        return;
++                    }
++                    res.once('finish', resolve);
++                    res.once('close', resolve);
++                });
+             });
+         }
+         catch (e) {
+@@ -146,10 +188,17 @@
+             if (e instanceof lib_1.ConnectorError) {
+                 errorType = e.type;
+             }
+-            res.status(500).write(`${errorType} error: \n + ${(0, util_1.inspect)(e)}`);
++            if (!res.headersSent) {
++                res.status(500);
++            }
++            if (!res.writableEnded) {
++                res.write(`${errorType} error: \n + ${(0, util_1.inspect)(e)}`);
++            }
+         }
+         finally {
+-            res.end();
++            if (!res.writableEnded) {
++                res.end();
++            }
+         }
+     });
+     app.listen(port, () => {

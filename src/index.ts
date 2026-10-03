@@ -82,9 +82,7 @@ export const connector = async () => {
             'custom:dryrun',
             createOperationHandler('custom:dryrun', dryRun, config, {
                 errorMessage: 'Failed to run custom:dryrun',
-                // Long fetch/analyze phases send no row output; peers often idle-timeout (~60s) before the first NDJSON line.
                 keepAlive: 'simple',
-                keepAliveIntervalMs: 15_000,
             })
         )
 }

@@ -1,6 +1,6 @@
 {
     "name": "identity-fusion",
-    "version": "2.1.9",
+    "version": "2.1.10",
     "main": "dist/index.js",
     "scripts": {
         "clean": "shx rm -rf ./dist",
@@ -26,6 +26,7 @@
         "ci:docs-code-review": "node scripts/ci-eslint-changed.cjs",
         "ci:docs-review": "node scripts/ci-markdown-changed.cjs && npm run docs:prepare && (python3 -m pip install --user -r requirements-docs.txt || true) && python3 -m mkdocs build && node scripts/ci-check-readme-changelog.cjs",
         "prettier": "npx prettier --write .",
+        "postinstall": "patch-package",
         "prepack-zip": "npm ci && npm run build",
         "pack-zip": "spcx package",
         "test": "jest --passWithNoTests --maxWorkers=50%"
@@ -64,6 +65,7 @@
         "globals": "^17.5.0",
         "jest": "^30.3.0",
         "markdownlint-cli": "^0.49.0",
+        "patch-package": "^8.0.1",
         "prettier": "^3.8.3",
         "shx": "^0.4.0",
         "ts-jest": "^29.4.9",

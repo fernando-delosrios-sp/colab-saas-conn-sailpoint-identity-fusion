@@ -3,8 +3,8 @@ import { FusionConfig } from '../model/config'
 import { LogService } from './logService'
 import { assert } from 'console'
 
-const KEEPALIVE = 2.5 * 60 * 1000
 const DEFAULT_PROXY_REQUEST_TIMEOUT_MS = 5 * 60 * 1000
+const MAX_PROXY_REDIRECTS = 8
 
 const unwrapData = (obj: any, log: LogService): any => {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj)) {
@@ -25,6 +25,103 @@ const isValidObject = (obj: any): boolean => {
         return false
     }
     return Object.keys(obj).length > 0
+}
+
+const contentTypeOf = (response: globalThis.Response): string => response.headers.get('content-type') ?? ''
+
+const looksLikeHtml = (text: string, contentType: string): boolean => {
+    if (/text\/html/i.test(contentType)) {
+        return true
+    }
+    const start = text.trimStart().slice(0, 32).toLowerCase()
+    return start.startsWith('<!doctype html') || start.startsWith('<html')
+}
+
+const htmlProxyError = (proxyUrl: string, status: number, contentType: string, body: string): ConnectorError =>
+    new ConnectorError(
+        `Proxy at ${proxyUrl} returned HTML instead of a JSON stream (HTTP ${status}, Content-Type: ${contentType || 'none'}). ` +
+            'A reverse proxy such as Caddy does this when it buffers/times out NDJSON, serves a site page, or turns POST into GET via redirect. ' +
+            `Snippet: ${body.trim().slice(0, 120)}`
+    )
+
+const stripSseLine = (line: string): string => {
+    const trimmed = line.trim()
+    if (trimmed.toLowerCase().startsWith('data:')) {
+        return trimmed.slice(5).trim()
+    }
+    return trimmed
+}
+
+const isRedirectStatus = (status: number): boolean => status >= 300 && status < 400
+
+/**
+ * fetch() follows 301/302/303 by converting POST to GET, which returns Caddy/file-server HTML.
+ * Replay POST for 301/302/307/308 instead, and stay on the original host.
+ */
+const postPreservingRedirects = async (
+    proxyUrl: string,
+    init: RequestInit,
+    log: LogService
+): Promise<globalThis.Response> => {
+    const originalHost = new URL(proxyUrl).host
+    let url = proxyUrl
+
+    for (let hop = 0; hop < MAX_PROXY_REDIRECTS; hop++) {
+        const response = await fetch(url, { ...init, redirect: 'manual' })
+        if (!isRedirectStatus(response.status)) {
+            return response
+        }
+
+        const location = response.headers.get('location')
+        await response.arrayBuffer().catch(() => undefined)
+        if (!location) {
+            throw new ConnectorError(`Proxy at ${url} returned redirect ${response.status} without a Location header`)
+        }
+
+        const next = new URL(location, url)
+        if (next.host !== originalHost) {
+            throw new ConnectorError(`Proxy redirect to a different host was blocked: ${originalHost} -> ${next.host}`)
+        }
+        if (response.status === 303) {
+            throw new ConnectorError(
+                `Proxy at ${url} issued 303 to ${next.toString()}, which would change the POST stream into a GET page load`
+            )
+        }
+
+        log.debug(`Following proxy redirect ${response.status} to ${next.toString()}`)
+        url = next.toString()
+    }
+
+    throw new ConnectorError(`Proxy at ${proxyUrl} exceeded ${MAX_PROXY_REDIRECTS} redirects`)
+}
+
+const sendParsedRecord = (parsed: any, res: Response<any>, log: LogService): boolean => {
+    if (parsed === null || parsed === undefined) {
+        return false
+    }
+
+    if (typeof parsed === 'object' && !Array.isArray(parsed) && typeof parsed.type === 'string') {
+        if (parsed.type === 'keepAlive') {
+            return false
+        }
+        if (parsed.type === 'state') {
+            res.saveState(parsed.data)
+            return false
+        }
+        if (parsed.type === 'config') {
+            return false
+        }
+    }
+
+    const unwrapped = unwrapData(parsed, log)
+    if (!isValidObject(unwrapped)) {
+        log.debug('Skipping empty NDJSON object')
+        return false
+    }
+
+    log.debug(`Sending object: ${JSON.stringify(unwrapped).substring(0, 200)}`)
+    res.send(unwrapped)
+    return true
 }
 
 /**
@@ -80,9 +177,6 @@ export class ProxyService {
      * @param input - The SDK input payload for the current operation
      */
     async execute(input: any): Promise<void> {
-        const interval = setInterval(() => {
-            this.res.keepAlive()
-        }, KEEPALIVE)
         try {
             if (!this.config.proxyEnabled || !this.config.proxyUrl) {
                 throw new ConnectorError('Proxy mode is not enabled or proxy URL is missing')
@@ -101,15 +195,23 @@ export class ProxyService {
             }, proxyRequestTimeoutMs)
             let response: globalThis.Response
             try {
-                response = await fetch(proxyUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
+                response = await postPreservingRedirects(
+                    proxyUrl,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Accept: 'application/x-ndjson, application/json, text/event-stream',
+                        },
+                        body: JSON.stringify(body),
+                        signal: controller.signal,
                     },
-                    body: JSON.stringify(body),
-                    signal: controller.signal,
-                })
+                    this.log
+                )
             } catch (fetchError) {
+                if (fetchError instanceof ConnectorError) {
+                    throw fetchError
+                }
                 if (fetchError instanceof Error && fetchError.name === 'AbortError') {
                     throw new ConnectorError(`Proxy request to ${proxyUrl} timed out after ${proxyRequestTimeoutMs} ms`)
                 }
@@ -123,14 +225,18 @@ export class ProxyService {
                 clearTimeout(timeout)
             }
 
-            if (!response.ok) {
-                const errorText = await response.text()
-                throw new ConnectorError(
-                    `Proxy server returned error status ${response.status}: ${errorText || response.statusText}`
-                )
+            const contentType = contentTypeOf(response)
+            const data = await response.text()
+
+            if (looksLikeHtml(data, contentType)) {
+                throw htmlProxyError(proxyUrl, response.status, contentType, data || response.statusText)
             }
 
-            const data = await response.text()
+            if (!response.ok) {
+                throw new ConnectorError(
+                    `Proxy server returned error status ${response.status}: ${data || response.statusText}`
+                )
+            }
 
             if (!data || data.trim().length === 0) {
                 this.log.debug('Proxy received empty response')
@@ -141,7 +247,10 @@ export class ProxyService {
                 `Proxy received response (${data.length} chars): ${data.substring(0, 500)}${data.length > 500 ? '...' : ''}`
             )
 
-            const lines = data.split('\n').filter((line) => line.trim().length > 0)
+            const lines = data
+                .split('\n')
+                .map(stripSseLine)
+                .filter((line) => line.length > 0 && !line.startsWith(':'))
             this.log.debug(`Processing ${lines.length} non-empty lines from proxy response`)
 
             if (lines.length === 0) {
@@ -205,19 +314,14 @@ export class ProxyService {
             let validObjectCount = 0
             for (const line of lines) {
                 try {
-                    let parsed = JSON.parse(line)
-
-                    parsed = unwrapData(parsed, this.log)
-
-                    if (!isValidObject(parsed)) {
-                        this.log.debug(`Skipping empty NDJSON object`)
-                        continue
+                    const parsed = JSON.parse(line)
+                    if (sendParsedRecord(parsed, this.res, this.log)) {
+                        validObjectCount++
                     }
-
-                    this.log.debug(`Sending object: ${JSON.stringify(parsed).substring(0, 200)}`)
-                    this.res.send(parsed)
-                    validObjectCount++
                 } catch (parseError) {
+                    if (looksLikeHtml(line, '')) {
+                        throw htmlProxyError(proxyUrl, response.status, contentType, line)
+                    }
                     this.log.error(`Failed to parse line: ${line.substring(0, 200)}`)
                     throw new ConnectorError(
                         `Failed to parse JSON line from proxy response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. Line: ${line.substring(0, 100)}`
@@ -230,8 +334,6 @@ export class ProxyService {
             if (error instanceof ConnectorError) throw error
             const detail = error instanceof Error ? error.message : String(error)
             throw new ConnectorError(`Proxy operation failed: ${detail}`)
-        } finally {
-            clearInterval(interval)
         }
     }
 }

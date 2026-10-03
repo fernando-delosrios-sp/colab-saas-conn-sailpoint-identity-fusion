@@ -16,8 +16,6 @@ type KeepAliveMode = 'memory' | 'simple'
 export interface OperationHandlerOptions {
     errorMessage: string | ((input: any) => string)
     keepAlive?: KeepAliveMode
-    /** Override `config.processingWait` for the keepAlive timer (ms). Use when pre-output work can exceed client idle timeouts. */
-    keepAliveIntervalMs?: number
 }
 
 function resolveRunMode(
@@ -35,32 +33,25 @@ function resolveRunMode(
 function scheduleKeepAlive(
     handlerOptions: OperationHandlerOptions,
     config: FusionConfig,
-    runMode: RunMode,
     isProxyServer: boolean,
     res: { keepAlive: () => void }
 ): ReturnType<typeof setInterval> | undefined {
-    const everyMs = handlerOptions.keepAliveIntervalMs ?? config.processingWait
+    if (!handlerOptions.keepAlive) {
+        return undefined
+    }
 
-    if (handlerOptions.keepAlive === 'memory') {
-        if (isProxyServer) {
-            return undefined
-        }
-        return setInterval(() => {
+    const everyMs = config.processingWait ?? 60_000
+    const tick = () => {
+        if (handlerOptions.keepAlive === 'memory' && !isProxyServer) {
             const memoryUsage = process.memoryUsage()
             logger.info(
                 `Memory usage - RSS: ${(memoryUsage.rss / 1024 / 1024).toFixed(2)} MB, Heap Used: ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB, Heap Total: ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`
             )
-            res.keepAlive()
-        }, everyMs)
+        }
+        res.keepAlive()
     }
-
-    if (handlerOptions.keepAlive === 'simple' && runMode !== RunMode.Proxy) {
-        return setInterval(() => {
-            res.keepAlive()
-        }, everyMs)
-    }
-
-    return undefined
+    tick()
+    return setInterval(tick, everyMs)
 }
 
 async function runOperation(
@@ -98,7 +89,7 @@ export function createOperationHandler(
         try {
             const serviceRegistry = new ServiceRegistry(config, context, res, operationName)
             const { runMode, isProxyServer } = resolveRunMode(context, serviceRegistry.proxy, operationName)
-            interval = scheduleKeepAlive(options, config, runMode, isProxyServer, res)
+            interval = scheduleKeepAlive(options, config, isProxyServer, res)
 
             logger.info(`Running ${operationName} in ${runMode} mode`)
             await runOperation(runMode, operationName, context, serviceRegistry, input, defaultFn)
