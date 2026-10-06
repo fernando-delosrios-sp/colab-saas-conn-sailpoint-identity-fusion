@@ -1,6 +1,6 @@
 import { readConfig } from '@sailpoint/connector-sdk'
 import type { FusionConfig, RecordingConfig } from '../../model/config'
-import { bootstrapLog } from '../../services/logService'
+import { bootstrapLog } from '../../services/logService/bootstrapLog'
 import { getInternalConfigFlat } from './internal'
 import * as advancedConnectionSettings from './settings/advancedConnectionSettings'
 import * as attributeMappingDefinitionsSettings from './settings/attributeMappingDefinitionsSettings'

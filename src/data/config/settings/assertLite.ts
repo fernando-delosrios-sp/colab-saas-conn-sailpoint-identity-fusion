@@ -8,7 +8,7 @@
  * validation that runs before any operation starts.
  */
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
-import { bootstrapLog } from '../../../services/logService'
+import { bootstrapLog } from '../../../services/logService/bootstrapLog'
 
 export function assert(condition: unknown, message: string): asserts condition {
     if (!condition) {

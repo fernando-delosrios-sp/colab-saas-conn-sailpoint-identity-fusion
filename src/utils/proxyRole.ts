@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
-import { bootstrapLog } from '../services/logService'
+import { bootstrapLog } from '../services/logService/bootstrapLog'
 
 /** Minimal config slice for proxy client/server role detection. */
 export type ProxyRoleConfig = {

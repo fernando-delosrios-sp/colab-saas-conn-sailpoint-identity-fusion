@@ -1,7 +1,7 @@
 /**
  * connector-spec.json -> Attribute Matching Settings -> Matching Settings
  */
-import { bootstrapLog } from '../../../services/logService'
+import { bootstrapLog } from '../../../services/logService/bootstrapLog'
 import { assert } from './assertLite'
 import { extractBoolean } from '../../../utils/attributes'
 import { migrateConfigKey } from '../migration'

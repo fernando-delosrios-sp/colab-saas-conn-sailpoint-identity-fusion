@@ -1,7 +1,7 @@
 /**
  * connector-spec.json -> Advanced Settings -> External Settings
  */
-import { bootstrapLog } from '../../../services/logService'
+import { bootstrapLog } from '../../../services/logService/bootstrapLog'
 import { extractBoolean, rawLooksEnabled } from '../../../utils/attributes'
 import type { ExternalSettingsSection } from '../../../model/config'
 import { assert } from './assertLite'
