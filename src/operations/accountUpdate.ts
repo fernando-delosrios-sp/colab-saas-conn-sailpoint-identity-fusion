@@ -7,7 +7,8 @@ import { runAccountUpdatePipeline } from './helpers/accountUpdateHelpers'
  *
  * Processes attribute changes from the platform, currently supporting action-type
  * entitlements: report, fusion, and correlate. Each action is executed sequentially
- * against the rebuilt fusion account.
+ * against the rebuilt fusion account. Status entitlement requests are rejected with
+ * an attribute-level provisioning error that names the account and the status.
  *
  * Processing Flow:
  * 1. SETUP: Load sources and schema

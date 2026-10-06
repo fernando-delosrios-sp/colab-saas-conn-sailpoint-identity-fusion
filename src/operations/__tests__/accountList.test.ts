@@ -51,10 +51,10 @@ function createTwoSweepRegistry(scenario: AggregationScenario) {
         decisionHistory.push([...dataBySweep[currentSweep.value].decisions])
     })
 
-    fusion.forEachISCAccount.mockImplementation(async (sendFn: (account: unknown) => void) => {
+    fusion.forEachISCAccount.mockImplementation(async (sendFn: (account: unknown) => void | Promise<void>) => {
         const output = dataBySweep[currentSweep.value].outputAccounts
         for (const account of output) {
-            sendFn(account)
+            await sendFn(account)
         }
         return { sent: output.length, eligible: output.length }
     })
@@ -251,9 +251,9 @@ describe('accountList dry-run mode', () => {
         const res = registry.res
         const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
         const outputAccounts = [{ identity: 'acct-1' }, { identity: 'acct-2' }]
-        fusion.forEachISCAccount.mockImplementation(async (sendFn: (account: unknown) => void) => {
+        fusion.forEachISCAccount.mockImplementation(async (sendFn: (account: unknown) => void | Promise<void>) => {
             for (const account of outputAccounts) {
-                sendFn(account)
+                await sendFn(account)
             }
             return { sent: outputAccounts.length, eligible: outputAccounts.length }
         })
@@ -350,8 +350,8 @@ describe('accountList report epilogue', () => {
     it('emits the aggregation report and rethrows when res.send fails mid-stream', async () => {
         const { registry, sources, fusion } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         fusion.fusionReportOnAggregation = true
-        fusion.forEachISCAccount.mockImplementation(async (sendFn: (a: unknown) => void) => {
-            sendFn({ id: 'a1' })
+        fusion.forEachISCAccount.mockImplementation(async (sendFn: (a: unknown) => void | Promise<void>) => {
+            await sendFn({ id: 'a1' })
             return { sent: 1, eligible: 1 }
         })
         ;(registry.res.send as Mock).mockImplementation(() => {
@@ -372,8 +372,8 @@ describe('accountList report epilogue', () => {
         const { registry, fusion } = createMockRegistry([{ name: 'fusion', correlationMode: 'none' }])
         const reports = registry.reports as any
         reports.generateDryRunReport = vi.fn().mockResolvedValue({ reportHtmlOutputPath: './reports/dry-run.html' })
-        fusion.forEachISCAccount.mockImplementation(async (sendFn: (a: unknown) => void) => {
-            sendFn({ id: 'a1' })
+        fusion.forEachISCAccount.mockImplementation(async (sendFn: (a: unknown) => void | Promise<void>) => {
+            await sendFn({ id: 'a1' })
             return { sent: 1, eligible: 1 }
         })
         ;(registry.res.send as Mock).mockImplementation(() => {

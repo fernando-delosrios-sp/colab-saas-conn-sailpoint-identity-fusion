@@ -10,6 +10,7 @@ import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
 import { generateReport } from './generateReport'
 import { buildReportAggregationStats, buildTerminalSummary, DryRunInput, type FetchResult } from './accountListHelpers'
+import { sendWithBackpressure } from '../../utils/responseBackpressure'
 
 export type { FetchResult } from './accountListHelpers'
 
@@ -343,8 +344,8 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
     const { sent } = await log.runStep(
         'send-accounts',
         () =>
-            fusion.forEachISCAccount((account) => {
-                res.send(account)
+            fusion.forEachISCAccount(async (account) => {
+                await sendWithBackpressure(res, account)
                 if (options.streamProgress) options.streamProgress.sent++
             }, true),
         {

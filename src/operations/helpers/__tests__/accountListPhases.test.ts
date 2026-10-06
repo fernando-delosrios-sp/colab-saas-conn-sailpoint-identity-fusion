@@ -1,5 +1,7 @@
 import { buildReportAggregationStats } from '../accountListHelpers'
-import { reportEpilogue } from '../accountListPhases'
+import { outputPhase, reportEpilogue } from '../accountListPhases'
+import { createOperationTestRegistry } from '../../__tests__/harness/operationTestRegistry'
+import * as responseBackpressure from '../../../utils/responseBackpressure'
 import { FusionRun } from '../../../model/fusionRun'
 import { LogService } from '../../../services/logService'
 import { RecordingService, resetRecordingLifecycleForTests } from '../../../services/recordingService'
@@ -242,6 +244,24 @@ describe('reportEpilogue recording artifacts', () => {
         expect(scenario.matchingResultsPath).toContain('matching-results.json')
 
         fs.rmSync(dir, { recursive: true, force: true })
+    })
+})
+
+describe('outputPhase', () => {
+    it('sends each account through stream backpressure', async () => {
+        const registry = createOperationTestRegistry()
+        const account = { key: { simple: { id: '1' } }, attributes: {}, disabled: false }
+        const sendSpy = vi.spyOn(responseBackpressure, 'sendWithBackpressure')
+        const fusion = registry.fusion as any
+        fusion.forEachISCAccount.mockImplementation(async (send: (account: unknown) => Promise<void>) => {
+            await send(account)
+            return { sent: 1, eligible: 1 }
+        })
+
+        await outputPhase(registry, { isPersistent: false })
+
+        expect(sendSpy).toHaveBeenCalledWith(registry.res, account)
+        expect(registry.res.send).toHaveBeenCalledWith(account)
     })
 })
 

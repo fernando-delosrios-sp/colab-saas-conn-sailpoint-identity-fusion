@@ -701,7 +701,7 @@ function configureNonReplayMocks(
                 `forEachISCAccount mock: getISCAccount for managedKey=${account.managedKey} produced iscAccount=${!!iscAccount}`
             )
             if (iscAccount) {
-                send(iscAccount)
+                await send(iscAccount)
                 sent++
             }
         }

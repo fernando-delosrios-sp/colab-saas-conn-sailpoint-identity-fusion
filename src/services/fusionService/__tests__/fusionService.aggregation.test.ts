@@ -2681,6 +2681,37 @@ describe('FusionService — aggregation', () => {
             expect(maxInFlight).toBeLessThanOrEqual(12)
             expect(sentKeys).toEqual(accounts.map((x) => x.managedKey))
         })
+
+        it('awaits the send callback before sending the next account', async () => {
+            const accounts = Array.from({ length: 3 }, (_, i) =>
+                FusionAccount.fromManagedAccount({
+                    id: `await-acct-${i}`,
+                    name: `Await Account ${i}`,
+                    sourceId: 'src-1',
+                    nativeIdentity: `await-native-${i}`,
+                    sourceName: 'Source 1',
+                    attributes: {},
+                } as Account)
+            )
+            for (const account of accounts) {
+                ctx.fusionService.setFusionAccount(account)
+            }
+            vi.spyOn(ctx.fusionService as any, 'getISCAccount').mockImplementation(async (...args: any[]) => {
+                const account = args[0] as FusionAccount
+                return { key: account.managedKey, attributes: {}, disabled: false }
+            })
+
+            let inFlight = 0
+            let maxInFlight = 0
+            await ctx.fusionService.forEachISCAccount(async () => {
+                inFlight += 1
+                maxInFlight = Math.max(maxInFlight, inFlight)
+                await new Promise((resolve) => setTimeout(resolve, 5))
+                inFlight -= 1
+            })
+
+            expect(maxInFlight).toBe(1)
+        })
     })
 
 })

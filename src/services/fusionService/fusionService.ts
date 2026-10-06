@@ -968,7 +968,7 @@ export class FusionService {
     private async processOutputBatch(
         batch: FusionAccount[],
         refreshUniqueAttributes: boolean,
-        send: (account: StdAccountListOutput) => void
+        send: (account: StdAccountListOutput) => unknown
     ): Promise<number> {
         const outputBatch = await Promise.all(
             batch.map(async (account) => {
@@ -983,7 +983,7 @@ export class FusionService {
         for (let j = 0; j < outputBatch.length; j++) {
             const output = outputBatch[j]
             if (output) {
-                send(output)
+                await send(output)
                 sent++
             }
             this.run.removeFusionAccount(batch[j])
@@ -996,11 +996,11 @@ export class FusionService {
      * Memory optimization: avoids accumulating the full output array - processes
      * and sends one at a time instead of building the whole array first.
      *
-     * @param send - Callback invoked with each account output (e.g. res.send)
+     * @param send - Callback for each account. Async callbacks are awaited so a slow client can apply backpressure.
      * @returns Number of accounts sent and number of eligible accounts
      */
     public async forEachISCAccount(
-        send: (account: StdAccountListOutput) => void,
+        send: (account: StdAccountListOutput) => unknown,
         refreshUniqueAttributes: boolean = false
     ): Promise<{ sent: number; eligible: number }> {
         const batchSize = getFusionParallelBatchSize(this.config)

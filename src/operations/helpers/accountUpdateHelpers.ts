@@ -1,4 +1,8 @@
 import {
+    AttributeChange,
+    AttributeChangeOp,
+    ResultMessageLevel,
+    ResultStatus,
     StdAccountUpdateInput,
 } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../../services/serviceRegistry'
@@ -114,8 +118,18 @@ export async function runAccountUpdatePipeline(
     log.debug(`Found fusion account: ${accountLabel || fusionAccount.managedKey}`)
     log.stepEnd('rebuild-fusion-account')
 
-    log.stepStart('process-changes', { count: input.changes.length })
-    for (const change of input.changes) {
+    const statusChanges = input.changes.filter((change) => change.attribute === FusionAttribute.Statuses)
+    const statusChangeMessage =
+        statusChanges.length > 0
+            ? statusEntitlementChangeMessage(accountLabel, input.identity, statusChanges)
+            : undefined
+    if (statusChangeMessage) {
+        log.error(statusChangeMessage)
+    }
+
+    const changesToApply = input.changes.filter((change) => change.attribute !== FusionAttribute.Statuses)
+    log.stepStart('process-changes', { count: changesToApply.length })
+    for (const change of changesToApply) {
         assert(change.attribute, 'Change attribute is required')
 
         if (change.attribute === FusionAttribute.Actions) {
@@ -124,7 +138,7 @@ export async function runAccountUpdatePipeline(
             log.crash(`Unsupported entitlement change: ${change.attribute}`)
         }
     }
-    log.stepEnd('process-changes', { count: input.changes.length })
+    log.stepEnd('process-changes', { count: changesToApply.length })
 
     restoreReverseCorrelationSnapshot(fusionAccount, reverseCorrelationSnapshot)
 
@@ -133,9 +147,52 @@ export async function runAccountUpdatePipeline(
     assert(iscAccount, 'Failed to generate ISC account from fusion account')
     log.stepEnd('generate-account')
 
-    res.send(iscAccount)
+    res.send(
+        statusChangeMessage
+            ? {
+                  ...iscAccount,
+                  results: [
+                      {
+                          attribute: FusionAttribute.Statuses,
+                          status: ResultStatus.Error,
+                          messages: [
+                              {
+                                  level: ResultMessageLevel.ERROR,
+                                  message: statusChangeMessage,
+                              },
+                          ],
+                      },
+                  ],
+              }
+            : iscAccount
+    )
     timer.end(`✓ Account update completed for ${accountLabel}`)
     return accountLabel
 }
 
+function formatStatusAccountLabel(displayLabel: string, identity: string): string {
+    if (!displayLabel || displayLabel === identity) return identity
+    return `${displayLabel} (${identity})`
+}
 
+function quoteStatusValues(value: unknown): string {
+    const values = [value]
+        .flat()
+        .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
+        .filter((item) => item.length > 0)
+    if (values.length === 0) return 'an unspecified status'
+    return values.map((item) => `"${item}"`).join(', ')
+}
+
+function statusChangeVerb(op: AttributeChangeOp): string {
+    if (op === AttributeChangeOp.Remove) return 'remove'
+    if (op === AttributeChangeOp.Set) return 'set'
+    return 'add'
+}
+
+function statusEntitlementChangeMessage(displayLabel: string, identity: string, changes: AttributeChange[]): string {
+    const attempts = changes
+        .map((change) => `${statusChangeVerb(change.op)} ${quoteStatusValues(change.value)}`)
+        .join('; ')
+    return `Account ${formatStatusAccountLabel(displayLabel, identity)} cannot change status entitlements (${attempts}). Status entitlements are assigned by Fusion and are not requestable.`
+}
