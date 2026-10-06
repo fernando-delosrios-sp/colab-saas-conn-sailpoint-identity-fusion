@@ -26,7 +26,13 @@ describe('SchemaService', () => {
             fetchIdentitySchemaAttributes: vi.fn().mockResolvedValue([
                 { name: 'empId', description: 'Employee ID', type: 'string', multi: false, entitlement: false },
                 { name: 'groups', description: 'Groups', type: 'string', multi: true, entitlement: false },
-                { name: 'unrecognized', description: 'Unrecognized Type', type: 'string', multi: false, entitlement: false },
+                {
+                    name: 'unrecognized',
+                    description: 'Unrecognized Type',
+                    type: 'string',
+                    multi: false,
+                    entitlement: false,
+                },
             ]),
         }
 
@@ -154,12 +160,15 @@ describe('SchemaService', () => {
                     { name: 'id', type: 'string', required: true },
                     { name: 'name', type: 'string', required: true },
                     { name: 'department', type: 'string', multi: false },
+                    { name: 'employeeId', type: 'string', multi: false, required: true },
+                    { name: 'employeeNumber', type: 'int', multi: false },
+                    { name: 'active', type: 'boolean', multi: false },
                     { name: 'reviews', type: 'string', multi: true },
                 ],
             })
         })
 
-        it('omits null or absent schema attributes from platform output', () => {
+        it('Unset attribute is omitted from subset', () => {
             const resultWithNull = schemaService.getFusionAttributeSubset({
                 id: '1',
                 name: 'Ada Wong',
@@ -177,7 +186,7 @@ describe('SchemaService', () => {
             expect(resultWithAbsent).not.toHaveProperty('department')
         })
 
-        it('retains populated attribute values', () => {
+        it('Populated attribute is retained', () => {
             const result = schemaService.getFusionAttributeSubset({
                 id: '1',
                 name: 'Ada Wong',
@@ -186,30 +195,174 @@ describe('SchemaService', () => {
             expect(result.name).toBe('Ada Wong')
         })
 
-        it('retains empty multi-valued arrays', () => {
+        it('Blank string is omitted', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                department: '',
+            })
+
+            expect(result).not.toHaveProperty('department')
+        })
+
+        it('Whitespace-only string is omitted', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                department: '   ',
+            })
+
+            expect(result).not.toHaveProperty('department')
+        })
+
+        it('Surrounding whitespace on a non-blank string is preserved', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                department: '  Finance  ',
+            })
+
+            expect(result.department).toBe('  Finance  ')
+        })
+
+        it('Empty multi-valued array is omitted', () => {
             const result = schemaService.getFusionAttributeSubset({
                 id: '1',
                 name: 'Ada Wong',
                 reviews: [],
             })
 
-            expect(result.reviews).toEqual([])
+            expect(result).not.toHaveProperty('reviews')
         })
 
-        it('does not mutate the input attribute bag', () => {
+        it('Multi-valued array of only blank strings is omitted', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                reviews: ['', '  '],
+            })
+
+            expect(result).not.toHaveProperty('reviews')
+        })
+
+        it('Mixed multi-valued array drops blank elements', () => {
+            const reviews = ['ok', '', '  ']
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                reviews,
+            })
+
+            expect(result.reviews).toEqual(['ok'])
+            expect(reviews).toEqual(['ok', '', '  '])
+        })
+
+        it('Boolean false is retained', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                active: false,
+            })
+
+            expect(result.active).toBe(false)
+        })
+
+        it('Numeric zero is retained', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                employeeNumber: 0,
+            })
+
+            expect(result.employeeNumber).toBe(0)
+        })
+
+        it('Blank string on a numeric attribute is emitted as zero', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                employeeNumber: '',
+            })
+
+            expect(result.employeeNumber).toBe(0)
+        })
+
+        it('Blank string on a boolean attribute is emitted as false', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                active: '',
+            })
+
+            expect(result.active).toBe(false)
+        })
+
+        it('Blank identity attribute is retained', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '',
+                name: 'Ada Wong',
+            })
+
+            expect(result.id).toBe('')
+        })
+
+        it('Whitespace-only display attribute is retained', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                name: '   ',
+            })
+
+            expect(result.name).toBe('   ')
+        })
+
+        it('Null identity attribute is omitted', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: null,
+                name: 'Ada Wong',
+            })
+
+            expect(result).not.toHaveProperty('id')
+        })
+
+        it('Blank required attribute other than id or name is omitted', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                employeeId: '',
+            })
+
+            expect(result).not.toHaveProperty('employeeId')
+        })
+
+        it('String zero is retained', () => {
+            const result = schemaService.getFusionAttributeSubset({
+                id: '1',
+                name: 'Ada Wong',
+                department: '0',
+            })
+
+            expect(result.department).toBe('0')
+        })
+
+        it('Internal bag unchanged', () => {
+            const reviews: string[] = []
             const input = {
                 id: '1',
                 name: 'Ada Wong',
                 department: null,
+                reviews,
             }
 
-            schemaService.getFusionAttributeSubset(input)
+            const result = schemaService.getFusionAttributeSubset(input)
 
             expect(input).toEqual({
                 id: '1',
                 name: 'Ada Wong',
                 department: null,
+                reviews: [],
             })
+            expect(input.reviews).toBe(reviews)
+            expect(result).not.toHaveProperty('department')
+            expect(result).not.toHaveProperty('reviews')
         })
     })
 
@@ -253,5 +406,3 @@ describe('SchemaService', () => {
         })
     })
 })
-
-

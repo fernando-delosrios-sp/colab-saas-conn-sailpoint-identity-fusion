@@ -71,9 +71,31 @@ export class SchemaService {
             const schemaDef = this.fusionSchemaAttributeMap.get(attribute)
             const casted = schemaDef ? this.castAttributeValue(value, schemaDef) : value
             if (casted === null || casted === undefined) continue
-            fusionAttributes[attribute] = casted
+            const emitted = this.emittedPlatformValue(attribute, casted)
+            if (emitted === undefined) continue
+            fusionAttributes[attribute] = emitted
         }
         return fusionAttributes
+    }
+
+    /**
+     * Returns the value to assign on the platform bag, or `undefined` when the attribute should be omitted.
+     * Blank strings and arrays that are empty after blank string elements are removed are omitted.
+     * `id` and `name` are still returned when the emitted value is a blank string.
+     * Filtered arrays are copies; `casted` is not mutated.
+     */
+    private emittedPlatformValue(attribute: string, casted: any): any {
+        if (Array.isArray(casted)) {
+            const filtered = casted.filter((element) => !this.isBlankString(element))
+            return filtered.length === 0 ? undefined : filtered
+        }
+        if (this.isBlankString(casted) && attribute !== 'id' && attribute !== 'name') return undefined
+        return casted
+    }
+
+    /** A string with no characters, or only whitespace. */
+    private isBlankString(value: unknown): boolean {
+        return typeof value === 'string' && value.trim() === ''
     }
 
     /**
@@ -82,10 +104,7 @@ export class SchemaService {
      * - For multi-valued attributes (`multi` is true): scalar values are wrapped in an array.
      * - Values are cast to the target type (`string`, `boolean`, `int`/`long`).
      */
-    private castAttributeValue(
-        value: any,
-        schemaDef: SchemaAttribute
-    ): any {
+    private castAttributeValue(value: any, schemaDef: SchemaAttribute): any {
         if (value === null || value === undefined) return null
 
         const isMulti = schemaDef.multi === true
@@ -104,7 +123,7 @@ export class SchemaService {
             if (type === 'string') {
                 if (typeof value === 'object' && value !== null) {
                     if (Array.isArray(value)) {
-                        const isObjectArray = value.some(v => typeof v === 'object' && v !== null)
+                        const isObjectArray = value.some((v) => typeof v === 'object' && v !== null)
                         if (isObjectArray) {
                             return JSON.stringify(value)
                         } else {
@@ -449,5 +468,3 @@ export class SchemaService {
         }
     }
 }
-
-
