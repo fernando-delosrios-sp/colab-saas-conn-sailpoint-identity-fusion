@@ -1,6 +1,8 @@
 # Standard account schema attributes
 
-Every Identity Fusion NG account exposes the following built-in attributes. These are always present regardless of Attribute Mapping or Attribute Definition configuration.
+The Identity Fusion account schema always includes the following built-in attributes, regardless of Attribute Mapping or Attribute Definition configuration. The table is that schema.
+
+The account sent to Identity Security Cloud omits a schema attribute when its value is a blank string (empty or whitespace-only) or an empty array. Blank string elements are dropped from a multi-valued attribute first, and the attribute is omitted when nothing remains. **id** and **name** are still sent when they are blank. Boolean `false` and numeric `0` are still sent.
 
 | Attribute            | Type                 | Multi | Description                                                                                                                                                                                                                                                                                          |
 | -------------------- | -------------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
