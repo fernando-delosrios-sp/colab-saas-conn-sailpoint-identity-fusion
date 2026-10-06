@@ -1,7 +1,7 @@
 /**
  * connector-spec.json -> Advanced Settings -> Developer Settings
  */
-import { bootstrapLog } from '../../../services/logService'
+import { bootstrapLog } from '../../../services/logService/bootstrapLog'
 import { extractBoolean } from '../../../utils/attributes'
 import type { DeveloperSettingsSection } from '../../../model/config'
 
