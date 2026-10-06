@@ -1,4 +1,11 @@
-import { AttributeChangeOp, ConnectorError, StdAccountUpdateInput } from '@sailpoint/connector-sdk'
+import {
+    AttributeChange,
+    AttributeChangeOp,
+    ConnectorError,
+    ResultMessageLevel,
+    ResultStatus,
+    StdAccountUpdateInput,
+} from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
 import { assert } from '../utils/assert'
@@ -10,7 +17,8 @@ import { ATTR_OPS_NONE } from '../services/attributeService/types'
  *
  * Processes attribute changes from the platform, currently supporting action-type
  * entitlements: report, fusion, and correlate. Each action is executed sequentially
- * against the rebuilt fusion account.
+ * against the rebuilt fusion account. Status entitlement requests are rejected with
+ * an attribute-level provisioning error that names the account and the status.
  *
  * Processing Flow:
  * 1. SETUP: Load sources and schema
@@ -56,9 +64,19 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.nativeIdentity}`)
         timer.phase('Step 2: Rebuilding fusion account with fresh attributes')
 
-        log.info(`Processing ${input.changes.length} change(s)`)
+        const statusChanges = input.changes.filter((change) => change.attribute === 'statuses')
+        const statusChangeMessage =
+            statusChanges.length > 0
+                ? statusEntitlementChangeMessage(fusionAccount.name, input.identity, statusChanges)
+                : undefined
+        if (statusChangeMessage) {
+            log.error(statusChangeMessage)
+        }
+
+        const changesToApply = input.changes.filter((change) => change.attribute !== 'statuses')
+        log.info(`Processing ${changesToApply.length} change(s)`)
         let shouldRecomputeCorrelationStatus = true
-        for (const change of input.changes) {
+        for (const change of changesToApply) {
             assert(change.attribute, 'Change attribute is required')
 
             if (change.attribute === 'actions') {
@@ -92,10 +110,60 @@ export const accountUpdate = async (serviceRegistry: ServiceRegistry, input: Std
 
         timer.phase('Step 4: Generating updated ISC account')
 
-        res.send(iscAccount)
+        const output = statusChangeMessage
+            ? {
+                  ...iscAccount,
+                  results: [
+                      {
+                          attribute: 'statuses',
+                          status: ResultStatus.Error,
+                          messages: [
+                              {
+                                  level: ResultMessageLevel.ERROR,
+                                  message: statusChangeMessage,
+                              },
+                          ],
+                      },
+                  ],
+              }
+            : iscAccount
+
+        res.send(output)
         timer.end(`✓ Account update completed for ${input.identity}`)
     } catch (error) {
         if (error instanceof ConnectorError) throw error
         log.crash(`Failed to update account ${input.identity}`, error)
     }
+}
+
+function accountLabel(name: string | undefined, identity: string): string {
+    const trimmedName = name?.trim()
+    if (!trimmedName || trimmedName === identity) return identity
+    return `${trimmedName} (${identity})`
+}
+
+function quoteStatusValues(value: unknown): string {
+    const values = [value]
+        .flat()
+        .map((item) => (item === undefined || item === null ? '' : String(item).trim()))
+        .filter((item) => item.length > 0)
+    if (values.length === 0) return 'an unspecified status'
+    return values.map((item) => `"${item}"`).join(', ')
+}
+
+function statusChangeVerb(op: AttributeChangeOp): string {
+    if (op === AttributeChangeOp.Remove) return 'remove'
+    if (op === AttributeChangeOp.Set) return 'set'
+    return 'add'
+}
+
+function statusEntitlementChangeMessage(
+    name: string | undefined,
+    identity: string,
+    changes: AttributeChange[]
+): string {
+    const attempts = changes
+        .map((change) => `${statusChangeVerb(change.op)} ${quoteStatusValues(change.value)}`)
+        .join('; ')
+    return `Account ${accountLabel(name, identity)} cannot change status entitlements (${attempts}). Status entitlements are assigned by Fusion and are not requestable.`
 }

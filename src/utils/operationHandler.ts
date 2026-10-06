@@ -33,10 +33,17 @@ function resolveRunMode(
 function scheduleKeepAlive(
     handlerOptions: OperationHandlerOptions,
     config: FusionConfig,
+    runMode: RunMode,
     isProxyServer: boolean,
     res: { keepAlive: () => void }
 ): ReturnType<typeof setInterval> | undefined {
     if (!handlerOptions.keepAlive) {
+        return undefined
+    }
+
+    // Proxy clients wait on the remote stream. Simple keep-alives stay off so the
+    // local handler does not emit heartbeats the proxy path is not meant to send.
+    if (handlerOptions.keepAlive === 'simple' && runMode === RunMode.Proxy) {
         return undefined
     }
 
@@ -89,7 +96,7 @@ export function createOperationHandler(
         try {
             const serviceRegistry = new ServiceRegistry(config, context, res, operationName)
             const { runMode, isProxyServer } = resolveRunMode(context, serviceRegistry.proxy, operationName)
-            interval = scheduleKeepAlive(options, config, isProxyServer, res)
+            interval = scheduleKeepAlive(options, config, runMode, isProxyServer, res)
 
             logger.info(`Running ${operationName} in ${runMode} mode`)
             await runOperation(runMode, operationName, context, serviceRegistry, input, defaultFn)
