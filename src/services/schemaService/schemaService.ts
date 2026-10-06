@@ -55,11 +55,13 @@ export class SchemaService {
      * Filters an attribute bag down to only the attributes defined in the fusion account schema,
      * casting each value to match its schema-defined type and cardinality.
      *
-     * Nullish cast values (`null` / `undefined`) are omitted from the returned object so platform
-     * output stays sparse. The input attribute bag is never mutated.
+     * Null and undefined values are omitted. After cast, blank strings and empty arrays are omitted.
+     * Blank string elements are removed from a multi-valued value first; the attribute is omitted when
+     * none remain. `id` and `name` are still included when the emitted value is a blank string.
+     * The input attribute bag is never mutated.
      *
      * @param attributes - The full attribute bag to filter, or null
-     * @returns A new object containing schema-defined attributes with non-nullish cast values
+     * @returns A new object containing the schema attributes sent to ISC
      */
     public getFusionAttributeSubset(attributes: Attributes | null): Attributes {
         if (!attributes) return {}
@@ -104,7 +106,10 @@ export class SchemaService {
      * - For multi-valued attributes (`multi` is true): scalar values are wrapped in an array.
      * - Values are cast to the target type (`string`, `boolean`, `int`/`long`).
      */
-    private castAttributeValue(value: any, schemaDef: SchemaAttribute): any {
+    private castAttributeValue(
+        value: any,
+        schemaDef: SchemaAttribute
+    ): any {
         if (value === null || value === undefined) return null
 
         const isMulti = schemaDef.multi === true
@@ -123,7 +128,7 @@ export class SchemaService {
             if (type === 'string') {
                 if (typeof value === 'object' && value !== null) {
                     if (Array.isArray(value)) {
-                        const isObjectArray = value.some((v) => typeof v === 'object' && v !== null)
+                        const isObjectArray = value.some(v => typeof v === 'object' && v !== null)
                         if (isObjectArray) {
                             return JSON.stringify(value)
                         } else {

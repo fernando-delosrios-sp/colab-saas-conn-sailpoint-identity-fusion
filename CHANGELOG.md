@@ -6,6 +6,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-10-06 · v2.2.0
+
+### ⚠️ Breaking Changes
+
+- **ISC account output omits blank strings and empty arrays** — Accounts sent to Identity Security Cloud no longer include a schema attribute whose value is a blank string or an empty array. Blank string elements are dropped from a multi-valued attribute first, and the attribute is omitted when nothing remains. `id` and `name` are still sent when they are blank. Boolean false and numeric zero are still sent.
+    - Callers that expected an empty list, such as `reviews: []`, on the account payload should treat a missing key as empty. A missing key does not clear a value already stored in Identity Security Cloud.
+
+---
+
 ## 2026-09-30 · v2.2.0
 
 ### ⚠️ Breaking Changes

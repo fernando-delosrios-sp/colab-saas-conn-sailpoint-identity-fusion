@@ -6,17 +6,17 @@
 
 ## 2. Verification
 
-- [ ] 2.1 Confirm canonical test command: `npm test`
-- [ ] 2.2 All delta spec scenarios covered by named automated tests (coverage evidence for `/opsx:verify`)
-- [ ] 2.3 Run `npm run lint` and confirm no new warnings from this change
+- [x] 2.1 Confirm canonical test command: `npm test`
+- [x] 2.2 All delta spec scenarios covered by named automated tests (coverage evidence for `/opsx:verify`)
+- [x] 2.3 Run `npm run lint` and confirm no new warnings from this change
 
 ## 3. Documentation
 
-- [ ] 3.1 No README or getting-started change: payload omission belongs on the schema reference, not the getting-started router
-- [ ] 3.2 In `docs/reference/standard-account-schema.md`, state that the account sent to ISC omits blank strings and empty arrays, and that `id` and `name` are still sent when blank. Keep the attribute table as the schema, not a claim that every attribute is populated on every account
-- [ ] 3.3 Update the JSDoc on `getFusionAttributeSubset` so it describes omission of blank strings and empty arrays, the `id` and `name` exemption, and that the input bag is not mutated
+- [x] 3.1 No README or getting-started change: payload omission belongs on the schema reference, not the getting-started router
+- [x] 3.2 In `docs/reference/standard-account-schema.md`, state that the account sent to ISC omits blank strings and empty arrays, and that `id` and `name` are still sent when blank. Keep the attribute table as the schema, not a claim that every attribute is populated on every account
+- [x] 3.3 Update the JSDoc on `getFusionAttributeSubset` so it describes omission of blank strings and empty arrays, the `id` and `name` exemption, and that the input bag is not mutated
 
 ## 4. Changelog
 
-- [ ] 4.1 Create or update changelog entry for this change via changelog-generator
-- [ ] 4.2 Confirm the entry says ISC account output omits blank strings and empty arrays, and that `id` and `name` are still sent when blank
+- [x] 4.1 Create or update changelog entry for this change via changelog-generator
+- [x] 4.2 Confirm the entry says ISC account output omits blank strings and empty arrays, and that `id` and `name` are still sent when blank
