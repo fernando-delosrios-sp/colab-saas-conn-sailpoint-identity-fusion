@@ -3,7 +3,9 @@
 ## Purpose
 
 FusionRun (`src/model/fusionRun.ts`) is the centralized state container for a single operation run. It holds all mutable data loaded during the run and serves as the single source of truth that stateless services read from and write to. It is a domain object with encapsulated collection-management methods and state-integrity validation — it is NOT a service orchestrator.
+
 ## Requirements
+
 ### Requirement: FusionRun is the single source of truth for operation run state
 
 FusionRun SHALL be the centralized state container for a single operation run. All services SHALL read from and write to FusionRun rather than holding internal mutable state. No mutable state relevant to the operation run SHALL exist outside FusionRun.
@@ -546,3 +548,33 @@ FusionRun SHALL maintain an optional simulated current time in milliseconds. Whe
 - **WHEN** `snapshot()` is called and the snapshot is restored on a new run
 - **THEN** the restored run MUST preserve the simulated time value if present in the snapshot
 
+### Requirement: registerFusionAccount duplicate handling SHALL honor the Skip setting
+
+FusionRun SHALL resolve the `skipDuplicateFusionAccounts` Developer Setting at run start. When registering a Fusion account whose Fusion identity already has a registered Fusion account with a different account key, FusionRun SHALL skip the duplicate (setting enabled) or overwrite the existing account (setting disabled). A registration with the same account key SHALL update the existing account in place regardless of the setting.
+
+#### Scenario: Setting disabled overwrites the existing account
+- **GIVEN** the `skipDuplicateFusionAccounts` Developer Setting is disabled
+- **AND** a Fusion identity already has a registered Fusion account with account key `A`
+- **WHEN** a Fusion account with account key `B` and the same Fusion identity is registered
+- **THEN** the incoming account SHALL overwrite the existing account in the identity map
+- **AND** a conflict warning SHALL be logged
+
+#### Scenario: Setting enabled keeps the first account and skips the duplicate
+- **GIVEN** the `skipDuplicateFusionAccounts` Developer Setting is enabled
+- **AND** a Fusion identity already has a registered Fusion account with account key `A`
+- **WHEN** a Fusion account with account key `B` and the same Fusion identity is registered
+- **THEN** the incoming account SHALL NOT be registered
+- **AND** the first account SHALL remain in the identity map
+- **AND** a conflict warning SHALL be logged
+
+#### Scenario: Same account key is an in-place update in both states
+- **GIVEN** a Fusion identity already has a registered Fusion account with account key `A`
+- **WHEN** a Fusion account with the same account key `A` is registered
+- **THEN** the incoming account SHALL replace the existing account in the identity map
+- **AND** no conflict warning SHALL be logged
+
+#### Scenario: Duplicate is skipped even without reporting available
+- **GIVEN** the `skipDuplicateFusionAccounts` Developer Setting is enabled
+- **AND** no tracker or logger is attached to the run
+- **WHEN** a Fusion account with a different account key for an already-registered Fusion identity is registered
+- **THEN** the incoming account SHALL NOT be registered
