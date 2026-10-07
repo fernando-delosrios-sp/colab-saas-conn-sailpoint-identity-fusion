@@ -25,7 +25,8 @@ const LABEL_BG = '#f8fafc'
 const TABLE_STYLE = `width:100%;border-collapse:collapse;table-layout:auto;margin:12px 0 28px 0;border:1px solid ${BORDER_COLOR};`
 const TH_STYLE =
     `text-align:left;padding:10px 14px;border:1px solid ${BORDER_COLOR};background:${HEADER_BG};` +
-    `color:${MUTED_COLOR};font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;`
+    `color:${MUTED_COLOR};font-size:12px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;` +
+    `white-space:nowrap;word-break:keep-all;overflow-wrap:normal;`
 const TD_STYLE = `padding:10px 14px;border:1px solid ${BORDER_COLOR};color:${TEXT_COLOR};font-size:14px;line-height:1.45;`
 const TD_NUMERIC_STYLE = `${TD_STYLE}text-align:right;white-space:nowrap;`
 const TD_ATTR_LABEL_STYLE = `${TD_STYLE}width:220px;background:${LABEL_BG};color:${MUTED_COLOR};font-weight:600;`
@@ -179,8 +180,8 @@ function renderAttributeTable(
 
     return (
         `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="${TABLE_STYLE}">` +
-        `<tr><th style="${TH_STYLE}">${escapeHtml(translate('attribute', locale))}</th>` +
-        `<th style="${TH_STYLE}">${escapeHtml(translate('value', locale))}</th></tr>` +
+        `<tr><th nowrap style="${TH_STYLE}">${escapeHtml(translate('attribute', locale))}</th>` +
+        `<th nowrap style="${TH_STYLE}">${escapeHtml(translate('value', locale))}</th></tr>` +
         rows +
         `</table>`
     )
@@ -247,7 +248,7 @@ function renderCandidateScoreTable(candidate: Candidate, locale: string): string
     }
 
     const th = (key: string, numeric = false) =>
-        `<th style="${TH_STYLE}${numeric ? 'text-align:right;' : ''}">${escapeHtml(translate(key, locale))}</th>`
+        `<th nowrap style="${TH_STYLE}${numeric ? 'text-align:right;' : ''}">${escapeHtml(translate(key, locale))}</th>`
     return (
         `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="${TABLE_STYLE}">` +
         `<tr>${th('attribute')}${th('value')}${th('algorithm')}${th('threshold', true)}${th('result', true)}${th('score', true)}</tr>` +

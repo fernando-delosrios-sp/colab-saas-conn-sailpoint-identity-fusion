@@ -235,6 +235,7 @@ describe('form HTML helpers', () => {
         expect(html).toContain('>Threshold<')
         expect(html).toContain('>Result<')
         expect(html).toContain('>Score<')
+        expect(html).toMatch(/<th nowrap style="[^"]*white-space:nowrap[^"]*">Threshold</)
         expect(html).toContain('#f0fdf4')
         expect(html).toContain('#fef2f2')
         expect(html).toContain('#e0f2fe')
