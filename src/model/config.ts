@@ -374,6 +374,12 @@ export interface DeveloperSettingsSection {
      * Enabled by default.
      */
     concurrencyCheckEnabled: boolean
+    /**
+     * Keep the first Fusion account registered for a Fusion identity and skip later
+     * duplicates (accounts that resolve to the same identity with a different account key).
+     * Disabled by default; when disabled, a later account overwrites the earlier one.
+     */
+    skipDuplicateFusionAccounts: boolean
 }
 
 /** External infrastructure settings: shared target, proxy mode, recording, and logging. */

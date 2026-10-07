@@ -6,6 +6,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
+## 2026-10-07 · v2.2.0
+
+### ✨ New Features
+
+- **Skip Fusion accounts with duplicate names** — A new Developer Setting keeps the first Fusion account registered for a Fusion identity and skips later accounts that resolve to the same identity with a different account key. Disabled by default, so the existing last-registered-wins behavior is unchanged unless the setting is enabled.
+
+---
+
 ## 2026-10-06 · v2.2.0
 
 ### ⚠️ Breaking Changes

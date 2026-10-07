@@ -155,6 +155,77 @@ describe('FusionRun', () => {
         expect(run.fusionAccountMap.size).toBe(2)
     })
 
+    describe('registerFusionAccount duplicate handling', () => {
+        beforeEach(() => {
+            FusionAccount.configure({ sources: [] } as any)
+        })
+
+        const makeAccount = (nativeIdentity: string, identityId: string, name: string) =>
+            FusionAccount.fromFusionAccount({
+                nativeIdentity,
+                identityId,
+                name,
+                sourceName: 'Identity Fusion NG',
+                uncorrelated: false,
+                attributes: {},
+            } as unknown as Account)
+
+        it('keeps the first account and skips a later duplicate when the Skip setting is enabled', () => {
+            const run = new FusionRun(undefined, { skipDuplicateFusionAccounts: true } as any)
+            run.setTracker(new AggregationTracker())
+
+            const first = makeAccount('fusion-a', 'identity-dup', 'First')
+            const duplicate = makeAccount('fusion-b', 'identity-dup', 'Duplicate')
+
+            run.registerFusionAccount(first)
+            run.registerFusionAccount(duplicate)
+
+            expect(run.getFusionIdentity('identity-dup')).toBe(first)
+            expect(run.fusionIdentityMap.size).toBe(1)
+        })
+
+        it('overwrites the existing account when the Skip setting is disabled', () => {
+            const run = new FusionRun(undefined, { skipDuplicateFusionAccounts: false } as any)
+            run.setTracker(new AggregationTracker())
+
+            const first = makeAccount('fusion-a', 'identity-dup', 'First')
+            const duplicate = makeAccount('fusion-b', 'identity-dup', 'Duplicate')
+
+            run.registerFusionAccount(first)
+            run.registerFusionAccount(duplicate)
+
+            expect(run.getFusionIdentity('identity-dup')).toBe(duplicate)
+            expect(run.fusionIdentityMap.size).toBe(1)
+        })
+
+        it('still updates in place when the same account key is refreshed', () => {
+            const run = new FusionRun(undefined, { skipDuplicateFusionAccounts: true } as any)
+            run.setTracker(new AggregationTracker())
+
+            const original = makeAccount('fusion-a', 'identity-1', 'Original')
+            const refreshed = makeAccount('fusion-a', 'identity-1', 'Refreshed')
+
+            run.registerFusionAccount(original)
+            run.registerFusionAccount(refreshed)
+
+            expect(run.getFusionIdentity('identity-1')).toBe(refreshed)
+            expect(run.fusionIdentityMap.size).toBe(1)
+        })
+
+        it('skips a duplicate even when no tracker or logger is attached', () => {
+            const run = new FusionRun(undefined, { skipDuplicateFusionAccounts: true } as any)
+
+            const first = makeAccount('fusion-a', 'identity-dup', 'First')
+            const duplicate = makeAccount('fusion-b', 'identity-dup', 'Duplicate')
+
+            run.registerFusionAccount(first)
+            run.registerFusionAccount(duplicate)
+
+            expect(run.getFusionIdentity('identity-dup')).toBe(first)
+            expect(run.fusionIdentityMap.size).toBe(1)
+        })
+    })
+
     describe('disable operations', () => {
         it('queues and awaits pending disable operations', async () => {
             const run = new FusionRun()

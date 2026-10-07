@@ -84,6 +84,8 @@ export interface RunStateSnapshot {
  */
 export class FusionRun {
     public readonly isRecordMode: boolean
+    /** Keep the first Fusion account for an identity and skip later duplicate accounts. */
+    public readonly skipDuplicateFusionAccounts: boolean
     /** Set when account-list dry-run mode activates write inhibition. */
     public isDryRunMode = false
     readonly managedAccountsById = new Map<string, Account>()
@@ -240,6 +242,7 @@ export class FusionRun {
         config?: FusionConfig
     ) {
         this.isRecordMode = config?.recording?.mode === 'record'
+        this.skipDuplicateFusionAccounts = config?.skipDuplicateFusionAccounts ?? false
         this.candidateRegistry = new CandidateRegistry({
             getFusionAccount: (key: string) => this.getFusionAccountByManagedKey(key),
             sourcesByName: this.sourcesByName,
@@ -408,7 +411,18 @@ export class FusionRun {
         if (hasValue(identityId) && fusionAccount.type !== FusionAccountKind.Managed) {
             const existingFusionAccount = this.fusionIdentityMapValue.get(identityId!)
             if (existingFusionAccount) {
-                this.trackConflictingFusionIdentity(identityId!, existingFusionAccount, fusionAccount, tracker)
+                // A duplicate account resolves to an identity that already has one. When the
+                // Skip setting is enabled, keep the first account and skip the duplicate so it
+                // is never returned; otherwise fall through and let the incoming account win.
+                const isDuplicate = this.trackConflictingFusionIdentity(
+                    identityId!,
+                    existingFusionAccount,
+                    fusionAccount,
+                    tracker
+                )
+                if (isDuplicate && this.skipDuplicateFusionAccounts) {
+                    return
+                }
                 this.removeFusionIdentityOwnership(identityId!)
             }
             this.fusionIdentityMapValue.set(identityId!, fusionAccount)
@@ -698,27 +712,30 @@ export class FusionRun {
         existingAccount: FusionAccount,
         newAccount: FusionAccount,
         tracker?: AggregationTracker
-    ): void {
-        if (!tracker || !this.log) return
-
+    ): boolean {
         const existingKey = this.conflictTrackingKey(existingAccount)
         const incomingKey = this.conflictTrackingKey(newAccount)
-        if (existingKey === incomingKey) return
+        // Same key means the existing account is being refreshed/updated, not duplicated.
+        if (existingKey === incomingKey) return false
 
-        let accounts = tracker.conflictingFusionIdentityAccounts.get(identityId)
-        if (!accounts) {
-            accounts = new Map()
-            tracker.conflictingFusionIdentityAccounts.set(identityId, accounts)
+        if (tracker && this.log) {
+            let accounts = tracker.conflictingFusionIdentityAccounts.get(identityId)
+            if (!accounts) {
+                accounts = new Map()
+                tracker.conflictingFusionIdentityAccounts.set(identityId, accounts)
+            }
+
+            accounts.set(existingKey, resolveFusionAccountNameOrDisplayName(existingAccount, existingKey))
+            accounts.set(incomingKey, resolveFusionAccountNameOrDisplayName(newAccount, incomingKey))
+
+            const accountLabels = Array.from(accounts.entries()).map(([managedKey, name]) => `${name} (${managedKey})`)
+            this.log.warn(
+                `More than one Fusion account was found for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
+                    'This is generally caused by non-unique account names. Please review the configuration and consider using a unique attribute for the account name.'
+            )
         }
 
-        accounts.set(existingKey, resolveFusionAccountNameOrDisplayName(existingAccount, existingKey))
-        accounts.set(incomingKey, resolveFusionAccountNameOrDisplayName(newAccount, incomingKey))
-
-        const accountLabels = Array.from(accounts.entries()).map(([managedKey, name]) => `${name} (${managedKey})`)
-        this.log.warn(
-            `More than one Fusion account was found for identity ${identityId} (${accounts.size} account(s)): ${accountLabels.join(', ')}. ` +
-                'This is generally caused by non-unique account names. Please review the configuration and consider using a unique attribute for the account name.'
-        )
+        return true
     }
 
     private conflictTrackingKey(fa: FusionAccount): string {

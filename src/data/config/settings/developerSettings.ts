@@ -17,6 +17,7 @@ export const runtimeDefaults = {
     resetForms: false,
     concurrencyCheckEnabled: true,
     forceAttributeRefresh: false,
+    skipDuplicateFusionAccounts: false,
 } as const
 
 export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSection {
@@ -32,5 +33,7 @@ export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSec
         scoringMaxConcurrency: (raw.scoringMaxConcurrency as number | undefined) ?? runtimeDefaults.scoringMaxConcurrency,
         concurrencyCheckEnabled: extractBoolean(raw, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled,
         forceAttributeRefresh: extractBoolean(raw, 'forceAttributeRefresh') ?? runtimeDefaults.forceAttributeRefresh,
+        skipDuplicateFusionAccounts:
+            extractBoolean(raw, 'skipDuplicateFusionAccounts') ?? runtimeDefaults.skipDuplicateFusionAccounts,
     }
 }
