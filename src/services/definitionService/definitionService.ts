@@ -415,7 +415,11 @@ export class DefinitionService {
             return undefined
         }
 
-        assert(uniqueId, `Account ID is required for simple key`)
+        assert(
+            uniqueId,
+            `Account ID is required for simple key: account ${fusionAccount.name} [${fusionAccount.sourceName}] ` +
+            `is missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+        )
 
         return SimpleKey(uniqueId)
     }
