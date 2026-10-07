@@ -1083,11 +1083,12 @@ export class FusionService {
         const attributes = this.schemas.getFusionAttributeSubset(fusionAccount.attributes)
         const disabled = fusionAccount.disabled
 
-        return {
-            key: fusionAccount.key,
-            attributes,
-            disabled,
-        }
+        if (fusionAccount.name !== 'slpt.services')
+            return {
+                key: fusionAccount.key,
+                attributes,
+                disabled,
+            }
     }
 
     // ------------------------------------------------------------------------
