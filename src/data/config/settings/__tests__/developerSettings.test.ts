@@ -116,6 +116,22 @@ describe('developerSettings readSettings', () => {
         expect(result.forceAttributeRefresh).toBe(false)
     })
 
+    it('defaults skipDuplicateFusionAccounts to false when omitted', () => {
+        const raw = {}
+
+        const result = readSettings(raw)
+
+        expect(result.skipDuplicateFusionAccounts).toBe(false)
+    })
+
+    it('normalizes string "true" to boolean true for skipDuplicateFusionAccounts', () => {
+        const raw = { skipDuplicateFusionAccounts: 'true' as unknown as boolean }
+
+        const result = readSettings(raw)
+
+        expect(result.skipDuplicateFusionAccounts).toBe(true)
+    })
+
     it('normalizes string "true" to boolean true for forceAttributeRefresh', () => {
         const raw = { forceAttributeRefresh: 'true' as unknown as boolean }
 

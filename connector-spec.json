@@ -1098,6 +1098,13 @@
                             "helpKey": "Safeguard against data conflicts if multiple aggregations overlap."
                         },
                         {
+                            "key": "skipDuplicateFusionAccounts",
+                            "label": "Skip Fusion accounts with duplicate names?",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "Keep the first Fusion account for an identity and skip later accounts with duplicate names."
+                        },
+                        {
                             "key": "managedAccountsBatchSize",
                             "label": "Managed accounts batch size",
                             "type": "number",
