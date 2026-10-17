@@ -35,7 +35,7 @@
         "@sailpoint/connector-sdk": "1.2.1",
         "axios-retry": "^4.5.0",
         "double-metaphone": "^2.0.1",
-        "handlebars": "^4.7.8",
+        "handlebars": "^4.7.10",
         "jmespath": "^0.16.0",
         "libphonenumber-js": "^1.12.42",
         "parse-address-string": "^0.0.3",
