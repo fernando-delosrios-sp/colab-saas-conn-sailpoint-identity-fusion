@@ -32,7 +32,9 @@ Optional HTTP header `x-fusion-baseurl` carries the ISC connection base URL so m
 
 ### Log levels
 
-External logging respects **External logging level** (Error, Warn, Info, Debug). ISC debug logging (`spConnDebugLoggingEnabled`) is separate and does not replace external delivery.
+**Log level** (Advanced Settings → Log Settings) is the minimum severity the connector writes to the ISC host log. Options are Error, Warn, Info, and Debug; the default is Info. Messages below it are skipped before they are built (no message formatting or caller-origin capture).
+
+**External logging level** (External Settings) separately controls delivery to the external target or disk sink. Because the two thresholds are independent, a message below the host Log level can still reach an active external sink when the external level admits it. The platform `spConnDebugLoggingEnabled` toggle forces Debug when enabled and overrides the Log level selection.
 
 ### Local HTTP receiver
 

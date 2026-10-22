@@ -7,6 +7,7 @@ import * as attributeMappingDefinitionsSettings from './settings/attributeMappin
 import * as connectionSettings from './settings/connectionSettings'
 import * as developerSettings from './settings/developerSettings'
 import * as externalSettings from './settings/externalSettings'
+import * as logSettings from './settings/logSettings'
 import * as matchingSettings from './settings/matchingSettings'
 import * as normalAttributeDefinitionsSettings from './settings/normalAttributeDefinitionsSettings'
 import * as processingControlSettings from './settings/processingControlSettings'
@@ -27,6 +28,7 @@ const settingsPipeline = [
     matchingSettings.readSettings,
     reviewSettings.readSettings,
     developerSettings.readSettings,
+    logSettings.readSettings,
     advancedConnectionSettings.readSettings,
     externalSettings.readSettings,
 ] as const

@@ -196,6 +196,7 @@ const scope = loadInitialValues('scopeSettings.ts')
 const processing = loadInitialValues('processingControlSettings.ts')
 const attributeMapping = loadInitialValues('attributeMappingDefinitionsSettings.ts')
 const developer = loadInitialValues('developerSettings.ts')
+const log = loadInitialValues('logSettings.ts')
 const external = loadInitialValues('externalSettings.ts')
 const uniqueDefs = loadInitialValues('uniqueAttributeDefinitionsSettings.ts')
 const normalDefs = loadInitialValues('normalAttributeDefinitionsSettings.ts')
@@ -218,6 +219,7 @@ const merged = {
     processingWait: advancedConnection.processingWait,
     heartbeatInterval: advancedConnection.heartbeatInterval,
     ...developer,
+    ...log,
     ...external,
     ...uniqueDefs,
     ...normalDefs,

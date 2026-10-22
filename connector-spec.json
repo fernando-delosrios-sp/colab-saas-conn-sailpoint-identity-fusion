@@ -33,6 +33,7 @@
         "heartbeatInterval": 10,
         "managedAccountsBatchSize": 100,
         "scoringMaxConcurrency": 12,
+        "logLevel": "info",
         "externalProcessingEnabled": false,
         "externalTargetUrl": "",
         "externalTargetPassword": "",
@@ -1228,6 +1229,40 @@
                             ]
                         }
                     ],
+                    "docLinkLabel": "Advanced settings reference",
+                    "docLink": "https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/advanced/"
+                },
+                {
+                    "type": "section",
+                    "sectionTitle": "Log Settings",
+                    "items": [
+                        {
+                            "key": "logLevel",
+                            "label": "Log level",
+                            "type": "radio",
+                            "required": false,
+                            "helpKey": "Minimum severity written to the platform log. Messages below it are skipped before they are built; default Info.",
+                            "options": [
+                                {
+                                    "label": "Error",
+                                    "value": "error"
+                                },
+                                {
+                                    "label": "Warn",
+                                    "value": "warn"
+                                },
+                                {
+                                    "label": "Info",
+                                    "value": "info"
+                                },
+                                {
+                                    "label": "Debug",
+                                    "value": "debug"
+                                }
+                            ]
+                        }
+                    ],
+                    "sectionHelpMessage": "<strong>Choose how much the connector writes to the platform log.</strong><br><br><strong>Log level</strong> is the minimum severity written to the ISC host log. Messages below it are skipped before they are built. Options are Error, Warn, Info, and Debug; the default is Info. This is separate from <strong>External logging level</strong>, which controls delivery to an external log target.<br><br>See also: <a href=\"https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/use-guides/operation/monitor-aggregation-progress/\">Monitor aggregation progress</a>.",
                     "docLinkLabel": "Advanced settings reference",
                     "docLink": "https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/configuration/advanced/"
                 },

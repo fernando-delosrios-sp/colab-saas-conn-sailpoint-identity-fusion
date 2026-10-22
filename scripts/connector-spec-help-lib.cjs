@@ -107,7 +107,7 @@ const SECTION_HELP = {
     },
     'Processing Control': {
         sectionHelpMessage:
-            '<strong>Control account maintenance.</strong><br><br><strong>History limits:</strong> Cap the number of audit history messages stored per account.<br><br><strong>Delete when empty:</strong> Remove the Fusion account if all its underlying source accounts are deleted.<br><br><strong>Skip missing targets:</strong> Ignore source accounts missing a mapped native identity attribute.' +
+            '<strong>Control account maintenance.</strong><br><br><strong>History limits:</strong> Cap the number of audit history messages stored per account.<br><br><strong>Delete when empty:</strong> Remove the Fusion account if all its underlying source accounts are deleted.<br><br><strong>Skip missing targets:</strong> Ignore source accounts missing a mapped native identity attribute.<br><br><strong>Promote first found managed account:</strong> When enabled, set mainAccount to the first live managed account while the origin is not a current contributor, and clear mainAccount when the origin is a current contributor again.' +
             seeAlso([
                 ['use-guides/configuration/configuring-sources-and-scope/', 'Configuring sources and scope'],
             ]),
@@ -177,6 +177,15 @@ const SECTION_HELP = {
             seeAlso([
                 ['reference/proxy-mode/', 'Proxy mode reference'],
                 ['reference/scenario-recording/', 'Scenario recording reference'],
+            ]),
+        docLinkLabel: 'Advanced settings reference',
+        docLinkPath: 'configuration/advanced/',
+    },
+    'Log Settings': {
+        sectionHelpMessage:
+            '<strong>Choose how much the connector writes to the platform log.</strong><br><br><strong>Log level</strong> is the minimum severity written to the ISC host log. Messages below it are skipped before they are built. Options are Error, Warn, Info, and Debug; the default is Info. This is separate from <strong>External logging level</strong>, which controls delivery to an external log target.' +
+            seeAlso([
+                ['use-guides/operation/monitor-aggregation-progress/', 'Monitor aggregation progress'],
             ]),
         docLinkLabel: 'Advanced settings reference',
         docLinkPath: 'configuration/advanced/',

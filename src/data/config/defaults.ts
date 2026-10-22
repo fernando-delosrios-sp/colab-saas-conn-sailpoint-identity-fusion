@@ -3,6 +3,7 @@ import * as attributeMappingDefinitionsSettings from './settings/attributeMappin
 import * as connectionSettings from './settings/connectionSettings'
 import * as developerSettings from './settings/developerSettings'
 import * as externalSettings from './settings/externalSettings'
+import * as logSettings from './settings/logSettings'
 import * as matchingSettings from './settings/matchingSettings'
 import * as normalAttributeDefinitionsSettings from './settings/normalAttributeDefinitionsSettings'
 import * as processingControlSettings from './settings/processingControlSettings'
@@ -28,6 +29,7 @@ export const connectorSpecInitialValues = {
     processingWait: advancedConnectionSettings.connectorSpecInitialValues.processingWait,
     heartbeatInterval: advancedConnectionSettings.connectorSpecInitialValues.heartbeatInterval,
     ...developerSettings.connectorSpecInitialValues,
+    ...logSettings.connectorSpecInitialValues,
     ...externalSettings.connectorSpecInitialValues,
     ...uniqueAttributeDefinitionsSettings.connectorSpecInitialValues,
     ...normalAttributeDefinitionsSettings.connectorSpecInitialValues,
@@ -42,6 +44,7 @@ export const runtimeDefaults = {
     ...processingControlSettings.runtimeDefaults,
     ...matchingSettings.runtimeDefaults,
     ...developerSettings.runtimeDefaults,
+    ...logSettings.runtimeDefaults,
     ...advancedConnectionSettings.runtimeDefaults,
     ...scopeSettings.runtimeDefaults,
     ...externalSettings.runtimeDefaults,
