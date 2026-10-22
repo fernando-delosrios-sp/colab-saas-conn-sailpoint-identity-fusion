@@ -8,6 +8,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ## 2026-10-22 · v2.2.0
 
+### ✨ New Features
+
+- **Choose the platform log level** — Advanced Settings now has a **Log Settings** section with a **Log level** radio (Error, Warn, Info, Debug; default Info). Messages below the selected level are skipped before they are built, so quieter levels also reduce logging work. The platform debug toggle still forces Debug, and external delivery keeps its own **External logging level** in External Settings.
+
 ### 🐛 Fixes
 
 - **Ownership decisions no longer reissue a Fusion review on the same run** — When a reviewer selects an owner for a machine account on an Orphan source in Ownership mode, the connector writes `ownerIdentity` but deliberately does not correlate the account or attach it to a Fusion account. The decided account was left on the Match work queue, so the same run's uncorrelated sweep re-scored the stale, owner-less snapshot, opened a duplicate review form, and listed the account again under **Fusion Reviews** beside its own processed decision. The account is now claimed off the work queue once the owner is written, matching every other decision path. The ownership no-match path already claimed its account and is unchanged.

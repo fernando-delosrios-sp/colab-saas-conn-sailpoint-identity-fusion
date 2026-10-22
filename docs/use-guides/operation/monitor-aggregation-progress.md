@@ -40,6 +40,8 @@ External logging routing depends on connector role:
 5. **Enable external logging?** — on
 6. **External logging level** — Info for production; Debug for troubleshooting
 
+Host-stream verbosity is separate: set **Advanced Settings → Log Settings → Log level** (default Info). External logging level only controls delivery to the external target or disk sink.
+
 Each log entry is a plain-text line sent via HTTP POST with `Content-Type: text/plain`. Optional header `x-fusion-baseurl` carries the tenant base URL for multi-tenant receivers.
 
 **Local receiver for development:**
@@ -123,6 +125,8 @@ For match segments (`matches(...)`), decision segments (`decisions(...)`), corre
 
 ## Log levels
 
+Set the host-stream level in **Advanced Settings → Log Settings → Log level**. The default is **Info**.
+
 | Level     | What gets logged                 | Use when                            |
 | --------- | -------------------------------- | ----------------------------------- |
 | **Error** | Critical errors only             | Production; minimal volume          |
@@ -130,8 +134,10 @@ For match segments (`matches(...)`), decision segments (`decisions(...)`), corre
 | **Info**  | Standard operational messages    | Production monitoring (recommended) |
 | **Debug** | All logs including debug details | Troubleshooting; high volume        |
 
+Messages below the selected Log level are skipped before they are built. The separate **External logging level** in External Settings controls what reaches the external target or disk sink; a message below the host Log level can still reach an active external sink when that level admits it.
+
 !!! note
-Debug level generates high log volume; use temporarily. ISC debug logging (`spConnDebugLoggingEnabled`) is separate and does not replace external delivery.
+Debug level generates high log volume; use temporarily. The platform `spConnDebugLoggingEnabled` toggle forces Debug when enabled, and does not replace external delivery.
 
 ---
 

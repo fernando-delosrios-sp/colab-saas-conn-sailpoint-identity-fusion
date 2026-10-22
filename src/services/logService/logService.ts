@@ -246,14 +246,8 @@ export class LogService {
      */
     constructor(config: LogConfig) {
         this.logger = logger
-        // Determine configured log level: explicit logLevel > debug flag > default 'info'
-        if (config.logLevel) {
-            this.configuredLevel = config.logLevel
-        } else if (config.spConnDebugLoggingEnabled) {
-            this.configuredLevel = 'debug'
-        } else {
-            this.configuredLevel = 'info'
-        }
+        // Platform debug toggle forces debug; otherwise the Log Settings value applies (default 'info').
+        this.configuredLevel = config.spConnDebugLoggingEnabled ? 'debug' : (config.logLevel ?? 'info')
 
         // External logging configuration — role-aware routing from External Settings
         this.externalLoggingLevel = config.externalLoggingLevel ?? 'error'
@@ -636,28 +630,48 @@ export class LogService {
         }
     }
 
+    /** Whether this level is at or above the configured host Log level. */
+    private shouldEmitToHost(level: LogLevel): boolean {
+        return LOG_LEVEL_PRIORITY[level] >= LOG_LEVEL_PRIORITY[this.configuredLevel]
+    }
+
     /**
-     * Internal log method that handles both regular and external logging.
+     * Internal emit path shared by `log`, `assert`, and `crash`.
      *
      * Performance Optimization:
-     * Stack trace capture (getCallerInfo) is one of the most expensive operations in V8.
-     * We only pay that cost when caller origin is actually needed: when external logging
-     * is enabled for this level, or when debug-level logging is configured.
+     * Messages below both active sinks return before formatting or stack capture.
+     * Stack trace capture (getCallerInfo) is one of the most expensive operations
+     * in V8, so it runs only when caller origin is actually needed: for external
+     * delivery or when debug-level logging is configured.
+     *
+     * @param skipFrames - Stack frames to skip so the origin resolves to the caller of the public method
+     */
+    private emit(level: LogLevel, message: string, data: any, skipFrames: number): void {
+        const toHost = this.shouldEmitToHost(level)
+        const toExternal = this.shouldSendExternal(level)
+        if (!toHost && !toExternal) {
+            return
+        }
+
+        const needsOrigin = toExternal || this.configuredLevel === 'debug'
+        const origin = needsOrigin ? getCallerInfo(skipFrames).origin : undefined
+
+        if (toHost) {
+            // Use SDK logger - it handles timestamp and level formatting
+            this.logger[level](this.formatMessage(message, data, origin))
+        }
+
+        if (toExternal) {
+            this.sendToExternalService(level, message, data, origin)
+        }
+    }
+
+    /**
+     * Internal log method that tracks warn/error issues and emits via {@link emit}.
      */
     private log(level: LogLevel, message: string, data?: any): void {
         this.trackIssue(level, message)
-        const needsOrigin = this.shouldSendExternal(level) || this.configuredLevel === 'debug'
-        const origin = needsOrigin ? getCallerInfo(3).origin : undefined
-
-        const output = this.formatMessage(message, data, origin)
-
-        // Use SDK logger - it handles timestamp and level formatting
-        this.logger[level](output)
-
-        // Send to external service if enabled and level threshold is met
-        if (this.shouldSendExternal(level)) {
-            this.sendToExternalService(level, message, data, origin)
-        }
+        this.emit(level, message, data, 4)
     }
 
     private trackIssue(level: LogLevel, message: string): void {
@@ -726,18 +740,7 @@ export class LogService {
     assert(condition: boolean, message: string, data?: any, level: LogLevel = 'error'): void {
         if (!condition) {
             this.trackIssue(level, message)
-            const callerInfo = getCallerInfo(2)
-            const { origin } = callerInfo
-            const assertMessage = `Assertion failed: ${message}`
-            const output = this.formatMessage(assertMessage, data, origin)
-
-            // Use SDK logger - it handles timestamp and level formatting
-            this.logger[level](output)
-
-            // Send to external service if enabled and level threshold is met
-            if (this.shouldSendExternal(level)) {
-                this.sendToExternalService(level, assertMessage, data, origin)
-            }
+            this.emit(level, `Assertion failed: ${message}`, data, 3)
         }
     }
 
@@ -751,17 +754,7 @@ export class LogService {
      */
     crash(message: string, data?: any): void {
         this.trackIssue('error', message)
-        const callerInfo = getCallerInfo(2)
-        const { origin } = callerInfo
-        const output = this.formatMessage(message, data, origin)
-
-        // Use SDK logger - it handles timestamp and level formatting
-        this.logger.error(output)
-
-        // Send to external service (crash is always error level)
-        if (this.shouldSendExternal('error')) {
-            this.sendToExternalService('error', message, data, origin)
-        }
+        this.emit('error', message, data, 3)
 
         // Build a descriptive error message that includes the original error detail.
         // This ensures the user sees context about what went wrong, not just the generic message.

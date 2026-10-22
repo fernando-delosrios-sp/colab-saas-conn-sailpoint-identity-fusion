@@ -410,6 +410,16 @@ export interface ExternalSettingsSection {
     proxyRequestTimeoutMs?: number
 }
 
+/** Log Settings: master verbosity for the connector's host log stream. */
+export interface LogSettingsSection {
+    /**
+     * Minimum severity written to the ISC host log.
+     * Ordered `debug < info < warn < error`; options Error, Warn, Info, Debug.
+     * Defaults to Info when unset.
+     */
+    logLevel?: 'error' | 'warn' | 'info' | 'debug'
+}
+
 // Advanced Connection Settings Section
 export interface AdvancedConnectionSettingsSection {
     /**
@@ -464,9 +474,13 @@ export interface AdvancedConnectionSettingsSection {
     heartbeatInterval?: number
 }
 
-/** Combined advanced settings: developer, connection tuning, and external infrastructure. */
+/** Combined advanced settings: developer, connection tuning, log verbosity, and external infrastructure. */
 interface AdvancedSettingsMenu
-    extends DeveloperSettingsSection, AdvancedConnectionSettingsSection, ExternalSettingsSection {}
+    extends
+        DeveloperSettingsSection,
+        AdvancedConnectionSettingsSection,
+        LogSettingsSection,
+        ExternalSettingsSection {}
 
 // ============================================================================
 // Internal/Computed fields

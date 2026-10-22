@@ -221,4 +221,42 @@ describe('LogService external logging routing', () => {
         await log.flush()
         expect(fetchMock).not.toHaveBeenCalled()
     })
+
+    it('delivers a below-host-level message to an active external sink', async () => {
+        delete process.env.PROXY_PASSWORD
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+        global.fetch = fetchMock
+
+        const log = new LogService({
+            spConnDebugLoggingEnabled: false,
+            logLevel: 'error',
+            externalProcessingEnabled: true,
+            externalLoggingEnabled: true,
+            externalTargetUrl: 'https://logs.example.com/ingest',
+            externalLoggingLevel: 'debug',
+        })
+
+        log.debug('external detail')
+        await log.flush()
+
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        expect(fetchMock.mock.calls[0][1]?.body).toContain('external detail')
+    })
+
+    it('skips a below-level message entirely when external logging is inactive', async () => {
+        delete process.env.PROXY_PASSWORD
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true })
+        global.fetch = fetchMock
+
+        const log = new LogService({
+            spConnDebugLoggingEnabled: false,
+            logLevel: 'error',
+            externalProcessingEnabled: false,
+        })
+
+        log.info('status')
+        await log.flush()
+
+        expect(fetchMock).not.toHaveBeenCalled()
+    })
 })

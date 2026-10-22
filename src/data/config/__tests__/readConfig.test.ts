@@ -249,6 +249,29 @@ describe('safeReadConfig heartbeat interval', () => {
     })
 })
 
+describe('safeReadConfig log level', () => {
+    beforeEach(() => {
+        vi.mocked(readConfig).mockResolvedValue(minimalPlatformConfig as never)
+    })
+
+    it('defaults logLevel to info when omitted', async () => {
+        const config = await safeReadConfig()
+
+        expect(config.logLevel).toBe('info')
+    })
+
+    it('surfaces a configured logLevel from platform config', async () => {
+        vi.mocked(readConfig).mockResolvedValue({
+            ...minimalPlatformConfig,
+            logLevel: 'warn',
+        } as never)
+
+        const config = await safeReadConfig()
+
+        expect(config.logLevel).toBe('warn')
+    })
+})
+
 
 
 
