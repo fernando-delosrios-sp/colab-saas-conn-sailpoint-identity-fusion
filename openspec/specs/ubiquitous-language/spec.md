@@ -837,6 +837,28 @@ The ubiquitous-language glossary SHALL define **Attribute pruning** (dropping ma
 - **THEN** a **Referenced attribute set** entry SHALL list its constituent sources (schema names, mapping `existingAttributes`, template textual references, match rule attributes)
 - **AND** it SHALL state the set is computed once per run as a union across all managed sources
 
+### Requirement: Glossary defines Log Settings and Log level
+
+The ubiquitous-language glossary SHALL define **Log Settings** as the Advanced Settings section that exposes the connector's host-log verbosity, and **Log level** as the minimum severity the connector writes to the ISC host log, ordered `debug < info < warn < error` with options Error, Warn, Info, and Debug and a default of Info. The **Log level** definition SHALL be distinguished from **External logging level**, which governs external delivery only.
+
+#### Scenario: Glossary entry for Log level
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **Log level** entry
+- **AND** the entry SHALL state that it is the minimum severity written to the ISC host log
+- **AND** the entry SHALL list the options Error, Warn, Info, and Debug with a default of Info
+
+#### Scenario: Glossary entry for Log Settings
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **Log Settings** entry identifying it as the Advanced Settings section that exposes the Log level
+
+#### Scenario: Log level is distinguished from External logging level
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** the **Log level** entry SHALL NOT be defined as the external delivery threshold
+- **AND** the glossary SHALL retain **External logging level** as the separate external-delivery term
+
 ## Canonical Terms
 
 ### Account taxonomy
@@ -1143,8 +1165,10 @@ Configuration is organized into menus and sections in the connector source in IS
 | Term | Definition |
 |---|---|
 | **Proxy mode** | A deployment option where connector logic runs on an external server and communicates with ISC via a lightweight proxy connector. Offloads processing from ISC infrastructure. |
+| **Log Settings** | The Advanced Settings section that exposes the connector's host-log verbosity. Contains the **Log level** setting. |
+| **Log level** | The minimum severity the connector writes to the ISC host log, ordered `debug < info < warn < error`. Options: Error, Warn, Info, Debug. Default: Info. Messages below it are skipped before they are built. Distinct from **External logging level**. |
 | **External logging** | Sending connector log output to an external endpoint (e.g., Splunk, Datadog) for centralized monitoring. Controlled by the external logging URL and level settings. |
-| **External logging level** | The minimum severity for logs sent to the external endpoint. Options: Error, Warn, Info, Debug. |
+| **External logging level** | The minimum severity for logs sent to the external endpoint. Options: Error, Warn, Info, Debug. Distinct from **Log level**, which governs the host stream. |
 | **Concurrency check** | A safeguard that prevents overlapping connector aggregations from running simultaneously. Controlled by **Enable concurrency check?** in Developer Settings. |
 | **Priority processing** | When enabled, the connector expedites its processing queue. Controlled by **Enable priority processing?** in Developer Settings. |
 | **Cascade aggregation** | When `cascadeAggregationEnabled` is true, single-account operations (e.g., accountRead) trigger managed-source aggregation for sources referenced by the Fusion account before fetching managed account data. Per-source cascade failures are logged and the operation continues with available data. |
