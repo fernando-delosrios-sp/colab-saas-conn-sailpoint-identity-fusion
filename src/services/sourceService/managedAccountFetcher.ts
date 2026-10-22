@@ -5,6 +5,7 @@ import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { wrapConnectorError } from '../../utils/error'
 import { LogService } from '../logService'
 import { CompiledAccountJmespathFilter, compileAccountPageJmespathFilter } from './accountFilters'
+import { pruneManagedAccountAttributes } from './referencedAttributeSet'
 import { SourceInfo } from './types'
 
 export interface ManagedAccountFetcherDeps {
@@ -14,6 +15,8 @@ export interface ManagedAccountFetcherDeps {
     batchLimitedSourceNames: Set<string>
     batchCumulativeCount: Record<string, number>
     accountJmespathFiltersBySourceName: Map<string, CompiledAccountJmespathFilter>
+    /** When set, managed source account attributes are pruned to this set at registration. */
+    referencedAttributeSet?: ReadonlySet<string>
     fetchAccountsBySourceIdGenerator: (
         sourceId: string,
         abortSignal?: AbortSignal,
@@ -146,7 +149,7 @@ function collectAccountsFromBatch(
     batch: Account[],
     effectiveLimit: number | undefined,
     collectedCount: number,
-    deps: Pick<ManagedAccountFetcherDeps, 'run' | 'accountJmespathFiltersBySourceName'>
+    deps: Pick<ManagedAccountFetcherDeps, 'run' | 'accountJmespathFiltersBySourceName' | 'referencedAttributeSet'>
 ): { collectedCount: number; discardedMachineCount: number; reachedLimit: boolean } {
     const filteredBatch = applyManagedJmespathFilter(source, batch, deps.accountJmespathFiltersBySourceName)
     let nextCollected = collectedCount
@@ -163,6 +166,10 @@ function collectAccountsFromBatch(
         } else if (isMachineManagedAccount(account)) {
             discardedMachineCount++
             continue
+        }
+
+        if (deps.referencedAttributeSet) {
+            pruneManagedAccountAttributes(account, deps.referencedAttributeSet)
         }
 
         const accountKey = getManagedAccountKeyFromAccount(account)
@@ -237,6 +244,7 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
                     const batchResult = collectAccountsFromBatch(source, batch, effectiveLimit, collectedCount, {
                         run,
                         accountJmespathFiltersBySourceName,
+                        referencedAttributeSet: deps.referencedAttributeSet,
                     })
                     collectedCount = batchResult.collectedCount
                     discardedMachineCount += batchResult.discardedMachineCount

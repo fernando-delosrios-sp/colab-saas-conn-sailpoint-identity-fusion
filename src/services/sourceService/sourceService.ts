@@ -31,6 +31,7 @@ import {
     matchesManagedJmespathFilter,
     type ManagedAccountFetcherDeps,
 } from './managedAccountFetcher'
+import { pruneManagedAccountAttributes } from './referencedAttributeSet'
 import {
     aggregateDelayedSources as aggregateDelayedSourcesImpl,
     aggregateManagedSource as aggregateManagedSourceImpl,
@@ -86,7 +87,23 @@ export class SourceService {
     /** Per-run cache: managed source names that passed reverse-correlation setup/assert this session. */
     private reverseCorrelationReadinessBySourceName = new Set<string>()
 
+    /**
+     * Referenced attribute set for managed source account attribute pruning at Bulk ingest.
+     * Initialized once per run by pipelines that load the Fusion account schema
+     * (account-list and Fusion report). Single-account operations never initialize it,
+     * so their single-account fetches keep unpruned bodies (pre-change behavior).
+     */
+    private referencedAttributeSet?: ReadonlySet<string>
+
     public fusionAccountsByNativeIdentity?: Map<string, Account>
+
+    /**
+     * Install the referenced attribute set used to prune managed source account
+     * attributes at ingest. See {@link referencedAttributeSet}.
+     */
+    public setReferencedAttributeSet(referencedAttributeSet: ReadonlySet<string>): void {
+        this.referencedAttributeSet = referencedAttributeSet
+    }
 
     /**
      * Clear managed accounts cache to free memory after processing.
@@ -561,6 +578,9 @@ export class SourceService {
             )
             return undefined
         }
+        if (sourceInfo.isManaged && candidate && this.referencedAttributeSet) {
+            pruneManagedAccountAttributes(candidate, this.referencedAttributeSet)
+        }
         return candidate
     }
 
@@ -1031,6 +1051,7 @@ export class SourceService {
             batchCumulativeCount: this.batchCumulativeCount,
             accountJmespathFiltersBySourceName: this.accountJmespathFiltersBySourceName,
             fetchAccountsBySourceIdGenerator: this.fetchAccountsBySourceIdGenerator.bind(this),
+            ...(this.referencedAttributeSet ? { referencedAttributeSet: this.referencedAttributeSet } : {}),
         }
     }
 
