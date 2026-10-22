@@ -2,7 +2,7 @@
 
 ### Requirement: Raw Fusion account fetch cache cleared after Refresh
 
-The account-list operation SHALL clear the raw Fusion account fetch cache (`fusionAccountsByNativeIdentity`) at the end of the Refresh phase, after all persisted Fusion accounts have been rebuilt into derived Fusion accounts. In record mode the cache SHALL be retained until the existing post-epilogue clear, matching the record-mode retention of the managed-account cache. Single-account operations SHALL be unaffected; they fetch their own raw Fusion account copy.
+The account-list operation SHALL clear the raw Fusion account fetch cache (`fusionAccountsByNativeIdentity`) at the end of the Refresh phase, after all persisted Fusion accounts have been rebuilt into derived Fusion accounts. In record mode the cache SHALL be retained for the whole run, matching the record-mode retention of the managed-account cache. Single-account operations SHALL be unaffected; they fetch their own raw Fusion account copy.
 
 #### Scenario: Cache cleared entering Process
 
@@ -11,12 +11,12 @@ The account-list operation SHALL clear the raw Fusion account fetch cache (`fusi
 - **THEN** the raw Fusion account fetch cache SHALL be cleared
 - **AND** the Process, Output, and report epilogue steps SHALL run without reading raw Fusion account bodies
 
-#### Scenario: Record mode retains cache until epilogue
+#### Scenario: Record mode retains cache for the whole run
 
 - **GIVEN** a persistent account-list operation in record mode
 - **WHEN** the Refresh phase completes
 - **THEN** the raw Fusion account fetch cache SHALL still be populated
-- **AND** it SHALL be cleared after the report epilogue as before
+- **AND** the cache SHALL be retained through the epilogue as before (the post-epilogue clear is itself skipped in record mode)
 
 #### Scenario: JIT unique attribute refresh survives early clear
 

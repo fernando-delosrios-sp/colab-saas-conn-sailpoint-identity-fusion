@@ -52,7 +52,7 @@ Meanwhile the raw Fusion account cache's only accountList reader is `processFusi
 
 ### D5: Clear the raw Fusion account fetch cache at end of Refresh
 
-- **Choice**: `refreshPhase` clears `fusionAccountsByNativeIdentity` after `processFusionAccounts`, except in record mode; the existing post-epilogue clear stays as the record-mode safeguard.
+- **Choice**: `refreshPhase` clears `fusionAccountsByNativeIdentity` after `processFusionAccounts`, except in record mode (which retains the cache for the whole run, as today); the existing post-epilogue clear stays as a harmless non-record safeguard.
 - **Reason**: verified sole accountList reader is Refresh. Single-account operations fetch their own copy. Report epilogue resolves ids via FusionRun maps and `managedAccountInventory`; ReportService reads only `fusionAccountCount` (a size). Output-time JIT unique refresh reads derived Fusion accounts plus the unique-value registry populated from derived accounts during Refresh/Match — never the raw cache.
 - **Considered alternatives**: clearing at start of Process (identical window, but Refresh-end is the natural owner and reads cleaner in phase logs).
 
