@@ -36,6 +36,12 @@ The **Default attribute merge from multiple sources** setting applies globally t
 
 When a Fusion account becomes refresh-eligible mid-run after a prior **claim-only absorb**, Map and Define need complete live snapshots. Previously claimed managed accounts rematerialize from **claimed account retention** onto `attributeBag.sources` before Map and Define run. A missing designated snapshot is a last-resort preserve, not a substitute for rematerializing origin and sibling accounts.
 
+## Attribute pruning at Fetch
+
+During Fetch, **attribute pruning** drops each managed source account's attributes that fall outside the **referenced attribute set** — Fusion schema attribute names, mapping source attributes (`existingAttributes`), attribute names referenced in Attribute Definition, Unique, and form Velocity templates, and match rule attributes. Unreferenced attributes never reach the Match work queue, claimed account retention, or live snapshots, which keeps large aggregations within the connector runtime memory budget. Pruning is always on and runs after all fetch filters (Accounts API filter, Accounts JMESPath filter, machine-account discard), so filters still see complete account data.
+
+Because pruning resolves references statically, Velocity templates must reference attributes by name (dot, bracket, or quoted styles all work). Templates that compute attribute names dynamically — for example `$account[$attributeName]` — are unsupported: the referenced value will have been pruned.
+
 **Origin** and **main** are pointers into the snapshot-key index. When the identity bag is present, **Identities** is a contributing snapshot indexed under the identity id, so `originAccount` or `mainAccount` may name either a managed account or that identity. Identity-origin is not a separate merge path.
 
 | Pointer                                     | Snapshot used                             |

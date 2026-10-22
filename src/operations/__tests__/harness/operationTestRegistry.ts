@@ -58,6 +58,7 @@ export function createOperationTestRegistry(options: TestRegistryOptions = {}): 
     schemas.setFusionAccountSchema = vi.fn().mockResolvedValue(undefined)
     schemas.loadFusionAccountSchemaFromSource = vi.fn().mockResolvedValue(undefined)
     schemas.getManagedSourceSchemaAttributeNames = vi.fn().mockResolvedValue(new Set<string>())
+    schemas.listSchemaAttributeNames = vi.fn().mockReturnValue([])
     Object.defineProperty(schemas, 'fusionDisplayAttribute', { value: 'name', writable: true, configurable: true })
 
     const identities = registry.identities as any

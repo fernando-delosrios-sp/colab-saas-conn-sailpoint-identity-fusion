@@ -194,6 +194,42 @@ describe('fetchPhase global reviewer hydration', () => {
     })
 })
 
+describe('refreshPhase raw Fusion account cache clear', () => {
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
+    it('clears the raw fusion account cache after processFusionAccounts when not in record mode', async () => {
+        const registry = createOperationTestRegistry()
+        const sources = registry.sources as any
+        const fusion = registry.fusion as any
+        fusion.ensureGlobalReviewerOwnersInScope = vi.fn().mockResolvedValue(undefined)
+        fusion.processFusionAccounts = vi.fn().mockResolvedValue([{ id: 'fa-1' }])
+
+        await refreshPhase(registry)
+
+        expect(sources.clearFusionAccounts).toHaveBeenCalledTimes(1)
+        expect(sources.clearFusionAccounts.mock.invocationCallOrder[0]).toBeGreaterThan(
+            fusion.processFusionAccounts.mock.invocationCallOrder[0]
+        )
+    })
+
+    it('retains the raw fusion account cache in record mode', async () => {
+        const registry = createOperationTestRegistry()
+        const recordRun = new FusionRun(undefined, { recording: { mode: 'record' } } as any)
+        registry.sources.run = recordRun
+        ;(registry.fusion as any).run = recordRun
+        const sources = registry.sources as any
+        const fusion = registry.fusion as any
+        fusion.ensureGlobalReviewerOwnersInScope = vi.fn().mockResolvedValue(undefined)
+        fusion.processFusionAccounts = vi.fn().mockResolvedValue([{ id: 'fa-1' }])
+
+        await refreshPhase(registry)
+
+        expect(sources.clearFusionAccounts).not.toHaveBeenCalled()
+    })
+})
+
 describe('refreshPhase workload summary', () => {
     afterEach(() => {
         vi.restoreAllMocks()

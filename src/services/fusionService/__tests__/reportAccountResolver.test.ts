@@ -49,6 +49,24 @@ describe('reportAccountResolver', () => {
         expect(isReportableIscAccountId('src::nat-1')).toBe(false)
     })
 
+    it('resolves report ids with the raw Fusion account fetch cache cleared after Refresh', () => {
+        const run = new FusionRun()
+        run.managedAccountInventory.set('src-a::native-1', {
+            id: 'isc-from-inventory',
+            name: 'User',
+            sourceName: 'Source A',
+        })
+        const sources = {
+            fusionAccountsByNativeIdentity: undefined,
+            resolveIscAccountIdForManagedKey: (key: string) => run.getManagedAccountInfo(key)?.id,
+        } as any
+
+        expect(resolveReportAccountIdValue('src-a::native-1', sources)).toBe('isc-from-inventory')
+        expect(
+            resolveReportAccountId({ iscAccountId: undefined, managedAccountId: 'src-a::native-1' } as FusionAccount, sources)
+        ).toBe('isc-from-inventory')
+    })
+
     it('resolves managed account ISC id from inventory for report decisions', () => {
         const run = new FusionRun()
         run.managedAccountInventory.set('src-a::native-1', {

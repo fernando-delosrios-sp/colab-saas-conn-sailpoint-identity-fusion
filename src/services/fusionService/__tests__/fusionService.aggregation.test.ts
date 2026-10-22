@@ -2809,6 +2809,16 @@ describe('FusionService — aggregation', () => {
 
             expect(ctx.mockDefinitionService.refreshUniqueAttributes).toHaveBeenCalledWith(account)
         })
+
+        it('refreshes unique attributes at Output with the raw Fusion account fetch cache cleared after Refresh', async () => {
+            const account = registerOutputAccount(false)
+            ctx.mockDefinitionService.hasMissingUniqueAttribute = vi.fn().mockReturnValue(true)
+            ctx.mockSources.fusionAccountsByNativeIdentity = undefined
+
+            await ctx.fusionService.forEachISCAccount(() => undefined, true)
+
+            expect(ctx.mockDefinitionService.refreshUniqueAttributes).toHaveBeenCalledWith(account)
+        })
     })
 
     describe('forEachISCAccount performance behavior', () => {

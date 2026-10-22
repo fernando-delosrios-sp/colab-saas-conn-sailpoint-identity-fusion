@@ -8,6 +8,7 @@ import {
 import { formatCorrelationSummaryValue } from '../../services/logService/operationRunContext'
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
+import { buildReferencedAttributeSet } from '../../services/sourceService/referencedAttributeSet'
 import { generateReport } from './generateReport'
 import { buildReportAggregationStats, buildTerminalSummary, DryRunInput, type FetchResult } from './accountListHelpers'
 import { sendWithBackpressure } from '../../utils/responseBackpressure'
@@ -138,6 +139,10 @@ export async function setupPhase(
     log.detail({ action: 'managed sources aggregated' })
     aggregateManagedSourcesOp.done({ sources: sources.managedSources.length })
 
+    const referencedAttributeSet = buildReferencedAttributeSet(config, schemas.listSchemaAttributeNames())
+    sources.setReferencedAttributeSet(referencedAttributeSet)
+    log.debug(`Referenced attribute set computed: ${referencedAttributeSet.size} attribute(s)`)
+
     await definition.initializeCounters()
     log.detail({ action: 'attribute counters initialized' })
     return true
@@ -194,7 +199,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
 // --- Phase 3: Refresh ---
 
 export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<void> {
-    const { log, fusion } = serviceRegistry
+    const { log, fusion, sources } = serviceRegistry
     const ctx = log.getRunContext()
     if (ctx && ctx.phase !== 'Refresh') {
         ctx.phase = 'Refresh'
@@ -205,6 +210,12 @@ export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<vo
     const refreshOp = log.track('refreshPhase.processFusionAccounts')
     const processedFusionAccounts = await fusion.processFusionAccounts()
     refreshOp.done({ count: processedFusionAccounts.length })
+    if (!sources.run.isRecordMode) {
+        sources.clearFusionAccounts()
+        log.detail({ action: 'raw fusion account fetch cache cleared from memory' })
+    } else {
+        log.detail({ cache: 'raw fusion account fetch cache retained for recording' })
+    }
     const summary = log.flushRefreshMetricsSummary()
     if (summary) {
         log.detail({ action: 'refresh workload', ...summary })

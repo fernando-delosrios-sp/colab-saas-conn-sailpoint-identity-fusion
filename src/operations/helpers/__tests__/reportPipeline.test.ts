@@ -39,6 +39,7 @@ function stubPhases(registry: ServiceRegistry): void {
     const schemas = registry.schemas as any
     schemas.loadFusionAccountSchemaFromSource = vi.fn().mockResolvedValue(undefined)
     schemas.getManagedSourceSchemaAttributeNames = vi.fn().mockResolvedValue(new Set())
+    schemas.listSchemaAttributeNames = vi.fn().mockReturnValue([])
 
     const identities = registry.identities as any
     identities.fetchIdentities = vi.fn().mockResolvedValue(undefined)
