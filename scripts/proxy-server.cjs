@@ -27,6 +27,12 @@ if (process.env.LOG_FILE && isDeprecatedIngestLogPath(process.env.LOG_FILE)) {
 }
 
 const COMMAND_RUN = 'run'
+/**
+ * Keep-alive cadence for the forwarded NDJSON response. ISC's proxy client splits
+ * the body on newlines and ignores empty lines, so a bare newline keeps NAT /
+ * undici body timers alive during long silent stretches of aggregation.
+ */
+const HEARTBEAT_INTERVAL_MS = 30_000
 const argv = process.argv.slice(2)
 
 if (!argv[0]) {
@@ -65,9 +71,13 @@ const appendPlainLog = (message, baseurl) => {
 
 const spawnTsc = () => {
     const tsc = childProcess
-        .spawn(/^win/.test(process.platform) ? 'tsc.cmd' : 'tsc', ['--inlineSourcemap', 'true', '--sourceMap', 'false', '--watch'], {
-            shell: true,
-        })
+        .spawn(
+            /^win/.test(process.platform) ? 'tsc.cmd' : 'tsc',
+            ['--inlineSourcemap', 'true', '--sourceMap', 'false', '--watch'],
+            {
+                shell: true,
+            }
+        )
         .once('spawn', () => {
             tsc.stdout.on('data', (data) => console.log(`tsc: ${data}`))
             tsc.stderr.on('data', (data) => console.error(`tsc: ${data}`))
@@ -93,14 +103,24 @@ const loadConnector = async (connectorModulePath) => {
 }
 
 const runConnectorCommand = async (cmd, res) => {
+    // Send the response headers up front. Otherwise Express waits for the first
+    // account line, and ISC's fetch sits in "waiting for headers" until it dies
+    // (around 5 minutes) when aggregation is slow to produce output.
+    res.status(200)
     res.type('application/x-ndjson')
+    res.flushHeaders()
+
     await _withConfig(cmd.config, async () => {
         const c = await loadConnector(connectorPath)
+
+        // Route connector NDJSON and keep-alive heartbeats through a single
+        // PassThrough so the two producers never write to `res` concurrently.
+        const gate = new stream.PassThrough()
         const out = new stream.Transform({
             writableObjectMode: true,
             transform(chunk, encoding, callback) {
                 try {
-                    this.push(`${JSON.stringify(chunk)}\n`)
+                    gate.write(`${JSON.stringify(chunk)}\n`)
                 } catch (e) {
                     callback(e)
                     return
@@ -109,48 +129,54 @@ const runConnectorCommand = async (cmd, res) => {
             },
         })
 
-        stream.pipeline(out, res, (err) => {
+        stream.pipeline(gate, res, (err) => {
             if (err) {
                 console.error(err)
             }
         })
 
-        await new Promise((resolve, reject) => {
-            out.on('finish', () => resolve())
-            out.on('error', (e) => reject(e))
+        const heartbeat = setInterval(() => gate.write('\n'), HEARTBEAT_INTERVAL_MS)
 
-            const runConnector = async () => {
-                try {
-                    if (c.connector == null && c.connectorCustomizer == null) {
-                        throw new Error('Connector not found. Did you export it?')
-                    }
-                    if (c.connector != null) {
-                        await c.connector._exec(
+        try {
+            await new Promise((resolve, reject) => {
+                out.on('finish', () => resolve())
+                out.on('error', (e) => reject(e))
+
+                const runConnector = async () => {
+                    try {
+                        if (c.connector == null && c.connectorCustomizer == null) {
+                            throw new Error('Connector not found. Did you export it?')
+                        }
+                        if (c.connector != null) {
+                            await c.connector._exec(
+                                cmd.type,
+                                { version: cmd.version, commandType: cmd.type },
+                                cmd.input,
+                                out,
+                                c.connectorCustomizer
+                            )
+                            return
+                        }
+                        const output = await c.connectorCustomizer._exec(
                             cmd.type,
                             { version: cmd.version, commandType: cmd.type },
                             cmd.input,
-                            out,
-                            c.connectorCustomizer
+                            out
                         )
-                        return
+                        out.write(output)
+                    } catch (e) {
+                        reject(e)
+                    } finally {
+                        out.end()
                     }
-                    const output = await c.connectorCustomizer._exec(
-                        cmd.type,
-                        { version: cmd.version, commandType: cmd.type },
-                        cmd.input,
-                        out
-                    )
-                    out.write(output)
-                } catch (e) {
-                    reject(e)
-                } finally {
-                    out.end()
                 }
-            }
 
-            void runConnector()
-        })
-        res.status(200)
+                void runConnector()
+            })
+            gate.end()
+        } finally {
+            clearInterval(heartbeat)
+        }
     })
 }
 
@@ -191,9 +217,7 @@ app.post('/', async (req, res) => {
         }
 
         const authContext = describeProxyAuthContext(cmd.config)
-        console.log(
-            `[proxy-server] Incoming operation: ${cmd.type ?? 'unknown'} auth=${JSON.stringify(authContext)}`
-        )
+        console.log(`[proxy-server] Incoming operation: ${cmd.type ?? 'unknown'} auth=${JSON.stringify(authContext)}`)
 
         assertProxyCommandAuthorized(cmd.config)
         console.log(`[proxy-server] Accepted forwarded operation: ${cmd.type ?? 'unknown'}`)
@@ -204,6 +228,12 @@ app.post('/', async (req, res) => {
         const operationLabel = cmd?.type ? ` (${cmd.type})` : ''
         console.error(`[proxy-server] Rejected forwarded operation${operationLabel}: ${message}`)
         console.log(`[proxy-server] Rejected forwarded operation${operationLabel}: ${message}`)
+        if (res.headersSent) {
+            // The connector command already flushed its 200 headers; report the late
+            // failure in-band instead of rewriting an already-sent status line.
+            res.write(`${ConnectorErrorType.Generic} error: \n + ${util.inspect(e)}`)
+            return
+        }
         if (e instanceof Error && e.message === 'Proxy password mismatch') {
             res.status(401).json({ error: e.message })
             return
@@ -222,7 +252,7 @@ app.post('/', async (req, res) => {
     }
 })
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(`Identity Fusion proxy server listening at http://localhost:${port}`)
     console.log(`Connector: ${connectorPath}`)
     console.log(
@@ -237,3 +267,9 @@ app.listen(port, () => {
     }
 })
 
+// Long-running aggregation can sit silent for hours. Node 18+ defaults
+// requestTimeout to 300000 ms, which would cut a forwarded command short, so
+// disable the server-side socket/header/request timeouts.
+server.requestTimeout = 0
+server.headersTimeout = 0
+server.timeout = 0
