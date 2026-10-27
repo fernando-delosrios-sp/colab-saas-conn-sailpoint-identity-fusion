@@ -9,6 +9,10 @@ import { FusionAccount } from '../model/account'
 import { SourceService } from './sourceService'
 import { FusionRun } from '../model/fusionRun'
 import { forEachChunked } from '../utils/yieldToEventLoop'
+import {
+    pruneIdentityDocumentAttributes,
+    filterIdentityAccounts,
+} from './sourceService/referencedAttributeSet'
 
 // ============================================================================
 // Constants
@@ -72,6 +76,7 @@ export class IdentityService {
     private identityScopeFetchCompleted = false
     private readonly identityScopeQuery?: string
     private readonly includeIdentities: boolean
+    private referencedAttributeSet?: ReadonlySet<string>
 
     // ------------------------------------------------------------------------
     // Constructor
@@ -81,16 +86,58 @@ export class IdentityService {
      * @param config - Fusion configuration containing identity scope settings
      * @param log - Logger instance
      * @param client - API client for ISC search and account operations
+     * @param sources - Source service for managed source and fusion source resolution
+     * @param run - Active fusion run tracking cache and state
+     * @param options - Optional configuration options including referencedAttributeSet
      */
     constructor(
-        config: FusionConfig,
+        private config: FusionConfig,
         private log: LogService,
         private client: ClientService,
         private sources: SourceService,
-        private run: FusionRun
+        private run: FusionRun,
+        options?: { referencedAttributeSet?: ReadonlySet<string> }
     ) {
         this.identityScopeQuery = config.identityScopeQuery
         this.includeIdentities = config.includeIdentities ?? true
+        if (options?.referencedAttributeSet) {
+            this.referencedAttributeSet = options.referencedAttributeSet
+        }
+    }
+
+    /**
+     * Sets or updates the referenced attribute set used to prune identity attributes at ingest.
+     */
+    public setReferencedAttributeSet(referencedAttributeSet: ReadonlySet<string>): void {
+        this.referencedAttributeSet = referencedAttributeSet
+    }
+
+    /**
+     * Returns the active referenced attribute set from either local configuration or SourceService.
+     */
+    public getEffectiveReferencedAttributeSet(): ReadonlySet<string> | undefined {
+        return this.referencedAttributeSet ?? this.sources.referencedAttributeSet
+    }
+
+    /**
+     * Prunes an incoming identity document by dropping unreferenced attributes and
+     * removing linked accounts belonging to unmanaged sources.
+     */
+    public pruneIdentityDocument(identity: IdentityDocument): IdentityDocument {
+        const refSet = this.getEffectiveReferencedAttributeSet()
+        if (refSet) {
+            pruneIdentityDocumentAttributes(identity, refSet)
+        }
+        const managedSourceNames = new Set<string>()
+        for (const s of this.config.sources ?? []) {
+            if (s.name) managedSourceNames.add(s.name)
+        }
+        for (const s of this.sources.managedSources ?? []) {
+            if (s.name) managedSourceNames.add(s.name)
+        }
+        const fusionSourceId = this.sources.hasFusionSource ? this.sources.fusionSourceId : undefined
+        filterIdentityAccounts(identity, { fusionSourceId, managedSourceNames })
+        return identity
     }
 
     // ------------------------------------------------------------------------
@@ -179,6 +226,7 @@ export class IdentityService {
                         page,
                         (identity) => {
                             if (!identity.protected) {
+                                this.pruneIdentityDocument(identity)
                                 this.run.addIdentity(identity.id, identity)
                                 this.identityIdsInScope.add(identity.id)
                             }
@@ -228,12 +276,15 @@ export class IdentityService {
             const query = buildIdentityQuery(this.identityScopeQuery)
 
             try {
-                yield* this.client.paginateSearchApiGenerator<IdentityDocument>(
+                for await (const page of this.client.paginateSearchApiGenerator<IdentityDocument>(
                     query,
                     QueuePriority.HIGH,
                     'IdentityService>fetchIdentitiesGenerator searchPost',
                     abortSignal
-                )
+                )) {
+                    page.forEach((identity) => this.pruneIdentityDocument(identity))
+                    yield page
+                }
             } catch (error) {
                 if (error instanceof ConnectorError) throw error
                 const detail = error instanceof Error ? error.message : String(error)
@@ -264,7 +315,10 @@ export class IdentityService {
                 priority: QueuePriority.HIGH,
                 context: 'IdentityService>fetchIdentityById searchPost',
             })
-            identities.forEach((identity) => this.run.addIdentity(identity.id, identity))
+            identities.forEach((identity) => {
+                this.pruneIdentityDocument(identity)
+                this.run.addIdentity(identity.id, identity)
+            })
             return identities[0]
         }, `Failed to fetch identity by ID "${id}"`)
     }
@@ -286,7 +340,10 @@ export class IdentityService {
                 priority: QueuePriority.HIGH,
                 context: 'IdentityService>fetchIdentityByName searchPost',
             })
-            identities.forEach((identity) => this.run.addIdentity(identity.id, identity))
+            identities.forEach((identity) => {
+                this.pruneIdentityDocument(identity)
+                this.run.addIdentity(identity.id, identity)
+            })
             return identities[0]
         }, `Failed to fetch identity by name "${name}"`)
     }
@@ -305,6 +362,7 @@ export class IdentityService {
             )
             if (!profile?.id) return undefined
             const doc = this.identityDocumentFromProfile(profile)
+            this.pruneIdentityDocument(doc)
             this.run.addIdentity(doc.id!, doc)
             return doc
         }, `Failed to fetch identity profile by ID "${id}"`)
@@ -365,6 +423,7 @@ export class IdentityService {
                     context: 'IdentityService>hydrateMissingIdentitiesById searchPost',
                 })
                 identities.forEach((identity) => {
+                    this.pruneIdentityDocument(identity)
                     this.run.addIdentity(identity.id, identity)
                 })
             } catch (err) {
