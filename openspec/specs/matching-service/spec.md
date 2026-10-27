@@ -18,6 +18,7 @@ The match service (`src/services/matchingService/`) provides weighted scoring al
 MatchingService SHALL NOT expose sweep orchestration (`processUncorrelatedManagedAccounts`) or outcome handlers (merge, form creation, non-match registration). Those belong to **MatchOutcomeDispatcher** — see `match-outcome-dispatch/spec.md`.
 
 ## Requirements
+
 ### Requirement: MatchOutcomeDispatcher dispatches exact match → automatic merge
 
 When scoring produces an exact match (all evaluated rules score 100, none skipped) and automatic merge is enabled, MatchOutcomeDispatcher SHALL create a synthetic decision and merge the managed account into the matching Fusion identity without creating a review form. When more than one retained identity match is exact, MatchOutcomeDispatcher SHALL merge into the rank-1 identity after top-K form sort (combined score, then identity id), not whichever identity was compared first.
@@ -593,5 +594,20 @@ When an Ownership-eligible account has no identity candidate that meets the matc
 - **THEN** a disable SHALL be queued for that account
 - **AND** the account SHALL NOT gain an owner identity
 
+### Requirement: Match candidate projection indexing
 
+MatchingService SHALL support indexing candidate identities as `MatchCandidateRecord` projections containing `identityId`, `identityName`, and the projected union of attributes needed for matching, review forms, and reporting (`matchingRules ∪ fusionFormAttributes ∪ reportAttributes`).
 
+#### Scenario: Candidate roster indexes projected candidate records
+
+- **GIVEN** a pool of candidate identities to index for matching
+- **WHEN** `buildTrigramIndex` builds the blocking indexes and candidate roster
+- **THEN** the blocking identity roster SHALL store `MatchCandidateRecord` projections rather than requiring full `FusionAccount` instances
+- **AND** blocking indexes SHALL index values extracted from the projected candidate attributes
+
+#### Scenario: Candidate records provide attributes for matching, forms, and reporting
+
+- **GIVEN** an uncorrelated managed account being scored against candidate records
+- **WHEN** a candidate record matches or passes the review threshold
+- **THEN** the resulting `FusionMatch` SHALL expose the candidate's `identityId`, `identityName`, and projected `attributes`
+- **AND** review forms and reports SHALL be generated from those projected attributes without initiating secondary API calls
