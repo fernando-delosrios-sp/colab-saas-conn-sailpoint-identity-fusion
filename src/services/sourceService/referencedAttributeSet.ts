@@ -1,4 +1,4 @@
-import { AccountV2025 as Account } from 'sailpoint-api-client'
+import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionConfig } from '../../model/config'
 import { fusionAccountSchemaAttributes } from '../../data/schema'
 
@@ -87,4 +87,86 @@ export function pruneManagedAccountAttributes(
         }
     }
     return account
+}
+
+/**
+ * Core identity attribute keys that are always preserved during Identity Document Pruning,
+ * regardless of whether they appear in the referenced attribute set.
+ */
+export const CORE_IDENTITY_ATTRIBUTES: ReadonlySet<string> = new Set([
+    'displayName',
+    'email',
+    'name',
+    'id',
+    'firstname',
+    'lastname',
+    'firstName',
+    'lastName',
+    'uid',
+    'cloudLifecycleState',
+])
+
+/**
+ * Attribute pruning for identity documents: drops unreferenced attributes from
+ * `identity.attributes` upon page arrival. Preserves core identity fields and any
+ * attribute present in `referencedAttributeSet`. Mutates in place.
+ */
+export function pruneIdentityDocumentAttributes(
+    identity: IdentityDocument,
+    referencedAttributeSet?: ReadonlySet<string>
+): IdentityDocument {
+    const attributes = identity.attributes
+    if (!attributes || typeof attributes !== 'object') return identity
+    if (!referencedAttributeSet) return identity
+
+    for (const key of Object.keys(attributes)) {
+        if (!CORE_IDENTITY_ATTRIBUTES.has(key) && !referencedAttributeSet.has(key)) {
+            delete (attributes as Record<string, unknown>)[key]
+        }
+    }
+    return identity
+}
+
+export interface FilterIdentityAccountsOptions {
+    fusionSourceId?: string
+    managedSourceNames?: ReadonlySet<string>
+}
+
+/**
+ * Filters `identity.accounts` to retain only accounts belonging to configured Fusion
+ * and managed sources. Retained account summaries are pruned to essential fields
+ * (`id`, `nativeIdentity`, `name`, `disabled`, `source: { id, name }`).
+ * Mutates in place.
+ */
+export function filterIdentityAccounts(
+    identity: IdentityDocument,
+    options: FilterIdentityAccountsOptions = {}
+): IdentityDocument {
+    if (!identity.accounts || !Array.isArray(identity.accounts)) return identity
+
+    const { fusionSourceId, managedSourceNames } = options
+
+    identity.accounts = (identity.accounts as any[])
+        .filter((account) => {
+            if (!account) return false
+            const sourceId = account.source?.id
+            const sourceName = account.source?.name
+            const isFusion = Boolean(fusionSourceId && sourceId === fusionSourceId)
+            const isManaged = Boolean(sourceName && managedSourceNames?.has(sourceName))
+            return isFusion || isManaged
+        })
+        .map((account) => ({
+            id: account.id,
+            nativeIdentity: account.nativeIdentity,
+            name: account.name,
+            disabled: account.disabled,
+            source: account.source
+                ? {
+                      id: account.source.id,
+                      name: account.source.name,
+                  }
+                : undefined,
+        }))
+
+    return identity
 }

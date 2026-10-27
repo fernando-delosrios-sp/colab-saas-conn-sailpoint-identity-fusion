@@ -84,7 +84,7 @@ export async function setupPhase(
     schema: any,
     options: PhaseOptions
 ): Promise<boolean> {
-    const { log, fusion, schemas, sources, definition, config } = serviceRegistry
+    const { log, fusion, schemas, sources, definition, config, identities } = serviceRegistry
     const { isPersistent, tracker } = options
     const forceAttributeRefresh = isPersistent && config.forceAttributeRefresh
 
@@ -142,6 +142,7 @@ export async function setupPhase(
 
     const referencedAttributeSet = buildReferencedAttributeSet(config, schemas.listSchemaAttributeNames())
     sources.setReferencedAttributeSet(referencedAttributeSet)
+    identities.setReferencedAttributeSet(referencedAttributeSet)
     log.debug(`Referenced attribute set computed: ${referencedAttributeSet.size} attribute(s)`)
 
     await definition.initializeCounters()

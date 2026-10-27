@@ -1,9 +1,15 @@
-import { AccountV2025 as Account } from 'sailpoint-api-client'
+import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionRun } from '../../../model/fusionRun'
 import { FusionConfig, SourceType } from '../../../model/config'
 import type { SourceInfo } from '../types'
 import { fetchManagedAccounts, type ManagedAccountFetcherDeps } from '../managedAccountFetcher'
-import { buildReferencedAttributeSet, pruneManagedAccountAttributes } from '../referencedAttributeSet'
+import {
+    buildReferencedAttributeSet,
+    pruneManagedAccountAttributes,
+    pruneIdentityDocumentAttributes,
+    filterIdentityAccounts,
+    CORE_IDENTITY_ATTRIBUTES,
+} from '../referencedAttributeSet'
 
 /**
  * Characterization: managed source account attribute pruning at Bulk ingest.
@@ -270,5 +276,157 @@ describe('fetchManagedAccounts pruning at Bulk ingest', () => {
         expect(Object.keys(registered.attributes as object).sort()).toEqual(
             ['junkAttr0', 'junkAttr1', 'junkAttr2', 'junkAttr3', 'lastName'].sort()
         )
+    })
+})
+
+describe('pruneIdentityDocumentAttributes', () => {
+    it('drops unreferenced attributes while preserving referenced and core fields', () => {
+        const identity: IdentityDocument = {
+            id: 'id-123',
+            name: 'john.doe',
+            displayName: 'John Doe',
+            email: 'john.doe@example.com',
+            attributes: {
+                displayName: 'John Doe',
+                email: 'john.doe@example.com',
+                name: 'john.doe',
+                firstname: 'John',
+                lastname: 'Doe',
+                uid: 'jdoe',
+                cloudLifecycleState: 'active',
+                department: 'Engineering',
+                unreferencedCustomAttr1: 'secret-1',
+                unreferencedCustomAttr2: 'secret-2',
+            },
+        }
+
+        const referencedSet = new Set(['department'])
+        pruneIdentityDocumentAttributes(identity, referencedSet)
+
+        expect(identity.attributes).toEqual({
+            displayName: 'John Doe',
+            email: 'john.doe@example.com',
+            name: 'john.doe',
+            firstname: 'John',
+            lastname: 'Doe',
+            uid: 'jdoe',
+            cloudLifecycleState: 'active',
+            department: 'Engineering',
+        })
+    })
+
+    it('preserves all core identity attributes even when referenced set is empty', () => {
+        const identity: IdentityDocument = {
+            id: 'id-456',
+            attributes: {
+                id: 'id-456',
+                name: 'jane.smith',
+                displayName: 'Jane Smith',
+                email: 'jane@example.com',
+                firstname: 'Jane',
+                lastname: 'Smith',
+                firstName: 'Jane',
+                lastName: 'Smith',
+                uid: 'jsmith',
+                cloudLifecycleState: 'active',
+                randomField: 'dropped',
+            },
+        }
+
+        expect(CORE_IDENTITY_ATTRIBUTES.has('displayName')).toBe(true)
+        expect(CORE_IDENTITY_ATTRIBUTES.has('email')).toBe(true)
+        pruneIdentityDocumentAttributes(identity, new Set())
+
+        expect(identity.attributes).toEqual({
+            id: 'id-456',
+            name: 'jane.smith',
+            displayName: 'Jane Smith',
+            email: 'jane@example.com',
+            firstname: 'Jane',
+            lastname: 'Smith',
+            firstName: 'Jane',
+            lastName: 'Smith',
+            uid: 'jsmith',
+            cloudLifecycleState: 'active',
+        })
+    })
+
+    it('returns identity untouched when attributes or referenced set is undefined', () => {
+        const idWithoutAttrs: IdentityDocument = { id: 'id-1' }
+        expect(pruneIdentityDocumentAttributes(idWithoutAttrs, new Set(['dept']))).toBe(idWithoutAttrs)
+
+        const idWithAttrs: IdentityDocument = { id: 'id-2', attributes: { foo: 'bar' } }
+        expect(pruneIdentityDocumentAttributes(idWithAttrs, undefined)).toBe(idWithAttrs)
+        expect(idWithAttrs.attributes).toEqual({ foo: 'bar' })
+    })
+})
+
+describe('filterIdentityAccounts', () => {
+    it('keeps only Fusion and managed source accounts and strips extra fields', () => {
+        const identity: IdentityDocument = {
+            id: 'id-789',
+            accounts: [
+                {
+                    id: 'acc-fusion',
+                    name: 'jdoe-fusion',
+                    nativeIdentity: 'jdoe-fusion-native',
+                    disabled: false,
+                    source: { id: 'fusion-source-id', name: 'Fusion' },
+                    entitlementCount: 15,
+                    authoritative: true,
+                    attributes: { temp: 'junk' },
+                } as any,
+                {
+                    id: 'acc-managed',
+                    name: 'jdoe-hr',
+                    nativeIdentity: 'jdoe-hr-native',
+                    disabled: true,
+                    source: { id: 'hr-source-id', name: 'HR Source' },
+                    entitlementCount: 2,
+                } as any,
+                {
+                    id: 'acc-external-1',
+                    name: 'jdoe-aws',
+                    nativeIdentity: 'jdoe-aws-native',
+                    source: { id: 'aws-source-id', name: 'AWS Cloud' },
+                } as any,
+                {
+                    id: 'acc-external-2',
+                    name: 'jdoe-slack',
+                    source: { id: 'slack-source-id', name: 'Slack' },
+                } as any,
+            ],
+        }
+
+        filterIdentityAccounts(identity, {
+            fusionSourceId: 'fusion-source-id',
+            managedSourceNames: new Set(['HR Source']),
+        })
+
+        expect(identity.accounts).toEqual([
+            {
+                id: 'acc-fusion',
+                nativeIdentity: 'jdoe-fusion-native',
+                name: 'jdoe-fusion',
+                disabled: false,
+                source: { id: 'fusion-source-id', name: 'Fusion' },
+            },
+            {
+                id: 'acc-managed',
+                nativeIdentity: 'jdoe-hr-native',
+                name: 'jdoe-hr',
+                disabled: true,
+                source: { id: 'hr-source-id', name: 'HR Source' },
+            },
+        ])
+    })
+
+    it('handles identity with no accounts or undefined accounts safely', () => {
+        const identity: IdentityDocument = { id: 'id-no-acc' }
+        filterIdentityAccounts(identity, {
+            fusionSourceId: 'fusion-1',
+            managedSourceNames: new Set(['HR']),
+        })
+        expect(identity.accounts).toBeUndefined()
     })
 })

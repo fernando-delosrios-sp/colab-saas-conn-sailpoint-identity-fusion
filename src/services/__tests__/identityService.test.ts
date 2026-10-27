@@ -8,7 +8,12 @@ import { IdentityService } from '../identityService'
 import type { Mock } from 'vitest'
 
 type ClientServiceStub = Pick<ClientService, 'call' | 'paginateSearchApiGenerator'>
-type SourceServiceStub = Pick<SourceService, 'resolveIscAccountIdForManagedKey'>
+type SourceServiceStub = Pick<SourceService, 'resolveIscAccountIdForManagedKey'> & {
+    hasFusionSource?: boolean
+    fusionSourceId?: string
+    managedSources?: any[]
+    referencedAttributeSet?: ReadonlySet<string>
+}
 
 function makeIdentity(id: string, overrides: Partial<IdentityDocument> = {}): IdentityDocument {
     return {
@@ -64,9 +69,13 @@ function makeLog(): LogService {
     } as unknown as LogService
 }
 
-function makeSources(): SourceServiceStub {
+function makeSources(overrides: Partial<SourceServiceStub> = {}): SourceServiceStub {
     return {
         resolveIscAccountIdForManagedKey: vi.fn(),
+        hasFusionSource: true,
+        fusionSourceId: 'fusion-source-1',
+        managedSources: [{ id: 'hr-source-id', name: 'HR Source' }],
+        ...overrides,
     } as unknown as SourceServiceStub
 }
 
@@ -83,20 +92,25 @@ function makeService(
     overrides: {
         config?: Partial<FusionConfig>
         searchResultsByQuery?: Record<string, IdentityDocument[]>
+        sources?: Partial<SourceServiceStub>
+        referencedAttributeSet?: ReadonlySet<string>
+        run?: FusionRun
     } = {}
-): { service: IdentityService; client: ClientServiceStub; log: LogService } {
+): { service: IdentityService; client: ClientServiceStub; log: LogService; run: FusionRun; sources: SourceServiceStub } {
     const log = makeLog()
     const client = makeClient(overrides.searchResultsByQuery)
-    const sources = makeSources()
+    const sources = makeSources(overrides.sources)
     const config = makeConfig(overrides.config)
+    const run = overrides.run ?? new FusionRun()
     const service = new IdentityService(
         config,
         log,
         client as unknown as ClientService,
         sources as unknown as SourceService,
-        new FusionRun()
+        run,
+        overrides.referencedAttributeSet ? { referencedAttributeSet: overrides.referencedAttributeSet } : undefined
     )
-    return { service, client, log }
+    return { service, client, log, run, sources }
 }
 
 describe('IdentityService.hasIdentityInScope', () => {
@@ -526,5 +540,254 @@ describe('IdentityService.correlateAccounts', () => {
 
         expect(log.recordCorrelationSkipped).toHaveBeenCalledWith('noIscAccountId')
         expect(log.recordCorrelationActivity).toHaveBeenCalledWith({ kind: 'link', accounts: 1 })
+    })
+})
+
+describe('Identity Document Pruning on Ingest', () => {
+    it('Scenario: Unreferenced identity attributes are dropped on page arrival', async () => {
+        const query = '*'
+        const identityDoc: IdentityDocument = makeIdentity('id-page-1', {
+            name: 'alice.smith',
+            displayName: 'Alice Smith',
+            email: 'alice@example.com',
+            attributes: {
+                displayName: 'Alice Smith',
+                email: 'alice@example.com',
+                name: 'alice.smith',
+                id: 'id-page-1',
+                firstname: 'Alice',
+                lastname: 'Smith',
+                title: 'Senior Engineer',
+                department: 'R&D',
+                junkField1: 'drop-me-1',
+                junkField2: 'drop-me-2',
+            },
+        })
+
+        const referencedAttributeSet = new Set(['title', 'department'])
+        const { service, run } = makeService({
+            config: { identityScopeQuery: query, includeIdentities: true },
+            searchResultsByQuery: { [query]: [identityDoc] },
+            referencedAttributeSet,
+        })
+
+        await service.fetchIdentities()
+
+        const cached = run.getIdentity('id-page-1')
+        expect(cached).toBeDefined()
+        expect(cached?.attributes).toEqual({
+            displayName: 'Alice Smith',
+            email: 'alice@example.com',
+            name: 'alice.smith',
+            id: 'id-page-1',
+            firstname: 'Alice',
+            lastname: 'Smith',
+            title: 'Senior Engineer',
+            department: 'R&D',
+        })
+        expect((cached?.attributes as any)?.junkField1).toBeUndefined()
+        expect((cached?.attributes as any)?.junkField2).toBeUndefined()
+    })
+
+    it('Scenario: Non-managed linked accounts are excluded from identity document', async () => {
+        const query = '*'
+        const identityDoc: IdentityDocument = makeIdentity('id-page-2', {
+            accounts: [
+                {
+                    id: 'acc-fusion',
+                    name: 'asmith-fusion',
+                    nativeIdentity: 'native-fusion-1',
+                    disabled: false,
+                    source: { id: 'fusion-source-1', name: 'Identity Fusion' },
+                    entitlementCount: 10,
+                    authoritative: true,
+                } as any,
+                {
+                    id: 'acc-managed',
+                    name: 'asmith-hr',
+                    nativeIdentity: 'native-hr-1',
+                    disabled: false,
+                    source: { id: 'hr-source-id', name: 'HR Source' },
+                    entitlementCount: 3,
+                } as any,
+                {
+                    id: 'acc-unmanaged-slack',
+                    name: 'asmith-slack',
+                    nativeIdentity: 'native-slack-1',
+                    source: { id: 'slack-id', name: 'Slack' },
+                } as any,
+                {
+                    id: 'acc-unmanaged-aws',
+                    name: 'asmith-aws',
+                    nativeIdentity: 'native-aws-1',
+                    source: { id: 'aws-id', name: 'AWS Cloud' },
+                } as any,
+            ],
+        })
+
+        const { service, run } = makeService({
+            config: { identityScopeQuery: query, includeIdentities: true },
+            searchResultsByQuery: { [query]: [identityDoc] },
+            sources: {
+                hasFusionSource: true,
+                fusionSourceId: 'fusion-source-1',
+                managedSources: [{ id: 'hr-source-id', name: 'HR Source' }],
+            },
+        })
+
+        await service.fetchIdentities()
+
+        const cached = run.getIdentity('id-page-2')
+        expect(cached).toBeDefined()
+        expect(cached?.accounts).toEqual([
+            {
+                id: 'acc-fusion',
+                nativeIdentity: 'native-fusion-1',
+                name: 'asmith-fusion',
+                disabled: false,
+                source: { id: 'fusion-source-1', name: 'Identity Fusion' },
+            },
+            {
+                id: 'acc-managed',
+                nativeIdentity: 'native-hr-1',
+                name: 'asmith-hr',
+                disabled: false,
+                source: { id: 'hr-source-id', name: 'HR Source' },
+            },
+        ])
+    })
+
+    it('Scenario: On-demand identity hydration applies pruning', async () => {
+        const identityId = 'id-single-ondemand'
+        const rawIdentity: IdentityDocument = makeIdentity(identityId, {
+            name: 'bob.ondemand',
+            displayName: 'Bob OnDemand',
+            email: 'bob@example.com',
+            attributes: {
+                displayName: 'Bob OnDemand',
+                email: 'bob@example.com',
+                name: 'bob.ondemand',
+                firstname: 'Bob',
+                lastname: 'OnDemand',
+                costCenter: 'CC-99',
+                unneededMetadata: 'discard',
+            },
+            accounts: [
+                {
+                    id: 'acc-hr',
+                    name: 'bob-hr',
+                    nativeIdentity: 'bob-hr-nat',
+                    disabled: false,
+                    source: { id: 'hr-source-id', name: 'HR Source' },
+                    extraProp: 123,
+                } as any,
+                {
+                    id: 'acc-external',
+                    name: 'bob-service-now',
+                    source: { id: 'snow-id', name: 'ServiceNow' },
+                } as any,
+            ],
+        })
+
+        const referencedAttributeSet = new Set(['costCenter'])
+        const { service, run } = makeService({
+            searchResultsByQuery: { [`id:"${identityId}"`]: [rawIdentity] },
+            referencedAttributeSet,
+            sources: {
+                hasFusionSource: true,
+                fusionSourceId: 'fusion-source-1',
+                managedSources: [{ id: 'hr-source-id', name: 'HR Source' }],
+            },
+        })
+
+        const result = await service.fetchIdentityById(identityId)
+
+        // Verifies return value is pruned
+        expect(result.attributes).toEqual({
+            displayName: 'Bob OnDemand',
+            email: 'bob@example.com',
+            name: 'bob.ondemand',
+            firstname: 'Bob',
+            lastname: 'OnDemand',
+            costCenter: 'CC-99',
+        })
+        expect(result.accounts).toEqual([
+            {
+                id: 'acc-hr',
+                nativeIdentity: 'bob-hr-nat',
+                name: 'bob-hr',
+                disabled: false,
+                source: { id: 'hr-source-id', name: 'HR Source' },
+            },
+        ])
+
+        // Verifies cached value in run is also pruned
+        const cached = run.getIdentity(identityId)
+        expect(cached).toBe(result)
+    })
+
+    it('reduces heap footprint across synthetic high-volume identity payloads', async () => {
+        const count = 300
+        const query = '*'
+        const identities: IdentityDocument[] = []
+
+        for (let i = 0; i < count; i++) {
+            const attributes: Record<string, any> = {
+                displayName: `User ${i}`,
+                email: `user${i}@example.com`,
+                name: `user.${i}`,
+                firstname: `User`,
+                lastname: `${i}`,
+            }
+            // Add 40 junk attributes per identity
+            for (let j = 0; j < 40; j++) {
+                attributes[`junk_attribute_${j}`] = `some-long-string-value-that-takes-space-${i}-${j}`
+            }
+
+            identities.push(
+                makeIdentity(`id-synthetic-${i}`, {
+                    attributes,
+                    accounts: [
+                        {
+                            id: `acc-fusion-${i}`,
+                            name: `user${i}-fusion`,
+                            nativeIdentity: `native-fusion-${i}`,
+                            disabled: false,
+                            source: { id: 'fusion-source-1', name: 'Identity Fusion' },
+                        } as any,
+                        {
+                            id: `acc-ext-1-${i}`,
+                            source: { id: 'ext-1', name: 'External 1' },
+                        } as any,
+                        {
+                            id: `acc-ext-2-${i}`,
+                            source: { id: 'ext-2', name: 'External 2' },
+                        } as any,
+                    ],
+                })
+            )
+        }
+
+        const { service, run } = makeService({
+            config: { identityScopeQuery: query, includeIdentities: true },
+            searchResultsByQuery: { [query]: identities },
+            referencedAttributeSet: new Set(),
+            sources: {
+                hasFusionSource: true,
+                fusionSourceId: 'fusion-source-1',
+                managedSources: [],
+            },
+        })
+
+        await service.fetchIdentities()
+
+        expect(run.identityCount).toBe(count)
+        for (const identity of run.identityValues()) {
+            // Unreferenced 40 junk attributes removed
+            expect(Object.keys(identity.attributes as object).length).toBe(5)
+            // External accounts removed, only fusion account retained
+            expect(identity.accounts).toHaveLength(1)
+            expect(identity.accounts![0].source?.id).toBe('fusion-source-1')
+        }
     })
 })

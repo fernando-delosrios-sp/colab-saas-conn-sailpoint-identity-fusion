@@ -63,6 +63,8 @@ Identities and correlated managed accounts form the Match **baseline**. See [Glo
 | Setting | Config menu | Phase / step | Behavior |
 | --- | --- | --- | --- |
 | **Promote first found managed account to main account when origin account is missing** (`promoteMainAccountWhenOriginMissing`) | Source Settings → Processing Control | Refresh `processFusionAccount`, including single-account read | Off when the key is absent. While on, sets `mainAccount` to the first live managed account before Map when the origin is not a current contributor, and clears `mainAccount` before Map when the origin is a current contributor again. |
+| **Identity Document Pruning** | Automatic / Internal | Fetch (bulk ingest and on-demand hydration) | Drops unreferenced attributes from `identity.attributes` outside the referenced attribute set upon page arrival. Preserves core identity fields (`displayName`, `email`, `name`, `id`, `firstname`, `lastname`, `uid`, `cloudLifecycleState`). Always active. |
+| **Identity Account Filtering** | Automatic / Internal | Fetch (bulk ingest and on-demand hydration) | Filters `identity.accounts` to retain only accounts belonging to configured Fusion and managed sources, stripping unmanaged third-party accounts and keeping essential fields (`id`, `nativeIdentity`, `name`, `disabled`, `source`). Always active. |
 
 ## Review and reporting
 

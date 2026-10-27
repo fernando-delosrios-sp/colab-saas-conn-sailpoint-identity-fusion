@@ -93,7 +93,7 @@ export class SourceService {
      * (account-list and Fusion report). Single-account operations never initialize it,
      * so their single-account fetches keep unpruned bodies (pre-change behavior).
      */
-    private referencedAttributeSet?: ReadonlySet<string>
+    private referencedAttributeSetValue?: ReadonlySet<string>
 
     public fusionAccountsByNativeIdentity?: Map<string, Account>
 
@@ -102,7 +102,14 @@ export class SourceService {
      * attributes at ingest. See {@link referencedAttributeSet}.
      */
     public setReferencedAttributeSet(referencedAttributeSet: ReadonlySet<string>): void {
-        this.referencedAttributeSet = referencedAttributeSet
+        this.referencedAttributeSetValue = referencedAttributeSet
+    }
+
+    /**
+     * Get the active referenced attribute set if configured for this run.
+     */
+    public get referencedAttributeSet(): ReadonlySet<string> | undefined {
+        return this.referencedAttributeSetValue
     }
 
     /**
