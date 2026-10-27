@@ -77,7 +77,7 @@ After bind, paths are under `ACTIVE_CHANGE_ROOT`. Prefer OpenSpec `artifactPaths
 **Interactive host** — **structured-choices** venue gate (one message; **must run** — a trusted Issue or filled Presets does not skip it):
 
 1. Initialize **`TRACKING`**: copy non-empty `TRACKING_HINT` fields **field-by-field**, **except Branch, Issue, PR, and Presets keys** — copy those only on a **trusted hint**; set **Change** = `CHANGE_ROOT_REL`. Initialize empty **`PRESET_OVERRIDES`**. **Do not write to disk.**
-2. **Venue:** `local` | `worktree` | `remote` → set `TRACKING` Presets → `venue` **and** `PRESET_OVERRIDES` → `venue`. When presenting the gate for `worktree`, check if `harness-proxy` is installed (`which harness-proxy` or `./bin/harness-proxy`): if present, offer `worktree (harness-proxy)` to delegate isolated group runs to `agents/software-engineer.md`; otherwise standard git worktree applies.
+2. **Venue:** `local` | `worktree` | `remote` → set `TRACKING` Presets → `venue` **and** `PRESET_OVERRIDES` → `venue`.
 3. When the OpenSpec adapter set `STORE`, set Presets → `store`; add to `PRESET_OVERRIDES` **only** when `STORE_SOURCE` is `explicit`.
 4. **Parallelism** (agent — not a user gate): choose `single` | `subagent-per-group` using the criteria below; set Presets → `parallelism` and `PRESET_OVERRIDES` → `parallelism`; note one-line rationale in session.
 5. Snapshot **`TRACKING_SETUP`** = copy of `TRACKING`.
@@ -146,9 +146,7 @@ Per implementation task:
 **Parallelism `subagent-per-group`:**
 
 - **`local`:** subagents read `ACTIVE_CHANGE_ROOT`; no git; orchestrator commits on `ORIGINAL_BRANCH`.
-- **`worktree`:**
-  - **With `harness-proxy` (when available):** For each `##` implementation group, dispatch `harness-proxy run --system-prompt agents/software-engineer.md "<group tasks and related scenarios>"`. The proxy handles isolated worktree provisioning, execution, commit, and auto-merge back into the active branch.
-  - **Without `harness-proxy` (fallback):** Optional group worktrees on `apply-<name>-<slug>`; orchestrator merges into `APPLY_REF`; merge gate (step 4) squash-merges to `ORIGINAL_BRANCH` before verify.
+- **`worktree`:** optional group worktrees on `apply-<name>-<slug>`; orchestrator merges into `APPLY_REF`; merge gate (step 4) squash-merges to `ORIGINAL_BRANCH` before verify.
 - **`remote`:** subagents on runner checkout; orchestrator commits on `FEATURE_BRANCH`.
 
 Documentation group: update files from proposal Impact and tasks. Changelog group: invoke **changelog-generator** with `ACTIVE_CHANGE_ROOT` as the change root.
