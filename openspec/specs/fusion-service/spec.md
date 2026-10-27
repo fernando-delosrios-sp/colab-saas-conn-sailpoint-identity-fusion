@@ -3,7 +3,9 @@
 ## Purpose
 
 The fusion service (`src/services/fusionService/`) is the orchestrator for the Fusion account model: it builds `FusionAccount` instances from managed sources and identity data, blends new managed accounts into existing Fusion accounts, and produces the `FusionReportAccount` / `FusionReportBlend` report records used by the connector's account and report operations. This spec defines the contract for how a managed account becomes a Fusion account, the blending semantics, and the report-side vocabulary that downstream operations consume.
+
 ## Requirements
+
 ### Requirement: Account Blending Terminology
 The system SHALL use the term "blending" to refer to the process of merging a managed account into a Fusion account.
 
@@ -1160,3 +1162,23 @@ When a Fusion account is seeded, `attributeBag.current` and `attributeBag.previo
 - **THEN** `attributeBag.current` MUST NOT contain `department`
 - **AND** `attributeBag.current` MUST NOT contain `notes`
 - **AND** `attributeBag.current` MUST contain `name: "Ada Wong"`
+
+### Requirement: Streaming Refresh Phase Processing
+
+FusionService SHALL process refreshed Fusion accounts directly from map iterables in concurrent batches without allocating an intermediate array of all accounts or accumulating a full results array, and SHALL incrementally delete each raw account from the fetch cache upon completing its processing when not in record mode.
+
+#### Scenario: Refresh processing consumes map iterables without full-array materialization
+
+- **GIVEN** a collection of raw Fusion accounts loaded in the source fetch cache
+- **WHEN** `FusionService.processFusionAccounts` executes during the Refresh phase
+- **THEN** it SHALL pull items in batches directly from the cache's values iterator
+- **AND** it SHALL NOT convert the full cache into an intermediate array
+- **AND** it SHALL track the count of completed accounts without accumulating an array of all results
+
+#### Scenario: Raw fusion account cache is depleted incrementally during refresh
+
+- **GIVEN** a raw Fusion account is being processed during the Refresh phase
+- **AND** record mode is not active
+- **WHEN** the account's corresponding `FusionAccount` is constructed and registered in `FusionRun`
+- **THEN** the raw account SHALL be deleted from the source service's fusion accounts cache immediately
+- **AND** raw and hydrated representations SHALL NOT coexist after processing completes
