@@ -46,6 +46,25 @@ describe('FusionAccount', () => {
         FusionAccount.configure(minimalConfig)
     })
 
+    describe('static managed source names', () => {
+        afterEach(() => {
+            FusionAccount.configure(minimalConfig)
+        })
+
+        it('precomputes a shared ReadonlySet and reuses it across instances', () => {
+            FusionAccount.configure(aliasConfig)
+
+            expect(FusionAccount.managedSourceNames).toEqual(new Set(['HR', 'CRM']))
+
+            const first = FusionAccount.createForFactory()
+            const second = FusionAccount.createForFactory()
+
+            expect((first.layers as any).sourceConfigNamesSet).toBe(FusionAccount.managedSourceNames)
+            expect((second.layers as any).sourceConfigNamesSet).toBe(FusionAccount.managedSourceNames)
+            expect((first.layers as any).sourceConfigNamesSet).toBe((second.layers as any).sourceConfigNamesSet)
+        })
+    })
+
     describe('1. Factory Methods', () => {
         it('fromIdentity initializes correctly', () => {
             const identity: IdentityDocument = {
@@ -144,6 +163,21 @@ describe('FusionAccount', () => {
 
             expect(acc.attributeBag.previous).not.toHaveProperty('department')
             expect(acc.attributeBag.previous).not.toHaveProperty('notes')
+            expect(acc.attributeBag.previous.name).toBe('Ada Wong')
+        })
+
+        it('seeds previous as a distinct frozen snapshot of the current bag', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-lean-snapshot',
+                sourceName: 'Identity Fusion NG',
+                attributes: { department: null, name: 'Ada Wong' },
+            } as Account)
+
+            expect(acc.attributeBag.previous).not.toBe(acc.attributeBag.current)
+            expect(acc.attributeBag.previous).toEqual({ name: 'Ada Wong' })
+
+            acc.attributes.name = 'Mutated Name'
+            expect(acc.attributeBag.current.name).toBe('Mutated Name')
             expect(acc.attributeBag.previous.name).toBe('Ada Wong')
         })
 

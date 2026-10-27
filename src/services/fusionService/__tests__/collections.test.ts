@@ -115,28 +115,77 @@ describe('collections utilities', () => {
     })
 
     describe('forEachBatched', () => {
-        it('should process an empty array', async () => {
+        it('should process an empty iterable and return zero', async () => {
             const fn = vi.fn()
-            await forEachBatched([], fn)
+            const onProgress = vi.fn()
+
+            const result = await forEachBatched([], fn, 2, onProgress)
+
+            expect(result).toBe(0)
             expect(fn).not.toHaveBeenCalled()
+            expect(onProgress).not.toHaveBeenCalled()
         })
 
         it('should process items smaller than batch size', async () => {
             const items = [1, 2, 3]
             const fn = vi.fn(async () => {})
 
-            await forEachBatched(items, fn, 5)
+            const result = await forEachBatched(items, fn, 5)
 
+            expect(result).toBe(3)
             expect(fn).toHaveBeenCalledTimes(3)
         })
 
-        it('should process items in multiple batches', async () => {
+        it('should process items in multiple batches and return the completion count', async () => {
             const items = [1, 2, 3, 4, 5]
             const fn = vi.fn(async () => {})
 
-            await forEachBatched(items, fn, 2)
+            const result = await forEachBatched(items, fn, 2)
 
+            expect(result).toBe(5)
             expect(fn).toHaveBeenCalledTimes(5)
+        })
+
+        it('should stream directly from a Map iterator without materializing an array', async () => {
+            const source = new Map<string, number>([
+                ['a', 1],
+                ['b', 2],
+                ['c', 3],
+            ])
+            const seen: number[] = []
+
+            const result = await forEachBatched(source.values(), async (value) => {
+                seen.push(value)
+            }, 2)
+
+            expect(result).toBe(3)
+            expect(seen).toEqual([1, 2, 3])
+        })
+
+        it('should report cumulative progress after each batch', async () => {
+            const items = [1, 2, 3, 4, 5]
+            const fn = vi.fn(async () => {})
+            const onProgress = vi.fn()
+
+            await forEachBatched(items, fn, 2, onProgress)
+
+            expect(onProgress).toHaveBeenCalledTimes(3)
+            expect(onProgress).toHaveBeenNthCalledWith(1, 2)
+            expect(onProgress).toHaveBeenNthCalledWith(2, 4)
+            expect(onProgress).toHaveBeenNthCalledWith(3, 5)
+        })
+
+        it('should propagate a rejection and stop processing later batches', async () => {
+            const items = [1, 2, 3, 4, 5]
+            const fn = vi.fn(async (item: number) => {
+                if (item === 3) throw new Error('boom')
+            })
+
+            await expect(forEachBatched(items, fn, 2)).rejects.toThrow('boom')
+            // The first batch (1, 2) completed and the second batch (3, 4) was started
+            // before the rejection surfaced; item 5 was never pulled from the iterator.
+            expect(fn).toHaveBeenCalledTimes(4)
+            expect(fn).not.toHaveBeenCalledWith(5)
         })
     })
 })

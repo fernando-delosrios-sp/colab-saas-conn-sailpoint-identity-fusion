@@ -29,6 +29,8 @@ export const IDENTITIES_SOURCE_NAME = 'Identities'
  */
 export class FusionAccount {
     private static config?: FusionConfig
+    /** Shared set of configured managed source names, precomputed once per run in {@link configure}. */
+    private static managedSourceNamesValue: ReadonlySet<string> = new Set()
 
     private keyValue?: SimpleKeyType
     private managedKeyValue?: string
@@ -60,7 +62,7 @@ export class FusionAccount {
         this.correlation = new FusionCorrelation(this.collections)
         this.layers = new FusionLayers(
             this.collections,
-            new Set(resolvedConfig.sources.map((sc) => sc.name)),
+            FusionAccount.managedSourceNames,
             resolvedConfig.fusionAccountRefreshThresholdInSeconds
         )
     }
@@ -71,6 +73,12 @@ export class FusionAccount {
 
     static configure(config: FusionConfig): void {
         FusionAccount.config = config
+        FusionAccount.managedSourceNamesValue = new Set(config.sources.map((sc) => sc.name))
+    }
+
+    /** Shared precomputed managed source names, reused across every FusionAccount instance. */
+    static get managedSourceNames(): ReadonlySet<string> {
+        return FusionAccount.managedSourceNamesValue
     }
 
     static buildIdentityInfo(source: Parameters<typeof buildIdentityInfo>[0]): ReturnType<typeof buildIdentityInfo> {
@@ -111,10 +119,12 @@ export class FusionAccount {
         if (seed.sourceName) this.sourceNameValue = seed.sourceName
         if (seed.isMachine === true) this.isMachine = true
         if (seed.attributeBagCurrent !== undefined) {
-            this.attributeBagValue.current = omitNullishAttributeKeys(seed.attributeBagCurrent)
-        }
-        if (seed.attributeBagPrevious !== undefined) {
-            this.attributeBagValue.previous = omitNullishAttributeKeys(seed.attributeBagPrevious)
+            // Single-pass nullish omission for the current bag; `previous` is a frozen
+            // prior-run snapshot cloned once so later Map/Define mutations to `current`
+            // do not corrupt the view read by `$previous` and existing-account checks.
+            const current = omitNullishAttributeKeys(seed.attributeBagCurrent)
+            this.attributeBagValue.current = current
+            this.attributeBagValue.previous = { ...current }
         }
     }
 
