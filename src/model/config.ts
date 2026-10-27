@@ -386,6 +386,11 @@ export interface DeveloperSettingsSection {
      * Disabled by default; when disabled, a later account overwrites the earlier one.
      */
     skipDuplicateFusionAccounts: boolean
+    /**
+     * Stream Fusion accounts to ISC as they are created and release them from memory
+     * before the uncorrelated match sweep. Disabled by default.
+     */
+    fusionDropAccountsAfterEmit?: boolean
 }
 
 /** External infrastructure settings: shared target, proxy mode, recording, and logging. */

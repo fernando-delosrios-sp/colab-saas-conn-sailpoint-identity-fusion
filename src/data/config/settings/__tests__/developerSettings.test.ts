@@ -132,6 +132,22 @@ describe('developerSettings readSettings', () => {
         expect(result.skipDuplicateFusionAccounts).toBe(true)
     })
 
+    it('defaults fusionDropAccountsAfterEmit to false when omitted', () => {
+        const raw = {}
+
+        const result = readSettings(raw)
+
+        expect(result.fusionDropAccountsAfterEmit).toBe(false)
+    })
+
+    it('normalizes string "true" to boolean true for fusionDropAccountsAfterEmit', () => {
+        const raw = { fusionDropAccountsAfterEmit: 'true' as unknown as boolean }
+
+        const result = readSettings(raw)
+
+        expect(result.fusionDropAccountsAfterEmit).toBe(true)
+    })
+
     it('normalizes string "true" to boolean true for forceAttributeRefresh', () => {
         const raw = { forceAttributeRefresh: 'true' as unknown as boolean }
 

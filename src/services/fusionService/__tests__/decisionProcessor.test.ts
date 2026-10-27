@@ -142,6 +142,65 @@ describe('DecisionProcessor', () => {
         expect(registerFusionAccount).toHaveBeenCalled()
     })
 
+    it('re-fetches an early-emitted target identity and assembles it with the automatic merge decision', async () => {
+        const cachedIdentity = {
+            id: 'identity-early',
+            name: 'Cached Name',
+            attributes: { email: 'cached@example.com' },
+        }
+        const fetchedIdentity = {
+            id: 'identity-early',
+            name: 'Fresh Name',
+            displayName: 'Fresh Display Name',
+            attributes: { email: 'fresh@example.com' },
+        }
+        const fetchIdentityById = vi.fn().mockResolvedValue(fetchedIdentity)
+        const assembleAccount = vi.fn().mockImplementation(async (account: FusionAccount) => {
+            expect(account.identityDisplayName).toBe('Fresh Display Name')
+            expect(account.managedKey).toBe('src-1::native-1')
+            account.setMappedAttributes({ ...account.attributes, assembled: 'yes' })
+        })
+        const decision = {
+            submitter: { id: 'system', email: '', name: 'System' },
+            account: {
+                id: 'src-1::native-1',
+                name: 'Managed Account',
+                sourceId: 'src-1',
+                sourceName: 'Source 1',
+                nativeIdentity: 'native-1',
+            },
+            newIdentity: false,
+            identityId: 'identity-early',
+            automaticMerge: true,
+            comments: 'Automatic merge',
+            finished: true,
+        }
+        run.markAccountEmitted('identity-early')
+        processor = new DecisionProcessor({ fusionDropAccountsAfterEmit: true } as FusionConfig, log, run, {
+            forms: { fetchFormData: vi.fn() } as any,
+            identities: {
+                getIdentityById: vi.fn().mockReturnValue(cachedIdentity),
+                fetchIdentityById,
+            } as any,
+            correlationManager: { applyPerSourceCorrelationIfNeeded: vi.fn().mockResolvedValue(undefined) } as any,
+            definitionService: {} as any,
+            mappingService: {} as any,
+            sources: { setMachineAccountOwnerIdentity: vi.fn().mockResolvedValue(undefined) } as any,
+            accountAssembly: {
+                assembleAccount,
+                registerFusionAccount: vi.fn(),
+                isAggregationAccountListMode: () => true,
+            } as any,
+        })
+
+        const updatedAccount = await processor.processFusionIdentityDecision(decision as any)
+
+        expect(fetchIdentityById).toHaveBeenCalledWith('identity-early')
+        expect(assembleAccount).toHaveBeenCalledWith(expect.any(FusionAccount), expect.any(Object))
+        expect(updatedAccount?.identityDisplayName).toBe('Fresh Display Name')
+        expect(updatedAccount?.attributes.assembled).toBe('yes')
+    })
+
     it('does not reprocess an authorized merge after the managed account left the work queue', async () => {
         const assembleAccount = vi.fn().mockResolvedValue(undefined)
         processor = new DecisionProcessor({} as FusionConfig, log, run, {

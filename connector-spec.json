@@ -1118,6 +1118,13 @@
                             "helpKey": "Keep the first Fusion account for an identity and skip later accounts with duplicate names."
                         },
                         {
+                            "key": "fusionDropAccountsAfterEmit",
+                            "label": "Drop Fusion accounts after emission?",
+                            "type": "toggle",
+                            "required": false,
+                            "helpKey": "Stream Fusion accounts to Identity Security Cloud as they are created and release them from memory before the uncorrelated match sweep."
+                        },
+                        {
                             "key": "managedAccountsBatchSize",
                             "label": "Managed accounts batch size",
                             "type": "number",

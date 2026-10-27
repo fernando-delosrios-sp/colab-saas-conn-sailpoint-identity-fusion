@@ -63,7 +63,7 @@ Preview locally: `npm run docs:serve` (see [docs/README.md](docs/README.md) for 
 
 Release history: [CHANGELOG.md](CHANGELOG.md) (mirrored on the [documentation site](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/CHANGELOG/) after `npm run docs:prepare`).
 
-Latest fix (2026-10-23): incremental unique-attribute counters now persist to the Fusion source across aggregations — see [CHANGELOG.md](CHANGELOG.md).
+Latest improvement (2026-10-27): drop Fusion accounts after emission reduces memory footprint during aggregation by streaming accounts early and decoupling match candidates — see [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

@@ -20,6 +20,8 @@ describe('accountListPhases step instrumentation', () => {
         }
 
         fusion.processRecordUniqueRegistration = vi.fn().mockResolvedValue({ registered: 0 })
+        fusion.emitEligibleAccounts = vi.fn().mockResolvedValue(0)
+        fusion.clearEmittedFusionAccounts = vi.fn()
         identities.hydrateMissingIdentitiesById = vi.fn().mockResolvedValue(undefined)
         registry.run.managedAccountsById.set('acct-1', { id: 'acct-1', sourceName: 'HR' } as any)
 
@@ -54,6 +56,45 @@ describe('accountListPhases step instrumentation', () => {
         await processPhase(registry, { isPersistent: false })
 
         expect(log.track).toHaveBeenCalledWith('FusionService.initializeManagedAccountProcessing')
+    })
+
+    it('streams and clears emitted accounts before the uncorrelated sweep when enabled', async () => {
+        const registry = createRegistry()
+        registry.config.fusionDropAccountsAfterEmit = true
+        const fusion = registry.fusion as any
+        const output = { key: { simple: { id: 'early-1' } }, attributes: {}, disabled: false }
+        fusion.emitEligibleAccounts.mockImplementation(async (send: (account: unknown) => Promise<void>) => {
+            await send(output)
+            return 1
+        })
+        const streamProgress = { sent: 0 }
+
+        await processPhase(registry, {
+            isPersistent: false,
+            streamProgress,
+            allowEarlyAccountEmission: true,
+        })
+
+        expect(registry.res.send).toHaveBeenCalledWith(output)
+        expect(streamProgress.sent).toBe(1)
+        expect(fusion.processCorrelatedManagedAccounts.mock.invocationCallOrder[0]).toBeLessThan(
+            fusion.emitEligibleAccounts.mock.invocationCallOrder[0]
+        )
+        expect(fusion.emitEligibleAccounts.mock.invocationCallOrder[0]).toBeLessThan(
+            fusion.clearEmittedFusionAccounts.mock.invocationCallOrder[0]
+        )
+        expect(fusion.clearEmittedFusionAccounts.mock.invocationCallOrder[0]).toBeLessThan(
+            fusion.processUncorrelatedManagedAccounts.mock.invocationCallOrder[0]
+        )
+    })
+
+    it('keeps early emission disabled by default', async () => {
+        const registry = createRegistry()
+
+        await processPhase(registry, { isPersistent: false, streamProgress: { sent: 0 } })
+
+        expect((registry.fusion as any).emitEligibleAccounts).not.toHaveBeenCalled()
+        expect((registry.fusion as any).clearEmittedFusionAccounts).not.toHaveBeenCalled()
     })
 
     it('processPhase logs form-reconcile with forms-created and instances-sent', async () => {

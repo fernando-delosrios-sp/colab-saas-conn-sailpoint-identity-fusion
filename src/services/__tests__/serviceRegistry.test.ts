@@ -3,6 +3,9 @@ import { ClientService } from '../clientService'
 import { DryRunApiAdapter } from '../clientService/dryRunApiAdapter'
 import { IscApiAdapter } from '../clientService/iscApiAdapter'
 import { FusionConfig } from '../../model/config'
+import { FusionAccount } from '../../model/account'
+import { AggregationTracker } from '../../model/aggregationTracker'
+import { MatchCandidateType } from '../matchingService/types'
 import { createTestRegistry } from '../../operations/__tests__/harness/testRegistry'
 
 vi.mock('../clientService/sdkApiAdapter', () => ({
@@ -45,6 +48,76 @@ describe('ServiceRegistry context overrides', () => {
         )
 
         expect(registry.reports).toBe(reportService)
+    })
+
+    it('streams and marks an auto-merged account emitted during early account emission', async () => {
+        const send = vi.fn()
+        const registry = new ServiceRegistry(
+            minimalConfig({
+                fusionDropAccountsAfterEmit: true,
+                fusionEnableAutoMerge: true,
+                fusionAutoMergeScore: 100,
+            }),
+            {} as any,
+            { send } as any,
+            'accountList'
+        )
+        registry.run.setTracker(new AggregationTracker())
+        const identity = FusionAccount.fromIdentity({
+            id: 'identity-early',
+            name: 'Early Identity',
+            attributes: {},
+        } as any)
+        registry.run.registerFusionAccount(identity)
+        registry.matching.buildTrigramIndex(registry.run.allFusionIdentities)
+        registry.run.markFusionAccountEmitted(identity)
+        registry.run.clearEmittedFusionAccounts()
+
+        const updatedAccount = FusionAccount.fromIdentity({
+            id: 'identity-early',
+            name: 'Early Identity',
+            attributes: { email: 'managed@example.com' },
+        } as any)
+        const output = { key: { simple: { id: 'identity-early' } }, attributes: {}, disabled: false }
+        vi.spyOn(registry.matching, 'scoreFusionAccount').mockImplementation(async (account, _pool, type) => {
+            if (type === MatchCandidateType.Identity) {
+                account.layers.addFusionMatch({
+                    identityId: 'identity-early',
+                    identityName: 'Early Identity',
+                    candidateType: 'identity',
+                    scores: [{ attribute: 'Combined score', algorithm: 'weighted-mean', score: 100, isMatch: true }],
+                })
+            }
+            return 1
+        })
+        vi.spyOn(registry.fusion.decisionProcessor, 'processFusionIdentityDecision').mockResolvedValue(updatedAccount)
+        vi.spyOn(registry.fusion, 'getISCAccount').mockResolvedValue(output as any)
+        registry.run.sourcesByName.set('Source A', {
+            id: 'source-a-id',
+            name: 'Source A',
+            isManaged: true,
+            sourceType: 'authoritative',
+            config: {},
+        } as any)
+
+        await registry.matchOutcomeDispatcher.runMatchSweep(
+            [
+                {
+                    id: 'managed-1',
+                    name: 'Managed Account',
+                    sourceId: 'source-a-id',
+                    sourceName: 'Source A',
+                    nativeIdentity: 'native-1',
+                    attributes: {},
+                    uncorrelated: true,
+                } as any,
+            ],
+            1
+        )
+
+        expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(updatedAccount, true)
+        expect(send).toHaveBeenCalledWith(output)
+        expect(registry.run.isAccountEmitted('identity-early')).toBe(true)
     })
 })
 
@@ -110,5 +183,4 @@ describe('ServiceRegistry.activateDryRunMode', () => {
         expect(inner.accountsApi.updateAccount).not.toHaveBeenCalled()
     })
 })
-
 

@@ -196,17 +196,24 @@ export class DecisionProcessor {
 
         // Enrich submitter and selected identity display names for user-facing output.
         await this.enrichDecisionSubmitter(fusionDecision)
-        let selectedIdentity = await this.enrichDecisionIdentityName(fusionDecision)
-
         const existingIdentityAccount =
             isAuthorizedDecision && fusionDecision.identityId
                 ? this.resolveAuthorizedMergeTarget(fusionDecision.identityId)
                 : undefined
+        const rebuildDroppedIdentity =
+            this.config.fusionDropAccountsAfterEmit &&
+            isAuthorizedDecision &&
+            Boolean(fusionDecision.identityId) &&
+            !existingIdentityAccount
+        let selectedIdentity = await this.enrichDecisionIdentityName(fusionDecision, rebuildDroppedIdentity)
         const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
 
         if (isAuthorizedDecision && fusionDecision.identityId) {
             if (!selectedIdentity) {
-                selectedIdentity = await this.resolveIdentityBestEffort(fusionDecision.identityId)
+                selectedIdentity = await this.resolveIdentityBestEffort(
+                    fusionDecision.identityId,
+                    rebuildDroppedIdentity
+                )
             }
             if (selectedIdentity) {
                 fusionAccount.addIdentityLayer(selectedIdentity)
@@ -309,7 +316,10 @@ export class DecisionProcessor {
      * Returns the resolved identity document (if any) so the caller can reuse it
      * for the identity layer without a second lookup.
      */
-    private async enrichDecisionIdentityName(decision: FusionDecision): Promise<IdentityDocument | undefined> {
+    private async enrichDecisionIdentityName(
+        decision: FusionDecision,
+        forceFetch = false
+    ): Promise<IdentityDocument | undefined> {
         const identityId = trimStr(decision.identityId)
         if (!identityId) return undefined
 
@@ -317,7 +327,7 @@ export class DecisionProcessor {
         if (currentName && currentName !== identityId) return undefined
 
         try {
-            const identity = await this.resolveIdentityBestEffort(identityId)
+            const identity = await this.resolveIdentityBestEffort(identityId, forceFetch)
             const label =
                 identity?.displayName || (identity as any)?.attributes?.displayName || identity?.name
             if (label && label !== identityId) {
@@ -352,11 +362,17 @@ export class DecisionProcessor {
     }
 
     /**
-     * Resolve an identity by ID: returns the cached document if available, otherwise
-     * makes a live API call only during aggregation (non-aggregation modes are read-only).
+     * Resolve an identity by ID, bypassing cache when rebuilding a missing target in early-emission mode.
+     * Otherwise, make a live API call only during aggregation (non-aggregation modes are read-only).
      */
-    private async resolveIdentityBestEffort(identityId: string): Promise<IdentityDocument | undefined> {
+    private async resolveIdentityBestEffort(
+        identityId: string,
+        forceFetch = false
+    ): Promise<IdentityDocument | undefined> {
         try {
+            if (forceFetch && this.deps.accountAssembly.isAggregationAccountListMode()) {
+                return await this.deps.identities.fetchIdentityById(identityId)
+            }
             const cached = this.deps.identities.getIdentityById(identityId)
             if (cached) return cached
             return this.deps.accountAssembly.isAggregationAccountListMode() ? this.deps.identities.fetchIdentityById(identityId) : undefined
@@ -365,4 +381,3 @@ export class DecisionProcessor {
         }
     }
 }
-

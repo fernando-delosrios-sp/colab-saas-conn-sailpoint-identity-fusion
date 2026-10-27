@@ -1,5 +1,6 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount, FusionAccountKind } from './account'
+import { MatchCandidateRecord } from './matchCandidateRecord'
 import { SourceInfo } from '../services/sourceService'
 import { FusionDecision } from './form'
 import { AggregationTracker } from './aggregationTracker'
@@ -95,6 +96,7 @@ export class FusionRun {
     private readonly claimedAccountRetention = new Map<string, Account>()
     private readonly fusionAccountMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityMapValue = new Map<string, FusionAccount>()
+    private readonly emittedAccountKeys = new Set<string>()
     private readonly fusionIdentityOwnerIdByManagedKey = new Map<string, string>()
     private readonly identityMapValue = new Map<string, IdentityDocument>()
     /** Non-protected identity IDs loaded from ISC during this run (survives cache clears). */
@@ -127,11 +129,11 @@ export class FusionRun {
     private managedAccountProcessingBatchSizeValue: number = 0
     trigramIndexByAttribute: Map<string, Map<string, Set<FusionAccount>>> = new Map()
     /** Compact-id roster for Binary/LIG3 blocking indexes (index = compact identity id). */
-    blockingIdentityRoster: FusionAccount[] = []
+    blockingIdentityRoster: MatchCandidateRecord[] = []
     binaryIndexByAttribute: Map<string, Map<string, number[]>> = new Map()
     lig3LengthIndexByAttribute: Map<string, Map<number, number[]>> = new Map()
-    normalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
-    nameNormalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
+    normalizedCache: WeakMap<MatchCandidateRecord | FusionAccount, Map<string, string>> = new WeakMap()
+    nameNormalizedCache: WeakMap<MatchCandidateRecord | FusionAccount, Map<string, string>> = new WeakMap()
     /** Run-scoped name-matcher token arrays keyed by already-normalized name string. */
     nameMatcherTokenCache: Map<string, string[]> = new Map()
     /** Run-scoped Double Metaphone codes keyed by name-matcher token. */
@@ -628,6 +630,52 @@ export class FusionRun {
 
     markAutoMerged(identityId: string): void {
         this.autoMergedIdentityIdsValue.add(identityId)
+    }
+
+    markAccountEmitted(key: string): void {
+        if (key) this.emittedAccountKeys.add(key)
+    }
+
+    isAccountEmitted(key: string | undefined): boolean {
+        return key !== undefined && this.emittedAccountKeys.has(key)
+    }
+
+    markFusionAccountEmitted(account: FusionAccount, outputKey?: string): void {
+        this.markAccountEmitted(account.identityId ?? '')
+        this.markAccountEmitted(account.managedKey ?? '')
+        this.markAccountEmitted(account.key?.simple?.id ?? '')
+        this.markAccountEmitted(outputKey ?? '')
+    }
+
+    isFusionAccountEmitted(account: FusionAccount): boolean {
+        return (
+            this.isAccountEmitted(account.identityId) ||
+            this.isAccountEmitted(account.managedKey) ||
+            this.isAccountEmitted(account.key?.simple?.id)
+        )
+    }
+
+    /** Drop emitted Fusion accounts while preserving their compact match candidate records. */
+    clearEmittedFusionAccounts(): number {
+        let cleared = 0
+        const emittedIdentityIds = new Set<string>()
+        for (const [key, account] of this.fusionAccountMapValue) {
+            if (!this.isFusionAccountEmitted(account) && !this.isAccountEmitted(key)) continue
+            this.fusionAccountMapValue.delete(key)
+            cleared++
+        }
+        for (const [identityId, account] of this.fusionIdentityMapValue) {
+            if (!this.isFusionAccountEmitted(account) && !this.isAccountEmitted(identityId)) continue
+            this.fusionIdentityMapValue.delete(identityId)
+            emittedIdentityIds.add(identityId)
+            cleared++
+        }
+        if (emittedIdentityIds.size > 0) {
+            for (const [managedKey, identityId] of this.fusionIdentityOwnerIdByManagedKey) {
+                if (emittedIdentityIds.has(identityId)) this.fusionIdentityOwnerIdByManagedKey.delete(managedKey)
+            }
+        }
+        return cleared
     }
 
     isAutoMerged(identityId: string): boolean {
