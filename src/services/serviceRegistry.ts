@@ -30,6 +30,7 @@ import { ReportService } from './reportService'
 import { RecordingService } from './recordingService'
 import { FusionRun } from '../model/fusionRun'
 import { internalConfig } from '../data/config'
+import { sendWithBackpressure } from '../utils/responseBackpressure'
 
 /**
  * Central dependency injection container for all connector services.
@@ -204,6 +205,16 @@ export class ServiceRegistry {
             accountAssembly: this.fusion.accountAssembly,
             forms: this.forms,
             decisionProcessor: this.fusion.decisionProcessor,
+            emitUpdatedAccount: async (account) => {
+                const output = await this.fusion.getISCAccount(account, true)
+                if (!output) return
+                await sendWithBackpressure(this.res, output)
+                const outputKey =
+                    typeof output.key === 'object' && output.key !== null && 'simple' in output.key
+                        ? output.key.simple.id
+                        : undefined
+                this.run.markFusionAccountEmitted(account, outputKey)
+            },
             commandType,
         })
         this.fusion.matchOutcomeDispatcher = this.matchOutcomeDispatcher

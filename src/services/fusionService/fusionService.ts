@@ -1135,11 +1135,53 @@ export class FusionService {
             const output = outputBatch[j]
             if (output) {
                 await send(output)
+                const outputKey =
+                    typeof output.key === 'object' && output.key !== null && 'simple' in output.key
+                        ? output.key.simple.id
+                        : undefined
+                this.run.markFusionAccountEmitted(batch[j], outputKey)
                 sent++
             }
             this.run.removeFusionAccount(batch[j])
         }
         return sent
+    }
+
+    /** Stream accounts assembled before the uncorrelated sweep, retaining only their candidate projections. */
+    public async emitEligibleAccounts(send: (account: StdAccountListOutput) => Promise<void>): Promise<number> {
+        let sent = 0
+        let processed = 0
+        const yieldEvery = Math.max(1, getFusionParallelBatchSize(this.config))
+        const emit = async (account: FusionAccount): Promise<void> => {
+            processed++
+            if (processed % yieldEvery === 0) await yieldToEventLoop()
+            if (this.run.isFusionAccountEmitted(account)) return
+            if (this.deleteEmpty && account.collections.statuses.isOrphan()) return
+
+            const output = await this.getISCAccount(account, false)
+            if (!output) return
+
+            await send(output)
+            const outputKey =
+                typeof output.key === 'object' && output.key !== null && 'simple' in output.key
+                    ? output.key.simple.id
+                    : undefined
+            this.run.markFusionAccountEmitted(account, outputKey)
+            sent++
+        }
+
+        for (const account of this.run.fusionAccountsIterable()) {
+            await emit(account)
+        }
+        for (const account of this.run.allFusionIdentities) {
+            await emit(account)
+        }
+        return sent
+    }
+
+    /** Remove emitted FusionAccount objects before the uncorrelated match sweep. */
+    public clearEmittedFusionAccounts(): number {
+        return this.run.clearEmittedFusionAccounts()
     }
 
     /**
@@ -1159,8 +1201,10 @@ export class FusionService {
 
         const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
         const eligibleAccounts = this.deleteEmpty
-            ? allAccounts.filter((account) => !account.collections.statuses.isOrphan())
-            : allAccounts
+            ? allAccounts.filter(
+                  (account) => !this.run.isFusionAccountEmitted(account) && !account.collections.statuses.isOrphan()
+              )
+            : allAccounts.filter((account) => !this.run.isFusionAccountEmitted(account))
 
         const totalEligible = eligibleAccounts.length
         const totalBatches = Math.ceil(totalEligible / batchSize)

@@ -1,5 +1,6 @@
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
+import { createMatchCandidateRecord, MatchCandidateRecord } from '../../model/matchCandidateRecord'
 import { assert } from '../../utils/assert'
 import {
     MatchingConfig,
@@ -188,6 +189,7 @@ export class MatchingService {
     private readonly fusionManualReviewScore: number
     private readonly fusionMaxIdentityMatchCandidates: number
     private readonly fusionScoreMap: Map<string, number>
+    private readonly candidateAttributes: Set<string>
     /** Reused per identity comparison so pass reconstruction does not allocate a new array each time. */
     private readonly ruleNumericScratch: RuleScoreNumeric[] = []
 
@@ -205,6 +207,10 @@ export class MatchingService {
         this.fusionManualReviewScore = config.fusionManualReviewScore ?? 0
         this.fusionMaxIdentityMatchCandidates = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
         this.fusionScoreMap = config.fusionScoreMap ?? new Map()
+        this.candidateAttributes = new Set([
+            ...(config.matchingConfigs ?? []).map(({ attribute }) => attribute),
+            ...(config.fusionFormAttributes ?? []),
+        ])
     }
 
     /**
@@ -233,7 +239,7 @@ export class MatchingService {
      * Cache is keyed by (FusionAccount, attributeName) so each (identity, attribute) pair is normalized once
      * regardless of how many managed accounts are scored against it.
      */
-    private getNormalized(account: FusionAccount, attrName: string, rawValue: string): string {
+    private getNormalized(account: MatchCandidateRecord | FusionAccount, attrName: string, rawValue: string): string {
         if (!this.run) return normalizeLIG3(rawValue)
         let byAttr = this.run.normalizedCache.get(account)
         if (!byAttr) {
@@ -249,7 +255,7 @@ export class MatchingService {
     }
 
     /** Return the name-normalized form of `rawValue` for `account`, computing and caching on first access. */
-    private getNameNormalized(account: FusionAccount, attrName: string, rawValue: string): string {
+    private getNameNormalized(account: MatchCandidateRecord | FusionAccount, attrName: string, rawValue: string): string {
         if (!this.run) return normalizeNameForMatcher(rawValue)
         let byAttr = this.run.nameNormalizedCache.get(account)
         if (!byAttr) {
@@ -292,9 +298,9 @@ export class MatchingService {
      * positive-threshold rules with recall-safe blockers contribute: Binary exact values and LIG3 length bounds.
      * Algorithms without a proven blocker do not filter candidates.
      *
-     * @param identities - All Fusion identities to index
+     * @param identities - All candidate identities to index (Match Candidate Records or Fusion identities)
      */
-    public buildTrigramIndex(identities: Iterable<FusionAccount>): void {
+    public buildTrigramIndex(identities: Iterable<MatchCandidateRecord | FusionAccount>): void {
         if (!this.run) return
         this.run.trigramIndexByAttribute.clear()
         this.run.binaryIndexByAttribute.clear()
@@ -302,6 +308,22 @@ export class MatchingService {
         this.run.blockingIdentityRoster = []
         this.run.indexedMandatoryAttributes = []
         this.run.trigramIndexBuilt = false
+
+        const identityArray = Array.from(identities, (identity) => {
+            if (!(identity instanceof FusionAccount)) return identity
+            const identityId = identity.identityId
+            if (!identityId) return undefined
+
+            const attributes: Record<string, string> = {}
+            for (const attribute of this.candidateAttributes) {
+                const value = identity.attributes[attribute]
+                if (value !== undefined && value !== null) {
+                    attributes[attribute] = String(value)
+                }
+            }
+            return createMatchCandidateRecord(identityId, identity.displayName ?? identity.name ?? '', attributes)
+        }).filter((identity): identity is MatchCandidateRecord => identity !== undefined)
+        this.run.blockingIdentityRoster = identityArray
 
         const indexableMandatory = this.matchingConfigs.filter(
             (config) =>
@@ -311,8 +333,6 @@ export class MatchingService {
         )
         if (indexableMandatory.length === 0) return
 
-        const identityArray = Array.from(identities)
-        this.run.blockingIdentityRoster = identityArray
         for (const config of indexableMandatory) {
             if (config.algorithm === 'binary') {
                 this.run.binaryIndexByAttribute.set(
@@ -348,7 +368,7 @@ export class MatchingService {
         account: FusionAccount,
         log?: LogService,
         excludeIds?: ReadonlySet<string>
-    ): Set<FusionAccount> | undefined {
+    ): Set<MatchCandidateRecord | FusionAccount> | undefined {
         if (!this.run) return undefined
         if (!this.run.trigramIndexBuilt || this.run.indexedMandatoryAttributes.length === 0) {
             this.run.fullScanFallbackCount += 1
@@ -413,13 +433,13 @@ export class MatchingService {
      * Yields periodically so heavy Match scoring does not block the Node event loop.
      *
      * @param fusionAccount - The account to score (typically a provisional Fusion account)
-     * @param fusionIdentities - The set of existing fusion identities to compare against
+     * @param fusionIdentities - The candidate identities to compare against (Match Candidate Records or Fusion accounts)
      * @param maxIdentityMatches - Identity-origin retention cap applied after scoring the whole pool.
      *   Deferred scoring is uncapped.
      */
     public async scoreFusionAccount(
         fusionAccount: FusionAccount,
-        fusionIdentities: Iterable<FusionAccount>,
+        fusionIdentities: Iterable<MatchCandidateRecord | FusionAccount>,
         candidateType: MatchCandidateType = MatchCandidateType.Identity,
         maxIdentityMatches?: number
     ): Promise<number> {
@@ -475,8 +495,10 @@ export class MatchingService {
      * Deferred candidate matching compares a managed account against current-run non-matched deferred candidates.
      * Guard against accidental self-comparison to prevent a perfect self-match.
      */
-    private isSameDeferredCandidate(fusionAccount: FusionAccount, fusionIdentity: FusionAccount): boolean {
+    private isSameDeferredCandidate(fusionAccount: FusionAccount, fusionIdentity: MatchCandidateRecord | FusionAccount): boolean {
         if (fusionAccount === fusionIdentity) return true
+        // Match Candidate Records carry no managed account keys, so they cannot be the same deferred candidate.
+        if (!('layers' in fusionIdentity)) return false
 
         const managedAccountId = fusionAccount.managedAccountId
         if (!managedAccountId) {
@@ -530,11 +552,11 @@ export class MatchingService {
      * Deferred candidates always build a full ScoreReport[] breakdown.
      *
      * @param fusionAccount - The candidate account being evaluated
-     * @param fusionIdentity - The existing identity to compare against
+     * @param fusionIdentity - The candidate identity to compare against (attributes read from `fusionIdentity.attributes`)
      */
     private compareFusionAccounts(
         fusionAccount: FusionAccount,
-        fusionIdentity: FusionAccount,
+        fusionIdentity: MatchCandidateRecord | FusionAccount,
         candidateType: MatchCandidateType,
         useFullBreakdown: boolean
     ): void {
@@ -648,14 +670,18 @@ export class MatchingService {
 
     private storeThresholdPassingMatch(
         fusionAccount: FusionAccount,
-        fusionIdentity: FusionAccount,
+        fusionIdentity: MatchCandidateRecord | FusionAccount,
         candidateType: MatchCandidateType,
         scores: ScoreReport[]
     ): void {
+        const isFusionAccount = 'layers' in fusionIdentity
         fusionAccount.layers.addFusionMatch({
-            fusionIdentity,
+            fusionIdentity: isFusionAccount ? fusionIdentity : undefined,
             identityId: fusionIdentity.identityId ?? '',
-            identityName: this.getIdentityDisplayLabel(fusionIdentity),
+            identityName: isFusionAccount
+                ? this.getIdentityDisplayLabel(fusionIdentity)
+                : trimStr(fusionIdentity.identityName) || fusionIdentity.identityId || 'Unknown',
+            attributes: fusionIdentity.attributes,
             candidateType,
             scores,
         })
@@ -663,7 +689,7 @@ export class MatchingService {
 
     private evaluateCombinedScoreRuleAtIndex(
         fusionAccount: FusionAccount,
-        fusionIdentity: FusionAccount,
+        fusionIdentity: MatchCandidateRecord | FusionAccount,
         ruleIndex: number,
         weightedSum: number,
         weightTotal: number
@@ -763,7 +789,7 @@ export class MatchingService {
      * Fast-path combined score evaluation without allocating score breakdown arrays.
      * On pass, `ruleNumericScratch` holds one numeric result per configured rule.
      */
-    private evaluateCombinedScorePass(fusionAccount: FusionAccount, fusionIdentity: FusionAccount): boolean {
+    private evaluateCombinedScorePass(fusionAccount: FusionAccount, fusionIdentity: MatchCandidateRecord | FusionAccount): boolean {
         this.ruleNumericScratch.length = 0
         let hasFailedMandatory = false
         let weightedSum = 0
@@ -802,7 +828,7 @@ export class MatchingService {
      */
     private scoreRulePair(
         fusionAccount: FusionAccount,
-        fusionIdentity: FusionAccount,
+        fusionIdentity: MatchCandidateRecord | FusionAccount,
         matching: MatchingConfig,
         accountAttribute: unknown,
         identityAttribute: unknown
@@ -826,7 +852,7 @@ export class MatchingService {
      */
     private evaluateRuleTotals(
         fusionAccount: FusionAccount,
-        fusionIdentity: FusionAccount,
+        fusionIdentity: MatchCandidateRecord | FusionAccount,
         matching: MatchingConfig,
         accountAttribute: unknown,
         identityAttribute: unknown
@@ -847,7 +873,7 @@ export class MatchingService {
     /** Shared algorithm dispatch for the deferred (full breakdown) comparison path. */
     private dispatchRuleScore(
         fusionAccount: FusionAccount,
-        fusionIdentity: FusionAccount,
+        fusionIdentity: MatchCandidateRecord | FusionAccount,
         matching: MatchingConfig,
         accountAttribute: unknown,
         identityAttribute: unknown
@@ -890,7 +916,7 @@ export class MatchingService {
     /** Numeric algorithm dispatch for the identity fast path. */
     private dispatchRuleScoreNumeric(
         fusionAccount: FusionAccount,
-        fusionIdentity: FusionAccount,
+        fusionIdentity: MatchCandidateRecord | FusionAccount,
         matching: MatchingConfig,
         accountAttribute: unknown,
         identityAttribute: unknown
@@ -937,7 +963,7 @@ export class MatchingService {
     /** LIG3 length-ratio upper bound check without allocating a skip ScoreReport. */
     private isLig3UpperBoundUnreachable(
         fusionAccount: FusionAccount,
-        fusionIdentity: FusionAccount,
+        fusionIdentity: MatchCandidateRecord | FusionAccount,
         matching: MatchingConfig,
         accountAttribute: unknown,
         identityAttribute: unknown
@@ -955,7 +981,7 @@ export class MatchingService {
     /** Normalization cache + delegate to {@link lig3UpperBoundSkipIfUnreachable}. */
     private lig3UpperBoundSkipForPair(
         fusionAccount: FusionAccount,
-        fusionIdentity: FusionAccount,
+        fusionIdentity: MatchCandidateRecord | FusionAccount,
         matching: MatchingConfig,
         accountAttribute: unknown,
         identityAttribute: unknown

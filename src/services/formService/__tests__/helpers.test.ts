@@ -10,6 +10,7 @@ import {
 import { countIdentityCandidateFusionMatches } from '../../matchingService/matchingHelpers'
 import { MatchCandidateType } from '../../matchingService/types'
 import { SourceType } from '../../../model/config'
+import { createMatchCandidateRecord } from '../../../model/matchCandidateRecord'
 
 describe('formService helpers', () => {
     describe('countIdentityCandidateFusionMatches', () => {
@@ -250,6 +251,51 @@ describe('formService helpers', () => {
             const fusionAccount = { fusionMatches: [] } as any
             expect(() => buildCandidateList(fusionAccount, 0)).toThrow()
             expect(() => buildCandidateList(fusionAccount, 20)).toThrow()
+        })
+
+        it('builds candidates from Match Candidate Record attributes without fusionIdentity', () => {
+            const record = createMatchCandidateRecord('id-1', 'Jane Doe', { department: 'IT' })
+            const fusionAccount = {
+                fusionMatches: [
+                    {
+                        identityId: record.identityId,
+                        identityName: record.identityName,
+                        attributes: record.attributes,
+                        scores: [{ attribute: 'Combined score', score: 90 }],
+                    },
+                ],
+            } as any
+
+            const candidates = buildCandidateList(fusionAccount, 1)
+            expect(candidates[0]).toEqual({
+                id: 'id-1',
+                name: 'Jane Doe',
+                attributes: { department: 'IT' },
+                scores: [{ attribute: 'Combined score', score: 90 }],
+            })
+        })
+
+        it('prefers Match Candidate Record attributes.displayName for the candidate name', () => {
+            const fusionAccount = {
+                fusionMatches: [
+                    {
+                        identityId: 'id-1',
+                        identityName: 'Stale Name',
+                        attributes: { displayName: 'Jane Doe' },
+                        scores: [{ attribute: 'Combined score', score: 90 }],
+                    },
+                ],
+            } as any
+
+            expect(buildCandidateList(fusionAccount, 1)[0].name).toBe('Jane Doe')
+        })
+
+        it('throws when a match has neither candidate attributes nor fusionIdentity', () => {
+            const fusionAccount = {
+                fusionMatches: [{ identityId: 'id-1', identityName: 'Jane', scores: [] }],
+            } as any
+
+            expect(() => buildCandidateList(fusionAccount, 1)).toThrow()
         })
 
         it('should map matches to Candidate objects correctly', () => {

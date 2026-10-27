@@ -19,6 +19,7 @@ export interface PhaseOptions {
     isPersistent: boolean
     tracker?: AggregationTracker
     streamProgress?: { sent: number }
+    allowEarlyAccountEmission?: boolean
 }
 
 // --- Private helpers ---
@@ -225,7 +226,7 @@ export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<vo
 
 // --- Phase 4: Process ---
 
-export async function processPhase(serviceRegistry: ServiceRegistry, _options: PhaseOptions): Promise<void> {
+export async function processPhase(serviceRegistry: ServiceRegistry, options: PhaseOptions): Promise<void> {
     const { log, fusion, identities, sources, forms } = serviceRegistry
 
     await log.runStep('process-identities', () => fusion.processIdentities(), {
@@ -274,6 +275,24 @@ export async function processPhase(serviceRegistry: ServiceRegistry, _options: P
         trackDone: (result) => ({ registered: result.registered }),
         endDetail: (result) => ({ registered: result.registered }),
     })
+
+    if (options.allowEarlyAccountEmission && serviceRegistry.config.fusionDropAccountsAfterEmit && serviceRegistry.res) {
+        const sent = await log.runStep(
+            'early-account-emission',
+            () =>
+                fusion.emitEligibleAccounts(async (account) => {
+                    await sendWithBackpressure(serviceRegistry.res, account)
+                    if (options.streamProgress) options.streamProgress.sent++
+                }),
+            {
+                track: 'FusionService.emitEligibleAccounts',
+                trackDone: (count) => ({ sent: count }),
+                endDetail: (count) => ({ sent: count }),
+            }
+        )
+        const cleared = fusion.clearEmittedFusionAccounts()
+        log.detail({ action: 'emitted fusion accounts cleared before match sweep', sent, cleared })
+    }
 
     const uncorrelatedCount = sources.run.managedAccountsById.size
     await log.runStep('uncorrelated-sweep', () => fusion.processUncorrelatedManagedAccounts(), {
@@ -363,14 +382,21 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
             }, true),
         {
             track: 'outputPhase.sendAccounts',
-            trackDone: (result) => ({ sent: result.sent, eligible: result.eligible }),
-            endDetail: (result) => ({ sent: result.sent, eligible: result.eligible }),
+            trackDone: (result) => ({
+                sent: options.streamProgress?.sent ?? result.sent,
+                eligible: result.eligible + (options.streamProgress?.sent ?? 0) - result.sent,
+            }),
+            endDetail: (result) => ({
+                sent: options.streamProgress?.sent ?? result.sent,
+                eligible: result.eligible + (options.streamProgress?.sent ?? 0) - result.sent,
+            }),
         }
     )
-    log.detail({ sent, action: 'accounts sent to platform' })
+    const totalSent = options.streamProgress?.sent ?? sent
+    log.detail({ sent: totalSent, action: 'accounts sent to platform' })
 
     if (!isPersistent) {
-        return sent
+        return totalSent
     }
 
     await log.runStep('form-cleanup', () => forms.cleanUpForms(), {
@@ -394,7 +420,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
 
     await log.runStep('await-form-deletes', () => forms.awaitPendingDeleteOperations())
     log.detail({ action: 'queued form deletions completed' })
-    return sent
+    return totalSent
 }
 
 // --- Epilogue ---

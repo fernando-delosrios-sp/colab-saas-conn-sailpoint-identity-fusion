@@ -110,6 +110,23 @@ describe('FusionRun', () => {
         expect(run.isAutoMerged('id-3')).toBe(false)
     })
 
+    it('drops emitted Fusion identities while retaining non-emitted accounts', () => {
+        FusionAccount.configure({ sources: [] } as any)
+        const run = new FusionRun()
+        const emitted = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Emitted', attributes: {} } as any)
+        const retained = FusionAccount.fromIdentity({ id: 'identity-2', name: 'Retained', attributes: {} } as any)
+        run.registerFusionAccount(emitted)
+        run.registerFusionAccount(retained)
+
+        run.markFusionAccountEmitted(emitted, 'native-1')
+
+        expect(run.isAccountEmitted('native-1')).toBe(true)
+        expect(run.isFusionAccountEmitted(emitted)).toBe(true)
+        expect(run.clearEmittedFusionAccounts()).toBe(1)
+        expect(run.getFusionIdentity('identity-1')).toBeUndefined()
+        expect(run.getFusionIdentity('identity-2')).toBe(retained)
+    })
+
     describe('simulated recording time', () => {
         it('setSimulatedTime, clearSimulatedTime, and currentTimeMs use ISO and epoch inputs', () => {
             const run = new FusionRun()

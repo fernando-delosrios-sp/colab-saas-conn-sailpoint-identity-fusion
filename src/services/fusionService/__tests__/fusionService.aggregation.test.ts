@@ -2822,6 +2822,48 @@ describe('FusionService — aggregation', () => {
     })
 
     describe('forEachISCAccount performance behavior', () => {
+        it('streams early accounts once and sends only match-sweep accounts in Phase 5', async () => {
+            const identity = FusionAccount.fromIdentity({
+                id: 'identity-early',
+                name: 'Early Identity',
+                attributes: {},
+            } as IdentityDocument)
+            ctx.fusionService.setFusionAccount(identity)
+            vi.spyOn(ctx.fusionService, 'getISCAccount').mockImplementation(async (account) => ({
+                key: { simple: { id: account.identityId ?? account.managedKey ?? '' } },
+                attributes: {},
+                disabled: false,
+            }))
+
+            const earlyOutputs: unknown[] = []
+            expect(await ctx.fusionService.emitEligibleAccounts(async (output) => {
+                earlyOutputs.push(output)
+            })).toBe(1)
+            expect(await ctx.fusionService.forEachISCAccount(() => undefined)).toEqual({ sent: 0, eligible: 0 })
+            expect(ctx.fusionService.clearEmittedFusionAccounts()).toBe(1)
+
+            const matchedDuringSweep = FusionAccount.fromManagedAccount({
+                id: 'managed-new',
+                name: 'New Account',
+                sourceId: 'src-1',
+                nativeIdentity: 'managed-new',
+                sourceName: 'Source 1',
+                attributes: {},
+            } as Account)
+            ctx.fusionService.setFusionAccount(matchedDuringSweep)
+            const phaseFiveOutputs: unknown[] = []
+
+            const result = await ctx.fusionService.forEachISCAccount((output) => {
+                phaseFiveOutputs.push(output)
+            })
+
+            expect(earlyOutputs).toHaveLength(1)
+            expect(phaseFiveOutputs).toHaveLength(1)
+            expect(result.sent).toBe(1)
+            expect(result.eligible).toBe(1)
+            expect(phaseFiveOutputs[0]).toMatchObject({ key: { simple: { id: 'src-1::managed-new' } } })
+        })
+
         it('uses bounded concurrency while preserving output order', async () => {
             const sentKeys: string[] = []
             const accounts = Array.from({ length: 28 }, (_, i) =>

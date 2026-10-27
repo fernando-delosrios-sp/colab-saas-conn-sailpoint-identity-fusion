@@ -121,6 +121,32 @@ describe('fusionReportHelpers', () => {
             })
         })
 
+        it('should map Match Candidate Record matches to accountId and accountName', () => {
+            const match = {
+                identityId: 'id3',
+                identityName: 'Record Name',
+                attributes: { displayName: 'Attr Name' },
+                scores: [],
+            } as any
+            expect(fusionReportMatchCandidateAccountFields(match)).toEqual({
+                accountId: 'id3',
+                accountName: 'Record Name',
+            })
+        })
+
+        it('should fall back to attributes.displayName when identityName is blank and no fusionIdentity', () => {
+            const match = {
+                identityId: 'id4',
+                identityName: '  ',
+                attributes: { displayName: ' Attr Name ' },
+                scores: [],
+            } as any
+            expect(fusionReportMatchCandidateAccountFields(match)).toEqual({
+                accountId: 'id4',
+                accountName: 'Attr Name',
+            })
+        })
+
         it('should return undefined accountId if match.identityId is missing and no fusionIdentity', () => {
             const match = {
                 identityName: 'Match Name',

@@ -1,5 +1,6 @@
 import { FusionAccount } from '../../../model/account'
-import { COMBINED_SCORE_ROW_ATTRIBUTE } from '../../matchingService/matchingService'
+import { COMBINED_SCORE_ROW_ATTRIBUTE, MatchingService } from '../../matchingService/matchingService'
+import { createMatchCandidateRecord } from '../../../model/matchCandidateRecord'
 import { createUrlContext } from '../../../utils/url'
 import { buildFusionReport, FusionReportState } from '../fusionReportBuilder'
 
@@ -121,6 +122,40 @@ describe('buildFusionReport', () => {
         expect(report.accounts[0].matches).toHaveLength(1)
         expect(report.accounts[0].matches[0].candidateType).toBe('identity')
         expect(report.accounts[0].matches[0].identityId).toBe('isc-alexia')
+    })
+
+    it('maps report candidate fields from a Match Candidate Record match', async () => {
+        const fusionAccount = FusionAccount.fromManagedAccount({
+            id: 'acct-1',
+            nativeIdentity: 'native-1',
+            name: 'Test Account',
+            sourceId: 'source-a',
+            sourceName: 'Source A',
+            attributes: { employeeId: 'E123' },
+        } as any)
+        const matching = new MatchingService(
+            {
+                matchingConfigs: [{ attribute: 'employeeId', algorithm: 'binary', fusionScore: 100, mandatory: true }],
+                fusionManualReviewScore: 80,
+            } as any,
+            {} as any
+        )
+        const record = createMatchCandidateRecord('identity-1', 'Record Identity', {
+            employeeId: 'E123',
+            displayName: 'Record Display',
+        })
+        await matching.scoreFusionAccount(fusionAccount, [record])
+
+        const report = buildFusionReport({ ...buildReportState({}), matchAccounts: [fusionAccount] })
+
+        expect(report.accounts[0].matches).toHaveLength(1)
+        expect(report.accounts[0].matches[0]).toMatchObject({
+            accountId: 'identity-1',
+            accountName: 'Record Identity',
+            identityId: 'identity-1',
+            identityName: 'Record Identity',
+            candidateType: 'identity',
+        })
     })
 })
 

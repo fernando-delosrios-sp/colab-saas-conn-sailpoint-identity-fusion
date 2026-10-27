@@ -18,6 +18,7 @@ export const runtimeDefaults = {
     concurrencyCheckEnabled: true,
     forceAttributeRefresh: false,
     skipDuplicateFusionAccounts: false,
+    fusionDropAccountsAfterEmit: false,
 } as const
 
 export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSection {
@@ -35,5 +36,7 @@ export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSec
         forceAttributeRefresh: extractBoolean(raw, 'forceAttributeRefresh') ?? runtimeDefaults.forceAttributeRefresh,
         skipDuplicateFusionAccounts:
             extractBoolean(raw, 'skipDuplicateFusionAccounts') ?? runtimeDefaults.skipDuplicateFusionAccounts,
+        fusionDropAccountsAfterEmit:
+            extractBoolean(raw, 'fusionDropAccountsAfterEmit') ?? runtimeDefaults.fusionDropAccountsAfterEmit,
     }
 }

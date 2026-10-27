@@ -103,6 +103,7 @@ These settings affect performance and testing but do not reset state:
 | **Enable concurrency check?** | Detect concurrent aggregation attempts |
 | **Managed accounts batch size** | Batch size for managed account fetches |
 | **Scoring concurrency limit** | Parallelism for Match scoring |
+| **Drop Fusion accounts after emission?** | Stream accounts during processing and release them from memory before the uncorrelated match sweep |
 
 See [Advanced Settings — Developer Settings](../../configuration/advanced.md) for defaults and ranges. For API queue tuning, see [Tune API performance](tune-api-performance.md).
 

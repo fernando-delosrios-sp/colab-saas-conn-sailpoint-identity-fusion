@@ -263,5 +263,22 @@ describe('outputPhase', () => {
         expect(sendSpy).toHaveBeenCalledWith(registry.res, account)
         expect(registry.res.send).toHaveBeenCalledWith(account)
     })
-})
 
+    it('returns the total count including accounts emitted before Phase 5', async () => {
+        const registry = createOperationTestRegistry()
+        const fusion = registry.fusion as any
+        fusion.forEachISCAccount.mockImplementation(async (send: (account: unknown) => Promise<void>) => {
+            await send({ key: { simple: { id: 'phase-five' } }, attributes: {}, disabled: false })
+            return { sent: 1, eligible: 1 }
+        })
+
+        const streamProgress = { sent: 2 }
+        const outputCount = await outputPhase(registry, {
+            isPersistent: false,
+            streamProgress,
+        })
+
+        expect(outputCount).toBe(3)
+        expect(streamProgress.sent).toBe(3)
+    })
+})

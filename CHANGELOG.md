@@ -4,6 +4,12 @@ All notable changes to **Identity Fusion NG** — the ISC connector for Map → 
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
 
+## 2026-10-27 · v2.2.0
+
+### 🔧 Improvements
+
+- **Drop Fusion accounts after emission reduces memory footprint during aggregation** — When **Drop Fusion accounts after emission?** is enabled in Developer Settings (`fusionDropAccountsAfterEmit`), accounts ready for ISC output are streamed to the connector response during identity assembly (Phases 3 and 4) rather than held in memory until Phase 5. The full `FusionAccount` instances are cleared prior to the uncorrelated match sweep, while candidate blocking and scoring rosters retain compact `MatchCandidateRecord` projections. If an uncorrelated account auto-matches a dropped identity, the identity is re-fetched and re-evaluated on-demand, streaming the updated account via last-write-wins.
+
 ---
 
 ## 2026-10-23 · v2.2.0
