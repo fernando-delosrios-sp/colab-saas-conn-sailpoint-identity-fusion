@@ -430,6 +430,50 @@ describe('SourceService.fetchFusionAccounts bulk ingest', () => {
     })
 })
 
+describe('SourceService fusion account cache streaming and depletion', () => {
+    it('fusionAccountValues streams the raw cache map values iterator', () => {
+        const { service } = createService()
+        service.fusionAccountsByNativeIdentity = new Map([
+            ['native-1', { id: 'f1', nativeIdentity: 'native-1' } as any],
+            ['native-2', { id: 'f2', nativeIdentity: 'native-2' } as any],
+        ])
+
+        const values = service.fusionAccountValues()
+
+        expect(Array.from(values).map((account) => account.id)).toEqual(['f1', 'f2'])
+    })
+
+    it('fusionAccountValues throws when the cache has not been loaded', () => {
+        const { service } = createService()
+        service.fusionAccountsByNativeIdentity = undefined
+
+        expect(() => service.fusionAccountValues()).toThrow('Fusion accounts have not been loaded')
+    })
+
+    it('deleteFusionAccount removes a single entry by native identity', () => {
+        const { service } = createService()
+        service.fusionAccountsByNativeIdentity = new Map([
+            ['native-1', { id: 'f1', nativeIdentity: 'native-1' } as any],
+            ['native-2', { id: 'f2', nativeIdentity: 'native-2' } as any],
+        ])
+
+        service.deleteFusionAccount('native-1')
+
+        expect(service.fusionAccountsByNativeIdentity.has('native-1')).toBe(false)
+        expect(service.fusionAccountsByNativeIdentity.has('native-2')).toBe(true)
+    })
+
+    it('deleteFusionAccount is a no-op when the cache is unset or the key is absent', () => {
+        const { service } = createService()
+        service.fusionAccountsByNativeIdentity = undefined
+        expect(() => service.deleteFusionAccount('missing')).not.toThrow()
+
+        service.fusionAccountsByNativeIdentity = new Map()
+        service.deleteFusionAccount('missing')
+        expect(service.fusionAccountsByNativeIdentity.size).toBe(0)
+    })
+})
+
 describe('SourceService per-source aggregation polling', () => {
     afterEach(() => {
         vi.useRealTimers()

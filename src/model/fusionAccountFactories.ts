@@ -42,7 +42,6 @@ function applyAttributeCollections(fa: FusionAccount, account: Account): void {
 
     fa.applyFactorySeed({
         attributeBagCurrent: { ...account.attributes! },
-        attributeBagPrevious: { ...account.attributes! },
     })
 
     const missingAccountIds: string[] = []
@@ -167,7 +166,6 @@ export function buildFromIdentity(identity: IdentityDocument): FusionAccount {
     if (identity.attributes) {
         fa.applyFactorySeed({
             attributeBagCurrent: { ...identity.attributes },
-            attributeBagPrevious: { ...identity.attributes },
         })
 
         fa.collections.hydratePersisted({
@@ -232,7 +230,6 @@ export function buildFromManagedAccount(account: Account): FusionAccount {
     if (account.attributes) {
         fa.applyFactorySeed({
             attributeBagCurrent: { ...account.attributes },
-            attributeBagPrevious: { ...account.attributes },
         })
 
         fa.collections.hydratePersisted({

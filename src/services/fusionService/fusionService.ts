@@ -405,31 +405,35 @@ export class FusionService {
      * - No snapshot or copy is made of managedAccountsById
      * - All parallel operations work with the direct reference
      * - Deletions physically remove accounts from memory as they're processed
+     * - Raw accounts are streamed straight from the fetch cache iterator in bounded
+     *   batches without materializing a full `Account[]` or accumulating a results array
      *
-     * @returns Processed fusion accounts
+     * @returns Number of fusion accounts processed
      */
-    public async processFusionAccounts(): Promise<FusionAccount[]> {
-        const { fusionAccounts } = this.sources
+    public async processFusionAccounts(): Promise<number> {
+        const fusionAccountCount = this.sources.fusionAccountCount
         this.log.detail({
             action: 'processing fusion accounts',
-            count: fusionAccounts.length,
+            count: fusionAccountCount,
         })
-        const results = await batchProcess(
-            fusionAccounts,
-            'Fusion accounts',
+        const onProgress =
+            fusionAccountCount === 0
+                ? undefined
+                : (completed: number) => this.log.setProgress(completed, fusionAccountCount, 'refreshed')
+
+        const processed = await forEachBatched(
+            this.sources.fusionAccountValues(),
             async (x: Account) => {
-                return await this.processFusionAccount(x)
+                await this.processFusionAccount(x)
             },
-            this.config,
-            this.log,
-            undefined,
-            'refreshed'
+            getFusionParallelBatchSize(this.config),
+            onProgress
         )
         this.log.detail({
             action: 'fusion accounts phase finished',
-            count: results.length,
+            count: processed,
         })
-        return results
+        return processed
     }
 
     /**
@@ -801,6 +805,12 @@ export class FusionService {
         const claimedIdentityId = fusionAccount.identityId
         if (claimedIdentityId) {
             this.identities.deleteIdentity(claimedIdentityId)
+        }
+
+        // Deplete the raw fetch cache entry-by-entry so the hydrated FusionAccount and its raw
+        // Account payload do not coexist in memory. Recording keeps the cache intact for snapshots.
+        if (!this.run.isRecordMode && fusionAccount.managedKey) {
+            this.sources.deleteFusionAccount(fusionAccount.managedKey)
         }
     }
 

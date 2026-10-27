@@ -124,6 +124,10 @@ export function createFusionServiceTestContext(): FusionServiceTestContext {
         get: vi.fn(() => []),
         configurable: true,
     })
+    Object.defineProperty(mockSources, 'fusionAccountCount', {
+        get: vi.fn(() => 0),
+        configurable: true,
+    })
     Object.defineProperty(mockSources, 'managedSources', {
         get: vi.fn(() => []),
         configurable: true,

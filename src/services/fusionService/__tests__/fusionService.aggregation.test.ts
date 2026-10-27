@@ -221,22 +221,14 @@ describe('FusionService — aggregation', () => {
                 },
             } as unknown as Account
 
-            vi.spyOn(ctx.mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
-
-            // Mock FusionAccount.fromFusionAccount static method if possible,
-            // but since it's a class method we might depend on its implementation or mock the return of processFusionAccount
-            // For unit testing FusionService, we want to see if it calls processFusionAccount.
-
-            // Since processFusionAccounts calls processFusionAccount internally, let's spy on that if we can,
-            // or verify side effects.
+            vi.spyOn(ctx.mockSources, 'fusionAccountValues').mockReturnValue([mockAccount].values())
 
             const trackSpy = vi.spyOn(ctx.mockLog, 'track')
             const metricSpy = vi.spyOn(ctx.mockLog, 'metric')
 
             const result = await ctx.fusionService.processFusionAccounts()
 
-            expect(result).toHaveLength(1)
-            expect(result[0].managedKey).toBe(`fusion-1`)
+            expect(result).toBe(1)
             expect(trackSpy).not.toHaveBeenCalled()
             expect(metricSpy).not.toHaveBeenCalled()
         })
@@ -319,7 +311,7 @@ describe('FusionService — aggregation', () => {
                 },
             } as unknown as Account
 
-            vi.spyOn(ctx.mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
+            vi.spyOn(ctx.mockSources, 'fusionAccountValues').mockReturnValue([mockAccount].values())
             ctx.mockIdentities.getIdentityById.mockReturnValue(undefined)
             ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
@@ -346,7 +338,7 @@ describe('FusionService — aggregation', () => {
                 },
             } as unknown as Account
 
-            vi.spyOn(ctx.mockSources, 'fusionAccounts', 'get').mockReturnValue([mockAccount])
+            vi.spyOn(ctx.mockSources, 'fusionAccountValues').mockReturnValue([mockAccount].values())
             ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
@@ -356,6 +348,53 @@ describe('FusionService — aggregation', () => {
             await ctx.fusionService.processFusionAccounts()
 
             expect(ctx.mockIdentities.deleteIdentity).not.toHaveBeenCalled()
+        })
+
+        it('depletes the raw fusion account cache after each account is finalized', async () => {
+            const mockAccount = {
+                nativeIdentity: 'fusion-deplete-1',
+                sourceId: 'mock-source',
+                identityId: undefined,
+                attributes: {
+                    id: 'fusion-deplete-1',
+                    name: 'Deplete Fusion Account',
+                    statuses: [],
+                    accounts: [],
+                },
+            } as unknown as Account
+
+            vi.spyOn(ctx.mockSources, 'fusionAccountValues').mockReturnValue([mockAccount].values())
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+
+            await ctx.fusionService.processFusionAccounts()
+
+            expect(ctx.mockSources.deleteFusionAccount).toHaveBeenCalledWith('fusion-deplete-1')
+        })
+
+        it('retains the raw fusion account cache when record mode is active', async () => {
+            ;(ctx.run as any).isRecordMode = true
+            const mockAccount = {
+                nativeIdentity: 'fusion-deplete-record-1',
+                sourceId: 'mock-source',
+                identityId: undefined,
+                attributes: {
+                    id: 'fusion-deplete-record-1',
+                    name: 'Record Fusion Account',
+                    statuses: [],
+                    accounts: [],
+                },
+            } as unknown as Account
+
+            vi.spyOn(ctx.mockSources, 'fusionAccountValues').mockReturnValue([mockAccount].values())
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
+
+            await ctx.fusionService.processFusionAccounts()
+
+            expect(ctx.mockSources.deleteFusionAccount).not.toHaveBeenCalled()
         })
 
         it('ensures processIdentities skips an identity after processFusionAccounts claims it', async () => {
@@ -374,7 +413,7 @@ describe('FusionService — aggregation', () => {
 
             const mockIdentityDoc = { id: identityId, name: 'Dedup Identity' } as IdentityDocument
 
-            vi.spyOn(ctx.mockSources, 'fusionAccounts', 'get').mockReturnValue([mockFusionAccount])
+            vi.spyOn(ctx.mockSources, 'fusionAccountValues').mockReturnValue([mockFusionAccount].values())
             ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()

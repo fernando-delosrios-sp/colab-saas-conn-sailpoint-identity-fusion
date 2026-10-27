@@ -60,10 +60,10 @@ This design addresses these multipliers through streaming execution, incremental
   - Lazily calculating the Set per account: Rejected; still allocates per account.
 
 ### D4: Single-Pass Factory Seeding
-- **Choice**: In `fromFusionAccount`, pass `account.attributes` directly into `applyFactorySeed`. `applyFactorySeed` calls `omitNullishAttributeKeys` once to produce `attributeBag.current`. For `attributeBag.previous`, assign `attributeBag.current` (or an empty frozen object) and only clone a distinct dictionary when a configured Velocity template contains `$previous`.
-- **Reason**: Eliminates 3 redundant shallow clones per refreshed account (saving 300k dictionary allocations on a 100k run).
+- **Choice**: Factories pass `account.attributes` into `applyFactorySeed` through a single shallow copy (`{...account.attributes}`). `applyFactorySeed` calls `omitNullishAttributeKeys` once to produce `attributeBag.current`, then clones the result once to seed `attributeBag.previous` as a frozen prior-run snapshot, so later Map/Define mutations to `current` never leak into the `$previous` / existing-account view.
+- **Reason**: Eliminates the duplicate source clone and the second `omitNullishAttributeKeys` pass per refreshed account.
 - **Considered alternatives**:
-  - Retaining unconditional cloning: Rejected; wastes memory when `$previous` is rarely referenced.
+  - Sharing `attributeBag.current` as `previous` and cloning only when a configured Velocity template references `$previous`: Rejected; `previous` is read unconditionally by existing-account detection (`isExistingFusionAccount`) and core-schema fallback, so sharing would corrupt the prior-run view.
 
 ## Risks / Trade-offs
 

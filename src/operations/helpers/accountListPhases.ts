@@ -210,8 +210,8 @@ export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<vo
     log.detail({ action: 'refreshing fusion accounts' })
     await fusion.ensureGlobalReviewerOwnersInScope()
     const refreshOp = log.track('refreshPhase.processFusionAccounts')
-    const processedFusionAccounts = await fusion.processFusionAccounts()
-    refreshOp.done({ count: processedFusionAccounts.length })
+    const processedCount = await fusion.processFusionAccounts()
+    refreshOp.done({ count: processedCount })
     if (!sources.run.isRecordMode) {
         sources.clearFusionAccounts()
         log.detail({ action: 'raw fusion account fetch cache cleared from memory' })

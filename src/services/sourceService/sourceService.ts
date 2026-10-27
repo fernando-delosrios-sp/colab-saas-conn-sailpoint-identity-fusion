@@ -130,6 +130,26 @@ export class SourceService {
         this.log.debug('Fusion accounts cache cleared from memory')
     }
 
+    /**
+     * Streaming iterator over the raw fusion account cache. Returns the map's
+     * values iterator directly so callers can consume entries in batches without
+     * first materializing a full `Account[]`.
+     */
+    public fusionAccountValues(): IterableIterator<Account> {
+        assert(this.fusionAccountsByNativeIdentity, 'Fusion accounts have not been loaded')
+        return this.fusionAccountsByNativeIdentity.values()
+    }
+
+    /**
+     * Delete a single raw fusion account from the fetch cache by native identity.
+     * Used during Refresh to deplete the cache incrementally as each hydrated
+     * FusionAccount is registered, preventing raw and hydrated representations from
+     * coexisting in memory.
+     */
+    public deleteFusionAccount(nativeIdentity: string): void {
+        this.fusionAccountsByNativeIdentity?.delete(nativeIdentity)
+    }
+
     // Config settings
     private readonly config: FusionConfig
     private readonly sources: SourceConfig[]
