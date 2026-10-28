@@ -942,6 +942,89 @@ describe('FusionAccount', () => {
 
             expect(acc.collections.statuses.isOrphan()).toBe(false)
         })
+
+        describe('record-source accounts do not contribute', () => {
+            const recordAccount = {
+                id: 'isc-crm-1',
+                sourceId: 'src-crm',
+                sourceName: 'CRM',
+                nativeIdentity: 'rec-1',
+                attributes: {},
+            } as unknown as Account
+            const authoritativeAccount = {
+                id: 'isc-hr-1',
+                sourceId: 'src-hr',
+                sourceName: 'HR',
+                nativeIdentity: 'hr-1',
+                attributes: {},
+            } as unknown as Account
+
+            const persistedWith = (attributes: Record<string, unknown>) =>
+                FusionAccount.fromFusionAccount({
+                    nativeIdentity: 'fusion-1',
+                    id: 'isc-1',
+                    name: 'Persisted Account',
+                    sourceName: 'Identity Fusion NG',
+                    attributes,
+                } as unknown as Account)
+
+            beforeEach(() => FusionAccount.configure(aliasConfig))
+            afterEach(() => FusionAccount.configure(minimalConfig))
+
+            it('marks managed-origin account orphan when only record-source accounts remain', () => {
+                const acc = persistedWith({ accounts: ['src-crm::rec-1'] })
+                const run = new FusionRun()
+                run.setManagedAccount('src-crm::rec-1', recordAccount)
+
+                acc.addManagedAccountLayer(run)
+
+                expect(acc.accountIds).toContain('src-crm::rec-1')
+                expect(acc.collections.statuses.isOrphan()).toBe(true)
+            })
+
+            it('does not mark orphan when an authoritative source account remains', () => {
+                const acc = persistedWith({ accounts: ['src-crm::rec-1', 'src-hr::hr-1'] })
+                const run = new FusionRun()
+                run.setManagedAccount('src-crm::rec-1', recordAccount)
+                run.setManagedAccount('src-hr::hr-1', authoritativeAccount)
+
+                acc.addManagedAccountLayer(run)
+
+                expect(acc.collections.statuses.isOrphan()).toBe(false)
+            })
+
+            it('marks identity-origin account orphan when only record-source accounts remain and identity is out of scope', () => {
+                const acc = persistedWith({
+                    originSource: IDENTITIES_SOURCE_NAME,
+                    originAccount: 'id-1',
+                    accounts: ['src-crm::rec-1'],
+                    statuses: ['baseline'],
+                })
+                acc.setOriginIdentityInScope(false)
+                const run = new FusionRun()
+                run.setManagedAccount('src-crm::rec-1', recordAccount)
+
+                acc.addManagedAccountLayer(run)
+
+                expect(acc.collections.statuses.isOrphan()).toBe(true)
+            })
+
+            it('retains the account when a linked account has no resolvable source name', () => {
+                const acc = persistedWith({ accounts: ['src-crm::rec-1'] })
+                const run = new FusionRun()
+                run.setManagedAccount('src-crm::rec-1', {
+                    id: 'isc-crm-1',
+                    sourceId: 'src-crm',
+                    nativeIdentity: 'rec-1',
+                    attributes: {},
+                } as unknown as Account)
+
+                acc.addManagedAccountLayer(run)
+
+                expect(acc.accountIds).toContain('src-crm::rec-1')
+                expect(acc.collections.statuses.isOrphan()).toBe(false)
+            })
+        })
     })
 
     describe('pruneDeletedManagedAccounts', () => {

@@ -8,7 +8,7 @@ The identity service (`src/services/identityService.ts`) is the connector's read
 
 ### Requirement: Identity-origin Fusion accounts become orphan when origin identity leaves scope
 
-A Fusion account created from an ISC identity MUST be considered orphan when it has no managed source accounts and its origin identity is not present in the configured identity scope.
+A Fusion account created from an ISC identity MUST be considered orphan when it has no contributing accounts and its origin identity is not present in the configured identity scope. A Record-source managed account is enrichment only: it is not a contributing account.
 
 Feature: Identity-origin orphan detection
 
@@ -28,18 +28,25 @@ Feature: Identity-origin orphan detection
 - **THEN** the account is marked `orphan`
 - **AND** the account retains the `baseline` status
 
-#### Scenario: Identity-origin account with managed accounts is not orphan even when origin identity is out of scope
+#### Scenario: Identity-origin account with contributing accounts is not orphan even when origin identity is out of scope
 - **GIVEN** a Fusion account was created from identity `idn-1`
 - **AND** `idn-1` is not present in the configured identity scope
-- **AND** the Fusion account still has managed source accounts
+- **AND** the Fusion account still has contributing accounts
 - **WHEN** the aggregation processes the account
 - **THEN** the account is not marked `orphan`
 
-#### Scenario: Managed-origin account without managed accounts still becomes orphan
+#### Scenario: Managed-origin account without contributing accounts still becomes orphan
 - **GIVEN** a Fusion account was created from a managed source account
-- **AND** the account has no managed source accounts left
+- **AND** the account has no contributing accounts left
 - **WHEN** the aggregation processes the account
 - **THEN** the account is marked `orphan`
+
+#### Scenario: Record-source accounts are not contributing accounts
+- **GIVEN** a Fusion account was created from a managed source account
+- **AND** the only managed source accounts left on it come from Record sources
+- **WHEN** the aggregation processes the account
+- **THEN** the account is marked `orphan`
+- **AND** `deleteEmpty` removes it from aggregation output when enabled
 
 #### Scenario: Single-account read detects out-of-scope origin identity
 - **GIVEN** a Fusion account was created from identity `idn-1`
