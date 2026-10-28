@@ -392,7 +392,7 @@
                             "label": "Delete accounts with no managed accounts left?",
                             "type": "toggle",
                             "required": false,
-                            "helpKey": "Automatically remove a Fusion account when all of its linked source accounts have been deleted."
+                            "helpKey": "Automatically remove a Fusion account when all of its contributing accounts or identity are gone. Record source accounts do not contribute."
                         },
                         {
                             "key": "skipAccountsWithMissingId",

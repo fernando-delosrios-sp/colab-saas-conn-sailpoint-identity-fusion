@@ -74,6 +74,7 @@ export class FusionLayers {
     constructor(
         private readonly collections: FusionCollections,
         private readonly sourceConfigNamesSet: ReadonlySet<string>,
+        private readonly recordSourceNamesSet: ReadonlySet<string>,
         private readonly fusionAccountRefreshThresholdInSeconds: number
     ) {}
 
@@ -272,7 +273,8 @@ export class FusionLayers {
 
         this.preserveMissingAccountContext(workQueue.managedAccountInventory)
 
-        if (this.collections.accountIds.size === 0) {
+        // Record-source accounts are enrichment only: they never keep a Fusion account from being orphan.
+        if (!this.hasContributingAccount(workQueue.managedAccountInventory)) {
             const fromIdentity = isIdentityOriginFusionAccount(
                 this.originSourceValue,
                 attributeBag.current,
@@ -703,6 +705,21 @@ export class FusionLayers {
                 schema: { id: nativeId },
             })
         }
+    }
+
+    /**
+     * Orphan detection counts contributing accounts only. Record-source accounts enrich a Fusion
+     * account but never contribute to it, so they cannot keep it alive. A source name that resolves
+     * to no record source (unknown name, or a configured source with no type) counts as
+     * contributing, which matches the authoritative default used elsewhere in the connector.
+     */
+    private hasContributingAccount(inventory: ReadonlyMap<string, ManagedAccountInfo>): boolean {
+        for (const accountId of this.collections.accountIds) {
+            const sourceName =
+                this.collections.managedAccountInfo.get(accountId)?.source.name ?? inventory.get(accountId)?.sourceName
+            if (!sourceName || !this.recordSourceNamesSet.has(sourceName)) return true
+        }
+        return false
     }
 
     private pruneDeletedManagedAccounts(inventory: ReadonlyMap<string, ManagedAccountInfo>): void {

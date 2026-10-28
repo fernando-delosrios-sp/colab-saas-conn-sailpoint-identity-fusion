@@ -1049,7 +1049,7 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **Baseline** | An existing identity that is included in the identity scope and used as a comparison point during the **Match** step. |
 | **Uncorrelated** | A Fusion account or managed source account that is not yet linked to a known identity. |
 | **Non-matched / `nonMatched`** | A managed source account that completed the **Match** step without finding any acceptable identity candidate. The status entitlement value is `nonMatched`; the matching status string is `non-matched`. |
-| **Orphan** | A Fusion account that no longer has any contributing managed source accounts. Depending on configuration, orphan accounts may be removed or disabled. |
+| **Orphan** | A Fusion account that no longer has any contributing managed source accounts. Record-source accounts are enrichment only and are not contributing accounts. Depending on configuration, orphan accounts may be removed or disabled. |
 | **Deferred** | A match result where the best candidate is a deferred candidate from the same source in the same operation run. The connector defers creating a new identity until a later aggregation can compare against the established baseline. |
 
 ### Entitlement system
@@ -1082,7 +1082,7 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 | **Uncorrelated** | `uncorrelated` | The Fusion account has managed source accounts that are not yet linked to a known identity. |
 | **Baseline** | `baseline` | The identity existed before this Fusion source aggregation and is included as a comparison point during Match. |
 | **Non-matched** | `nonMatched` | A managed source account completed the Match step without finding any acceptable identity candidate. |
-| **Orphan** | `orphan` | A Fusion account that no longer has any contributing managed source accounts. |
+| **Orphan** | `orphan` | A Fusion account that no longer has any contributing managed source accounts. Record-source accounts are not contributing accounts. |
 | **Authorized** | `authorized` | A managed source account was manually correlated to an identity by a reviewer. |
 | **Auto** | `auto` | A managed source account was automatically assigned to an identity after an exact attribute match (all rules scored 100). |
 | **Manual** | `manual` | A new Fusion account was manually approved by a reviewer. |

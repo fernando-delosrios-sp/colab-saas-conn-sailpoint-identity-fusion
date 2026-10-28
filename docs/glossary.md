@@ -136,7 +136,7 @@ Fusion accounts carry two kinds of entitlements, distinguished by how they are a
 | **Uncorrelated**  | `uncorrelated`  | The Fusion account has managed source accounts that are not yet linked to a known identity.                                               |
 | **Baseline**      | `baseline`      | The identity existed before this Fusion source aggregation and is included as a comparison point during Match.                            |
 | **Non-matched**   | `nonMatched`    | A managed source account completed the Match step without finding any acceptable identity candidate.                                      |
-| **Orphan**        | `orphan`        | A Fusion account that no longer has any contributing managed source accounts.                                                             |
+| **Orphan**        | `orphan`        | A Fusion account that no longer has any contributing managed source accounts. Record-source accounts are not contributing accounts.       |
 | **Authorized**    | `authorized`    | A managed source account was manually merged into an existing Fusion identity by a reviewer.                                              |
 | **Auto**          | `auto`          | A managed source account was automatically merged into an existing Fusion identity after an exact attribute match (all rules scored 100). |
 | **Manual**        | `manual`        | A new Fusion account was manually approved by a reviewer.                                                                                 |

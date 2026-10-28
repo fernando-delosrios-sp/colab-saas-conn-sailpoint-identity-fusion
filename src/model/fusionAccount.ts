@@ -31,6 +31,8 @@ export class FusionAccount {
     private static config?: FusionConfig
     /** Shared set of configured managed source names, precomputed once per run in {@link configure}. */
     private static managedSourceNamesValue: ReadonlySet<string> = new Set()
+    /** Shared set of configured Record source names, precomputed once per run in {@link configure}. */
+    private static recordSourceNamesValue: ReadonlySet<string> = new Set()
 
     private keyValue?: SimpleKeyType
     private managedKeyValue?: string
@@ -63,6 +65,7 @@ export class FusionAccount {
         this.layers = new FusionLayers(
             this.collections,
             FusionAccount.managedSourceNames,
+            FusionAccount.recordSourceNames,
             resolvedConfig.fusionAccountRefreshThresholdInSeconds
         )
     }
@@ -74,11 +77,19 @@ export class FusionAccount {
     static configure(config: FusionConfig): void {
         FusionAccount.config = config
         FusionAccount.managedSourceNamesValue = new Set(config.sources.map((sc) => sc.name))
+        FusionAccount.recordSourceNamesValue = new Set(
+            config.sources.filter((sc) => sc.sourceType === SourceType.Record).map((sc) => sc.name)
+        )
     }
 
     /** Shared precomputed managed source names, reused across every FusionAccount instance. */
     static get managedSourceNames(): ReadonlySet<string> {
         return FusionAccount.managedSourceNamesValue
+    }
+
+    /** Shared precomputed Record source names, reused across every FusionAccount instance. */
+    static get recordSourceNames(): ReadonlySet<string> {
+        return FusionAccount.recordSourceNamesValue
     }
 
     static buildIdentityInfo(source: Parameters<typeof buildIdentityInfo>[0]): ReturnType<typeof buildIdentityInfo> {
