@@ -12,6 +12,7 @@ Topic guides for Identity Fusion NG connector settings. Each guide covers **one 
 | **Pick per-source processing mode** | [Source types](source-types.md) | [Configuring sources and scope](configuring-sources-and-scope.md) |
 | **Merge multi-source attributes** | [Mapping attributes](mapping-attributes.md) | [Defining attributes](defining-attributes.md) |
 | **Generate unique IDs or computed fields** | [Defining attributes](defining-attributes.md) | [Mapping attributes](mapping-attributes.md) |
+| **Reserve unique values via customizer** | [Unique values customizer](unique-values-customizer.md) | [Defining attributes](defining-attributes.md) |
 | **Configure Match rules and thresholds** | [Matching identities](matching-identities.md) | [Tuning matching algorithms](tuning-matching-algorithms.md) |
 | **Set up review forms** | [Review forms and reviewers](review-forms-and-reviewers.md) | [Managing reviewers](managing-reviewers.md) |
 | **Assign reviewers** | [Managing reviewers](managing-reviewers.md) | [Review forms and reviewers](review-forms-and-reviewers.md) |
@@ -36,6 +37,7 @@ Topic guides for Identity Fusion NG connector settings. Each guide covers **one 
 | --- | --- |
 | [Mapping attributes](mapping-attributes.md) | Merge strategies and per-attribute mapping |
 | [Defining attributes](defining-attributes.md) | Velocity, unique IDs, UUIDs, counters |
+| [Unique values customizer](unique-values-customizer.md) | Standalone pre-compiled binary store for reserved unique values |
 
 ### Match
 
