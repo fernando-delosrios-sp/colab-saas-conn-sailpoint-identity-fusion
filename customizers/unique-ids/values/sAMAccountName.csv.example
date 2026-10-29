@@ -1,0 +1,18 @@
+# Sample reserved values for unique attribute 'sAMAccountName'
+# Add one value per line. Empty lines or whitespace are ignored.
+# Rename or copy this file to sAMAccountName.csv before running pack-zip.
+admin
+administrator
+root
+guest
+support
+test
+backup
+service
+api
+operator
+system
+daemon
+audit
+security
+helpdesk
