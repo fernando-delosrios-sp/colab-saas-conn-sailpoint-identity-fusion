@@ -63,6 +63,7 @@ export class ServiceRegistry {
     public matchOutcomeDispatcher: MatchOutcomeDispatcher
     public run: FusionRun
     public runContext: OperationRunContext
+    public customizerIndicesDir?: string
     private readonly clientUsesInjection: boolean
 
     /**
@@ -299,6 +300,11 @@ export class ServiceRegistry {
             throw new ConnectorError('ServiceRegistry not found', ConnectorErrorType.Generic)
         }
         return reg
+    }
+
+    /** Sets the customizer index directory. */
+    setCustomizerIndicesDir(dir?: string): void {
+        this.customizerIndicesDir = dir
     }
 
     /** Snapshot for the operation heartbeat (queue, memory, run context). */

@@ -41,6 +41,10 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
 
     const timer = log.timer()
     log.startOperationHeartbeat(() => serviceRegistry.getHeartbeatSnapshot())
+    const customizerIndicesDir = (input as any)?.customizerIndicesDir as string | undefined
+    if (customizerIndicesDir) {
+        serviceRegistry.setCustomizerIndicesDir(customizerIndicesDir)
+    }
     const phaseResult: { fetchResult?: FetchResult; outputCount?: number; continued: boolean } = {
         continued: true,
     }
@@ -57,6 +61,7 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
                     tracker: new AggregationTracker(),
                     streamProgress: { sent: 0 },
                     schema: input.schema,
+                    customizerIndicesDir,
                 },
                 { log, timer, logPhases: true, result: phaseResult }
             )
