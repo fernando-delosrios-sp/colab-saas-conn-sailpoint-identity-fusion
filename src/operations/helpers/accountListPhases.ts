@@ -20,6 +20,7 @@ export interface PhaseOptions {
     tracker?: AggregationTracker
     streamProgress?: { sent: number }
     allowEarlyAccountEmission?: boolean
+    customizerIndicesDir?: string
 }
 
 // --- Private helpers ---
@@ -147,6 +148,12 @@ export async function setupPhase(
 
     await definition.initializeCounters()
     log.detail({ action: 'attribute counters initialized' })
+
+    const customizerDir = options.customizerIndicesDir ?? serviceRegistry.customizerIndicesDir
+    if (customizerDir) {
+        serviceRegistry.setCustomizerIndicesDir(customizerDir)
+    }
+    definition.initializeCustomizerStore(customizerDir)
     return true
 }
 

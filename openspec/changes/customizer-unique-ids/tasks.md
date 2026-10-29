@@ -14,10 +14,10 @@
 
 ## 3. DefinitionService & Pipeline Integration with Logging
 
-- [ ] 3.1 Integrate `CustomizerValueStore` into `DefinitionService.isCandidateValueUnique` to reject candidate values matching customizer indexes
-- [ ] 3.2 Wire `input.customizerIndicesDir` through `accountList` and `setupPhase` into `ServiceRegistry` and `DefinitionService`
-- [ ] 3.3 Emit structured log traces (`log.info` / `log.detail`) detailing loaded customizer directory, attribute names, unique value counts, and load timings
-- [ ] 3.4 Add unit tests for `DefinitionService` verifying rejection of customizer-reserved unique values and log emission
+- [x] 3.1 Integrate `CustomizerValueStore` into `DefinitionService.isCandidateValueUnique` to reject candidate values matching customizer indexes
+- [x] 3.2 Wire `input.customizerIndicesDir` through `accountList` and `setupPhase` into `ServiceRegistry` and `DefinitionService`
+- [x] 3.3 Emit structured log traces (`log.info` / `log.detail`) detailing loaded customizer directory, attribute names, unique value counts, and load timings
+- [x] 3.4 Add unit tests for `DefinitionService` verifying rejection of customizer-reserved unique values and log emission
 
 ## 4. Verification
 
