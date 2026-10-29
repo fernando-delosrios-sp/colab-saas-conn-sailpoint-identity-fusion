@@ -37,6 +37,7 @@ nav:
                 - Map and Define:
                       - Mapping attributes: use-guides/configuration/mapping-attributes.md
                       - Defining attributes: use-guides/configuration/defining-attributes.md
+                      - Unique values customizer: use-guides/configuration/unique-values-customizer.md
                 - Match:
                       - Matching identities: use-guides/configuration/matching-identities.md
                       - Managing correlation: use-guides/configuration/managing-correlation.md

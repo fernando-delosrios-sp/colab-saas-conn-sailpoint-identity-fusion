@@ -1,8 +1,18 @@
+<!-- markdownlint-disable MD024 -->
 # Changelog
 
 All notable changes to **Identity Fusion NG** — the ISC connector for Map → Define → Match identity fusion, scenario recording/replay, and supporting tooling.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
+
+## 2026-10-29 · v2.3.0
+
+### ✨ New Features
+
+- **Unique Values Customizer for zero-heap reserved attribute pools** — A standalone SaaS Connectivity customizer template (`customizers/unique-ids/`) that allows tenant administrators to maintain single-column CSV files of reserved unique attribute values (such as legacy IDs, reserved usernames, and service accounts) without modifying connector code. When built with `npm run pack-zip`, values are compiled into compact, sorted 64-bit FNV-1a binary index files (`.bin`) and passed to Identity Fusion via the `beforeStdAccountList` hook. During unique attribute generation, candidate values are verified against the pre-compiled index via sub-microsecond binary search in the `CustomizerValueStore`, eliminating V8 string heap allocations and preventing container out-of-memory errors on large reserved datasets.
+- **Structured audit logging for customizer index metrics** — Aggregation runs now emit structured logs during the Setup phase detailing the attached customizer index directory, loaded unique attribute names, indexed value counts, and load durations. When no customizer is attached, a debug message confirms normal in-memory operation.
+
+---
 
 ## 2026-10-27 · v2.2.0
 

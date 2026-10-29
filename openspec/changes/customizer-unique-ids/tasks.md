@@ -21,16 +21,16 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Confirm canonical test command: `npm test` and `npm run lint`
-- [ ] 4.2 All delta spec scenarios covered by named automated tests (coverage evidence for `/opsx:verify`)
+- [x] 4.1 Confirm canonical test command: `npm test` and `npm run lint`
+- [x] 4.2 All delta spec scenarios covered by named automated tests (coverage evidence for `/opsx:verify`)
 
 ## 5. Documentation
 
-- [ ] 5.1 Document the Unique Values Customizer workflow and packaging in `docs/use-guides/configuration/`
-- [ ] 5.2 Update `openspec/specs/ubiquitous-language/spec.md` with promoted terms (`Customizer Value Store`, `Unique Values Customizer`)
-- [ ] 5.3 Run `npm run lint:docs-guides` and `npm run lint:markdown` to verify documentation integrity
+- [x] 5.1 Document the Unique Values Customizer workflow and packaging in `docs/use-guides/configuration/`
+- [x] 5.2 Update `openspec/specs/ubiquitous-language/spec.md` with promoted terms (`Customizer Value Store`, `Unique Values Customizer`)
+- [x] 5.3 Run `npm run lint:docs-guides` and `npm run lint:markdown` to verify documentation integrity
 
 ## 6. Changelog
 
-- [ ] 6.1 Create or update changelog entry for this change
-- [ ] 6.2 Confirm entry covers user-visible changes from proposal Capabilities
+- [x] 6.1 Create or update changelog entry for this change
+- [x] 6.2 Confirm entry covers user-visible changes from proposal Capabilities

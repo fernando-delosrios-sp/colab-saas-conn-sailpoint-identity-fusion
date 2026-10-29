@@ -398,3 +398,11 @@ Use `$statuses.includes("reviewer")` or `$statuses.indexOf("reviewer") >= 0`. Do
 `$previous.statuses` is still last run's snapshot if you need it.
 
 Normal definitions on a **newly created** identity-origin global reviewer stay one aggregation behind: reviewer registration runs after that account's Normal Define pass. Unique definitions run later in the same aggregation and do see `reviewer`. Persisted reviewer accounts already have the action, so their Normal definitions see live `$actions` / `$statuses` on every later run.
+
+---
+
+## Related guides
+
+- [Unique values customizer](unique-values-customizer.md): Pre-compiling reserved unique values into zero-heap binary indexes.
+- [Mapping attributes](mapping-attributes.md): Merging attributes across managed sources.
+- [Configuring sources and scope](configuring-sources-and-scope.md): Source priority and scope filters.

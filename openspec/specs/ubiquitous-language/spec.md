@@ -913,6 +913,22 @@ The ubiquitous-language glossary SHALL define **Iterable Batching** (processing 
 - **THEN** a **Raw Account Depletion** entry SHALL define it as deleting raw accounts from the fetch cache incrementally as each `FusionAccount` is registered
 - **AND** it SHALL specify that depletion is bypassed when record mode is active
 
+### Requirement: Glossary defines Customizer Value Store and Unique Values Customizer
+
+The ubiquitous-language glossary SHALL define **Customizer Value Store** (a memory-efficient, binary-indexed store within Identity Fusion that loads pre-compiled 64-bit hash arrays from a linked customizer package to verify whether candidate attribute values conflict with existing reserved values without allocating string objects on the V8 heap) and **Unique Values Customizer** (a standalone SailPoint SaaS Connectivity customizer project containing single-column CSV files corresponding to unique attribute names, packaged with a build-time pre-compiler that converts values into sorted binary index files for consumption by Identity Fusion). Documentation and code SHALL NOT refer to the customizer value store as a "static cache" or "disk table".
+
+#### Scenario: Customizer Value Store entry
+
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up how pre-compiled customizer unique values are evaluated
+- **THEN** a **Customizer Value Store** entry SHALL define it as a binary-indexed store in Identity Fusion that loads pre-compiled 64-bit hash arrays to check uniqueness without heap allocation
+
+#### Scenario: Unique Values Customizer entry
+
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up the customizer package for reserved unique values
+- **THEN** a **Unique Values Customizer** entry SHALL define it as a standalone customizer project compiling single-column CSVs into sorted binary indexes for Identity Fusion
+
 ## Canonical Terms
 
 ### Account taxonomy
@@ -1004,6 +1020,7 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **DefinitionService** | The stateless service responsible for the **Define** step — computing normal attributes via Velocity templates and generating persistent unique attributes (UUIDs, counters, disambiguated values). Located at `src/services/definitionService/`. |
 | **MatchingService** | The stateless service responsible for **scoring** in the Match step — weighted rule evaluation, trigram blocking, and normalization caches on FusionRun. Located at `src/services/matchingService/`. Outcome routing (merge, review form, defer, non-match) is **Match outcome dispatch** via `MatchOutcomeDispatcher`, not MatchingService. |
 | **FusionRun** | The centralized state container for a single operation run. Holds all mutable data loaded during the run (managed accounts, identities, Fusion accounts, form decisions, matching state) and serves as the single source of truth that stateless services read from and write to. Exposes `snapshot()` and `restore()` for recording and replay. Located at `src/model/fusionRun.ts`. |
+| **Customizer Value Store** | An in-memory zero-heap binary search store in Identity Fusion NG that loads pre-compiled 64-bit FNV-1a hash arrays from a linked customizer package to verify whether candidate attribute values conflict with existing reserved values without allocating string objects on the V8 heap. Located at `src/services/definitionService/customizerValueStore.ts`. |
 
 ### Matching and scoring
 
@@ -1230,6 +1247,7 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Localized user communications** | When enabled, review forms and emails use the reviewer's preferred language. Requires an identity attribute specifying the language code. |
 | **Governance group** | An ISC group assigned to source governance. Members of this group are eligible as global reviewers when **Owners are global reviewers?** is enabled. |
 | **Identity profile** | The ISC identity profile used for identities created by the Fusion source. Replaces the identity profiles of managed sources when Fusion is authoritative. |
+| **Unique Values Customizer** | A standalone SailPoint SaaS Connectivity customizer project containing single-column CSV files corresponding to unique attribute names, packaged with a build-time pre-compiler that converts values into sorted binary index files for consumption by Identity Fusion. |
 
 ### Testing
 
