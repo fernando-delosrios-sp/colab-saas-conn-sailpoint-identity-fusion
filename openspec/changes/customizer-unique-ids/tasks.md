@@ -9,8 +9,8 @@
 
 ## 2. Fusion CustomizerValueStore
 
-- [ ] 2.1 Implement `CustomizerValueStore` in `src/services/definitionService/customizerValueStore.ts` using 64-bit FNV-1a hashing and `BigInt64Array` binary search
-- [ ] 2.2 Add unit tests for `CustomizerValueStore` covering hit, miss, empty index, and case-sensitive matching
+- [x] 2.1 Implement `CustomizerValueStore` in `src/services/definitionService/customizerValueStore.ts` using 64-bit FNV-1a hashing and `BigInt64Array` binary search
+- [x] 2.2 Add unit tests for `CustomizerValueStore` covering hit, miss, empty index, and case-sensitive matching
 
 ## 3. DefinitionService & Pipeline Integration with Logging
 
