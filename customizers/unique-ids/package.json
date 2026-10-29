@@ -1,0 +1,22 @@
+{
+    "name": "identity-fusion-unique-ids-customizer",
+    "version": "1.0.0",
+    "description": "Unique Values Customizer for Identity Fusion NG",
+    "main": "dist/index.js",
+    "scripts": {
+        "clean": "node -e \"const fs = require('fs'); ['dist', 'data'].forEach(d => { if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true }); });\"",
+        "build:indices": "node --experimental-strip-types scripts/build-indices.ts",
+        "build:code": "npx ncc build ./src/index.ts -o ./dist -m -C && node -e \"const fs = require('fs'); if (fs.existsSync('data')) fs.cpSync('data', 'dist/data', { recursive: true });\"",
+        "build": "npm run build:indices && npm run build:code",
+        "prepack-zip": "npm run build",
+        "pack-zip": "spcx package"
+    },
+    "dependencies": {
+        "@sailpoint/connector-sdk": "1.2.7"
+    },
+    "devDependencies": {
+        "@types/node": "^24.13.3",
+        "@vercel/ncc": "^0.38.4",
+        "typescript": "~5.5.4"
+    }
+}
