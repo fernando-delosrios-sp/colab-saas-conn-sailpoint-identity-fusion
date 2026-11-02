@@ -71,9 +71,10 @@ export function buildReferencedAttributeSet(
 
 /**
  * Attribute pruning: drops a managed source account's `attributes` entries that are not
- * in the referenced attribute set. Mutates in place (the account object is owned by the
- * fetch pipeline at registration time; client-layer recording captured a deep copy
- * upstream). Top-level system fields are never pruned.
+ * in the referenced attribute set. Replaces the account's attribute bag rather than
+ * deleting keys in place, so large API response objects can be collected without
+ * leaving dictionary-mode bags in the managed-account work queue. Top-level system
+ * fields are never pruned.
  */
 export function pruneManagedAccountAttributes(
     account: Account,
@@ -81,11 +82,13 @@ export function pruneManagedAccountAttributes(
 ): Account {
     const attributes = account.attributes
     if (!attributes || typeof attributes !== 'object') return account
-    for (const key of Object.keys(attributes)) {
-        if (!referencedAttributeSet.has(key)) {
-            delete (attributes as Record<string, unknown>)[key]
+    const prunedAttributes: Record<string, unknown> = {}
+    for (const key of referencedAttributeSet) {
+        if (Object.prototype.hasOwnProperty.call(attributes, key)) {
+            prunedAttributes[key] = (attributes as Record<string, unknown>)[key]
         }
     }
+    account.attributes = prunedAttributes
     return account
 }
 
