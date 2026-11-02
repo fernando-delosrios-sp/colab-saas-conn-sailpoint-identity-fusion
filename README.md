@@ -63,7 +63,7 @@ Preview locally: `npm run docs:serve` (see [docs/README.md](docs/README.md) for 
 
 Release history: [CHANGELOG.md](CHANGELOG.md) (mirrored on the [documentation site](https://fernando-delosrios-sp.github.io/colab-saas-conn-sailpoint-identity-fusion/CHANGELOG/) after `npm run docs:prepare`).
 
-Latest improvement (2026-10-29): Unique Values Customizer provides a zero-heap pre-compiled binary store for reserved unique attribute pools — see [CHANGELOG.md](CHANGELOG.md).
+Latest improvement (2026-11-02): account list keeps Fusion accounts through matching and releases them as Output sends them — see [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

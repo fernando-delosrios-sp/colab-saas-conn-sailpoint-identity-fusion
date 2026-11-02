@@ -110,21 +110,25 @@ describe('FusionRun', () => {
         expect(run.isAutoMerged('id-3')).toBe(false)
     })
 
-    it('drops emitted Fusion identities while retaining non-emitted accounts', () => {
+    it('releases match indexes and rosters without dropping Fusion accounts', () => {
         FusionAccount.configure({ sources: [] } as any)
         const run = new FusionRun()
-        const emitted = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Emitted', attributes: {} } as any)
-        const retained = FusionAccount.fromIdentity({ id: 'identity-2', name: 'Retained', attributes: {} } as any)
-        run.registerFusionAccount(emitted)
-        run.registerFusionAccount(retained)
+        const identity = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Kept', attributes: {} } as any)
+        run.registerFusionAccount(identity)
+        run.blockingIdentityRoster = [{ identityId: 'identity-1', identityName: 'Kept', attributes: {} } as any]
+        run.trigramIndexBuilt = true
+        run.nameMatcherTokenCache.set('kept', ['kept'])
+        run.reviewersBySourceId.set('source-1', new Set([identity]))
+        run.registerPersistedDeferredCandidate(identity)
 
-        run.markFusionAccountEmitted(emitted, 'native-1')
+        run.releaseMatchWorkingSets()
 
-        expect(run.isAccountEmitted('native-1')).toBe(true)
-        expect(run.isFusionAccountEmitted(emitted)).toBe(true)
-        expect(run.clearEmittedFusionAccounts()).toBe(1)
-        expect(run.getFusionIdentity('identity-1')).toBeUndefined()
-        expect(run.getFusionIdentity('identity-2')).toBe(retained)
+        expect(run.getFusionIdentity('identity-1')).toBe(identity)
+        expect(run.blockingIdentityRoster).toEqual([])
+        expect(run.trigramIndexBuilt).toBe(false)
+        expect(run.nameMatcherTokenCache.size).toBe(0)
+        expect(run.reviewersBySourceId.size).toBe(0)
+        expect(run.deferredCandidateCount).toBe(0)
     })
 
     describe('simulated recording time', () => {
@@ -389,12 +393,18 @@ describe('FusionRun', () => {
             nativeIdentity: 'native-1',
             name: 'Test User',
             attributes: { givenName: 'Nadya' },
+            identity: { id: 'identity-1', attributes: { biography: 'not needed after claim' } },
+            recommendation: { type: 'unused' },
         } as Account
         run.setManagedAccount('src-a::native-1', account)
         run.claimAccount('src-a::native-1')
 
         expect(run.get('src-a::native-1')).toBeUndefined()
-        expect(run.getRetainedAccount('src-a::native-1')?.attributes?.givenName).toBe('Nadya')
+        const retained = run.getRetainedAccount('src-a::native-1')
+        expect(retained?.attributes?.givenName).toBe('Nadya')
+        expect(retained).not.toBe(account)
+        expect(retained).not.toHaveProperty('identity')
+        expect(retained).not.toHaveProperty('recommendation')
     })
 
     it('Retention clears with managed account state', () => {

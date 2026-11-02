@@ -84,9 +84,7 @@ export async function runAccountListPhases(
 
     result.fetchResult = await run(2, 'Fetch', () => fetchPhase(serviceRegistry, phaseOptions))
     await run(3, 'Refresh', () => refreshPhase(serviceRegistry))
-    await run(4, 'Process', () =>
-        processPhase(serviceRegistry, { ...phaseOptions, allowEarlyAccountEmission: throughPhase === 5 })
-    )
+    await run(4, 'Process', () => processPhase(serviceRegistry, phaseOptions))
 
     if (throughPhase === 5) {
         result.outputCount = await run(5, 'Output', () => outputPhase(serviceRegistry, phaseOptions))

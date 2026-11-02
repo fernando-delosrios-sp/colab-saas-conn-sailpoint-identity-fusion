@@ -19,7 +19,6 @@ export interface PhaseOptions {
     isPersistent: boolean
     tracker?: AggregationTracker
     streamProgress?: { sent: number }
-    allowEarlyAccountEmission?: boolean
     customizerIndicesDir?: string
 }
 
@@ -234,7 +233,7 @@ export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<vo
 
 // --- Phase 4: Process ---
 
-export async function processPhase(serviceRegistry: ServiceRegistry, options: PhaseOptions): Promise<void> {
+export async function processPhase(serviceRegistry: ServiceRegistry, _options: PhaseOptions): Promise<void> {
     const { log, fusion, identities, sources, forms } = serviceRegistry
 
     await log.runStep('process-identities', () => fusion.processIdentities(), {
@@ -283,24 +282,6 @@ export async function processPhase(serviceRegistry: ServiceRegistry, options: Ph
         trackDone: (result) => ({ registered: result.registered }),
         endDetail: (result) => ({ registered: result.registered }),
     })
-
-    if (options.allowEarlyAccountEmission && serviceRegistry.config.fusionDropAccountsAfterEmit && serviceRegistry.res) {
-        const sent = await log.runStep(
-            'early-account-emission',
-            () =>
-                fusion.emitEligibleAccounts(async (account) => {
-                    await sendWithBackpressure(serviceRegistry.res, account)
-                    if (options.streamProgress) options.streamProgress.sent++
-                }),
-            {
-                track: 'FusionService.emitEligibleAccounts',
-                trackDone: (count) => ({ sent: count }),
-                endDetail: (count) => ({ sent: count }),
-            }
-        )
-        const cleared = fusion.clearEmittedFusionAccounts()
-        log.detail({ action: 'emitted fusion accounts cleared before match sweep', sent, cleared })
-    }
 
     const uncorrelatedCount = sources.run.managedAccountsById.size
     await log.runStep('uncorrelated-sweep', () => fusion.processUncorrelatedManagedAccounts(), {

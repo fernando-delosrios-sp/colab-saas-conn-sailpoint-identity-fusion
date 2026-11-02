@@ -5,6 +5,13 @@ All notable changes to **Identity Fusion NG** — the ISC connector for Map → 
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
 
+## 2026-11-02
+
+### 🔧 Improvements
+
+- **Remove early Fusion account emission** — Developer Settings no longer offers **Drop Fusion accounts after emission?** (`fusionDropAccountsAfterEmit`). Accounts stay resident through matching and are sent once during Output, which keeps unique attributes, review entitlements, and auto-merge updates on the copy Identity Security Cloud receives.
+- **Release aggregation memory as Output sends accounts** — Output drops Match indexes, the candidate roster, and deferred-match registrations before sending, then removes each Fusion account as its batch is sent instead of holding a second full copy. Claimed managed accounts keep only the fields later rematerialization and blend reports read.
+
 ## 2026-10-29 · v2.3.0
 
 ### ✨ New Features

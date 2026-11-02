@@ -38,6 +38,28 @@ export function toManagedAccountInfo(account: Account): ManagedAccountInfo {
     }
 }
 
+/**
+ * Attribute body kept after a managed account leaves the Match work queue.
+ * Shares the original `attributes` object and drops unused payload such as the
+ * nested identity document.
+ */
+function toRetainedAccount(account: Account): Account {
+    const sourceId = account.sourceId ?? account.source?.id
+    return {
+        id: account.id,
+        name: account.name,
+        sourceId,
+        sourceName: account.sourceName,
+        nativeIdentity: account.nativeIdentity,
+        attributes: account.attributes,
+        disabled: account.disabled,
+        modified: account.modified,
+        identityId: account.identityId,
+        ...(account.isMachine === true ? { isMachine: true } : {}),
+        ...(account.source ? { source: { id: account.source.id, name: account.source.name } } : {}),
+    } as Account
+}
+
 export interface RunStateSnapshot {
     managedAccounts: Record<string, any>[]
     fusionAccounts: Record<string, any>[]
@@ -96,7 +118,6 @@ export class FusionRun {
     private readonly claimedAccountRetention = new Map<string, Account>()
     private readonly fusionAccountMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityMapValue = new Map<string, FusionAccount>()
-    private readonly emittedAccountKeys = new Set<string>()
     private readonly fusionIdentityOwnerIdByManagedKey = new Map<string, string>()
     private readonly identityMapValue = new Map<string, IdentityDocument>()
     /** Non-protected identity IDs loaded from ISC during this run (survives cache clears). */
@@ -255,7 +276,7 @@ export class FusionRun {
     private retainClaimedAccount(accountKey: string): void {
         const account = this.managedAccountsById.get(accountKey)
         if (account) {
-            this.claimedAccountRetention.set(accountKey, account)
+            this.claimedAccountRetention.set(accountKey, toRetainedAccount(account))
         }
     }
 
@@ -514,6 +535,25 @@ export class FusionRun {
     }
 
     /**
+     * Drop Match indexes, rosters, and reviewer sets once scoring is finished.
+     * Output still reads the Fusion account maps; these structures only keep extra references alive.
+     */
+    releaseMatchWorkingSets(): void {
+        this.clearDeferredCandidates()
+        this.blockingIdentityRoster = []
+        this.trigramIndexByAttribute.clear()
+        this.binaryIndexByAttribute.clear()
+        this.lig3LengthIndexByAttribute.clear()
+        this.indexedMandatoryAttributes = []
+        this.trigramIndexBuilt = false
+        this.nameMatcherTokenCache.clear()
+        this.nameMatcherPhoneticCache.clear()
+        this.normalizedCache = new WeakMap()
+        this.nameNormalizedCache = new WeakMap()
+        this.reviewersBySourceId.clear()
+    }
+
+    /**
      * Iterate over the current-run deferred-match candidates for a source.
      */
     currentRunDeferredCandidatesForSource(sourceName: string | null | undefined): Iterable<FusionAccount> {
@@ -630,52 +670,6 @@ export class FusionRun {
 
     markAutoMerged(identityId: string): void {
         this.autoMergedIdentityIdsValue.add(identityId)
-    }
-
-    markAccountEmitted(key: string): void {
-        if (key) this.emittedAccountKeys.add(key)
-    }
-
-    isAccountEmitted(key: string | undefined): boolean {
-        return key !== undefined && this.emittedAccountKeys.has(key)
-    }
-
-    markFusionAccountEmitted(account: FusionAccount, outputKey?: string): void {
-        this.markAccountEmitted(account.identityId ?? '')
-        this.markAccountEmitted(account.managedKey ?? '')
-        this.markAccountEmitted(account.key?.simple?.id ?? '')
-        this.markAccountEmitted(outputKey ?? '')
-    }
-
-    isFusionAccountEmitted(account: FusionAccount): boolean {
-        return (
-            this.isAccountEmitted(account.identityId) ||
-            this.isAccountEmitted(account.managedKey) ||
-            this.isAccountEmitted(account.key?.simple?.id)
-        )
-    }
-
-    /** Drop emitted Fusion accounts while preserving their compact match candidate records. */
-    clearEmittedFusionAccounts(): number {
-        let cleared = 0
-        const emittedIdentityIds = new Set<string>()
-        for (const [key, account] of this.fusionAccountMapValue) {
-            if (!this.isFusionAccountEmitted(account) && !this.isAccountEmitted(key)) continue
-            this.fusionAccountMapValue.delete(key)
-            cleared++
-        }
-        for (const [identityId, account] of this.fusionIdentityMapValue) {
-            if (!this.isFusionAccountEmitted(account) && !this.isAccountEmitted(identityId)) continue
-            this.fusionIdentityMapValue.delete(identityId)
-            emittedIdentityIds.add(identityId)
-            cleared++
-        }
-        if (emittedIdentityIds.size > 0) {
-            for (const [managedKey, identityId] of this.fusionIdentityOwnerIdByManagedKey) {
-                if (emittedIdentityIds.has(identityId)) this.fusionIdentityOwnerIdByManagedKey.delete(managedKey)
-            }
-        }
-        return cleared
     }
 
     isAutoMerged(identityId: string): boolean {

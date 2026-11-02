@@ -18,7 +18,6 @@ export const runtimeDefaults = {
     concurrencyCheckEnabled: true,
     forceAttributeRefresh: false,
     skipDuplicateFusionAccounts: false,
-    fusionDropAccountsAfterEmit: false,
 } as const
 
 export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSection {
@@ -26,17 +25,16 @@ export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSec
 
     return {
         resetAccounts:
-            extractBoolean(raw, 'resetAccounts') ??
-            extractBoolean(raw, 'reset') ??
-            runtimeDefaults.resetAccounts,
+            extractBoolean(raw, 'resetAccounts') ?? extractBoolean(raw, 'reset') ?? runtimeDefaults.resetAccounts,
         resetForms: extractBoolean(raw, 'resetForms') ?? runtimeDefaults.resetForms,
-        managedAccountsBatchSize: (raw.managedAccountsBatchSize as number | undefined) ?? runtimeDefaults.managedAccountsBatchSize,
-        scoringMaxConcurrency: (raw.scoringMaxConcurrency as number | undefined) ?? runtimeDefaults.scoringMaxConcurrency,
-        concurrencyCheckEnabled: extractBoolean(raw, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled,
+        managedAccountsBatchSize:
+            (raw.managedAccountsBatchSize as number | undefined) ?? runtimeDefaults.managedAccountsBatchSize,
+        scoringMaxConcurrency:
+            (raw.scoringMaxConcurrency as number | undefined) ?? runtimeDefaults.scoringMaxConcurrency,
+        concurrencyCheckEnabled:
+            extractBoolean(raw, 'concurrencyCheckEnabled') ?? runtimeDefaults.concurrencyCheckEnabled,
         forceAttributeRefresh: extractBoolean(raw, 'forceAttributeRefresh') ?? runtimeDefaults.forceAttributeRefresh,
         skipDuplicateFusionAccounts:
             extractBoolean(raw, 'skipDuplicateFusionAccounts') ?? runtimeDefaults.skipDuplicateFusionAccounts,
-        fusionDropAccountsAfterEmit:
-            extractBoolean(raw, 'fusionDropAccountsAfterEmit') ?? runtimeDefaults.fusionDropAccountsAfterEmit,
     }
 }

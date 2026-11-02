@@ -32,7 +32,6 @@ describe('MatchOutcomeDispatcher', () => {
             isAggregationMode?: boolean
             configOverrides?: Partial<FusionConfig>
             tracker?: AggregationTracker
-            emitUpdatedAccount?: (account: FusionAccount) => Promise<void>
         } = {}
     ) {
         const config = {
@@ -98,7 +97,6 @@ describe('MatchOutcomeDispatcher', () => {
             accountAssembly,
             forms,
             decisionProcessor,
-            emitUpdatedAccount: options.emitUpdatedAccount,
             commandType: options.commandType,
         })
 
@@ -217,49 +215,6 @@ describe('MatchOutcomeDispatcher', () => {
     }
 
     describe('runMatchSweep', () => {
-        it('re-emits an auto-matched Fusion account after its target identity was dropped', async () => {
-            const emitUpdatedAccount = vi.fn().mockResolvedValue(undefined)
-            const { dispatcher, matchingService, decisionProcessor, log, run } = createDispatcher({
-                commandType: StandardCommand.StdAccountList,
-                configOverrides: {
-                    fusionDropAccountsAfterEmit: true,
-                    fusionEnableAutoMerge: true,
-                    fusionAutoMergeScore: 100,
-                },
-                emitUpdatedAccount,
-            })
-            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
-
-            const identity = FusionAccount.fromIdentity({
-                id: 'identity-1',
-                name: 'Identity One',
-                attributes: {},
-            } as any)
-            run.registerFusionAccount(identity)
-            run.markFusionAccountEmitted(identity)
-            expect(run.clearEmittedFusionAccounts()).toBe(1)
-            expect(run.getFusionIdentity('identity-1')).toBeUndefined()
-
-            const updatedAccount = FusionAccount.fromIdentity({
-                id: 'identity-1',
-                name: 'Identity One',
-                attributes: { email: 'managed@example.com' },
-            } as any)
-            decisionProcessor.processFusionIdentityDecision.mockResolvedValue(updatedAccount)
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(async (fusionAccount, _pool, type) => {
-                if (type === MatchCandidateType.Identity) fusionAccount.layers.addFusionMatch(identityMatch())
-                return 1
-            })
-
-            await dispatcher.runMatchSweep([managedAccount()], 1)
-
-            expect(decisionProcessor.processFusionIdentityDecision).toHaveBeenCalledWith(
-                expect.objectContaining({ identityId: 'identity-1', automaticMerge: true })
-            )
-            expect(log.debug).toHaveBeenCalledWith(expect.stringContaining('is not resident; rebuilding it on demand'))
-            expect(emitUpdatedAccount).toHaveBeenCalledWith(updatedAccount)
-        })
-
         it('lets timers run while sweeping a large account set', async () => {
             // A first run has no identities to score against, so every await in the sweep settles
             // without I/O. Microtasks alone never let Node reach the timer phase, which is what
@@ -367,51 +322,6 @@ describe('MatchOutcomeDispatcher', () => {
 
             expect(identityPools).toEqual([[candidateOne, candidateTwo]])
             expect(run.identityCandidateSetSizeSum).toBe(2)
-        })
-
-        it('scores projected candidates after early-emitted Fusion identities are dropped', async () => {
-            const { dispatcher, matchingService, run } = createDispatcher({
-                commandType: StandardCommand.StdAccountList,
-                configOverrides: {
-                    fusionDropAccountsAfterEmit: true,
-                    fusionEnableAutoMerge: true,
-                    matchingConfigs: [
-                        { attribute: 'email', algorithm: 'jaro-winkler', fusionScore: 80, mandatory: false },
-                    ],
-                },
-            })
-            run.sourcesByName.set(SOURCE_NAME, sourceInfo())
-
-            const identity = FusionAccount.fromIdentity({
-                id: 'id-early',
-                name: 'Early Identity',
-                attributes: { email: 'early@example.com', unused: 'not retained' },
-            } as any)
-            run.registerFusionAccount(identity)
-            matchingService.buildTrigramIndex(run.allFusionIdentities)
-            run.markFusionAccountEmitted(identity)
-            expect(run.clearEmittedFusionAccounts()).toBe(1)
-
-            const identityPools: unknown[][] = []
-            vi.spyOn(matchingService, 'scoreFusionAccount').mockImplementation(
-                async (_account, pool, candidateType) => {
-                    if (candidateType === MatchCandidateType.Identity) identityPools.push(Array.from(pool))
-                    return 0
-                }
-            )
-
-            await dispatcher.runMatchSweep([managedAccount()], 1)
-
-            expect(identityPools).toEqual([
-                [
-                    {
-                        identityId: 'id-early',
-                        identityName: 'Early Identity',
-                        attributes: { email: 'early@example.com' },
-                    },
-                ],
-            ])
-            expect(run.identityCandidateSetSizeSum).toBe(1)
         })
 
         it('scores the full identity baseline and adds the baseline size when getCandidates returns undefined', async () => {
@@ -1370,10 +1280,7 @@ describe('MatchOutcomeDispatcher', () => {
             const { dispatcher, matchingService, decisionProcessor, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
-            run.sourcesByName.set(
-                SOURCE_NAME,
-                ownershipSource({ disableNonMatchingAccounts: true })
-            )
+            run.sourcesByName.set(SOURCE_NAME, ownershipSource({ disableNonMatchingAccounts: true }))
             const disableSpy = vi.fn().mockResolvedValue(undefined)
             run.setDisableOperationFactory(async (account) => disableSpy(account))
             vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)

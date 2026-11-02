@@ -235,20 +235,12 @@ async function scoreIdentityCandidates(
         const excludeIds =
             config.fusionEnableAutoMerge && run.autoMergedIdentityIds.size > 0 ? run.autoMergedIdentityIds : undefined
         const candidateSet = matchingService.getCandidates(fusionAccount, log, excludeIds)
-        const identityPool: Iterable<MatchCandidateRecord | FusionAccount> = candidateSet ??
-            (config.fusionDropAccountsAfterEmit
-                ? run.blockingIdentityRoster.filter(
-                      (candidate) => !excludeIds || !candidate.identityId || !excludeIds.has(candidate.identityId)
-                  )
-                : excludeIds
-                  ? run.fusionIdentitiesExcluding(excludeIds)
-                  : run.allFusionIdentities)
+        const identityPool: Iterable<MatchCandidateRecord | FusionAccount> =
+            candidateSet ?? (excludeIds ? run.fusionIdentitiesExcluding(excludeIds) : run.allFusionIdentities)
         if (candidateSet) {
             run.identityCandidateSetSizeSum += candidateSet.size
         } else {
-            run.identityCandidateSetSizeSum += config.fusionDropAccountsAfterEmit
-                ? run.blockingIdentityRoster.length
-                : run.fusionIdentityMap.size
+            run.identityCandidateSetSizeSum += run.fusionIdentityMap.size
         }
         const scoringStarted = Date.now()
         fusionIdentityComparisons = await matchingService.scoreFusionAccount(
@@ -391,7 +383,6 @@ export interface MatchOutcomeDispatcherDeps {
     readonly accountAssembly: AccountAssembly
     readonly forms: FormService
     readonly decisionProcessor: DecisionProcessor
-    readonly emitUpdatedAccount?: (account: FusionAccount) => Promise<void>
     readonly commandType?: StandardCommand
 }
 
@@ -789,7 +780,14 @@ export class MatchOutcomeDispatcher {
         const { fusionAccount, account, sourceInfo, sourceType } = analysis
 
         try {
-            return await this.dispatchScoredOutcome(scored, fusionAccount, account, sourceInfo, sourceType, serializeExactMatch)
+            return await this.dispatchScoredOutcome(
+                scored,
+                fusionAccount,
+                account,
+                sourceInfo,
+                sourceType,
+                serializeExactMatch
+            )
         } finally {
             this.claimScoredOwnershipAccount(account)
         }
@@ -882,18 +880,9 @@ export class MatchOutcomeDispatcher {
         )
         this.deps.run.markAutoMerged(identityId)
         this.deps.log.recordEvent('autoMerged')
-        const targetIdentityIsNotResident =
-            !this.deps.run.getFusionIdentity(identityId) && !this.deps.run.getFusionAccountByManagedKey(identityId)
-        if (this.deps.config.fusionDropAccountsAfterEmit && targetIdentityIsNotResident) {
-            this.deps.log.debug(`Auto-merge target identity ${identityId} is not resident; rebuilding it on demand`)
-        }
         const syntheticDecision = this.deps.forms.createAutomaticMergeDecision(fusionAccount, account, identityId)
         this.deps.forms.registerFinishedDecision(syntheticDecision)
-        const updatedAccount = await this.deps.decisionProcessor.processFusionIdentityDecision(syntheticDecision)
-        if (this.deps.config.fusionDropAccountsAfterEmit && updatedAccount && this.deps.emitUpdatedAccount) {
-            await this.deps.emitUpdatedAccount(updatedAccount)
-        }
-        return updatedAccount
+        return this.deps.decisionProcessor.processFusionIdentityDecision(syntheticDecision)
     }
 
     private async applyPartialMatchFormOutcome(
