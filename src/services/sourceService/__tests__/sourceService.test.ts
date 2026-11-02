@@ -1,4 +1,5 @@
 import { SourceService } from '../sourceService'
+import { MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL } from '../managedAccountFetcher'
 import { buildIdentityAttributeCreateErrorMessage } from '../sourceReverseCorrelationErrors'
 import { SourceInfo } from '../types'
 import { OrphanProcessingMode, SourceType } from '../../../model/config'
@@ -377,6 +378,55 @@ describe('SourceService Ownership fetch registration', () => {
         await service.fetchManagedAccounts()
 
         expect(service.run.managedAccountsById.has('managed-source-id::machine-5')).toBe(false)
+    })
+})
+
+describe('SourceService.fetchManagedAccounts bulk ingest', () => {
+    it('yields between managed account pages so keep-alives can run', async () => {
+        const { service, log } = createService()
+        const setImmediateSpy = vi.spyOn(global, 'setImmediate')
+
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(
+            async function* (_sourceId, _abort, _limit, onPageProgress) {
+                onPageProgress?.(1, 2)
+                yield [{ id: 'a1', sourceId: 'managed-source-id', nativeIdentity: 'native-1' } as any]
+                expect(service.run.managedAccountsById.has('managed-source-id::native-1')).toBe(true)
+                onPageProgress?.(2, 2)
+                yield [{ id: 'a2', sourceId: 'managed-source-id', nativeIdentity: 'native-2' } as any]
+            }
+        )
+
+        await service.fetchManagedAccounts()
+
+        expect(service.run.managedAccountsById.has('managed-source-id::native-2')).toBe(true)
+        expect(setImmediateSpy).toHaveBeenCalledTimes(2)
+        expect(log.setFetchPopulationProgress).toHaveBeenLastCalledWith('managed-accounts', 2, 2)
+        setImmediateSpy.mockRestore()
+    })
+
+    it('yields while storing one managed account page', async () => {
+        const { service, log } = createService()
+        const setImmediateSpy = vi.spyOn(global, 'setImmediate')
+        const accounts = Array.from({ length: MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL }, (_, index) => ({
+            id: `a${index}`,
+            sourceId: 'managed-source-id',
+            nativeIdentity: `native-${index}`,
+        }))
+
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* () {
+            yield accounts as any
+        })
+
+        await service.fetchManagedAccounts()
+
+        expect(service.run.managedAccountsById.size).toBe(MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL)
+        expect(setImmediateSpy).toHaveBeenCalledTimes(2)
+        expect(log.setFetchPopulationProgress).toHaveBeenCalledWith(
+            'managed-accounts',
+            MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL,
+            MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL
+        )
+        setImmediateSpy.mockRestore()
     })
 })
 

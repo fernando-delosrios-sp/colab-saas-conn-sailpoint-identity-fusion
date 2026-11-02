@@ -3,6 +3,7 @@ import { OrphanProcessingMode, SourceType } from '../../model/config'
 import { FusionRun } from '../../model/fusionRun'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { wrapConnectorError } from '../../utils/error'
+import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { LogService } from '../logService'
 import { CompiledAccountJmespathFilter, compileAccountPageJmespathFilter } from './accountFilters'
 import { pruneManagedAccountAttributes } from './referencedAttributeSet'
@@ -144,16 +145,21 @@ function computeAggregateFetchProgress(sourceProgress: Map<string, { registered:
     return { sumRegistered, sumTotal, allTotalsKnown }
 }
 
-function collectAccountsFromBatch(
+/** Accounts examined before registration yields, so one page cannot hold the event loop. */
+export const MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL = 100
+
+async function collectAccountsFromBatch(
     source: SourceInfo,
     batch: Account[],
     effectiveLimit: number | undefined,
     collectedCount: number,
-    deps: Pick<ManagedAccountFetcherDeps, 'run' | 'accountJmespathFiltersBySourceName' | 'referencedAttributeSet'>
-): { collectedCount: number; discardedMachineCount: number; reachedLimit: boolean } {
+    deps: Pick<ManagedAccountFetcherDeps, 'run' | 'accountJmespathFiltersBySourceName' | 'referencedAttributeSet'>,
+    onCollected?: (collectedCount: number) => void
+): Promise<{ collectedCount: number; discardedMachineCount: number; reachedLimit: boolean }> {
     const filteredBatch = applyManagedJmespathFilter(source, batch, deps.accountJmespathFiltersBySourceName)
     let nextCollected = collectedCount
     let discardedMachineCount = 0
+    let examinedSinceYield = 0
 
     for (const account of filteredBatch) {
         if (effectiveLimit !== undefined && nextCollected >= effectiveLimit) {
@@ -178,6 +184,12 @@ function collectAccountsFromBatch(
         }
         deps.run.setManagedAccount(accountKey, account)
         nextCollected++
+        examinedSinceYield++
+        if (examinedSinceYield >= MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL) {
+            examinedSinceYield = 0
+            onCollected?.(nextCollected)
+            await yieldToEventLoop()
+        }
     }
 
     const reachedLimit = effectiveLimit !== undefined && nextCollected >= effectiveLimit
@@ -241,16 +253,29 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
                         sourceProgress.set(source.id, { ...current, total })
                     }
                 )) {
-                    const batchResult = collectAccountsFromBatch(source, batch, effectiveLimit, collectedCount, {
-                        run,
-                        accountJmespathFiltersBySourceName,
-                        referencedAttributeSet: deps.referencedAttributeSet,
-                    })
+                    const batchResult = await collectAccountsFromBatch(
+                        source,
+                        batch,
+                        effectiveLimit,
+                        collectedCount,
+                        {
+                            run,
+                            accountJmespathFiltersBySourceName,
+                            referencedAttributeSet: deps.referencedAttributeSet,
+                        },
+                        (registered) => {
+                            const current = sourceProgress.get(source.id) ?? {}
+                            sourceProgress.set(source.id, { ...current, registered })
+                            reportAggregateFetchProgress()
+                        }
+                    )
                     collectedCount = batchResult.collectedCount
                     discardedMachineCount += batchResult.discardedMachineCount
                     const current = sourceProgress.get(source.id) ?? {}
                     sourceProgress.set(source.id, { ...current, registered: collectedCount })
                     reportAggregateFetchProgress()
+                    // Completed pages otherwise drain as microtasks and starve keep-alives.
+                    await yieldToEventLoop()
                     if (batchResult.reachedLimit) {
                         log.info(`Source ${source.name}: reached effectiveLimit of ${effectiveLimit}, stopping`)
                         break
