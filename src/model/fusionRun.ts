@@ -44,19 +44,19 @@ export function toManagedAccountInfo(account: Account): ManagedAccountInfo {
  * nested identity document.
  */
 function toRetainedAccount(account: Account): Account {
-    const sourceId = account.sourceId ?? account.source?.id
+    const legacySource = (account as Account & { source?: { id?: string; name?: string | null } }).source
+    const sourceId = account.sourceId || legacySource?.id
     return {
         id: account.id,
         name: account.name,
         sourceId,
-        sourceName: account.sourceName,
+        sourceName: account.sourceName ?? legacySource?.name ?? null,
         nativeIdentity: account.nativeIdentity,
         attributes: account.attributes,
         disabled: account.disabled,
         modified: account.modified,
         identityId: account.identityId,
         ...(account.isMachine === true ? { isMachine: true } : {}),
-        ...(account.source ? { source: { id: account.source.id, name: account.source.name } } : {}),
     } as Account
 }
 
