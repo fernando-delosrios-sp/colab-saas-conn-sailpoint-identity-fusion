@@ -85,6 +85,24 @@ When all 5 hold → proactively suggest "ready to `/opsx:propose`?" — wait for
 
 **Before committing:** run `npm run lint` (catches type issues, unused code, and style violations). For documentation edits under `docs/use-guides/`, also run `npm run lint:docs-guides`.
 
+## package-lock.json registry URLs
+
+`npm install` on a machine whose npm registry is Artifactory rewrites `resolved` in `package-lock.json` to `*.jfrog.io` / `artifactory` URLs. Those URLs must not be committed.
+
+Before any commit that touches `package-lock.json`:
+
+1. Search the file for `jfrog.io` and `artifactory`.
+2. Rewrite each `resolved` value to the public registry, keeping the package path and tarball name. Leave `integrity` unchanged.
+
+```
+https://sailpoint.jfrog.io/artifactory/api/npm/sp-npm-dev/concurrently/-/concurrently-9.2.5.tgz
+→ https://registry.npmjs.org/concurrently/-/concurrently-9.2.5.tgz
+```
+
+General form: drop the Artifactory host and `/artifactory/api/npm/<repo>/` prefix; keep the remainder under `https://registry.npmjs.org/`. Scoped packages stay `@scope/name/-/name-version.tgz`.
+
+Do not commit the lockfile while any `resolved` URL still points at Artifactory.
+
 ## Documentation
 
 MkDocs site under `docs/`. Use guides follow **one topic per page**; routers link out instead of embedding other topics.
