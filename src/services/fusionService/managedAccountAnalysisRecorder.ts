@@ -74,7 +74,8 @@ export class ManagedAccountAnalysisRecorder implements ManagedAccountAnalysisRec
                     sourceTypeValue,
                     reportAttributes,
                     undefined,
-                    reportAccountId
+                    reportAccountId,
+                    sourcesByName.get(fusionAccount.sourceName)?.internalProvenance === true
                 ),
                 deferred: true,
                 fusionIdentityComparisons,
@@ -97,7 +98,8 @@ export class ManagedAccountAnalysisRecorder implements ManagedAccountAnalysisRec
                 sourcesByName.get(fusionAccount.sourceName)?.sourceType,
                 reportAttributes,
                 undefined,
-                resolveReportAccountId(fusionAccount, sources)
+                resolveReportAccountId(fusionAccount, sources),
+                sourcesByName.get(fusionAccount.sourceName)?.internalProvenance === true
             ),
             fusionIdentityComparisons,
         })
@@ -115,7 +117,8 @@ export class ManagedAccountAnalysisRecorder implements ManagedAccountAnalysisRec
                 sourcesByName.get(fusionAccount.sourceName)?.sourceType,
                 reportAttributes,
                 error,
-                resolveReportAccountId(fusionAccount, sources)
+                resolveReportAccountId(fusionAccount, sources),
+                sourcesByName.get(fusionAccount.sourceName)?.internalProvenance === true
             ),
             fusionIdentityComparisons: trackerInstance.fusionIdentityComparisonsByAccount.get(fusionAccount) ?? 0,
         })

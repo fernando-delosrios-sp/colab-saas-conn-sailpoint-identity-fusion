@@ -6,7 +6,7 @@ import {
     buildIndices,
     fnv1a64,
 } from '../scripts/build-indices'
-import { connectorCustomizer, resolveDataDir } from '../src/index'
+import { connectorCustomizer, resolveDataDir, resolveHistoricalRecordsDir } from '../src/index'
 
 describe('Unique Values Customizer', () => {
     let tempDir: string
@@ -146,6 +146,25 @@ describe('Unique Values Customizer', () => {
             expect(result.filter).toBe('test')
             expect(typeof result.customizerIndicesDir).toBe('string')
             expect(result.customizerIndicesDir.length).toBeGreaterThan(0)
+        })
+
+        it('omits the historical-record directory when the package has no manifest', () => {
+            expect(resolveHistoricalRecordsDir(path.join(tempDir, 'index-only'))).toBeUndefined()
+        })
+
+        it('returns the historical-record directory when a manifest is packaged', async () => {
+            const customizerInstance = await connectorCustomizer()
+            const base = path.join(tempDir, 'packaged')
+            const manifestDir = path.join(base, 'data', 'historical-records')
+            fs.mkdirSync(manifestDir, { recursive: true })
+            fs.writeFileSync(path.join(manifestDir, 'manifest.json'), '{"formatVersion":1,"sources":[]}\n')
+            expect(resolveHistoricalRecordsDir(path.join(base, 'dist'))).toBe(manifestDir)
+
+            const result = await customizerInstance._exec('before:std:account:list', {} as any, { filter: 'test' })
+            expect(result.customizerIndicesDir).toEqual(expect.any(String))
+            expect(result.customizerHistoricalRecordsDir === undefined || typeof result.customizerHistoricalRecordsDir === 'string').toBe(
+                true
+            )
         })
 
         it('resolveDataDir prioritizes existing data directory', () => {

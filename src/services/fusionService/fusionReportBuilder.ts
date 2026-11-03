@@ -108,7 +108,8 @@ function buildMatchAccounts(state: FusionReportState): FusionReportAccount[] {
                 sourceInfo?.sourceType,
                 state.reportAttributes,
                 undefined,
-                resolveReportAccountId(fusionAccount, state.sources)
+                resolveReportAccountId(fusionAccount, state.sources),
+                sourceInfo?.internalProvenance === true
             ),
             fusionIdentityComparisons: state.fusionIdentityComparisonsByAccount.get(fusionAccount) ?? 0,
             matches,

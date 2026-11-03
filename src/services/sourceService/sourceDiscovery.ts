@@ -5,6 +5,7 @@ import { wrapConnectorError } from '../../utils/error'
 import { readPathString } from '../../utils/safeRead'
 import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
+import { historicalSourceId } from './historicalRecordFormat'
 import { getCompiledAccountJmespathFilter } from './managedAccountFetcher'
 import { SourceInfo } from './types'
 
@@ -51,6 +52,17 @@ export async function fetchAllSources(deps: SourceDiscoveryDeps, requireFusionSo
     const resolvedSources: SourceInfo[] = []
 
     for (const sourceConfig of state.sources) {
+        if (sourceConfig.historicalRecordFile) {
+            resolvedSources.push({
+                id: historicalSourceId(sourceConfig.historicalRecordFile),
+                name: sourceConfig.name,
+                isManaged: true,
+                sourceType: SourceType.Record,
+                config: sourceConfig,
+                internalProvenance: true,
+            })
+            continue
+        }
         const apiSource = apiSourcesByName.get(sourceConfig.name)
         assert(
             apiSource,
@@ -105,7 +117,7 @@ export async function fetchAllSources(deps: SourceDiscoveryDeps, requireFusionSo
     }
 
     state.allSources = resolvedSources
-    state.sourcesById = new Map(resolvedSources.map((x) => [x.id, x]))
+    state.sourcesById = new Map(resolvedSources.filter((source) => !source.internalProvenance).map((x) => [x.id, x]))
     run.sourcesByName.clear()
     for (const source of resolvedSources) {
         run.sourcesByName.set(source.name, source)

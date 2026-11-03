@@ -247,6 +247,11 @@ export interface SourceConfig {
      * attribute registration (for example reserving third-party identifiers).
      */
     includeRecordAccountsForMatching?: boolean
+    /**
+     * File name of a historical-record dump packaged with the Unique Values Customizer.
+     * When set, the source is an external Record source and is not fetched from ISC.
+     */
+    historicalRecordFile?: string
 }
 
 /** Configuration for all managed sources and aggregation behavior. */

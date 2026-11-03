@@ -8,6 +8,7 @@ import {
 import { formatCorrelationSummaryValue } from '../../services/logService/operationRunContext'
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
+import { validateConfiguredHistoricalRecords } from '../../services/sourceService/historicalRecordFormat'
 import { buildReferencedAttributeSet } from '../../services/sourceService/referencedAttributeSet'
 import { generateReport } from './generateReport'
 import { buildReportAggregationStats, buildTerminalSummary, DryRunInput, type FetchResult } from './accountListHelpers'
@@ -20,6 +21,7 @@ export interface PhaseOptions {
     tracker?: AggregationTracker
     streamProgress?: { sent: number }
     customizerIndicesDir?: string
+    customizerHistoricalRecordsDir?: string
 }
 
 // --- Private helpers ---
@@ -152,6 +154,10 @@ export async function setupPhase(
     if (customizerDir) {
         serviceRegistry.setCustomizerIndicesDir(customizerDir)
     }
+    const historicalRecordsDir =
+        options.customizerHistoricalRecordsDir ?? serviceRegistry.customizerHistoricalRecordsDir
+    serviceRegistry.setCustomizerHistoricalRecordsDir(historicalRecordsDir)
+    validateConfiguredHistoricalRecords(config.sources, historicalRecordsDir)
     definition.initializeCustomizerStore(customizerDir)
     return true
 }

@@ -120,11 +120,12 @@ When disabled:
 
 | Field | Description | Required | Notes |
 | --- | --- | --- | --- |
-| **Source name** | Exact ISC source name | Yes | Case-sensitive |
+| **Source name** | Report label and processing name | Yes | Exact ISC source name, unless **Historical record file** is set |
 | **Enabled** | Include in processing | No | Default on |
 | **Source type** | Authoritative accounts, Records, or Orphan accounts | Yes | See [Source types](source-types.md) |
 | **Orphan processing mode** | Assignment or Ownership | No (Orphan only) | Default Assignment. See [Source types](source-types.md#orphan-accounts) |
-| **Include record accounts in Match** | Match scoring for Records sources | No (Records only) | Default on |
+| **Include record accounts in Match** | Match scoring for Records sources | No (Records only) | Default on. Also applies to a Historical Record source |
+| **Historical record file** | Packaged historical-record dump | No (Records only) | File name such as `Historical Records.csv`. Leave empty for an ISC source. See [Unique Values Customizer](unique-values-customizer.md#historical-record-sources) |
 | **Disable non-matching accounts** | Disable orphan non-matches | No (Orphan only) | Background disable on managed source. Applies in Assignment mode and Ownership mode |
 | **[Deferred candidate matching](../../glossary.md#candidates)** | Same-run deferred-candidate comparison | No (Authoritative only) | Same source only; never cross-source |
 | **Accounts API filter** | Server-side account list filter | No | ISC `filters` parameter |

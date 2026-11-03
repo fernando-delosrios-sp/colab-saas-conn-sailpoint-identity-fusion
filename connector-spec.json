@@ -233,6 +233,15 @@
                                             "helpKey": "Enable when record accounts should be matched against Fusion identities."
                                         },
                                         {
+                                            "key": "historicalRecordFile",
+                                            "label": "Historical record file",
+                                            "type": "text",
+                                            "required": false,
+                                            "parentKey": "sourceType",
+                                            "parentValue": "record",
+                                            "helpKey": "File name of a headered historical-record dump packaged with the Unique Values Customizer, such as Historical Records.csv; leave empty for an Identity Security Cloud source."
+                                        },
+                                        {
                                             "key": "accountFilter",
                                             "label": "Accounts API filter",
                                             "type": "text",

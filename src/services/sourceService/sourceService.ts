@@ -77,6 +77,7 @@ export class SourceService {
     private sourcesById: Map<string, SourceInfo> = new Map()
     private aggregationDateCache: Map<string, Promise<Date>> = new Map()
     private allSourcesValue?: SourceInfo[]
+    public historicalRecordsDir?: string
     private fusionSourceIdValue?: string
     private fusionSourceOwnerValue?: OwnerDto
     private fusionSourceManagementWorkgroupId?: string
@@ -1079,6 +1080,7 @@ export class SourceService {
             accountJmespathFiltersBySourceName: this.accountJmespathFiltersBySourceName,
             fetchAccountsBySourceIdGenerator: this.fetchAccountsBySourceIdGenerator.bind(this),
             ...(this.referencedAttributeSet ? { referencedAttributeSet: this.referencedAttributeSet } : {}),
+            ...(this.historicalRecordsDir ? { historicalRecordsDir: this.historicalRecordsDir } : {}),
         }
     }
 

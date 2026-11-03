@@ -102,6 +102,41 @@ During the Setup phase, the connector emits structured audit logs:
 
 ---
 
+## Historical Record sources
+
+A historical-record dump is a headered CSV of complete account records. Place it in `customizers/unique-ids/records/` and name it for the source, for example `Historical Records.csv`. The dump must include a `nativeIdentity` column. Other columns become account attributes. Quoted commas, quotes, and line breaks are preserved.
+
+```text
+customizers/unique-ids/
+├── records/
+│   └── Historical Records.csv
+└── data/historical-records/
+    ├── manifest.json
+    └── Historical-Records-0000.hrb
+```
+
+`npm run pack-zip` compiles each `records/*.csv` into a versioned manifest and compact binary shards under `data/historical-records/`. The original CSV is not included in the deployable package. An index-only package remains valid.
+
+In Source Settings, add a Records source and set **Historical record file** to that file name. The source name is the label used in processing and reports. Identity Security Cloud does not need a managed source with the same name. **Include record accounts in Match** defaults to on. Turn it off to keep selective Map and unique-attribute registration without Match scoring. An unmatched historical record does not create a Fusion account.
+
+Reports show the Record source type and an `INTERNAL` badge for every historical reference. The account name is not linked to an ISC account.
+
+### Package compatibility and failures
+
+Rebuild and upload the customizer with the connector version that reads the manifest. Setup fails before Fetch when the configured file is missing, the manifest version is unsupported, or the dump has duplicate headers, a missing `nativeIdentity` header, or malformed CSV. The error names the file and the invalid header or row.
+
+### Benchmark and runtime memory
+
+Run the comparison from `customizers/unique-ids/`:
+
+```bash
+npm run benchmark:historical-records
+```
+
+The command measures streaming CSV and the compiled artifact in separate processes. It records package bytes, elapsed time, records per second, heap usage, external memory, RSS, and the filesystem type when the platform exposes it. Results are written to `customizers/unique-ids/benchmark/results.md`.
+
+The customizer runtime filesystem may be a ramfs. Files stored there still consume the runtime memory budget, so compiling the dump does not move it out of RAM. The compiled form avoids retaining the CSV text and the full parsed collection; aggregation still streams, prunes, and releases records. Treat the published measurements as environment-specific evidence, not as a claim that filesystem storage lowers container memory.
+
 ## Related guides
 
 - [Defining attributes](defining-attributes.md): Velocity expressions, unique definitions, and collision counters.

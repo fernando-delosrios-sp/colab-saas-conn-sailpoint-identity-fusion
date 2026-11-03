@@ -1739,6 +1739,72 @@ describe('FusionService — aggregation', () => {
             expect(ctx.run.linkedAccountKeyIndex).toBeUndefined()
         })
 
+        it('runs Match scoring for a Historical Record source when Include record accounts in Match is omitted', async () => {
+            const mockManagedAccount = {
+                nativeIdentity: 'historical-default-1',
+                name: 'Historical Default User',
+                sourceId: 'historical:Historical%20Records.csv',
+                sourceName: 'Historical Records.csv',
+                attributes: {},
+                uncorrelated: true,
+            } as Account
+
+            ;(ctx.fusionService as any).run.sourcesByName.set('Historical Records.csv', {
+                id: 'historical:Historical%20Records.csv',
+                name: 'Historical Records.csv',
+                sourceType: 'record',
+                internalProvenance: true,
+                config: { historicalRecordFile: 'Historical Records.csv' },
+            })
+            ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
+            ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
+            ctx.mockMatchingService.scoreFusionAccount.mockResolvedValue(0)
+
+            await ctx.fusionService.processManagedAccount(mockManagedAccount)
+
+            expect(ctx.mockMatchingService.scoreFusionAccount).toHaveBeenCalled()
+            expect(ctx.run.allFusionAccounts.filter((account) => account.sourceName === 'Historical Records.csv')).toEqual([])
+        })
+
+        it('registers a Historical Record source without Match scoring when Match is disabled', async () => {
+            const recordAccount = {
+                nativeIdentity: 'historical-skip-1',
+                name: 'Historical Skip User',
+                sourceId: 'historical:Historical%20Records.csv',
+                sourceName: 'Historical Records.csv',
+                attributes: { externalId: 'EXT-1' },
+                uncorrelated: true,
+            } as Account
+            const managedMap = new Map<string, Account>([['historical:Historical%20Records.csv::historical-skip-1', recordAccount]])
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
+            ;(ctx.fusionService as any).run.sourcesByName.set('Historical Records.csv', {
+                id: 'historical:Historical%20Records.csv',
+                name: 'Historical Records.csv',
+                sourceType: 'record',
+                internalProvenance: true,
+                config: {
+                    historicalRecordFile: 'Historical Records.csv',
+                    includeRecordAccountsForMatching: false,
+                },
+            })
+            const registerSpy = vi
+                .spyOn(ctx.mockDefinitionService, 'registerUniqueValuesFromRecordManagedAccounts')
+                .mockResolvedValue(1)
+
+            await ctx.fusionService.initializeManagedAccountProcessing()
+            const result = await ctx.fusionService.processRecordUniqueRegistration()
+
+            expect(result.registered).toBe(1)
+            expect(registerSpy).toHaveBeenCalledWith(
+                [recordAccount],
+                ctx.mockMappingService,
+                ctx.run,
+                expect.objectContaining({ onProgress: expect.any(Function) })
+            )
+            expect(managedMap.size).toBe(0)
+            expect(ctx.mockMatchingService.scoreFusionAccount).not.toHaveBeenCalled()
+        })
+
         it('runs Match scoring for record sources when includeRecordAccountsForMatching is omitted (default)', async () => {
             const mockManagedAccount = {
                 id: 'acct-record-default-match-1',

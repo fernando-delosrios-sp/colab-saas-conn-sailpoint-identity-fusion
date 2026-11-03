@@ -6,6 +6,13 @@ import { wrapConnectorError } from '../../utils/error'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { LogService } from '../logService'
 import { CompiledAccountJmespathFilter, compileAccountPageJmespathFilter } from './accountFilters'
+import {
+    findHistoricalRecordSource,
+    historicalPackageMessage,
+    HistoricalRecordFormatError,
+    iterateHistoricalRecords,
+    loadHistoricalRecordManifest,
+} from './historicalRecordFormat'
 import { pruneManagedAccountAttributes } from './referencedAttributeSet'
 import { SourceInfo } from './types'
 
@@ -18,6 +25,8 @@ export interface ManagedAccountFetcherDeps {
     accountJmespathFiltersBySourceName: Map<string, CompiledAccountJmespathFilter>
     /** When set, managed source account attributes are pruned to this set at registration. */
     referencedAttributeSet?: ReadonlySet<string>
+    /** Directory containing the packaged historical-record manifest and shards. */
+    historicalRecordsDir?: string
     fetchAccountsBySourceIdGenerator: (
         sourceId: string,
         abortSignal?: AbortSignal,
@@ -196,6 +205,76 @@ async function collectAccountsFromBatch(
     return { collectedCount: nextCollected, discardedMachineCount, reachedLimit }
 }
 
+const HISTORICAL_RECORD_BATCH_SIZE = 100
+
+function historicalRecordAccount(source: SourceInfo, headers: string[], values: string[]): Account {
+    const attributes: Record<string, string> = {}
+    headers.forEach((header, index) => {
+        attributes[header] = values[index] ?? ''
+    })
+    const nativeIdentity = attributes.nativeIdentity
+    return {
+        nativeIdentity,
+        name: attributes.name || nativeIdentity,
+        sourceId: source.id,
+        sourceName: source.name,
+        attributes,
+        disabled: false,
+        locked: false,
+        uncorrelated: true,
+    } as Account
+}
+
+async function fetchHistoricalRecordSource(
+    source: SourceInfo,
+    effectiveLimit: number | undefined,
+    deps: ManagedAccountFetcherDeps,
+    sourceProgress: Map<string, { registered: number; total?: number }>,
+    reportAggregateFetchProgress: () => void
+): Promise<{ collectedCount: number; discardedMachineCount: number }> {
+    const fileName = source.config?.historicalRecordFile
+    if (!fileName || !deps.historicalRecordsDir) {
+        throw new HistoricalRecordFormatError(historicalPackageMessage(fileName || source.name))
+    }
+    const manifest = loadHistoricalRecordManifest(deps.historicalRecordsDir)
+    const packaged = findHistoricalRecordSource(manifest, fileName)
+    if (!packaged) {
+        throw new HistoricalRecordFormatError(historicalPackageMessage(fileName))
+    }
+    sourceProgress.set(source.id, { registered: 0, total: packaged.recordCount })
+    reportAggregateFetchProgress()
+
+    let collectedCount = 0
+    let discardedMachineCount = 0
+    let batch: Account[] = []
+    const flush = async () => {
+        if (batch.length === 0) return
+        const batchResult = await collectAccountsFromBatch(
+            source,
+            batch,
+            effectiveLimit,
+            collectedCount,
+            deps,
+            (registered) => {
+                const current = sourceProgress.get(source.id) ?? {}
+                sourceProgress.set(source.id, { ...current, registered })
+                reportAggregateFetchProgress()
+            }
+        )
+        collectedCount = batchResult.collectedCount
+        discardedMachineCount += batchResult.discardedMachineCount
+        batch = []
+    }
+
+    for await (const record of iterateHistoricalRecords(deps.historicalRecordsDir, fileName)) {
+        if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
+        batch.push(historicalRecordAccount(source, record.headers, record.values))
+        if (batch.length >= HISTORICAL_RECORD_BATCH_SIZE) await flush()
+    }
+    await flush()
+    return { collectedCount, discardedMachineCount }
+}
+
 /**
  * Fetch and cache managed accounts from all managed sources.
  *
@@ -243,6 +322,31 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
                 log.info(`Fetching accounts from source: ${source.name}`)
                 let collectedCount = 0
                 let discardedMachineCount = 0
+
+                if (source.internalProvenance) {
+                    const historicalResult = await fetchHistoricalRecordSource(
+                        source,
+                        effectiveLimit,
+                        deps,
+                        sourceProgress,
+                        reportAggregateFetchProgress
+                    )
+                    collectedCount = historicalResult.collectedCount
+                    discardedMachineCount = historicalResult.discardedMachineCount
+                    const current = sourceProgress.get(source.id) ?? {}
+                    sourceProgress.set(source.id, { ...current, registered: collectedCount })
+                    reportAggregateFetchProgress()
+                    log.info(`Source ${source.name}: collected ${collectedCount} account(s)`)
+                    if (discardedMachineCount > 0) {
+                        log.warn(
+                            `Source ${source.name}: discarded ${discardedMachineCount} managed machine account(s) where isMachine=true`
+                        )
+                    }
+                    if (batchLimitedSourceNames.has(source.name)) {
+                        batchCumulativeCount[source.name] = collectedCount
+                    }
+                    return
+                }
 
                 for await (const batch of fetchAccountsBySourceIdGenerator(
                     source.id,

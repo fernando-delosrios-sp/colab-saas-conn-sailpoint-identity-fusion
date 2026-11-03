@@ -194,6 +194,7 @@ describe('DefinitionService Customizer Integration', () => {
                     setReferencedAttributeSet: vi.fn(),
                 },
                 definition: service,
+                setCustomizerHistoricalRecordsDir: vi.fn(),
                 identities: {
                     setReferencedAttributeSet: vi.fn(),
                 },

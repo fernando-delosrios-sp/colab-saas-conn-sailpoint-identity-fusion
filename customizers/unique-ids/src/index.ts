@@ -19,14 +19,28 @@ export function resolveDataDir(baseDir: string = __dirname): string {
 }
 
 /**
+ * Resolves the packaged historical-record directory when a manifest is present.
+ *
+ * @param baseDir - Directory relative to which data/ is located
+ * @returns Absolute historical-record directory, or undefined when the package has no dumps
+ */
+export function resolveHistoricalRecordsDir(baseDir: string = __dirname): string | undefined {
+    const dataDir = resolveDataDir(baseDir)
+    const candidate = path.resolve(dataDir, 'historical-records')
+    return fs.existsSync(path.join(candidate, 'manifest.json')) ? candidate : undefined
+}
+
+/**
  * SaaS Connectivity customizer entry point for Unique Values Customizer.
  */
 export const connectorCustomizer = async () => {
     return createConnectorCustomizer().beforeStdAccountList(async (_context, input) => {
         const customizerIndicesDir = resolveDataDir()
+        const customizerHistoricalRecordsDir = resolveHistoricalRecordsDir()
         return {
             ...input,
             customizerIndicesDir,
+            ...(customizerHistoricalRecordsDir ? { customizerHistoricalRecordsDir } : {}),
         }
     })
 }

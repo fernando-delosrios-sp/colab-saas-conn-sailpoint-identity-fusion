@@ -173,16 +173,20 @@ export function buildMinimalFusionReportAccount(
     sourceType: string | undefined,
     reportAttributes: string[],
     error?: string,
-    accountIdOverride?: string
+    accountIdOverride?: string,
+    internalProvenance = false
 ): FusionReportAccount {
     const reportAccountId = accountIdOverride ?? fusionAccount.managedAccountId
     const accountUrlId =
         accountIdOverride && !isCompositeManagedAccountKey(accountIdOverride) ? accountIdOverride : undefined
     const row: FusionReportAccount = {
         accountName: getFusionReportAccountLabel(fusionAccount),
-        accountUrl: urlContext.accountManagement(accountUrlId, fusionAccount.isMachine === true),
+        accountUrl: internalProvenance
+            ? undefined
+            : urlContext.accountManagement(accountUrlId, fusionAccount.isMachine === true),
         accountSource: fusionAccount.sourceName,
         sourceType: (sourceType as FusionReportAccount['sourceType']) ?? SourceType.Authoritative,
+        ...(internalProvenance ? { internalProvenance: true } : {}),
         accountId: reportAccountId,
         accountEmail: fusionAccount.email,
         accountAttributes: pickAttributes(fusionAccount.attributes as any, reportAttributes),

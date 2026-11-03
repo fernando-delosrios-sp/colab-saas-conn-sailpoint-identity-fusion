@@ -87,7 +87,8 @@
     },
     "knip": {
         "entry": [
-            "scripts/**/*.{cjs,js}"
+            "scripts/**/*.{cjs,js}",
+            "customizers/unique-ids/scripts/**/*.mts"
         ],
         "project": [
             "src/**/*.ts"
@@ -98,6 +99,7 @@
                 "vitest.scenario.config.ts"
             ]
         },
+        "ignoreBinaries": ["mount"],
         "rules": {
             "duplicates": "off"
         }

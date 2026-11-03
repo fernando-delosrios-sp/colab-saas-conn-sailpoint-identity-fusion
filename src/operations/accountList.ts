@@ -45,6 +45,10 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
     if (customizerIndicesDir) {
         serviceRegistry.setCustomizerIndicesDir(customizerIndicesDir)
     }
+    const customizerHistoricalRecordsDir = (input as any)?.customizerHistoricalRecordsDir as string | undefined
+    if (customizerHistoricalRecordsDir) {
+        serviceRegistry.setCustomizerHistoricalRecordsDir(customizerHistoricalRecordsDir)
+    }
     const phaseResult: { fetchResult?: FetchResult; outputCount?: number; continued: boolean } = {
         continued: true,
     }
@@ -62,6 +66,7 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
                     streamProgress: { sent: 0 },
                     schema: input.schema,
                     customizerIndicesDir,
+                    customizerHistoricalRecordsDir,
                 },
                 { log, timer, logPhases: true, result: phaseResult }
             )

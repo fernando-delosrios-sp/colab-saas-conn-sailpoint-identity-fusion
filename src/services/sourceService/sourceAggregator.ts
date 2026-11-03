@@ -68,6 +68,10 @@ export async function aggregateManagedSources(deps: SourceAggregatorDeps): Promi
 
     const aggregationChecks = await Promise.all(
         managedSources.map(async (source) => {
+            if (source.internalProvenance) {
+                log.debug(`Source ${source.name}: historical record source, skipping pre-processing aggregation`)
+                return { source, shouldAggregate: false }
+            }
             const mode = source.config?.aggregationMode ?? 'none'
 
             if (mode !== 'before') {
@@ -110,7 +114,9 @@ export async function aggregateDelayedSources(
 ): Promise<void> {
     const { log, managedSources } = deps
     assert(scheduleAggregation, 'Delayed aggregation scheduler is required')
-    const delayedSources = managedSources.filter((s) => s.config?.aggregationMode === 'delayed')
+    const delayedSources = managedSources.filter(
+        (s) => s.config?.aggregationMode === 'delayed' && !s.internalProvenance
+    )
 
     if (delayedSources.length === 0) {
         return

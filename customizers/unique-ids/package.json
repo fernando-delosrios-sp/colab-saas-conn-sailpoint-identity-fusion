@@ -6,8 +6,10 @@
     "scripts": {
         "clean": "node -e \"const fs = require('fs'); ['dist', 'data'].forEach(d => { if (fs.existsSync(d)) fs.rmSync(d, { recursive: true, force: true }); });\"",
         "build:indices": "node --experimental-strip-types scripts/build-indices.ts",
+        "build:records": "node --experimental-strip-types scripts/build-historical-records.mts",
+        "benchmark:historical-records": "node --experimental-strip-types scripts/benchmark-historical-records.mts",
         "build:code": "npx ncc build ./src/index.ts -o ./dist -m -C && node -e \"const fs = require('fs'); if (fs.existsSync('data')) fs.cpSync('data', 'dist/data', { recursive: true });\"",
-        "build": "npm run build:indices && npm run build:code",
+        "build": "npm run build:indices && npm run build:records && npm run build:code",
         "prepack-zip": "npm run build",
         "pack-zip": "spcx package"
     },

@@ -37,7 +37,7 @@ Topic guides for Identity Fusion NG connector settings. Each guide covers **one 
 | --- | --- |
 | [Mapping attributes](mapping-attributes.md) | Merge strategies and per-attribute mapping |
 | [Defining attributes](defining-attributes.md) | Velocity, unique IDs, UUIDs, counters |
-| [Unique values customizer](unique-values-customizer.md) | Standalone pre-compiled binary store for reserved unique values |
+| [Unique values customizer](unique-values-customizer.md) | Reserved unique values and packaged Historical Record sources |
 
 ### Match
 
