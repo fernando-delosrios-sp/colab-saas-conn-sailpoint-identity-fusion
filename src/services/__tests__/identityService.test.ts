@@ -515,7 +515,27 @@ describe('IdentityService.correlateAccounts', () => {
         await service.correlateAccounts(makeFusionAccount(), ['src-hr::acct-1'])
 
         expect(log.recordCorrelationActivity).toHaveBeenCalledWith({ kind: 'link', accounts: 1 })
+        expect(client.call).toHaveBeenCalledWith(
+            expect.any(Function),
+            expect.objectContaining({
+                context: 'IdentityService>correlateAccounts',
+                throwOnError: true,
+            })
+        )
         expect(log.recordCorrelationCompleted).toHaveBeenCalledWith({ kind: 'link' })
+    })
+
+    it('does not record completion when the correlation PATCH fails', async () => {
+        const { service, client } = makeService()
+        const log = (service as any).log as LogService
+        const sources = (service as any).sources as SourceServiceStub
+        ;(sources.resolveIscAccountIdForManagedKey as Mock).mockReturnValue('isc-1')
+        ;(client.call as Mock).mockRejectedValue(new Error('patch failed'))
+
+        await service.correlateAccounts(makeFusionAccount(), ['src-hr::acct-1'])
+
+        expect(log.recordCorrelationCompleted).not.toHaveBeenCalled()
+        expect(log.error).toHaveBeenCalledWith(expect.stringContaining('Failed to correlate managed key src-hr::acct-1'))
     })
 
     it('records merge correlation activity when kind is merge', async () => {

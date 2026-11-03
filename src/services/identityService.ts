@@ -539,7 +539,8 @@ export class IdentityService {
 
         // Optimistic: mark as correlated before the API call so the account
         // output reflects a successful correlation without waiting for the queue.
-        // If the API call fails, the next aggregation will re-detect it as uncorrelated.
+        // Completion is recorded only after the PATCH succeeds. If it fails, the
+        // next aggregation re-detects the account as uncorrelated.
         fusionAccount.correlation.markCorrelated(accountId)
 
         const correlationPromise = this.buildCorrelationPromise(accountId, iscAccountId, identityId, kind)
@@ -561,6 +562,7 @@ export class IdentityService {
             .call((api: any) => api.accounts.updateAccount(requestParameters).then((r: any) => r.data), {
                 priority: QueuePriority.LOW,
                 context: 'IdentityService>correlateAccounts',
+                throwOnError: true,
             })
             .then(() => {
                 this.log.recordCorrelationCompleted({ kind })
