@@ -5,7 +5,7 @@ import { wrapConnectorError } from '../../utils/error'
 import { readPathString } from '../../utils/safeRead'
 import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
-import { historicalSourceId } from './historicalRecordFormat'
+import { internalRecordSourceId } from './internalRecordFormat'
 import { getCompiledAccountJmespathFilter } from './managedAccountFetcher'
 import { SourceInfo } from './types'
 
@@ -52,9 +52,9 @@ export async function fetchAllSources(deps: SourceDiscoveryDeps, requireFusionSo
     const resolvedSources: SourceInfo[] = []
 
     for (const sourceConfig of state.sources) {
-        if (sourceConfig.historicalRecordFile) {
+        if (sourceConfig.internalRecordFile) {
             resolvedSources.push({
-                id: historicalSourceId(sourceConfig.historicalRecordFile),
+                id: internalRecordSourceId(sourceConfig.internalRecordFile),
                 name: sourceConfig.name,
                 isManaged: true,
                 sourceType: SourceType.Record,

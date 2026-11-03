@@ -51,13 +51,13 @@ export function readSettings(raw: Record<string, unknown>): SourcesSection {
                 typeof rawTimeout === 'number' && Number.isFinite(rawTimeout) && rawTimeout >= 0
                     ? rawTimeout
                     : runtimeDefaults.source.aggregationTimeoutMinutes
-            const historicalRecordFile =
-                typeof sourceConfig.historicalRecordFile === 'string' ? sourceConfig.historicalRecordFile.trim() : ''
+            const internalRecordFile =
+                typeof sourceConfig.internalRecordFile === 'string' ? sourceConfig.internalRecordFile.trim() : ''
             return {
                 ...sourceConfig,
-                ...(historicalRecordFile
-                    ? { historicalRecordFile, sourceType: SourceType.Record }
-                    : { historicalRecordFile: undefined }),
+                ...(internalRecordFile
+                    ? { internalRecordFile, sourceType: SourceType.Record }
+                    : { internalRecordFile: undefined }),
                 enabled: extractBoolean(sourceConfig, 'enabled') ?? runtimeDefaults.source.enabled,
                 aggregationMode: sourceConfig.aggregationMode ?? runtimeDefaults.source.aggregationMode,
                 aggregationTimeout,

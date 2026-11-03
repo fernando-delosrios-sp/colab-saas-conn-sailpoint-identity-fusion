@@ -63,7 +63,7 @@ export class ServiceRegistry {
     public run: FusionRun
     public runContext: OperationRunContext
     public customizerIndicesDir?: string
-    public customizerHistoricalRecordsDir?: string
+    public customizerInternalRecordsDir?: string
     private readonly clientUsesInjection: boolean
 
     /**
@@ -295,10 +295,10 @@ export class ServiceRegistry {
         this.customizerIndicesDir = dir
     }
 
-    /** Sets the packaged historical-record directory used by external Record sources. */
-    setCustomizerHistoricalRecordsDir(dir?: string): void {
-        this.customizerHistoricalRecordsDir = dir
-        this.sources.historicalRecordsDir = dir
+    /** Sets the packaged internal-record directory used by external Record sources. */
+    setCustomizerInternalRecordsDir(dir?: string): void {
+        this.customizerInternalRecordsDir = dir
+        this.sources.internalRecordsDir = dir
     }
 
     /** Snapshot for the operation heartbeat (queue, memory, run context). */

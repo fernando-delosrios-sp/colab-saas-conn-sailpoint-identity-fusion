@@ -9,9 +9,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ### ✨ New Features
 
-- **Historical Record sources** — The Unique Values Customizer can compile a headered historical-record dump, such as `Historical Records.csv`, into a versioned manifest and compact binary shards. A Records source can name that file and stream the records through Map, Define, unique-attribute registration, and the existing Match toggle without an Identity Security Cloud source of the same name.
-- **INTERNAL report badge** — Fusion, aggregation, dry-run, and review-decision reports keep the Record label for packaged historical records and add an `INTERNAL` badge. Those references do not link to an ISC account.
-- **Historical-record memory measurement** — `npm run benchmark:historical-records` compares streaming CSV with the compiled artifact and records package size, throughput, heap, external memory, RSS, and filesystem type. The runtime filesystem may be a ramfs, so those files still count toward the memory budget.
+- **Internal Record sources** — The Records Customizer can compile a headered internal-record dump, such as `Internal Records.csv`, into a versioned manifest and compact binary shards. A Records source can name that file and stream the records through Map, Define, unique-attribute registration, and the existing Match toggle without an Identity Security Cloud source of the same name.
+- **INTERNAL report badge** — Fusion, aggregation, dry-run, and review-decision reports keep the Record label for packaged internal records and add an `INTERNAL` badge. Those references do not link to an ISC account.
+- **Internal-record memory measurement** — `npm run benchmark:internal-records` compares streaming CSV with the compiled artifact and records package size, throughput, heap, external memory, RSS, and filesystem type. The runtime filesystem may be a ramfs, so those files still count toward the memory budget.
 
 ## 2026-11-02
 

@@ -7,12 +7,12 @@ import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { LogService } from '../logService'
 import { CompiledAccountJmespathFilter, compileAccountPageJmespathFilter } from './accountFilters'
 import {
-    findHistoricalRecordSource,
-    historicalPackageMessage,
-    HistoricalRecordFormatError,
-    iterateHistoricalRecords,
-    loadHistoricalRecordManifest,
-} from './historicalRecordFormat'
+    findInternalRecordSource,
+    internalPackageMessage,
+    InternalRecordFormatError,
+    iterateInternalRecords,
+    loadInternalRecordManifest,
+} from './internalRecordFormat'
 import { pruneManagedAccountAttributes } from './referencedAttributeSet'
 import { SourceInfo } from './types'
 
@@ -25,8 +25,8 @@ export interface ManagedAccountFetcherDeps {
     accountJmespathFiltersBySourceName: Map<string, CompiledAccountJmespathFilter>
     /** When set, managed source account attributes are pruned to this set at registration. */
     referencedAttributeSet?: ReadonlySet<string>
-    /** Directory containing the packaged historical-record manifest and shards. */
-    historicalRecordsDir?: string
+    /** Directory containing the packaged internal-record manifest and shards. */
+    internalRecordsDir?: string
     fetchAccountsBySourceIdGenerator: (
         sourceId: string,
         abortSignal?: AbortSignal,
@@ -205,9 +205,9 @@ async function collectAccountsFromBatch(
     return { collectedCount: nextCollected, discardedMachineCount, reachedLimit }
 }
 
-const HISTORICAL_RECORD_BATCH_SIZE = 100
+const INTERNAL_RECORD_BATCH_SIZE = 100
 
-function historicalRecordAccount(source: SourceInfo, headers: string[], values: string[]): Account {
+function internalRecordAccount(source: SourceInfo, headers: string[], values: string[]): Account {
     const attributes: Record<string, string> = {}
     headers.forEach((header, index) => {
         attributes[header] = values[index] ?? ''
@@ -225,21 +225,21 @@ function historicalRecordAccount(source: SourceInfo, headers: string[], values: 
     } as Account
 }
 
-async function fetchHistoricalRecordSource(
+async function fetchInternalRecordSource(
     source: SourceInfo,
     effectiveLimit: number | undefined,
     deps: ManagedAccountFetcherDeps,
     sourceProgress: Map<string, { registered: number; total?: number }>,
     reportAggregateFetchProgress: () => void
 ): Promise<{ collectedCount: number; discardedMachineCount: number }> {
-    const fileName = source.config?.historicalRecordFile
-    if (!fileName || !deps.historicalRecordsDir) {
-        throw new HistoricalRecordFormatError(historicalPackageMessage(fileName || source.name))
+    const fileName = source.config?.internalRecordFile
+    if (!fileName || !deps.internalRecordsDir) {
+        throw new InternalRecordFormatError(internalPackageMessage(fileName || source.name))
     }
-    const manifest = loadHistoricalRecordManifest(deps.historicalRecordsDir)
-    const packaged = findHistoricalRecordSource(manifest, fileName)
+    const manifest = loadInternalRecordManifest(deps.internalRecordsDir)
+    const packaged = findInternalRecordSource(manifest, fileName)
     if (!packaged) {
-        throw new HistoricalRecordFormatError(historicalPackageMessage(fileName))
+        throw new InternalRecordFormatError(internalPackageMessage(fileName))
     }
     sourceProgress.set(source.id, { registered: 0, total: packaged.recordCount })
     reportAggregateFetchProgress()
@@ -266,10 +266,10 @@ async function fetchHistoricalRecordSource(
         batch = []
     }
 
-    for await (const record of iterateHistoricalRecords(deps.historicalRecordsDir, fileName)) {
+    for await (const record of iterateInternalRecords(deps.internalRecordsDir, fileName)) {
         if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
-        batch.push(historicalRecordAccount(source, record.headers, record.values))
-        if (batch.length >= HISTORICAL_RECORD_BATCH_SIZE) await flush()
+        batch.push(internalRecordAccount(source, record.headers, record.values))
+        if (batch.length >= INTERNAL_RECORD_BATCH_SIZE) await flush()
     }
     await flush()
     return { collectedCount, discardedMachineCount }
@@ -324,15 +324,15 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
                 let discardedMachineCount = 0
 
                 if (source.internalProvenance) {
-                    const historicalResult = await fetchHistoricalRecordSource(
+                    const internalResult = await fetchInternalRecordSource(
                         source,
                         effectiveLimit,
                         deps,
                         sourceProgress,
                         reportAggregateFetchProgress
                     )
-                    collectedCount = historicalResult.collectedCount
-                    discardedMachineCount = historicalResult.discardedMachineCount
+                    collectedCount = internalResult.collectedCount
+                    discardedMachineCount = internalResult.discardedMachineCount
                     const current = sourceProgress.get(source.id) ?? {}
                     sourceProgress.set(source.id, { ...current, registered: collectedCount })
                     reportAggregateFetchProgress()

@@ -248,10 +248,10 @@ export interface SourceConfig {
      */
     includeRecordAccountsForMatching?: boolean
     /**
-     * File name of a historical-record dump packaged with the Unique Values Customizer.
+     * File name of an internal-record dump packaged with the Records Customizer.
      * When set, the source is an external Record source and is not fetched from ISC.
      */
-    historicalRecordFile?: string
+    internalRecordFile?: string
 }
 
 /** Configuration for all managed sources and aggregation behavior. */

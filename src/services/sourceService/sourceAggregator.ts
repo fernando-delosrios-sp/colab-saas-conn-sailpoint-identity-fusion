@@ -69,7 +69,7 @@ export async function aggregateManagedSources(deps: SourceAggregatorDeps): Promi
     const aggregationChecks = await Promise.all(
         managedSources.map(async (source) => {
             if (source.internalProvenance) {
-                log.debug(`Source ${source.name}: historical record source, skipping pre-processing aggregation`)
+                log.debug(`Source ${source.name}: internal record source, skipping pre-processing aggregation`)
                 return { source, shouldAggregate: false }
             }
             const mode = source.config?.aggregationMode ?? 'none'

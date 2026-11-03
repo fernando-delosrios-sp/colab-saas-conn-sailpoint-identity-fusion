@@ -22,6 +22,6 @@ export type SourceInfo = {
     config?: SourceConfig
     /** Source owner identity (only present for the fusion source itself) */
     owner?: OwnerDto
-    /** True when accounts come from a packaged historical-record dump. */
+    /** True when accounts come from a packaged internal-record dump. */
     internalProvenance?: boolean
 }

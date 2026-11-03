@@ -44,8 +44,8 @@ For log phase mapping during diagnosis, see [Config to account-list phases](../.
 | Proxy 401 | Password mismatch | [Run the connector via proxy](../operation/run-via-proxy.md) |
 | Empty or invalid proxy response | Wrong response format; server error | [Proxy deployment](../../reference/proxy-mode.md) |
 | Aggregation very slow | Low concurrency; no batching; large dataset | [Tune API performance](../operation/tune-api-performance.md) |
-| Historical record file is missing or incompatible | The customizer package does not contain that dump or uses an unsupported manifest | [Unique Values Customizer](../configuration/unique-values-customizer.md#historical-record-sources) |
-| Historical records increase memory | Runtime filesystem may be ramfs; package bytes still count as memory | [Unique Values Customizer](../configuration/unique-values-customizer.md#benchmark-and-runtime-memory) |
+| Internal record file is missing or incompatible | The customizer package does not contain that dump or uses an unsupported manifest | [Records Customizer](../configuration/records-customizer.md#internal-record-sources) |
+| Internal records increase memory | Runtime filesystem may be ramfs; package bytes still count as memory | [Records Customizer](../configuration/records-customizer.md#benchmark-and-runtime-memory) |
 | High memory usage (proxy) | Large in-memory result sets | [Proxy deployment](../../reference/proxy-mode.md) |
 | Cannot interpret logs | Unfamiliar log prefixes | [Monitor aggregation progress](../operation/monitor-aggregation-progress.md) · [Observability](../../reference/observability.md) |
 | Stuck processing flag | Prior run did not finish cleanly | [Reset Fusion state](../operation/reset-fusion-state.md) |
@@ -114,7 +114,7 @@ See [Run the connector via proxy](../operation/run-via-proxy.md) and [Proxy depl
 
 ## Category 6: Performance {#category-6-performance-issues}
 
-See [Tune API performance](../operation/tune-api-performance.md) for queue settings, RPS, batching, and timeout tuning. Historical-record package measurements and the ramfs memory limit are documented in [Unique Values Customizer](../configuration/unique-values-customizer.md#benchmark-and-runtime-memory).
+See [Tune API performance](../operation/tune-api-performance.md) for queue settings, RPS, batching, and timeout tuning. Internal-record package measurements and the ramfs memory limit are documented in [Records Customizer](../configuration/records-customizer.md#benchmark-and-runtime-memory).
 
 ---
 

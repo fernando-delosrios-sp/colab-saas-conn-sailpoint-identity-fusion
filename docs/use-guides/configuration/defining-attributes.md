@@ -403,6 +403,6 @@ Normal definitions on a **newly created** identity-origin global reviewer stay o
 
 ## Related guides
 
-- [Unique values customizer](unique-values-customizer.md): Pre-compiling reserved unique values into zero-heap binary indexes.
+- [Records customizer](records-customizer.md): Pre-compiling reserved unique values into zero-heap binary indexes.
 - [Mapping attributes](mapping-attributes.md): Merging attributes across managed sources.
 - [Configuring sources and scope](configuring-sources-and-scope.md): Source priority and scope filters.

@@ -90,11 +90,11 @@ Register unique attribute values **without** emitting Fusion accounts for non-ma
 
 **Deployment note:** Records sources usually sit in **side-car** deployments (Fusion non-authoritative). Pair with an authoritative HR source when Match should link records to real identities.
 
-### Historical Record sources
+### Internal Record sources
 
-A **Historical Record source** is a Records source whose accounts come from a packaged historical-record dump instead of an ISC managed source. Set **Source type** to Records and enter the dump's file name in **Historical record file**. **Include record accounts in Match** has the same meaning as it does for any other Records source.
+A **Internal Record source** is a Records source whose accounts come from a packaged internal-record dump instead of an ISC managed source. Set **Source type** to Records and enter the dump's file name in **Internal record file**. **Include record accounts in Match** has the same meaning as it does for any other Records source.
 
-The dump is a headered CSV, packaged with the Unique Values Customizer. It must include a `nativeIdentity` column. Reports keep the Record label and add an **INTERNAL** badge. Those accounts have no ISC account link. See [Unique Values Customizer](unique-values-customizer.md#historical-record-sources).
+The dump is a headered CSV, packaged with the Records Customizer. It must include a `nativeIdentity` column. Reports keep the Record label and add an **INTERNAL** badge. Those accounts have no ISC account link. See [Records Customizer](records-customizer.md#internal-record-sources).
 
 ## Orphan accounts
 

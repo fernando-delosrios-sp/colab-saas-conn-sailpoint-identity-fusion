@@ -639,14 +639,14 @@ describe('ReportService', () => {
         expect(sendEmail).toHaveBeenCalledTimes(1)
     })
 
-    it('shows an INTERNAL badge for a Historical Record reference and omits it for a configured Record source', () => {
+    it('shows an INTERNAL badge for an Internal Record reference and omits it for a configured Record source', () => {
         const { service } = createService()
-        const historical = service.renderFusionReportHtml(
+        const internal = service.renderFusionReportHtml(
             {
                 accounts: [
                     {
                         accountName: 'Ada Lovelace',
-                        accountSource: 'Historical Records.csv',
+                        accountSource: 'Internal Records.csv',
                         sourceType: SourceType.Record,
                         internalProvenance: true,
                         matches: [],
@@ -656,7 +656,7 @@ describe('ReportService', () => {
                     {
                         decisionLabel: 'Confirm no match',
                         accountName: 'Ada Lovelace',
-                        accountSource: 'Historical Records.csv',
+                        accountSource: 'Internal Records.csv',
                         sourceType: SourceType.Record,
                         internalProvenance: true,
                     },
@@ -665,9 +665,9 @@ describe('ReportService', () => {
             } as any,
             'fusion'
         )
-        expect(historical).toContain('>Record<')
-        expect(historical).toContain('>INTERNAL<')
-        expect(historical).not.toContain('>Ada Lovelace</a>')
+        expect(internal).toContain('>Record<')
+        expect(internal).toContain('>INTERNAL<')
+        expect(internal).not.toContain('>Ada Lovelace</a>')
 
         const configured = service.renderFusionReportHtml(
             {

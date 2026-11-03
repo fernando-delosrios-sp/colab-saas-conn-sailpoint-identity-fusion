@@ -447,7 +447,7 @@ describe('FusionService — aggregation', () => {
 
         it('does not append Associated managed account when fusion assignment decision replays authorization', async () => {
             const managedKey = 'source-a-id::native-new-2'
-            const historicalAccount = {
+            const internalAccount = {
                 nativeIdentity: 'fusion-identity-1',
                 identityId: 'identity-1',
                 name: 'Fusion Identity',
@@ -514,7 +514,7 @@ describe('FusionService — aggregation', () => {
                 sourceType: 'authoritative',
             } as any)
 
-            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(internalAccount)
 
             expect(result.accountIds).toContain(managedKey)
             expect(result.history.some((h) => h.includes('into existing identity by fernando.delosrios'))).toBe(true)
@@ -1739,22 +1739,22 @@ describe('FusionService — aggregation', () => {
             expect(ctx.run.linkedAccountKeyIndex).toBeUndefined()
         })
 
-        it('runs Match scoring for a Historical Record source when Include record accounts in Match is omitted', async () => {
+        it('runs Match scoring for an Internal Record source when Include record accounts in Match is omitted', async () => {
             const mockManagedAccount = {
-                nativeIdentity: 'historical-default-1',
-                name: 'Historical Default User',
-                sourceId: 'historical:Historical%20Records.csv',
-                sourceName: 'Historical Records.csv',
+                nativeIdentity: 'internal-default-1',
+                name: 'Internal Default User',
+                sourceId: 'internal-record:Internal%20Records.csv',
+                sourceName: 'Internal Records.csv',
                 attributes: {},
                 uncorrelated: true,
             } as Account
 
-            ;(ctx.fusionService as any).run.sourcesByName.set('Historical Records.csv', {
-                id: 'historical:Historical%20Records.csv',
-                name: 'Historical Records.csv',
+            ;(ctx.fusionService as any).run.sourcesByName.set('Internal Records.csv', {
+                id: 'internal-record:Internal%20Records.csv',
+                name: 'Internal Records.csv',
                 sourceType: 'record',
                 internalProvenance: true,
-                config: { historicalRecordFile: 'Historical Records.csv' },
+                config: { internalRecordFile: 'Internal Records.csv' },
             })
             ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
@@ -1763,27 +1763,27 @@ describe('FusionService — aggregation', () => {
             await ctx.fusionService.processManagedAccount(mockManagedAccount)
 
             expect(ctx.mockMatchingService.scoreFusionAccount).toHaveBeenCalled()
-            expect(ctx.run.allFusionAccounts.filter((account) => account.sourceName === 'Historical Records.csv')).toEqual([])
+            expect(ctx.run.allFusionAccounts.filter((account) => account.sourceName === 'Internal Records.csv')).toEqual([])
         })
 
-        it('registers a Historical Record source without Match scoring when Match is disabled', async () => {
+        it('registers an Internal Record source without Match scoring when Match is disabled', async () => {
             const recordAccount = {
-                nativeIdentity: 'historical-skip-1',
-                name: 'Historical Skip User',
-                sourceId: 'historical:Historical%20Records.csv',
-                sourceName: 'Historical Records.csv',
+                nativeIdentity: 'internal-skip-1',
+                name: 'Internal Skip User',
+                sourceId: 'internal-record:Internal%20Records.csv',
+                sourceName: 'Internal Records.csv',
                 attributes: { externalId: 'EXT-1' },
                 uncorrelated: true,
             } as Account
-            const managedMap = new Map<string, Account>([['historical:Historical%20Records.csv::historical-skip-1', recordAccount]])
+            const managedMap = new Map<string, Account>([['internal-record:Internal%20Records.csv::internal-skip-1', recordAccount]])
             vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(managedMap)
-            ;(ctx.fusionService as any).run.sourcesByName.set('Historical Records.csv', {
-                id: 'historical:Historical%20Records.csv',
-                name: 'Historical Records.csv',
+            ;(ctx.fusionService as any).run.sourcesByName.set('Internal Records.csv', {
+                id: 'internal-record:Internal%20Records.csv',
+                name: 'Internal Records.csv',
                 sourceType: 'record',
                 internalProvenance: true,
                 config: {
-                    historicalRecordFile: 'Historical Records.csv',
+                    internalRecordFile: 'Internal Records.csv',
                     includeRecordAccountsForMatching: false,
                 },
             })
@@ -2319,8 +2319,8 @@ describe('FusionService — aggregation', () => {
             expect(result).toBeUndefined()
         })
 
-        it('should hydrate missing account info during managed-account layer for historical missing accounts', async () => {
-            const historicalAccount = {
+        it('should hydrate missing account info during managed-account layer for internal missing accounts', async () => {
+            const internalAccount = {
                 nativeIdentity: 'fusion-1',
                 identityId: 'identity-1',
                 name: 'Fusion Account',
@@ -2359,13 +2359,13 @@ describe('FusionService — aggregation', () => {
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(internalAccount)
 
             expect(result.attributes.reverseNativeIdentity).toBe('native-missing-1')
         })
 
         it('applies identity layer when platform fusion account is uncorrelated but identityId is in scope', async () => {
-            const historicalAccount = {
+            const internalAccount = {
                 nativeIdentity: 'workday-native-1',
                 identityId: 'identity-1',
                 name: '30958535',
@@ -2391,14 +2391,14 @@ describe('FusionService — aggregation', () => {
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(internalAccount)
 
             expect(result.name).toBe('30958535')
             expect(result.identityDisplayName).toBe('Jane Q. Doe')
         })
 
         it('writes history when a newly associated managed account is picked up for an identity', async () => {
-            const historicalAccount = {
+            const internalAccount = {
                 nativeIdentity: 'fusion-identity-1',
                 identityId: 'identity-1',
                 name: 'Fusion Identity',
@@ -2449,7 +2449,7 @@ describe('FusionService — aggregation', () => {
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(internalAccount)
 
             expect(result.accountIds).toContain('source-a-id::native-new-2')
             expect(result.history).toEqual(
@@ -2460,7 +2460,7 @@ describe('FusionService — aggregation', () => {
         })
 
         it('should remove deleted managed accounts from accounts and missing-accounts history', async () => {
-            const historicalAccount = {
+            const internalAccount = {
                 nativeIdentity: 'fusion-1',
                 identityId: 'identity-1',
                 name: 'Fusion Account',
@@ -2508,7 +2508,7 @@ describe('FusionService — aggregation', () => {
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(internalAccount)
 
             expect(result.accountIds).toContain('source-a-id::native-existing-1')
             expect(result.accountIds).not.toContain('source-a-id::native-deleted-1')
@@ -2527,7 +2527,7 @@ describe('FusionService — aggregation', () => {
         it('forces needsRefresh when forceAttributeRefresh is enabled', async () => {
             ctx.mockConfig.forceAttributeRefresh = true
 
-            const historicalAccount = {
+            const internalAccount = {
                 nativeIdentity: 'fusion-force-refresh',
                 identityId: 'identity-force-refresh',
                 name: 'Fusion Force Refresh',
@@ -2542,7 +2542,7 @@ describe('FusionService — aggregation', () => {
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
             ctx.mockDefinitionService.registerUniqueAttributes.mockResolvedValue()
 
-            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(internalAccount)
 
             expect(result.needsRefresh).toBe(true)
         })
@@ -2551,7 +2551,7 @@ describe('FusionService — aggregation', () => {
             ctx.mockConfig.forceAttributeRefresh = true
             ctx.mockDefinitionService.hasEligibleAlwaysRecalculate.mockReturnValue(false)
 
-            const historicalAccount = {
+            const internalAccount = {
                 nativeIdentity: 'fusion-force-snapshots',
                 identityId: 'identity-force-snapshots',
                 name: 'Fusion Force Snapshots',
@@ -2587,7 +2587,7 @@ describe('FusionService — aggregation', () => {
                 return account
             })
 
-            const result = await ctx.fusionService.processFusionAccount(historicalAccount)
+            const result = await ctx.fusionService.processFusionAccount(internalAccount)
 
             expect(result.needsRefresh).toBe(true)
             expect(sourcesAtMap).toEqual(

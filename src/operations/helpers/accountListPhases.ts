@@ -8,7 +8,7 @@ import {
 import { formatCorrelationSummaryValue } from '../../services/logService/operationRunContext'
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
-import { validateConfiguredHistoricalRecords } from '../../services/sourceService/historicalRecordFormat'
+import { validateConfiguredInternalRecords } from '../../services/sourceService/internalRecordFormat'
 import { buildReferencedAttributeSet } from '../../services/sourceService/referencedAttributeSet'
 import { generateReport } from './generateReport'
 import { buildReportAggregationStats, buildTerminalSummary, DryRunInput, type FetchResult } from './accountListHelpers'
@@ -21,7 +21,7 @@ export interface PhaseOptions {
     tracker?: AggregationTracker
     streamProgress?: { sent: number }
     customizerIndicesDir?: string
-    customizerHistoricalRecordsDir?: string
+    customizerInternalRecordsDir?: string
 }
 
 // --- Private helpers ---
@@ -154,10 +154,10 @@ export async function setupPhase(
     if (customizerDir) {
         serviceRegistry.setCustomizerIndicesDir(customizerDir)
     }
-    const historicalRecordsDir =
-        options.customizerHistoricalRecordsDir ?? serviceRegistry.customizerHistoricalRecordsDir
-    serviceRegistry.setCustomizerHistoricalRecordsDir(historicalRecordsDir)
-    validateConfiguredHistoricalRecords(config.sources, historicalRecordsDir)
+    const internalRecordsDir =
+        options.customizerInternalRecordsDir ?? serviceRegistry.customizerInternalRecordsDir
+    serviceRegistry.setCustomizerInternalRecordsDir(internalRecordsDir)
+    validateConfiguredInternalRecords(config.sources, internalRecordsDir)
     definition.initializeCustomizerStore(customizerDir)
     return true
 }
