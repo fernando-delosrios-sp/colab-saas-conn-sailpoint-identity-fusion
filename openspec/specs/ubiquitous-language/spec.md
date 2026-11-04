@@ -928,7 +928,7 @@ Project code, configuration, documentation, and reports SHALL use **Internal Rec
 - **GIVEN** a project artifact refers to packaged internal account data
 - **WHEN** it names the source, file, or report provenance
 - **THEN** it SHALL use Internal Record source, Internal-record dump, or INTERNAL badge as applicable
-- **AND** it SHALL not use the retired terms internal source, CSV source, source record, raw account, or managed row for those concepts
+- **AND** it SHALL NOT use the retired terms internal source, CSV source, source record, raw account, or managed row for those concepts
 
 ## Canonical Terms
 
@@ -1167,11 +1167,13 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 | **$sources** | A Map keyed by source name containing per-source account snapshots. Accessible via dot notation (`$sources.Workday`). |
 | **$identity** | The correlated ISC identity object, available when the Fusion account is linked to an identity. |
 | **$previous** | The Fusion account's attributes from the previous aggregation. Used for change detection. |
-| **$counter** | In unique attribute definitions: renders empty on the first attempt and a zero-padded digit suffix on subsequent collision-retry attempts. Controlled by **Minimum counter digits** and **Maximum attempts**. |
+| **$counter** | In unique attribute definitions: collision-based disambiguation renders `$counter` empty on the first attempt and a zero-padded digit suffix on later attempts. Incremental mode renders the next padded number. A conditional expression may omit the counter when it equals zero (`#if($counter == 0)`). Controlled by **Minimum counter digits** and **Maximum attempts**. |
 | **$UUID** | Generates a fresh random v4 UUID. Referencing it in the expression triggers a new UUID per attempt. |
 | **$isUnique(value)** | Returns `true` when the given value (after applying the definition's case, trim, spaces, normalize, and maxLength transformations) is not already registered as in use. Allows branching between candidate formats before falling back to `$counter`. |
 | **$originSource** | In Define templates, resolves to the name of the source that originally created this Fusion account. Distinct from the **$originSource Source-name token** in Map Source name fields. |
-| **Incremental counter** | A persistent, always-incrementing counter that survives across aggregations. Controlled by **Use incremental counter?** and **Counter start value**. When off, collision-based disambiguation is used instead. |
+| **Base value** | The unique-attribute expression rendered with `$counter` empty, after trim, case, spaces, and normalize, then cut so a configured maximum length still has room for the counter. |
+| **Per base value counter** | An incremental counter stored per base value rather than once for the attribute. The label is **Per base value counter?** and the key is `counterPerBase`. Defaults to off and applies only when **Use incremental counter?** is on. |
+| **Incremental counter** | A persistent counter that survives across aggregations. **Use incremental counter?** keeps one counter for the attribute unless **Per base value counter?** is on. Controlled by **Use incremental counter?**, **Per base value counter?**, and **Counter start value**. When **Use incremental counter?** is off, collision-based disambiguation is used instead. |
 | **Collision-based disambiguation** | The default unique-value strategy: the expression is re-evaluated with an incrementing `$counter` suffix until a value is found that is not already in use, up to **Maximum attempts**. |
 
 ### Configuration vocabulary

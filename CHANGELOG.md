@@ -5,6 +5,19 @@ All notable changes to **Identity Fusion NG** — the ISC connector for Map → 
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
 
+## 2026-11-04 · v3.0.0
+
+### ⚠️ Breaking Changes
+
+- **Per base value counter** — A unique attribute can turn on **Per base value counter?** (`counterPerBase`) when **Use incremental counter?** is already on. Each base value then keeps its own sequence, so one expression can produce `ab1`, `ab2`, `bb1`, and `ab3`. The base value is the expression rendered with `$counter` empty, after trim, case, spaces, and normalize, then cut so a configured maximum length still has room for **Minimum counter digits**. The last issued number is stored in `connectorAttributes.fusionState` under that readable base value. The option defaults to off. Existing definitions that leave it off keep one counter for the attribute, including raising that counter from a kept value's trailing digits.
+  - **Migration:** An incremental expression must reference `$counter`, `${counter}`, `$!counter`, or `$!{counter}`. A `$UUID` reference does not count. An expression that omits the counter now fails at startup instead of retrying until **Maximum attempts**. Turning **Per base value counter?** on or off against saved state of the other shape fails until you switch the option back or reset Fusion state. With the option and a maximum length both on, a counter wider than **Minimum counter digits** ends the operation; raise **Minimum counter digits**. A per-base value that is already registered ends the operation and does not try the next number. Compare `$counter` with zero (`#if($counter == 0)`) when the first value should omit the counter.
+
+### 📚 Documentation
+
+- **Base value and per-base counting** — The defining-attributes guide and the glossary define **Base value**, **Per base value counter**, and the updated **Incremental counter** and **$counter** behavior, including the zero comparison, the width rule, and the startup failures.
+
+---
+
 ## 2026-11-03 · v2.4.0
 
 ### ✨ New Features

@@ -10,6 +10,7 @@ export const connectorSpecInitialValues = {
     case: 'same' as const,
     expression: '#set($initial = $firstname.substring(0, 1))$initial$lastname',
     useIncrementalCounter: false,
+    counterPerBase: false,
 } as const
 
 export const runtimeDefaults = {

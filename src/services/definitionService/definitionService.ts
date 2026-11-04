@@ -1,19 +1,14 @@
-import {
-    FusionConfig,
-    NormalAttributeDefinition,
-    UniqueAttributeDefinition,
-    SourceConfig,
-} from '../../model/config'
+import { FusionConfig, NormalAttributeDefinition, UniqueAttributeDefinition, SourceConfig } from '../../model/config'
 import { LogService } from '../logService'
 import { FusionAccount } from '../../model/account'
 import { getManagedAccountSnapshotKey } from '../../utils/velocityAccountSnapshot'
 import { FusionAccountKind } from '../../model/fusionAccountTypes'
 import { SchemaService } from '../schemaService'
 import { InMemoryLockService } from '../lockService'
-import { StateWrapper } from './stateWrapper'
+import { AttributeCounterState, StateWrapper } from './stateWrapper'
 import { ConnectorError, ConnectorErrorType, SimpleKey, SimpleKeyType } from '@sailpoint/connector-sdk'
 import { applyOutputTransforms, evaluateAttributeTemplate } from './templateEvaluator'
-import { createRenderContextForPass, padNumber } from './formatting'
+import { createRenderContextForPass, evaluateVelocityTemplate, padNumber } from './formatting'
 import crypto from 'crypto'
 import { assert } from '../../utils/assert'
 import { FUSION_STATE_CONFIG_PATH } from './constants'
@@ -29,6 +24,16 @@ import { buildUniqueRegistrationPlan, UniqueRegistrationPlan } from './uniqueReg
 import { CustomizerValueStore, type CustomizerStoreLoadResult } from './customizerValueStore'
 import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
 import type { SourceService } from '../sourceService'
+
+const COUNTER_REFERENCE = /\$(?:!\{counter\}|\{counter\}|!counter\b|counter\b)/
+
+function expressionReferencesCounter(expression: string | undefined): boolean {
+    return COUNTER_REFERENCE.test(expression ?? '')
+}
+
+function isBaseCounterMap(value: AttributeCounterState): value is Record<string, number> {
+    return typeof value !== 'number' && Object.values(value).every((entry) => typeof entry === 'number')
+}
 
 export interface RecordUniqueRegistrationProgress {
     onProgress?: (done: number, total: number) => void
@@ -202,8 +207,7 @@ export class DefinitionService {
             return
         }
 
-        const shouldRefresh =
-            fusionAccount.needsRefresh || fusionAccount.needsReset || this.forceAttributeRefresh
+        const shouldRefresh = fusionAccount.needsRefresh || fusionAccount.needsReset || this.forceAttributeRefresh
         const hasRefreshableDefinitions = this.hasEligibleAlwaysRecalculate(fusionAccount)
         if (!shouldRefresh && !hasRefreshableDefinitions) {
             onStats?.({ evaluated: 0, skipped: this.normalDefinitions.length })
@@ -244,9 +248,7 @@ export class DefinitionService {
      * deciding whether to generate a Unique value.
      */
     public hasMissingUniqueAttribute(fusionAccount: FusionAccount): boolean {
-        return this.uniqueDefinitions.some(
-            (def) => !isValidAttributeValue(fusionAccount.attributes[def.name])
-        )
+        return this.uniqueDefinitions.some((def) => !isValidAttributeValue(fusionAccount.attributes[def.name]))
     }
 
     public async refreshUniqueAttributes(fusionAccount: FusionAccount): Promise<void> {
@@ -265,9 +267,7 @@ export class DefinitionService {
             return
         }
 
-        this.log.debug(
-            `Refreshing unique attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`
-        )
+        this.log.debug(`Refreshing unique attributes for account: ${fusionAccount.name} [${fusionAccount.sourceName}]`)
 
         if (fusionAccount.needsReset) {
             await this.unregisterUniqueAttributes(fusionAccount)
@@ -305,7 +305,7 @@ export class DefinitionService {
                     fusionAccount.setReverseCorrelationAttribute(sc.correlationAttribute!, info.schema.id)
                     this.log.debug(
                         `Set reverse correlation attribute "${sc.correlationAttribute}" = "${info.schema.id}" ` +
-                        `for fusion account ${fusionAccount.name} (source: ${sc.name})`
+                            `for fusion account ${fusionAccount.name} (source: ${sc.name})`
                     )
                 }
             } else {
@@ -329,10 +329,7 @@ export class DefinitionService {
      * override-eligible. Returns false when the override did not take ownership of the
      * attribute — including when no alias resolves — so Normal definitions still evaluate.
      */
-    private applyDisplayAttributeOverrideIfApplicable(
-        fusionAccount: FusionAccount,
-        attributeName: string
-    ): boolean {
+    private applyDisplayAttributeOverrideIfApplicable(fusionAccount: FusionAccount, attributeName: string): boolean {
         const { fusionDisplayAttribute } = this.schemas
         if (attributeName !== fusionDisplayAttribute) return false
         if (!this.shouldApplyDisplayAttributeOverride(fusionAccount)) return false
@@ -369,7 +366,6 @@ export class DefinitionService {
             this.getUniqueValues(definition.name).add(valueStr)
         }
     }
-
 
     /**
      * Lightweight record-only path: selective map + register without normal/unique Define evaluation.
@@ -458,7 +454,7 @@ export class DefinitionService {
 
         this.log.debug(
             `Registered unique values from ${accounts.length} managed source account(s) ` +
-            `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
+                `for ${this.uniqueDefinitions.length} unique attribute definition(s)`
         )
     }
 
@@ -474,7 +470,7 @@ export class DefinitionService {
         if (isNullish(uniqueId) && this.skipAccountsWithMissingId) {
             this.log.warn(
                 `Skipping account ${fusionAccount.name} [${fusionAccount.sourceName}]: ` +
-                `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                    `Missing value for fusion identity attribute '${fusionIdentityAttribute}'`
             )
             return undefined
         }
@@ -482,7 +478,7 @@ export class DefinitionService {
         assert(
             uniqueId,
             `Account ID is required for simple key: account ${fusionAccount.name} [${fusionAccount.sourceName}] ` +
-            `is missing value for fusion identity attribute '${fusionIdentityAttribute}'`
+                `is missing value for fusion identity attribute '${fusionIdentityAttribute}'`
         )
 
         return SimpleKey(uniqueId)
@@ -494,9 +490,7 @@ export class DefinitionService {
 
     public async initializeCounters(): Promise<void> {
         const stateWrapper = this.getStateWrapper()
-        const counterDefinitions = this.uniqueDefinitions.filter(
-            (definition) => definition.useIncrementalCounter
-        )
+        const counterDefinitions = this.uniqueDefinitions.filter((definition) => definition.useIncrementalCounter)
         if (counterDefinitions.length === 0) return
 
         this.log.debug(`Initializing ${counterDefinitions.length} incremental counter attributes`)
@@ -509,23 +503,33 @@ export class DefinitionService {
             this.log.debug(`Preserving existing counter values: ${JSON.stringify(existingCounters)}`)
         }
 
+        for (const definition of counterDefinitions) {
+            this.assertIncrementalCounterReference(definition)
+            this.assertSavedCounterShape(definition, stateWrapper.get(definition.name))
+            this.assertPerBaseCounterFits(definition)
+        }
+
         await Promise.all(
             counterDefinitions.map((definition) => {
                 const start = definition.counterStart ?? 1
+                if (this.usesPerBaseCounter(definition)) {
+                    if (stateWrapper.get(definition.name) === undefined) {
+                        stateWrapper.set(definition.name, {})
+                    }
+                    return Promise.resolve()
+                }
                 return stateWrapper.initCounter(definition.name, start)
             })
         )
 
-        const finalCounters: { [key: string]: number } = {}
+        const finalCounters: { [key: string]: AttributeCounterState } = {}
         for (const definition of counterDefinitions) {
             const value = stateWrapper.get(definition.name)
             if (value !== undefined) {
                 finalCounters[definition.name] = value
             }
         }
-        this.log.debug(
-            `All incremental counters initialized. Current values: ${JSON.stringify(finalCounters)}`
-        )
+        this.log.debug(`All incremental counters initialized. Current values: ${JSON.stringify(finalCounters)}`)
     }
 
     public async saveState(): Promise<void> {
@@ -549,14 +553,12 @@ export class DefinitionService {
         )
     }
 
-    public async getStateObject(): Promise<{ [key: string]: number }> {
+    public async getStateObject(): Promise<{ [key: string]: AttributeCounterState }> {
         if (this.locks && typeof this.locks.waitForAllPendingOperations === 'function') {
             await this.locks.waitForAllPendingOperations()
         }
         const stateWrapper = this.getStateWrapper()
-        this.log.debug(
-            `Reading state - StateWrapper has ${stateWrapper.getSize()} entries`
-        )
+        this.log.debug(`Reading state - StateWrapper has ${stateWrapper.getSize()} entries`)
 
         const state = stateWrapper.getState()
         this.log.debug(`getState() returned: ${JSON.stringify(state)}`)
@@ -603,10 +605,7 @@ export class DefinitionService {
                 ([sourceName]) => identityInputsEnabled || sourceName !== IDENTITIES_SOURCE_NAME
             )
         )
-        context.account = this.resolveOriginAccountObjectForVelocity(
-            fusionAccount,
-            orderedAccounts
-        )
+        context.account = this.resolveOriginAccountObjectForVelocity(fusionAccount, orderedAccounts)
 
         if (fusionAccount.originSource) {
             context.originSource = fusionAccount.originSource
@@ -626,9 +625,7 @@ export class DefinitionService {
         fusionAccount: FusionAccount,
         orderedAccounts: Record<string, any>[]
     ): Record<string, any> | undefined {
-        const originIdRaw =
-            fusionAccount.originAccountId ??
-            fusionAccount.attributes[FusionAttribute.OriginAccount]
+        const originIdRaw = fusionAccount.originAccountId ?? fusionAccount.attributes[FusionAttribute.OriginAccount]
         const originId = trimStr(originIdRaw)
         if (!originId) return undefined
 
@@ -639,14 +636,8 @@ export class DefinitionService {
         const identityHasData = Object.keys(identityBag).length > 0
         const { fusionDisplayAttribute, fusionIdentityAttribute } = this.schemas
 
-        const configuredSchemaName = this.readAccountAttributeString(
-            fusionAccount,
-            fusionDisplayAttribute
-        )
-        const configuredSchemaId = this.readAccountAttributeString(
-            fusionAccount,
-            fusionIdentityAttribute
-        )
+        const configuredSchemaName = this.readAccountAttributeString(fusionAccount, fusionDisplayAttribute)
+        const configuredSchemaId = this.readAccountAttributeString(fusionAccount, fusionIdentityAttribute)
         const identityAlias = this.identityInputsEnabled(fusionAccount) ? fusionAccount.identityAlias : undefined
         const identityId = fusionAccount.identityId ?? trimStr(identityBag.id)
 
@@ -654,8 +645,7 @@ export class DefinitionService {
         const schemaId = configuredSchemaId ?? identityId ?? originId
 
         const identityIdTrimmed = trimStr(identityId)
-        const identityMatchesOrigin =
-            identityIdTrimmed !== undefined && identityIdTrimmed === originId
+        const identityMatchesOrigin = identityIdTrimmed !== undefined && identityIdTrimmed === originId
         if (originSource === 'Identities' && identityHasData && identityMatchesOrigin) {
             return {
                 ...identityBag,
@@ -668,41 +658,32 @@ export class DefinitionService {
             }
         }
 
-        const managed = orderedAccounts.find(
-            (account) => getManagedAccountSnapshotKey(account) === originId
-        )
+        const managed = orderedAccounts.find((account) => getManagedAccountSnapshotKey(account) === originId)
         if (managed) return managed
 
         return undefined
     }
 
-    private readAccountAttributeString(
-        fusionAccount: FusionAccount,
-        attributeName: string
-    ): string | undefined {
+    private readAccountAttributeString(fusionAccount: FusionAccount, attributeName: string): string | undefined {
         return trimStr(fusionAccount.attributes[attributeName])
     }
 
-    private getOrderedAccountsForContext(
-        fusionAccount: FusionAccount
-    ): Record<string, any>[] {
+    private getOrderedAccountsForContext(fusionAccount: FusionAccount): Record<string, any>[] {
         const { sourceAccountContexts } = fusionAccount.attributeBag
         const sources = this.identityInputsEnabled(fusionAccount)
             ? fusionAccount.attributeBag.sources
             : new Map(
-                [...fusionAccount.attributeBag.sources.entries()].filter(
-                    ([sourceName]) => sourceName !== IDENTITIES_SOURCE_NAME
-                )
-            )
+                  [...fusionAccount.attributeBag.sources.entries()].filter(
+                      ([sourceName]) => sourceName !== IDENTITIES_SOURCE_NAME
+                  )
+              )
         if (sources.size === 0) return sourceAccountContexts
 
         const ordered = this.buildOrderedAccountList(sources)
         return this.prioritizeMainAccount(ordered, fusionAccount)
     }
 
-    private buildOrderedAccountList(
-        sources: Map<string, Record<string, any>[]>
-    ): Record<string, any>[] {
+    private buildOrderedAccountList(sources: Map<string, Record<string, any>[]>): Record<string, any>[] {
         const ordered: Record<string, any>[] = []
         const seenSources = new Set<string>()
 
@@ -723,17 +704,13 @@ export class DefinitionService {
         return ordered
     }
 
-    private prioritizeMainAccount(
-        ordered: Record<string, any>[],
-        fusionAccount: FusionAccount
-    ): Record<string, any>[] {
+    private prioritizeMainAccount(ordered: Record<string, any>[], fusionAccount: FusionAccount): Record<string, any>[] {
         const mainAccountId = this.getMainAccountOverrideId(fusionAccount)
         if (!mainAccountId) return ordered
 
         const index = ordered.findIndex(
             (account) =>
-                getManagedAccountSnapshotKey(account) === mainAccountId ||
-                trimStr(account?._id) === mainAccountId
+                getManagedAccountSnapshotKey(account) === mainAccountId || trimStr(account?._id) === mainAccountId
         )
         if (index <= 0) return ordered
 
@@ -743,12 +720,8 @@ export class DefinitionService {
         return [prioritized, ...before, ...after]
     }
 
-    private getMainAccountOverrideId(
-        fusionAccount: FusionAccount
-    ): string | undefined {
-        return trimStr(
-            fusionAccount.attributeBag.current[FusionAttribute.MainAccount]
-        )
+    private getMainAccountOverrideId(fusionAccount: FusionAccount): string | undefined {
+        return trimStr(fusionAccount.attributeBag.current[FusionAttribute.MainAccount])
     }
 
     // ========================================================================
@@ -776,13 +749,9 @@ export class DefinitionService {
         const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
 
         const isImmutableIdentityAttribute =
-            definition.name === fusionIdentityAttribute &&
-            hasExistingValue &&
-            isExistingFusionAccount
+            definition.name === fusionIdentityAttribute && hasExistingValue && isExistingFusionAccount
         const isImmutableDisplayAttribute =
-            definition.name === fusionDisplayAttribute &&
-            hasExistingValue &&
-            isExistingFusionAccount
+            definition.name === fusionDisplayAttribute && hasExistingValue && isExistingFusionAccount
 
         if (isImmutableIdentityAttribute || isImmutableDisplayAttribute) {
             return 'skipped'
@@ -806,15 +775,9 @@ export class DefinitionService {
             return 'skipped'
         }
 
-        const result = evaluateAttributeTemplate(
-            definition,
-            context,
-            renderContext ? { renderContext } : undefined
-        )
+        const result = evaluateAttributeTemplate(definition, context, renderContext ? { renderContext } : undefined)
         if (result.error) {
-            this.log.error(
-                `Error evaluating normal attribute ${definition.name}: ${result.error}`
-            )
+            this.log.error(`Error evaluating normal attribute ${definition.name}: ${result.error}`)
             this.applyNormalDefinitionClearOrSafeDefault(
                 definition.name,
                 fusionAccount,
@@ -906,7 +869,7 @@ export class DefinitionService {
             if (hasValue && !fusionAccount.needsReset) {
                 const valueStr = String(existingValue)
                 this.getUniqueValues(name).add(valueStr)
-                if (definition.useIncrementalCounter) {
+                if (definition.useIncrementalCounter && !definition.counterPerBase) {
                     await this.seedIncrementalCounterFromExistingValue(definition, valueStr)
                 }
                 return
@@ -917,10 +880,7 @@ export class DefinitionService {
                 return
             }
 
-            if (
-                isFusionDisplayAttribute &&
-                this.applyDisplayAttributeOverrideIfApplicable(fusionAccount, name)
-            ) {
+            if (isFusionDisplayAttribute && this.applyDisplayAttributeOverrideIfApplicable(fusionAccount, name)) {
                 return
             }
 
@@ -988,6 +948,9 @@ export class DefinitionService {
         const maxAttempts = this.maxAttempts ?? runtimeDefaults.maxAttempts
 
         if (definition.useIncrementalCounter) {
+            if (definition.counterPerBase) {
+                return await this.generateWithPerBaseCounter(definition, fusionAccount, context)
+            }
             return await this.generateWithIncrementalCounter(definition, fusionAccount, context, maxAttempts)
         }
 
@@ -1036,10 +999,127 @@ export class DefinitionService {
 
         this.log.error(
             `DefinitionService: Failed to generate unique value for attribute ${definition.name} ` +
-            `for account: ${fusionAccount.name ?? fusionAccount.managedKey ?? 'unknown'} ` +
-            `(${fusionAccount.sourceName}) after ${maxAttempts} attempts (incremental counter)`
+                `for account: ${fusionAccount.name ?? fusionAccount.managedKey ?? 'unknown'} ` +
+                `(${fusionAccount.sourceName}) after ${maxAttempts} attempts (incremental counter)`
         )
         return undefined
+    }
+
+    private async generateWithPerBaseCounter(
+        definition: UniqueAttributeDefinition,
+        fusionAccount: FusionAccount,
+        context: Record<string, any>
+    ): Promise<any> {
+        const stateWrapper = this.getStateWrapper()
+        const digits = definition.digits ?? 1
+        const base = this.deriveBaseValue(definition, context)
+        const counterValue = await stateWrapper.allocateBaseCounter(
+            definition.name,
+            base,
+            definition.counterStart ?? 1,
+            definition.maxLength != null ? digits : undefined
+        )
+        context.counter = padNumber(counterValue, digits)
+
+        this.injectUUIDIfNeeded(definition, context)
+
+        const result = evaluateAttributeTemplate(definition, context)
+        if (result.error) {
+            this.log.error(result.error)
+            return undefined
+        }
+        const value = result.value
+        if (value === undefined || value === null) return undefined
+        this.debugUniqueGeneration(
+            `[${fusionAccount.name}] ${definition.name} = ${typeof value === 'object' ? JSON.stringify(value) : value}`
+        )
+
+        const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
+        if (await this.tryRegisterUniqueValue(definition.name, strValue)) {
+            this.debugUniqueGeneration(
+                `Generated unique value (per-base) for attribute ${definition.name}: ${strValue}`
+            )
+            return value
+        }
+
+        throw new ConnectorError(
+            `Unique attribute "${definition.name}" rendered "${strValue}", which is already registered. ` +
+                'The expression may hide $counter, Fusion state may have been lost or reset, ' +
+                'a managed-source or customizer value may already hold it, or truncation may have merged two bases.',
+            ConnectorErrorType.Generic
+        )
+    }
+
+    /**
+     * Base value: the expression rendered with `$counter` empty, after trim, case,
+     * spaces, and normalize. When a maximum length is set, keep the first
+     * `maxLength - digits` characters so the counter still fits.
+     */
+    private deriveBaseValue(definition: UniqueAttributeDefinition, context: Record<string, any>): string {
+        const previous = context.counter
+        context.counter = ''
+        try {
+            let raw: string
+            try {
+                raw = evaluateVelocityTemplate(definition.expression, context) ?? ''
+            } catch (error) {
+                throw new ConnectorError(
+                    `Failed to derive the base value for unique attribute "${definition.name}": ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                    ConnectorErrorType.Generic
+                )
+            }
+
+            const withoutMaxLength: UniqueAttributeDefinition = { ...definition, maxLength: undefined }
+            const transformed = applyOutputTransforms(raw, withoutMaxLength, definition.expression, context)
+            let base = typeof transformed === 'string' ? transformed : transformed == null ? '' : String(transformed)
+            if (definition.maxLength != null) {
+                const digits = definition.digits ?? 1
+                base = base.substring(0, Math.max(0, definition.maxLength - digits))
+            }
+            return base
+        } finally {
+            if (previous === undefined) delete context.counter
+            else context.counter = previous
+        }
+    }
+
+    private usesPerBaseCounter(definition: UniqueAttributeDefinition): boolean {
+        return definition.useIncrementalCounter === true && definition.counterPerBase === true
+    }
+
+    private assertIncrementalCounterReference(definition: UniqueAttributeDefinition): void {
+        if (expressionReferencesCounter(definition.expression)) return
+        throw new ConnectorError(
+            `Unique attribute "${definition.name}" expression does not reference $counter.`,
+            ConnectorErrorType.Generic
+        )
+    }
+
+    private assertSavedCounterShape(
+        definition: UniqueAttributeDefinition,
+        saved: AttributeCounterState | undefined
+    ): void {
+        if (saved === undefined) return
+        const perBase = this.usesPerBaseCounter(definition)
+        const shapeMatches = perBase ? isBaseCounterMap(saved) : typeof saved === 'number'
+        if (shapeMatches) return
+        throw new ConnectorError(
+            `Unique attribute "${definition.name}" saved counter state does not match Per base value counter?. ` +
+                'Switch Per base value counter? back or reset Fusion state.',
+            ConnectorErrorType.Generic
+        )
+    }
+
+    private assertPerBaseCounterFits(definition: UniqueAttributeDefinition): void {
+        if (!this.usesPerBaseCounter(definition) || definition.maxLength == null) return
+        const digits = definition.digits ?? 1
+        if (definition.maxLength > digits) return
+        throw new ConnectorError(
+            `Unique attribute "${definition.name}" maximum length cannot hold the counter. Raise Minimum counter digits.`,
+            ConnectorErrorType.Generic
+        )
     }
 
     private async generateWithCollisionDisambiguation(
@@ -1071,25 +1151,19 @@ export class DefinitionService {
 
             const strValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
             if (await this.tryRegisterUniqueValue(definition.name, strValue)) {
-                this.debugUniqueGeneration(
-                    `Generated unique value for attribute ${definition.name}: ${strValue}`
-                )
+                this.debugUniqueGeneration(`Generated unique value for attribute ${definition.name}: ${strValue}`)
                 return value
             }
 
-            this.debugUniqueGeneration(
-                `Value ${strValue} already exists for unique attribute: ${definition.name}`
-            )
+            this.debugUniqueGeneration(`Value ${strValue} already exists for unique attribute: ${definition.name}`)
             context.counter = padNumber(counter(), digits)
-            this.debugUniqueGeneration(
-                `Regenerating unique attribute: ${definition.name} (attempt ${attempt + 1})`
-            )
+            this.debugUniqueGeneration(`Regenerating unique attribute: ${definition.name} (attempt ${attempt + 1})`)
         }
 
         this.log.error(
             `DefinitionService: Failed to generate unique value for attribute ${definition.name} ` +
-            `for account: ${fusionAccount.name ?? fusionAccount.managedKey ?? 'unknown'} ` +
-            `(${fusionAccount.sourceName}) after ${maxAttempts} attempts (collision disambiguation)`
+                `for account: ${fusionAccount.name ?? fusionAccount.managedKey ?? 'unknown'} ` +
+                `(${fusionAccount.sourceName}) after ${maxAttempts} attempts (collision disambiguation)`
         )
         return undefined
     }
@@ -1108,14 +1182,10 @@ export class DefinitionService {
         return `${expression}$counter`
     }
 
-    private injectUUIDIfNeeded(
-        definition: UniqueAttributeDefinition,
-        context: Record<string, any>
-    ): void {
+    private injectUUIDIfNeeded(definition: UniqueAttributeDefinition, context: Record<string, any>): void {
         if (
             definition.expression &&
-            (definition.expression.includes('$UUID') ||
-                definition.expression.includes('${UUID}'))
+            (definition.expression.includes('$UUID') || definition.expression.includes('${UUID}'))
         ) {
             context.UUID = crypto.randomUUID()
         }
@@ -1130,39 +1200,26 @@ export class DefinitionService {
 
         if (
             !this.skipAccountsWithMissingId &&
-            !isValidAttributeValue(
-                fusionAccount.attributes[fusionIdentityAttribute]
-            )
+            !isValidAttributeValue(fusionAccount.attributes[fusionIdentityAttribute])
         ) {
-            const prevId =
-                fusionAccount.previousAttributes?.[fusionIdentityAttribute]
+            const prevId = fusionAccount.previousAttributes?.[fusionIdentityAttribute]
             if (isValidAttributeValue(prevId)) {
                 fusionAccount.attributes[fusionIdentityAttribute] = prevId
             } else {
                 fusionAccount.attributes[fusionIdentityAttribute] = crypto.randomUUID()
-                this.log.debug(
-                    `Generated fallback UUID for missing identity attribute: ${fusionAccount.name}`
-                )
+                this.log.debug(`Generated fallback UUID for missing identity attribute: ${fusionAccount.name}`)
             }
         }
 
-        if (
-            !isValidAttributeValue(
-                fusionAccount.attributes[fusionDisplayAttribute]
-            )
-        ) {
-            const prevDisplay =
-                fusionAccount.previousAttributes?.[fusionDisplayAttribute]
+        if (!isValidAttributeValue(fusionAccount.attributes[fusionDisplayAttribute])) {
+            const prevDisplay = fusionAccount.previousAttributes?.[fusionDisplayAttribute]
             if (isValidAttributeValue(prevDisplay)) {
                 fusionAccount.attributes[fusionDisplayAttribute] = prevDisplay
             } else {
                 const defaultDisplay = trimStr(fusionAccount.name)
                 if (defaultDisplay) {
-                    fusionAccount.attributes[fusionDisplayAttribute] =
-                        defaultDisplay
-                    this.log.debug(
-                        `Generated fallback for missing display attribute: ${fusionAccount.name}`
-                    )
+                    fusionAccount.attributes[fusionDisplayAttribute] = defaultDisplay
+                    this.log.debug(`Generated fallback for missing display attribute: ${fusionAccount.name}`)
                 }
             }
         }
@@ -1200,12 +1257,12 @@ export class DefinitionService {
         const key = definition.name
         const lockKey = `counter:${key}`
         await this.locks.withLock(lockKey, async () => {
-            if (stateWrapper.get(key) === undefined) {
+            if (typeof stateWrapper.get(key) !== 'number') {
                 const start = definition.counterStart ?? 1
                 await stateWrapper.initCounter(key, start)
             }
-            const nextCurrent = stateWrapper.get(key) ?? 0
-            if (parsed > nextCurrent) {
+            const nextCurrent = stateWrapper.get(key)
+            if (typeof nextCurrent === 'number' && parsed > nextCurrent) {
                 stateWrapper.set(key, parsed)
             }
         })
@@ -1222,10 +1279,7 @@ export class DefinitionService {
         )
     }
 
-    private shouldSkipStaticDefinition(
-        definition: NormalAttributeDefinition,
-        fusionAccount: FusionAccount
-    ): boolean {
+    private shouldSkipStaticDefinition(definition: NormalAttributeDefinition, fusionAccount: FusionAccount): boolean {
         return Boolean(definition.static && this.isExistingFusionAccount(fusionAccount))
     }
 
@@ -1246,11 +1300,7 @@ export class DefinitionService {
     }
 
     private identityInputsEnabled(fusionAccount: FusionAccount): boolean {
-        return (
-            this.includeIdentities ||
-            fusionAccount.fromIdentity ||
-            fusionAccount.type === FusionAccountKind.Identity
-        )
+        return this.includeIdentities || fusionAccount.fromIdentity || fusionAccount.type === FusionAccountKind.Identity
     }
 
     private fusionAttributeSafeDefault(
@@ -1272,9 +1322,6 @@ export class DefinitionService {
     }
 
     private isSystemProvenanceAttribute(name: string): boolean {
-        return (
-            name === FusionAttribute.OriginAccount ||
-            name === FusionAttribute.OriginSource
-        )
+        return name === FusionAttribute.OriginAccount || name === FusionAttribute.OriginSource
     }
 }

@@ -164,18 +164,20 @@ $UUID
 
 ### Unique sub-mode: Incremental counter
 
-**Behavior:** Sequential incrementing number; each account gets the next number in sequence. The counter is persistent (survives across aggregations) and always increments.
+**Behavior:** Sequential incrementing number. **Use incremental counter?** keeps one persistent counter for the attribute unless **Per base value counter?** is on. The counter survives across aggregations and always increments. The expression must reference `$counter`. Accepted forms are `$counter`, `${counter}`, `$!counter`, and `$!{counter}`. A `$UUID` reference does not count. Incremental mode does not append `$counter` on its own. An expression that omits it fails at startup, before any value is generated.
 
 **How it works:**
 
 1. The connector reads the current counter value for this attribute from state.
 2. It increments, applies **Minimum counter digits** for zero-padding, and substitutes `$counter` in the expression.
 3. The new counter value is persisted for the next account.
+4. A kept value can raise the single attribute counter from its trailing digits. That seeding does not run when **Per base value counter?** is on.
 
 **Fields:**
 
 - **Use incremental counter?** (Unique type only): turn on to switch from collision-based disambiguation to a persistent, always-incrementing counter.
 - **Counter start value:** First number in sequence (e.g. 1, 1000, 50000). Ignored unless the persistent counter has not been seeded yet.
+- **Per base value counter?:** Default is off. Shown and applied only when **Use incremental counter?** is on. When on, each base value keeps its own sequence.
 - **Minimum counter digits:** Zero-padding (e.g. 5 → `00001`, `00002`).
 
 **Example expression with prefix:**
@@ -187,6 +189,31 @@ EMP-$counter
 Counter start: 1000, Digits: 5
 → EMP-01000, EMP-01001, EMP-01002
 ```
+
+#### Per base value counter
+
+Turn on **Per base value counter?** when one expression should count separately for each base value, for example `ab1`, `ab2`, `bb1`, `ab3`.
+
+The **base value** is the expression rendered with `$counter` empty, after trim, case, spaces, and normalize. When **Maximum length** is set, that result is cut to `maximum length − minimum digits` characters so the counter still fits. Bases that match after the cut share one counter. `abcd` and `abce` with maximum length 4 and 1 digit both use the base `abc` and produce `abc1`, then `abc2`.
+
+Compare the counter with zero when a conditional should omit it. `#if($counter == 0)` is true for an empty counter and for a padded zero, so a start value of 0 renders the bare base and the next value prints `1`. `#if($counter)` does not omit zero, because the padded string `"0"` is truthy.
+
+```velocity
+#set($base = $prefix)#if($counter == 0)$base#else$base$counter#end
+```
+
+A line break in the template is part of the rendered value. Turn on **Trim leading and trailing spaces?** when the expression spans lines.
+
+With **Maximum length** set, the next number must fit in **Minimum counter digits**. A wider number ends the operation and names **Minimum counter digits**. Raise that setting so the reserved width can hold the sequence. Without a maximum length, the counter may still grow past the minimum digits.
+
+The connector stores the last issued number in `connectorAttributes.fusionState`. With **Per base value counter?** on, each attribute holds a map whose keys are the readable base values. Those keys can contain names. One entry is stored per distinct base, and the whole object is patched at the end of aggregation, so a large number of bases increases the patch size.
+
+**Startup and generation failures**
+
+- The expression does not reference `$counter`, `${counter}`, `$!counter`, or `$!{counter}`. The error names the attribute. This check runs for every incremental definition, including when **Per base value counter?** is off.
+- Saved state is a single number while **Per base value counter?** is on, or a map of base values while it is off. Switch **Per base value counter?** back or reset Fusion state. There is no silent conversion. Existing definitions that omit the option keep their single number.
+- **Maximum length** is less than or equal to **Minimum counter digits**.
+- A per-base render is already in the attribute registry or the customizer store. The operation stops. It does not try the next number. The error names the attribute and the value. That result means the expression hid `$counter`, Fusion state was lost or reset, a managed source or customizer already holds the value, or truncation merged two bases.
 
 ---
 
@@ -283,7 +310,7 @@ Prior Fusion account values — useful for one-time assignments or change detect
 
 | Variable           | Behavior                                                                                         |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
-| `$counter`         | Collision suffix for Unique definitions (auto-appended unless you use `#if` / `#set` directives) |
+| `$counter`         | Collision mode renders it empty on the first attempt, then a padded suffix. Incremental mode renders the next padded number. A conditional may omit it when it equals zero (`#if($counter == 0)`). |
 | `$UUID`            | Fresh v4 UUID per attempt                                                                        |
 | `$isUnique(value)` | Test whether a candidate value is already taken                                                  |
 

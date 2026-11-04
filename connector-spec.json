@@ -48,6 +48,7 @@
         "case": "same",
         "expression": "#set($initial = $firstname.substring(0, 1))$initial$lastname",
         "useIncrementalCounter": false,
+        "counterPerBase": false,
         "refresh": false,
         "static": false,
         "trim": false,
@@ -739,6 +740,14 @@
                                             "parentValue": "true",
                                             "required": true,
                                             "helpKey": "The first number the counter will use."
+                                        },
+                                        {
+                                            "key": "counterPerBase",
+                                            "label": "Per base value counter?",
+                                            "type": "toggle",
+                                            "parentKey": "useIncrementalCounter",
+                                            "parentValue": "true",
+                                            "helpKey": "Default is off and applies only when the incremental counter is already on."
                                         }
                                     ]
                                 },
