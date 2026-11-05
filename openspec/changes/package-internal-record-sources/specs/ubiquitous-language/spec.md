@@ -24,6 +24,9 @@ The ubiquitous-language glossary SHALL define **Internal Record configuration** 
 
 The ubiquitous-language glossary SHALL define **Records Customizer** as the standalone SailPoint SaaS Connectivity customizer project that packages Internal-record dumps and the Internal Record configuration for Identity Fusion. The glossary SHALL state that the **Customizer Value Store** is retired and SHALL NOT define it as a current binary index of reserved unique values. Documentation and code SHALL NOT refer to a reserved-value index as a static cache or disk table.
 
+#### Scenario: Customizer Value Store entry
+- **REMOVED** — superseded by **Customizer Value Store is retired**. The glossary no longer defines a current hash index of reserved values.
+
 #### Scenario: Records Customizer entry
 - **GIVEN** a reader consults the ubiquitous-language spec glossary
 - **WHEN** they look up the customizer package

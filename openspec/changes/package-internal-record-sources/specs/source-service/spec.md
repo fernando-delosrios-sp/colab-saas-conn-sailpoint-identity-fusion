@@ -33,6 +33,12 @@ SourceService SHALL apply the Accounts JMESPath filter saved for an Internal Rec
 
 When the customizer package contains an Internal Record configuration, SourceService SHALL resolve each entry as an Internal Record source with Record type and internal provenance. The source name, Include record accounts in Match flag, and Accounts JMESPath filter SHALL come from that entry. SourceService SHALL NOT require an Identity Security Cloud managed source or source ID for that entry, and SHALL NOT read an internal-record file from Source Settings. It SHALL keep Identity Security Cloud discovery and fetch behavior unchanged for configured sources that do not share an Internal Record source name.
 
+#### Scenario: Named packaged dump becomes an Internal Record source
+- **REMOVED** — superseded by **Packaged configuration becomes an Internal Record source**. Discovery reads the saved configuration, not a Source Settings file field.
+
+#### Scenario: Configured internal file is absent
+- **REMOVED** — superseded by **Packaged file is absent from the manifest**. Setup names the file missing from the packaged manifest.
+
 #### Scenario: Packaged configuration becomes an Internal Record source
 - **GIVEN** the attached customizer contains a saved entry for `Sample Records.csv` named `Sample Records`
 - **WHEN** source discovery completes
@@ -49,6 +55,12 @@ When the customizer package contains an Internal Record configuration, SourceSer
 ### Requirement: Internal Record sources SHALL use existing Record-source processing controls
 
 Internal Record sources SHALL honor the Include record accounts in Match value saved in the Internal Record configuration. When that value is enabled they SHALL enter Map, Define, and Match processing. When it is disabled they SHALL use selective Map and unique-attribute registration without Match scoring. In either case they SHALL NOT create a Fusion account solely because they are unmatched.
+
+#### Scenario: Internal record enters Match by default
+- **REMOVED** — superseded by **Saved Match flag scores the record**. Match follows the flag saved in the Internal Record configuration.
+
+#### Scenario: Internal record skips Match when configured
+- **REMOVED** — superseded by **Saved Match flag skips scoring**. Skipping Match is the saved flag, not a Source Settings field.
 
 #### Scenario: Saved Match flag scores the record
 - **GIVEN** an Internal Record source whose saved Include record accounts in Match value is enabled

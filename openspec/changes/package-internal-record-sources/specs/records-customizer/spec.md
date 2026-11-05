@@ -2,7 +2,7 @@
 
 ### Requirement: Records Customizer packaging SHALL save Internal Record configuration
 
-The Records Customizer pack SHALL read each headered CSV in `records/`. When `internal-record-configuration.json` has no entry for that file, an interactive pack SHALL prompt for the source name, Include record accounts in Match, the Accounts JMESPath filter, the Account ID field, and the Account Name field, and SHALL save the answers. A later pack SHALL reuse a saved entry without prompting. A non-interactive pack SHALL fail when any dump has no saved entry. The pack SHALL fail when two entries use the same source name. The saved file SHALL be copied into the deployable package. The original CSV SHALL NOT be included in that package.
+The Records Customizer pack SHALL save an Internal Record configuration entry for each headered CSV in `records/`. An interactive pack SHALL prompt only when that file has no saved entry. A non-interactive pack SHALL fail and name the file. Duplicate source names SHALL fail packaging. The saved file SHALL be copied into the deployable package, and the original CSV SHALL NOT be included.
 
 #### Scenario: Missing configuration prompts and is saved
 - **GIVEN** `records/Sample Records.csv` has no saved Internal Record configuration
@@ -29,6 +29,12 @@ The Records Customizer pack SHALL read each headered CSV in `records/`. When `in
 ### Requirement: Records Customizer SHALL expose packaged internal records
 
 The Records Customizer `beforeStdAccountList` hook SHALL provide the absolute location of the packaged Internal Record configuration, manifest, and artifacts when they are present. The hook SHALL NOT provide a unique-value index directory. A package with no Internal Record configuration SHALL remain valid.
+
+#### Scenario: Hook provides both optional customizer payloads
+- **REMOVED** — superseded by **Hook provides the Internal Record package location**. The hook no longer returns a unique-value index directory.
+
+#### Scenario: Existing index-only package remains compatible
+- **REMOVED** — superseded by **Package without Internal Record artifacts remains valid**. A package without Internal Record artifacts stays valid, and there is no index directory to return.
 
 #### Scenario: Hook provides the Internal Record package location
 - **GIVEN** a customizer package containing an Internal Record configuration and manifest

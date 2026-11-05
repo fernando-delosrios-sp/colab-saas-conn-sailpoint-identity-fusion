@@ -12,6 +12,9 @@ DefinitionService SHALL maintain per-attribute sets of registered unique values 
 - **WHEN** unregisterUniqueAttributes is called for a FusionAccount
 - **THEN** all unique values owned by that account SHALL be removed from registered sets
 
+#### Scenario: Candidate value rejected when matching customizer-provided unique value
+- **REMOVED** — superseded by **Candidate collides with a registered Internal Record value**. Unique checks use the registered-value set. There is no Customizer Value Store.
+
 #### Scenario: Candidate collides with a registered Internal Record value
 - **GIVEN** record registration has stored `jdoe` for attribute `sAMAccountName`
 - **WHEN** DefinitionService evaluates whether candidate `jdoe` is unique for `sAMAccountName`

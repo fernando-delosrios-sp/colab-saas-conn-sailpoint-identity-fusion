@@ -84,7 +84,7 @@ Register unique attribute values **without** emitting Fusion accounts for non-ma
 
 | Use case | Example |
 | --- | --- |
-| Username pool | Generate and reserve usernames from a CSV source before HR onboarding |
+| Username pool | Generate and reserve usernames from an Internal Record source before HR onboarding |
 | Employee number registry | Register IDs globally to prevent collisions across aggregations |
 | Pre-Match dedup check | Keep Match on to find duplicates before registering a unique value |
 
