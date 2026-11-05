@@ -1,6 +1,10 @@
 // Load repo-root `.env` before config/auth (proxy-server, spcx dev). Does not override existing env vars.
+import fs from 'fs'
 import path from 'path'
+import { createRequire } from 'module'
 import { loadDotEnv } from './utils/loadDotEnv'
+
+const recordsRequire = createRequire(__filename)
 
 loadDotEnv(path.join(__dirname, '..'))
 
@@ -80,5 +84,21 @@ export const connector = async () => {
             })
         )
 
+}
+
+/**
+ * Local `spcx run` loads a customizer only from this module.
+ * The records build lives beside the connector and is absent from an Identity Security Cloud upload,
+ * so a missing file leaves the platform customizer in charge.
+ */
+export const connectorCustomizer = async () => {
+    const recordsCustomizerPath = path.join(__dirname, '../customizers/records/dist/index.js')
+    if (!fs.existsSync(recordsCustomizerPath)) {
+        return undefined
+    }
+    const records = recordsRequire(recordsCustomizerPath) as {
+        connectorCustomizer: () => Promise<unknown>
+    }
+    return records.connectorCustomizer()
 }
 

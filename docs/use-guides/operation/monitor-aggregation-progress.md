@@ -93,8 +93,10 @@ During long `accountList` aggregations, the connector emits standardized prefixe
 **Refresh example:**
 
 ```
-14:30:45 [INFO]  [accountList] STATUS phase=Refresh progress=19032/102407 refreshed(Δ+192/10s) mem=1992.07MB(96%) cpu=87% elapsed=22M 14S
+14:30:45 [INFO]  [accountList] STATUS phase=Refresh progress=19032/102407 refreshed(Δ+192/10s) mem=1992.07MB heap=1912.39MB cpu=87% elapsed=22M 14S
 ```
+
+`mem=` is resident memory and `heap=` is the V8 heap, both in megabytes. A heap larger than `mem=` means the kernel compressed those pages or dropped them from the resident set. It does not mean usage passed 100%.
 
 ### How to read `cpu=` with progress and `api=`
 

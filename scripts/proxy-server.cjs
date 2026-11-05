@@ -88,10 +88,24 @@ const spawnTsc = () => {
 
 spawnTsc()
 
+/** Built records customizer. Its `data/internal-records` sits beside this file, which is the path the hook returns. */
+const recordsCustomizerPath = path.resolve(__dirname, '../customizers/records/dist/index.js')
+
+const loadRecordsCustomizer = () => {
+    if (!fs.existsSync(recordsCustomizerPath)) {
+        return undefined
+    }
+    return require(recordsCustomizerPath).connectorCustomizer
+}
+
+if (fs.existsSync(recordsCustomizerPath)) {
+    console.log(`Records customizer: ${recordsCustomizerPath}`)
+}
+
 const loadConnector = async (connectorModulePath) => {
     const c = require(connectorModulePath)
     const connector = c.connector
-    const connectorCustomizer = c.connectorCustomizer
+    const connectorCustomizer = c.connectorCustomizer ?? loadRecordsCustomizer()
     Object.keys(require.cache)
         .filter((key) => !key.includes('node_modules'))
         .forEach((key) => delete require.cache[key])

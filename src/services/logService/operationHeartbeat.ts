@@ -281,8 +281,9 @@ export function formatStatusLine(
     if (fusionReviewInventory) parts.push(fusionReviewInventory)
 
     if (memory) {
-        const heapPct = Math.round((memory.heapUsed / memory.rss) * 100)
-        parts.push(`mem=${formatMb(memory.rss)}MB(${heapPct}%)`)
+        // Megabytes only. heapUsed/rss exceeds 100% when V8 still counts pages the OS has
+        // compressed or dropped from the resident set, which reads as impossible usage.
+        parts.push(`mem=${formatMb(memory.rss)}MB heap=${formatMb(memory.heapUsed)}MB`)
     }
 
     const cpuSegment = formatCpuSegment(cpu, previousCpu, previousCpuAt, Date.now())

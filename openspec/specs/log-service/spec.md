@@ -109,7 +109,7 @@ When a previous process CPU sample exists, each `STATUS` line SHALL include a **
 
 ### Requirement: Operation heartbeat emits periodic STATUS lines
 
-The log service SHALL provide an operation heartbeat that emits a `STATUS` text line at a configurable interval while an operation heartbeat is active. The interval SHALL be `statsLoggingIntervalMs` from Advanced Connection Settings (configured as `heartbeatInterval` in seconds in the connector UI; default 10 seconds). Each `STATUS` line SHALL include, when available: current phase, current step, pipeline progress, operation elapsed time, API queue statistics in compact form `api={active}a/{queued}q/{completed}c` with optional delta suffix, process memory (RSS and heap used), and process CPU percent (`cpu={percent}%`) as specified in **STATUS includes process CPU percent**.
+The log service SHALL provide an operation heartbeat that emits a `STATUS` text line at a configurable interval while an operation heartbeat is active. The interval SHALL be `statsLoggingIntervalMs` from Advanced Connection Settings (configured as `heartbeatInterval` in seconds in the connector UI; default 10 seconds). Each `STATUS` line SHALL include, when available: current phase, current step, pipeline progress, operation elapsed time, API queue statistics in compact form `api={active}a/{queued}q/{completed}c` with optional delta suffix, process memory, and process CPU percent (`cpu={percent}%`) as specified in **STATUS includes process CPU percent**. Process memory SHALL be resident set size and V8 heap used, both in megabytes with two decimal places: `mem={rss}MB heap={heapUsed}MB`. STATUS SHALL NOT report memory as a percentage. Heap used MAY exceed RSS.
 
 During Fetch phase, pipeline progress SHALL be Fetch population counters (`fusion-accounts`, `managed-accounts`, `identities`) as specified in **Fetch STATUS SHALL render independent population counters**. During other phases, pipeline progress SHALL be `done/total` with optional unit and delta since the previous tick (`progress=`).
 
@@ -127,6 +127,13 @@ When correlation PATCH activity has occurred in the run and the API queue has pe
 - **WHEN** the operation heartbeat interval fires
 - **THEN** the connector host SHALL receive an INFO line prefixed with `[accountList] STATUS`
 - **AND** the line SHALL include `phase=Process`, `step=uncorrelated-sweep`, and `progress=537/800 analyzed`
+
+#### Scenario: STATUS memory is RSS and heap in megabytes
+
+- **GIVEN** process RSS is 512.00MB and V8 heap used is 1024.00MB
+- **WHEN** a STATUS line is formatted
+- **THEN** the line SHALL include `mem=512.00MB heap=1024.00MB`
+- **AND** the line SHALL NOT include a memory percentage
 
 #### Scenario: STATUS includes pipeline progress delta during local work
 
