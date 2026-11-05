@@ -53,7 +53,7 @@ DefinitionService SHALL generate unique attribute values for Unique attribute de
 
 ### Requirement: DefinitionService manages unique value registries
 
-DefinitionService SHALL maintain per-attribute sets of registered unique values to prevent collisions. It SHALL provide register and unregister operations for lifecycle management. When a `CustomizerValueStore` is attached, DefinitionService SHALL also reject candidate unique values that match any pre-compiled value in the customizer store for that attribute.
+DefinitionService SHALL maintain per-attribute sets of registered unique values to prevent collisions. It SHALL provide register and unregister operations for lifecycle management. A candidate SHALL be unique when it is absent from the registered set for that attribute. DefinitionService SHALL NOT consult a pre-compiled customizer value index.
 
 #### Scenario: Unique values registered after generation
 - **WHEN** a unique attribute value is successfully generated
@@ -64,10 +64,12 @@ DefinitionService SHALL maintain per-attribute sets of registered unique values 
 - **THEN** all unique values owned by that account SHALL be removed from registered sets
 
 #### Scenario: Candidate value rejected when matching customizer-provided unique value
-- **GIVEN** a CustomizerValueStore loaded with a reserved value for attribute "sAMAccountName"
-- **WHEN** DefinitionService evaluates whether candidate value "jdoe" is unique for "sAMAccountName"
-- **THEN** it SHALL check CustomizerValueStore for "jdoe"
-- **AND** if present, it SHALL report the candidate value as not unique without allocating strings on the heap
+- **REMOVED** — superseded by **Candidate collides with a registered Internal Record value**. Unique checks use the registered-value set. There is no Customizer Value Store.
+
+#### Scenario: Candidate collides with a registered Internal Record value
+- **GIVEN** record registration has stored `jdoe` for attribute `sAMAccountName`
+- **WHEN** DefinitionService evaluates whether candidate `jdoe` is unique for `sAMAccountName`
+- **THEN** it SHALL report the candidate as not unique
 
 ### Requirement: DefinitionService applies output transforms in canonical order
 
@@ -186,7 +188,7 @@ During counter initialization, DefinitionService SHALL fail the operation when a
 
 ### Requirement: Per base value counter fails when the rendered value is already registered
 
-When per-base counting applies, DefinitionService SHALL fail the operation if the rendered value is already in the attribute's unique registry or in the customizer store for that attribute. It SHALL NOT issue another number for that account. The error SHALL name the attribute and the rendered value, and it SHALL mention an expression that hides `$counter`, lost or reset Fusion state, a managed-source or customizer value, and truncation.
+When per-base counting applies, DefinitionService SHALL fail the operation if the rendered value is already in the attribute's unique registry. It SHALL NOT issue another number for that account. The error SHALL name the attribute and the rendered value, and it SHALL mention an expression that hides `$counter`, lost or reset Fusion state, a managed-source or Internal Record value, and truncation.
 
 #### Scenario: Registered per-base value fails the operation
 - **GIVEN** per-base counting is on
@@ -195,7 +197,7 @@ When per-base counting applies, DefinitionService SHALL fail the operation if th
 - **THEN** the operation SHALL fail
 - **AND** no further counter value SHALL be tried for that account
 - **AND** the error SHALL name the attribute and the rendered value
-- **AND** the error SHALL mention an expression that hides `$counter`, lost or reset Fusion state, a managed-source or customizer value, and truncation
+- **AND** the error SHALL mention an expression that hides `$counter`, lost or reset Fusion state, a managed-source or Internal Record value, and truncation
 
 ### Requirement: Per base value counter cuts the base to reserve counter width
 
@@ -767,20 +769,3 @@ During a single `refreshNormalAttributes` invocation for one Fusion account, `ev
 - **WHEN** the render context is constructed for that refresh pass
 - **THEN** exported context helpers SHALL remain accessible
 - **AND** helper keys SHALL override same-named caller properties
-
-### Requirement: DefinitionService logs customizer unique index loading metrics
-
-When initialized with a customizer index directory, DefinitionService (or its backing CustomizerValueStore) SHALL emit structured log messages detailing the loaded customizer directory, each loaded attribute name, the count of unique values loaded per attribute, and the total load duration in milliseconds.
-
-#### Scenario: Logging customizer index loading details
-- **GIVEN** a valid customizer index directory containing one or more `.bin` index files
-- **WHEN** DefinitionService initializes the CustomizerValueStore
-- **THEN** an informational or detail log SHALL record the directory path, the attribute names loaded, and the count of unique values for each attribute
-- **AND** the load operation timing SHALL be tracked and logged
-
-#### Scenario: Logging when customizer directory is absent
-- **GIVEN** an aggregation run where no customizer directory is provided in command input
-- **WHEN** DefinitionService initializes
-- **THEN** it SHALL proceed without error and log at debug level that no customizer unique value store was attached
-
----

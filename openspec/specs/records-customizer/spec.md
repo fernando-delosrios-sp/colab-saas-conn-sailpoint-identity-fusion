@@ -5,44 +5,48 @@ Defines the structure, compilation, and execution behavior of the standalone Rec
 
 ## Requirements
 
-### Requirement: Records Customizer compiles attribute CSV files to sorted binary hash indexes
-
-The customizer packaging build script (`npm run pack-zip`) SHALL read all `<attributeName>.csv` files in the `values/` directory and compile each into a compact, sorted 64-bit binary hash index file named `<attributeName>.bin` placed in the customizer output directory.
-
-#### Scenario: Single-column CSV compiled to sorted 64-bit binary hash file
-- **GIVEN** a file `values/sAMAccountName.csv` containing lines with usernames
-- **WHEN** the `build-indices` script runs during `pack-zip`
-- **THEN** each non-empty trimmed line SHALL be hashed using 64-bit FNV-1a
-- **AND** the 64-bit hashes SHALL be deduplicated and sorted in ascending order
-- **AND** the sorted hashes SHALL be written as contiguous 8-byte integers into `data/sAMAccountName.bin`
-
-#### Scenario: Empty or whitespace-only CSV handled gracefully
-- **GIVEN** a file `values/employeeNumber.csv` containing no entries or only whitespace
-- **WHEN** the `build-indices` script runs
-- **THEN** an empty `data/employeeNumber.bin` SHALL be produced without error
-- **AND** the compilation process SHALL log that 0 values were indexed
-
-### Requirement: Records Customizer passes index directory path to connector
-
-The customizer SHALL implement a `beforeStdAccountList` hook that resolves the local directory containing pre-compiled binary index files and returns it to Identity Fusion via the `input.customizerIndicesDir` property.
-
-#### Scenario: Customizer hook provides directory path
-- **GIVEN** a deployed customizer package containing compiled `.bin` files under `data/`
-- **WHEN** Identity Security Cloud invokes `beforeStdAccountList`
-- **THEN** the customizer hook SHALL return the input object with `customizerIndicesDir` set to the absolute path of the `data/` directory
-
 ### Requirement: Records Customizer SHALL expose packaged internal records
 
-The Records Customizer `beforeStdAccountList` hook SHALL retain the existing `customizerIndicesDir` contract and SHALL additionally provide the absolute location of the internal-record manifest and artifacts when they are packaged. A package without internal records SHALL remain valid.
+The Records Customizer `beforeStdAccountList` hook SHALL provide the absolute location of the packaged Internal Record configuration, manifest, and artifacts when they are present. The hook SHALL NOT provide a unique-value index directory. A package with no Internal Record configuration SHALL remain valid.
 
 #### Scenario: Hook provides both optional customizer payloads
-- **GIVEN** a customizer package containing unique-value indexes and an internal-record manifest
-- **WHEN** Identity Security Cloud invokes `beforeStdAccountList`
-- **THEN** the returned input SHALL include `customizerIndicesDir`
-- **AND** it SHALL include the resolved internal-record package location
+- **REMOVED** — superseded by **Hook provides the Internal Record package location**. The hook no longer returns a unique-value index directory.
 
 #### Scenario: Existing index-only package remains compatible
-- **GIVEN** a customizer package containing only unique-value indexes
+- **REMOVED** — superseded by **Package without Internal Record artifacts remains valid**. A package without Internal Record artifacts stays valid, and there is no index directory to return.
+
+#### Scenario: Hook provides the Internal Record package location
+- **GIVEN** a customizer package containing an Internal Record configuration and manifest
 - **WHEN** Identity Security Cloud invokes `beforeStdAccountList`
-- **THEN** the hook SHALL provide the index directory as before
-- **AND** the connector SHALL not treat the absence of internal-record artifacts as an error
+- **THEN** the returned input SHALL include the resolved Internal Record package location
+- **AND** it SHALL NOT include a unique-value index directory
+
+#### Scenario: Package without Internal Record artifacts remains valid
+- **GIVEN** a customizer package with no Internal Record configuration
+- **WHEN** Identity Security Cloud invokes `beforeStdAccountList`
+- **THEN** the hook SHALL complete
+- **AND** the connector SHALL NOT treat the absence of Internal Record artifacts as an error
+
+### Requirement: Records Customizer packaging SHALL save Internal Record configuration
+
+The Records Customizer pack SHALL save an Internal Record configuration entry for each headered CSV in `records/`. An interactive pack SHALL prompt only when that file has no saved entry. A non-interactive pack SHALL fail and name the file. Duplicate source names SHALL fail packaging. The saved file SHALL be copied into the deployable package, and the original CSV SHALL NOT be included.
+
+#### Scenario: Missing configuration prompts and is saved
+- **GIVEN** `records/Sample Records.csv` has no saved Internal Record configuration
+- **AND** the pack is interactive
+- **WHEN** the operator confirms the source name, Match flag, JMESPath filter, Account ID field, and Account Name field
+- **THEN** the pack SHALL save those answers for that file
+- **AND** a later pack of the same file SHALL reuse the saved answers without prompting
+
+#### Scenario: Non-interactive pack refuses an unsaved dump
+- **GIVEN** `records/Sample Records.csv` has no saved Internal Record configuration
+- **AND** the pack has no interactive terminal
+- **WHEN** the pack runs
+- **THEN** it SHALL fail before producing a zip
+- **AND** the error SHALL name the file
+
+#### Scenario: Duplicate source name fails packaging
+- **GIVEN** two dumps whose saved configuration uses the same source name
+- **WHEN** the pack runs
+- **THEN** it SHALL fail before producing a zip
+- **AND** the error SHALL name that source
