@@ -92,9 +92,9 @@ Register unique attribute values **without** emitting Fusion accounts for non-ma
 
 ### Internal Record sources
 
-A **Internal Record source** is a Records source whose accounts come from a packaged internal-record dump instead of an ISC managed source. Set **Source type** to Records and enter the dump's file name in **Internal record file**. **Include record accounts in Match** has the same meaning as it does for any other Records source.
+An **Internal Record source** is a Record source packaged with the Records Customizer and named in the Internal Record configuration. It is not selected by a Source Settings file field, and Identity Security Cloud is not queried for its accounts. Include record accounts in Match and the Accounts JMESPath filter are the values saved for that dump.
 
-The dump is a headered CSV, packaged with the Records Customizer. It must include a `nativeIdentity` column. Reports keep the Record label and add an **INTERNAL** badge. Those accounts have no ISC account link. See [Records Customizer](records-customizer.md#internal-record-sources).
+The dump is a headered CSV. Account ID and Account Name are columns chosen while packaging. Reports keep the Record label and add an **INTERNAL** badge. Those accounts have no ISC account link. See [Records Customizer](records-customizer.md).
 
 ## Orphan accounts
 

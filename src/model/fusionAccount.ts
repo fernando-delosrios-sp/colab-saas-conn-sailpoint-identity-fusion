@@ -92,6 +92,19 @@ export class FusionAccount {
         return FusionAccount.recordSourceNamesValue
     }
 
+    /**
+     * Add Internal Record sources discovered from the package after configuration was read.
+     * They follow the Record path and do not count as contributing accounts.
+     */
+    static includeRecordSources(names: Iterable<string>): void {
+        const managed = FusionAccount.managedSourceNamesValue as Set<string>
+        const record = FusionAccount.recordSourceNamesValue as Set<string>
+        for (const name of names) {
+            managed.add(name)
+            record.add(name)
+        }
+    }
+
     static buildIdentityInfo(source: Parameters<typeof buildIdentityInfo>[0]): ReturnType<typeof buildIdentityInfo> {
         return buildIdentityInfo(source)
     }

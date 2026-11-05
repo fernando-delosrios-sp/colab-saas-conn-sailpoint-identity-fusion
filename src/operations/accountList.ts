@@ -41,10 +41,6 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
 
     const timer = log.timer()
     log.startOperationHeartbeat(() => serviceRegistry.getHeartbeatSnapshot())
-    const customizerIndicesDir = (input as any)?.customizerIndicesDir as string | undefined
-    if (customizerIndicesDir) {
-        serviceRegistry.setCustomizerIndicesDir(customizerIndicesDir)
-    }
     const customizerInternalRecordsDir = (input as any)?.customizerInternalRecordsDir as string | undefined
     if (customizerInternalRecordsDir) {
         serviceRegistry.setCustomizerInternalRecordsDir(customizerInternalRecordsDir)
@@ -65,7 +61,6 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
                     tracker: new AggregationTracker(),
                     streamProgress: { sent: 0 },
                     schema: input.schema,
-                    customizerIndicesDir,
                     customizerInternalRecordsDir,
                 },
                 { log, timer, logPhases: true, result: phaseResult }
@@ -115,4 +110,3 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
         }
     }
 }
-

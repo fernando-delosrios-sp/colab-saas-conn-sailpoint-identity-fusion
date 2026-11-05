@@ -1739,7 +1739,7 @@ describe('FusionService — aggregation', () => {
             expect(ctx.run.linkedAccountKeyIndex).toBeUndefined()
         })
 
-        it('runs Match scoring for an Internal Record source when Include record accounts in Match is omitted', async () => {
+        it('Saved Match flag scores the record', async () => {
             const mockManagedAccount = {
                 nativeIdentity: 'internal-default-1',
                 name: 'Internal Default User',
@@ -1754,7 +1754,11 @@ describe('FusionService — aggregation', () => {
                 name: 'Internal Records.csv',
                 sourceType: 'record',
                 internalProvenance: true,
-                config: { internalRecordFile: 'Internal Records.csv' },
+                config: {
+                    name: 'Internal Records.csv',
+                    sourceType: 'record' as any,
+                    includeRecordAccountsForMatching: true,
+                },
             })
             ctx.mockMappingService.mapAttributes.mockImplementation((account) => account)
             ctx.mockDefinitionService.refreshNormalAttributes.mockResolvedValue()
@@ -1766,7 +1770,7 @@ describe('FusionService — aggregation', () => {
             expect(ctx.run.allFusionAccounts.filter((account) => account.sourceName === 'Internal Records.csv')).toEqual([])
         })
 
-        it('registers an Internal Record source without Match scoring when Match is disabled', async () => {
+        it('Saved Match flag skips scoring', async () => {
             const recordAccount = {
                 nativeIdentity: 'internal-skip-1',
                 name: 'Internal Skip User',
@@ -1783,7 +1787,7 @@ describe('FusionService — aggregation', () => {
                 sourceType: 'record',
                 internalProvenance: true,
                 config: {
-                    internalRecordFile: 'Internal Records.csv',
+                    name: 'Internal Records.csv',
                     includeRecordAccountsForMatching: false,
                 },
             })

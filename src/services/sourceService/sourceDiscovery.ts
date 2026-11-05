@@ -1,11 +1,19 @@
 import { BaseConfig, SourceConfig, SourceType } from '../../model/config'
+import { FusionAccount } from '../../model/fusionAccount'
 import { FusionRun } from '../../model/fusionRun'
 import { assert } from '../../utils/assert'
 import { wrapConnectorError } from '../../utils/error'
 import { readPathString } from '../../utils/safeRead'
 import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
-import { internalRecordSourceId } from './internalRecordFormat'
+import {
+    InternalRecordFormatError,
+    findInternalRecordSource,
+    internalPackageMessage,
+    internalRecordSourceId,
+    loadInternalRecordManifest,
+    loadPackagedInternalRecordConfiguration,
+} from './internalRecordFormat'
 import { getCompiledAccountJmespathFilter } from './managedAccountFetcher'
 import { SourceInfo } from './types'
 
@@ -26,6 +34,48 @@ export interface SourceDiscoveryDeps {
     client: ClientService
     run: FusionRun
     state: SourceDiscoveryState
+    /** Packaged Internal Record directory. Absent when the customizer shipped no configuration. */
+    internalRecordsDir?: string
+}
+
+/**
+ * Add each packaged Internal Record configuration entry as a Record source.
+ * A name that matches a configured source fails setup. A configured source with no
+ * packaged entry of the same name keeps its Identity Security Cloud feed.
+ */
+function appendInternalRecordSources(deps: SourceDiscoveryDeps, resolvedSources: SourceInfo[]): void {
+    const directory = deps.internalRecordsDir
+    if (!directory) return
+    const configuration = loadPackagedInternalRecordConfiguration(directory)
+    if (!configuration || configuration.sources.length === 0) return
+    const manifest = loadInternalRecordManifest(directory)
+    const configuredNames = new Set(deps.state.sources.map((source) => source.name))
+    for (const entry of configuration.sources) {
+        if (configuredNames.has(entry.sourceName)) {
+            throw new InternalRecordFormatError(
+                `Internal Record source "${entry.sourceName}" matches configured source "${entry.sourceName}"`
+            )
+        }
+        if (!findInternalRecordSource(manifest, entry.fileName)) {
+            throw new InternalRecordFormatError(internalPackageMessage(entry.fileName))
+        }
+        const filter = entry.accountJmespathFilter.trim()
+        resolvedSources.push({
+            id: internalRecordSourceId(entry.fileName),
+            name: entry.sourceName,
+            isManaged: true,
+            sourceType: SourceType.Record,
+            internalProvenance: true,
+            internalRecord: entry,
+            config: {
+                name: entry.sourceName,
+                sourceType: SourceType.Record,
+                includeRecordAccountsForMatching: entry.includeRecordAccountsInMatch,
+                ...(filter.length > 0 ? { accountJmespathFilter: filter } : {}),
+            },
+        })
+    }
+    FusionAccount.includeRecordSources(configuration.sources.map((entry) => entry.sourceName))
 }
 
 /**
@@ -37,10 +87,11 @@ export async function fetchAllSources(deps: SourceDiscoveryDeps, requireFusionSo
 
     const apiSources = await wrapConnectorError(
         () =>
-            client.call<any>(
-                (api: any, params: any) => api.sources.listSources(params),
-                { paginate: { mode: 'sequential', baseParams: {} }, priority: QueuePriority.HIGH, context: 'SourceService>fetchAllSources listSources' }
-            ),
+            client.call<any>((api: any, params: any) => api.sources.listSources(params), {
+                paginate: { mode: 'sequential', baseParams: {} },
+                priority: QueuePriority.HIGH,
+                context: 'SourceService>fetchAllSources listSources',
+            }),
         'Failed to fetch sources from ISC. Please verify your connector configuration and API credentials'
     )
     assert(
@@ -52,17 +103,6 @@ export async function fetchAllSources(deps: SourceDiscoveryDeps, requireFusionSo
     const resolvedSources: SourceInfo[] = []
 
     for (const sourceConfig of state.sources) {
-        if (sourceConfig.internalRecordFile) {
-            resolvedSources.push({
-                id: internalRecordSourceId(sourceConfig.internalRecordFile),
-                name: sourceConfig.name,
-                isManaged: true,
-                sourceType: SourceType.Record,
-                config: sourceConfig,
-                internalProvenance: true,
-            })
-            continue
-        }
         const apiSource = apiSourcesByName.get(sourceConfig.name)
         assert(
             apiSource,
@@ -76,6 +116,8 @@ export async function fetchAllSources(deps: SourceDiscoveryDeps, requireFusionSo
             config: sourceConfig,
         })
     }
+
+    appendInternalRecordSources(deps, resolvedSources)
 
     const fusionSource = apiSources.find(
         (x) => (x.connectorAttributes as BaseConfig).spConnectorInstanceId === state.spConnectorInstanceId
@@ -111,9 +153,7 @@ export async function fetchAllSources(deps: SourceDiscoveryDeps, requireFusionSo
         state.fusionSourceOwner = undefined
         state.fusionSourceManagementWorkgroupId = undefined
         state.workgroupMemberIdsByWorkgroupId.clear()
-        log.warn(
-            'Fusion source not found for this run. Continuing with managed sources only (custom report mode).'
-        )
+        log.warn('Fusion source not found for this run. Continuing with managed sources only (custom report mode).')
     }
 
     state.allSources = resolvedSources

@@ -9,6 +9,7 @@ import { CompiledAccountJmespathFilter, compileAccountPageJmespathFilter } from 
 import {
     findInternalRecordSource,
     internalPackageMessage,
+    internalRecordAttributes,
     InternalRecordFormatError,
     iterateInternalRecords,
     loadInternalRecordManifest,
@@ -109,7 +110,10 @@ function hasEstablishedOwnerIdentity(account: Account): boolean {
 }
 
 export function isOwnershipModeSource(source: SourceInfo | undefined): boolean {
-    return source?.sourceType === SourceType.Orphan && source.config?.orphanProcessingMode === OrphanProcessingMode.Ownership
+    return (
+        source?.sourceType === SourceType.Orphan &&
+        source.config?.orphanProcessingMode === OrphanProcessingMode.Ownership
+    )
 }
 
 /** Machine account on an Ownership-mode source with no established owner identity. */
@@ -207,18 +211,18 @@ async function collectAccountsFromBatch(
 
 const INTERNAL_RECORD_BATCH_SIZE = 100
 
-function internalRecordAccount(source: SourceInfo, headers: string[], values: string[]): Account {
-    const attributes: Record<string, string> = {}
-    headers.forEach((header, index) => {
-        attributes[header] = values[index] ?? ''
-    })
-    const nativeIdentity = attributes.nativeIdentity
+function internalRecordAccount(source: SourceInfo, headers: string[], values: string[], rawValues: string[]): Account {
+    const entry = source.internalRecord
+    if (!entry) {
+        throw new InternalRecordFormatError(internalPackageMessage(source.name))
+    }
+    const built = internalRecordAttributes(entry, headers, values, rawValues)
     return {
-        nativeIdentity,
-        name: attributes.name || nativeIdentity,
+        nativeIdentity: built.nativeIdentity,
+        name: built.name,
         sourceId: source.id,
         sourceName: source.name,
-        attributes,
+        attributes: built.attributes,
         disabled: false,
         locked: false,
         uncorrelated: true,
@@ -232,7 +236,7 @@ async function fetchInternalRecordSource(
     sourceProgress: Map<string, { registered: number; total?: number }>,
     reportAggregateFetchProgress: () => void
 ): Promise<{ collectedCount: number; discardedMachineCount: number }> {
-    const fileName = source.config?.internalRecordFile
+    const fileName = source.internalRecord?.fileName
     if (!fileName || !deps.internalRecordsDir) {
         throw new InternalRecordFormatError(internalPackageMessage(fileName || source.name))
     }
@@ -268,7 +272,7 @@ async function fetchInternalRecordSource(
 
     for await (const record of iterateInternalRecords(deps.internalRecordsDir, fileName)) {
         if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
-        batch.push(internalRecordAccount(source, record.headers, record.values))
+        batch.push(internalRecordAccount(source, record.headers, record.values, record.rawValues))
         if (batch.length >= INTERNAL_RECORD_BATCH_SIZE) await flush()
     }
     await flush()

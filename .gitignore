@@ -16,6 +16,8 @@ node_modules/
 
 # Build artifacts
 dist/
+customizers/records/data/
+customizers/records/records/*.csv
 coverage/
 reports/
 exportedObjects/

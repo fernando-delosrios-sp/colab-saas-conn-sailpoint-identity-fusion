@@ -44,7 +44,7 @@ For log phase mapping during diagnosis, see [Config to account-list phases](../.
 | Proxy 401 | Password mismatch | [Run the connector via proxy](../operation/run-via-proxy.md) |
 | Empty or invalid proxy response | Wrong response format; server error | [Proxy deployment](../../reference/proxy-mode.md) |
 | Aggregation very slow | Low concurrency; no batching; large dataset | [Tune API performance](../operation/tune-api-performance.md) |
-| Internal record file is missing or incompatible | The customizer package does not contain that dump or uses an unsupported manifest | [Records Customizer](../configuration/records-customizer.md#internal-record-sources) |
+| Internal Record source fails setup | The packaged dump is missing from the manifest, the manifest version is unsupported, or the source name matches a configured source | [Records Customizer](../configuration/records-customizer.md#package-compatibility-and-failures) |
 | Internal records increase memory | Runtime filesystem may be ramfs; package bytes still count as memory | [Records Customizer](../configuration/records-customizer.md#benchmark-and-runtime-memory) |
 | High memory usage (proxy) | Large in-memory result sets | [Proxy deployment](../../reference/proxy-mode.md) |
 | Cannot interpret logs | Unfamiliar log prefixes | [Monitor aggregation progress](../operation/monitor-aggregation-progress.md) · [Observability](../../reference/observability.md) |

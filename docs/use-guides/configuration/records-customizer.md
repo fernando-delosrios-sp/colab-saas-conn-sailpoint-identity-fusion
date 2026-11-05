@@ -1,21 +1,23 @@
 # Records Customizer
 
-The **Records Customizer** provides a zero-heap, decoupled mechanism to reserve attribute values (such as legacy usernames, historical employee numbers, and service account IDs) so Identity Fusion NG never issues colliding values during Unique attribute generation.
+The **Records Customizer** packages Internal-record dumps and the Internal Record configuration for Identity Fusion. Each dump becomes an Internal Record source. Unique values are reserved when those accounts carry them, not from a separate list of strings.
 
-**Configuration reference:** [Defining attributes](defining-attributes.md) · [Glossary](../../glossary.md)
+**Configuration reference:** [Source types](source-types.md) · [Glossary](../../glossary.md)
 
 !!! note "Didactic guide"
-    This page explains how to configure, compile, and package the standalone Records Customizer.
+This page explains how to prepare dumps, save the Internal Record configuration, and package the Records Customizer.
 
 ---
 
 ## When to use the Records Customizer
 
-| Scenario | Standard aggregation | Records Customizer |
-| --- | --- | --- |
-| **Large reserved pools (>50k values)** | ❌ High heap usage; risk of container OOM | ✅ Compact sorted 64-bit binary indexes (<1 MB for 100k values) |
-| **Decoupled updates** | ❌ Requires source data sync or connector release | ✅ Update CSV files and re-upload customizer package |
-| **Performance** | String allocation in V8 heap sets | Sub-microsecond binary search with zero heap allocations |
+| Need                                                                                  | What to do                                                                        |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Accounts that should follow the Record path without an Identity Security Cloud source | Put a headered CSV in `records/` and pack it                                      |
+| A username or employee number that must stay reserved                                 | Put that value on an account in the dump, on the unique attribute                 |
+| Match, filtering, Account ID, and Account Name                                        | Confirm them while packaging. They are saved in the Internal Record configuration |
+
+A bare list of usernames no longer reserves those usernames. Replace each old `values/*.csv` list with an Internal-record dump that carries the values on a unique attribute, then pack that dump.
 
 ---
 
@@ -25,14 +27,14 @@ The customizer template lives in `customizers/records/`:
 
 ```text
 customizers/records/
-├── data/                    # Generated .bin binary index files
+├── internal-record-configuration.json   # Saved packaging decisions
+├── records/                             # Internal-record dumps (not uploaded)
+│   └── Sample Records.csv
 ├── scripts/
-│   └── build-indices.ts     # Pre-pack script compiling CSVs to .bin
+│   └── build-internal-records.mts       # Pack script
 ├── src/
-│   └── index.ts             # Customizer entry point (beforeStdAccountList hook)
-├── values/                  # Attribute value CSV files (one per attribute)
-│   ├── .gitkeep
-│   └── sAMAccountName.csv   # One reserved value per line
+│   └── index.ts                         # beforeStdAccountList hook
+├── data/internal-records/               # Generated manifest, configuration, and shards
 ├── package.json
 └── tsconfig.json
 ```
@@ -41,23 +43,11 @@ customizers/records/
 
 ## Step-by-step workflow
 
-### 1. Populate attribute CSV files
+### 1. Add an Internal-record dump
 
-Create a single-column CSV file in `customizers/records/values/` named after the target unique attribute (e.g. `sAMAccountName.csv`, `employeeNumber.csv`).
+Place a headered CSV in `customizers/records/records/`. Commas and quotes follow RFC 4180. The file does not need a `nativeIdentity` column. You choose the Account ID and Account Name columns while packaging.
 
-```text
-admin
-administrator
-root
-guest
-service_backup
-```
-
-- Each non-empty trimmed line represents a reserved value.
-- Empty lines and leading/trailing whitespace are ignored.
-- Values are case-sensitive matching the target unique attribute generator.
-
-### 2. Build and package the customizer
+### 2. Pack and save the Internal Record configuration
 
 Inside `customizers/records/`, run:
 
@@ -65,65 +55,51 @@ Inside `customizers/records/`, run:
 npm run pack-zip
 ```
 
-This script:
+On an interactive terminal, each `records/*.csv` that has no saved entry prompts for:
 
-1. Executes `build-indices.ts` to hash lines using 64-bit FNV-1a.
-2. Deduplicates and sorts the 64-bit integers in ascending order.
-3. Writes contiguous 8-byte integers into `data/<attributeName>.bin`.
-4. Bundles the customizer code and binary indexes into a deployable customizer zip via `spcx package`.
+- Source name
+- Include record accounts in Match
+- Accounts JMESPath filter
+- Account ID field
+- Account Name field
+
+The pack also infers an Internal Record schema: one field per header. A field starts multi-valued when any cell contains an unquoted semicolon. A semicolon inside quotes does not. At the prompt:
+
+- `toggle <field>` flips that field's multi-valued flag
+- `rescan` reads the CSV again after you edit it
+- `continue` accepts the schema
+
+The answers are written to `internal-record-configuration.json`. The next pack reuses them and does not prompt. Edit that file between packs when you want to change a saved answer. A pack with no interactive terminal fails when any dump has no saved entry, and the error names the file.
+
+Packaging fails when two entries use the same source name, when the Accounts JMESPath filter is invalid, or when an Account ID is blank or duplicated. Those errors name the file and, for a bad row, the row.
+
+The deployable zip includes the Internal Record configuration, the manifest, and the shards. It does not include the original CSV.
 
 ### 3. Deploy to Identity Security Cloud
 
-1. In ISC, navigate to **Connections** > **Connectors** > **Identity Fusion**.
-2. Upload the compiled customizer zip file to the customizer slot.
+1. Upload the customizer zip to the Identity Fusion customizer slot.
+2. Remove any **Internal record file** value left in Source Settings from an older package. That field is no longer read.
 3. Run an account aggregation.
 
----
-
-## Runtime operation and logging
-
-When an aggregation runs:
-
-1. The customizer hook (`beforeStdAccountList`) resolves the index directory and injects `customizerIndicesDir` into the command input.
-2. `DefinitionService` loads the index files into the **Customizer Value Store**.
-3. During unique attribute generation, candidate values are evaluated against the customizer store using binary search before checking live accounts.
-4. If a collision occurs, Identity Fusion automatically regenerates or appends a disambiguation counter.
-
-### Structured logs
-
-During the Setup phase, the connector emits structured audit logs:
-
-- **Informational log:**
-  `Loaded customizer unique index store from /path/to/data: 2 attribute(s), 50000 total value(s) in 12ms`
-- **Detail log:**
-  `[operationContext] DETAIL action="customizer unique store loaded" directory="..." attributes={"sAMAccountName":45000,"employeeNumber":5000} totalValues=50000 durationMs=12`
-- **Debug log (when customizer is not attached):**
-  `No customizer unique value store was attached`
+Do not give an Internal Record source the same name as a configured source. Setup fails before Fetch and names that source. A configured source with a different name still comes from Identity Security Cloud.
 
 ---
 
-## Internal Record sources
+## What the connector does with the package
 
-A internal-record dump is a headered CSV of complete account records. Place it in `customizers/records/records/` and name it for the source, for example `Internal Records.csv`. The dump must include a `nativeIdentity` column. Other columns become account attributes. Quoted commas, quotes, and line breaks are preserved.
+`beforeStdAccountList` returns the directory that holds the Internal Record configuration, manifest, and shards. It does not return a unique-value index directory.
 
-```text
-customizers/records/
-├── records/
-│   └── Internal Records.csv
-└── data/internal-records/
-    ├── manifest.json
-    └── Internal-Records-0000.hrb
-```
+Each saved entry becomes an Internal Record source with Record type and internal provenance. Include record accounts in Match and the Accounts JMESPath filter come from that entry. An empty filter accepts every row. The Account ID field becomes `nativeIdentity`. The Account Name field becomes the account name, and an empty name falls back to the Account ID. A multi-valued field is split on unquoted semicolons into a list of strings. A quoted semicolon stays inside one list entry. A field saved as single-valued keeps an unquoted semicolon inside the string.
 
-`npm run pack-zip` compiles each `records/*.csv` into a versioned manifest and compact binary shards under `data/internal-records/`. The original CSV is not included in the deployable package. An index-only package remains valid.
+Match on follows the Record Match path. Match off registers mapped unique attributes and does not score. An unmatched record does not create a Fusion account.
 
-In Source Settings, add a Records source and set **Internal record file** to that file name. The source name is the label used in processing and reports. Identity Security Cloud does not need a managed source with the same name. **Include record accounts in Match** defaults to on. Turn it off to keep selective Map and unique-attribute registration without Match scoring. An unmatched internal record does not create a Fusion account.
+A value on a unique attribute is reserved when record registration stores it. Unique generation rejects a candidate that is already in that registered set. There is no Customizer Value Store.
 
-Reports show the Record source type and an `INTERNAL` badge for every internal reference. The account name is not linked to an ISC account.
+Reports keep the Record label and add an `INTERNAL` badge. Those accounts have no Identity Security Cloud account link.
 
 ### Package compatibility and failures
 
-Rebuild and upload the customizer with the connector version that reads the manifest. Setup fails before Fetch when the configured file is missing, the manifest version is unsupported, or the dump has duplicate headers, a missing `nativeIdentity` header, or malformed CSV. The error names the file and the invalid header or row.
+Rebuild and upload the customizer with the connector version that reads the manifest. Setup fails before Fetch when a saved dump is missing from the manifest or the manifest version is unsupported. The error names the file.
 
 ### Benchmark and runtime memory
 
@@ -135,10 +111,10 @@ npm run benchmark:internal-records
 
 The command measures streaming CSV and the compiled artifact in separate processes. It records package bytes, elapsed time, records per second, heap usage, external memory, RSS, and the filesystem type when the platform exposes it. Results are written to `customizers/records/benchmark/results.md`.
 
-The customizer runtime filesystem may be a ramfs. Files stored there still consume the runtime memory budget, so compiling the dump does not move it out of RAM. The compiled form avoids retaining the CSV text and the full parsed collection; aggregation still streams, prunes, and releases records. Treat the published measurements as environment-specific evidence, not as a claim that filesystem storage lowers container memory.
+The customizer runtime filesystem may be a ramfs. Files stored there still consume the runtime memory budget, so compiling the dump does not move it out of RAM. The compiled form avoids retaining the CSV text and the full parsed collection; aggregation still streams, prunes, and releases records. A large dump registers unique values into an in-memory set. Treat the published measurements as environment-specific evidence, not as a claim that filesystem storage lowers container memory.
 
 ## Related guides
 
+- [Source types](source-types.md): Record processing and the Internal Record source.
 - [Defining attributes](defining-attributes.md): Velocity expressions, unique definitions, and collision counters.
-- [Mapping attributes](mapping-attributes.md): Merging source accounts into Fusion accounts.
 - [Monitoring aggregation progress](../operation/monitor-aggregation-progress.md): Tracking phase progress and heartbeat logs.

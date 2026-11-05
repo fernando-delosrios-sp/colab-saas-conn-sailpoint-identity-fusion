@@ -1,5 +1,6 @@
 import { OwnerDto } from 'sailpoint-api-client'
 import { SourceConfig, SourceType } from '../../model/config'
+import type { InternalRecordConfigurationEntry } from './internalRecordConfiguration'
 
 // ============================================================================
 // Type Definitions — Source Service
@@ -22,6 +23,8 @@ export type SourceInfo = {
     config?: SourceConfig
     /** Source owner identity (only present for the fusion source itself) */
     owner?: OwnerDto
-    /** True when accounts come from a packaged internal-record dump. */
+    /** True when accounts come from a packaged Internal-record dump. */
     internalProvenance?: boolean
+    /** Saved packaging decisions when this source comes from the Internal Record configuration. */
+    internalRecord?: InternalRecordConfigurationEntry
 }

@@ -62,7 +62,6 @@ export class ServiceRegistry {
     public matchOutcomeDispatcher: MatchOutcomeDispatcher
     public run: FusionRun
     public runContext: OperationRunContext
-    public customizerIndicesDir?: string
     public customizerInternalRecordsDir?: string
     private readonly clientUsesInjection: boolean
 
@@ -290,12 +289,7 @@ export class ServiceRegistry {
         return reg
     }
 
-    /** Sets the customizer index directory. */
-    setCustomizerIndicesDir(dir?: string): void {
-        this.customizerIndicesDir = dir
-    }
-
-    /** Sets the packaged internal-record directory used by external Record sources. */
+    /** Sets the packaged Internal Record directory used by Record sources from the customizer. */
     setCustomizerInternalRecordsDir(dir?: string): void {
         this.customizerInternalRecordsDir = dir
         this.sources.internalRecordsDir = dir

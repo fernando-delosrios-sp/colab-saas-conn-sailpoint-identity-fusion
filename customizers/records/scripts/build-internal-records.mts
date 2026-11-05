@@ -1,12 +1,21 @@
 import * as path from 'path'
 import { fileURLToPath } from 'node:url'
-import { compileInternalRecordDumps } from '../../../src/services/sourceService/internalRecordFormat.ts'
+import { stdin as input } from 'process'
+import { packInternalRecords, createCliInternalRecordPrompter } from '../../../src/services/sourceService/internalRecordPack.ts'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const recordsDir = path.resolve(scriptDir, '../records')
+const configurationPath = path.resolve(scriptDir, '../internal-record-configuration.json')
 const outputDir = path.resolve(scriptDir, '../data')
+const interactive = input.isTTY === true
 
-compileInternalRecordDumps(recordsDir, outputDir)
+packInternalRecords({
+    recordsDir,
+    configurationPath,
+    outputDir,
+    interactive,
+    ...(interactive ? { prompt: createCliInternalRecordPrompter() } : {}),
+})
     .then((manifest) => {
         const count = manifest.sources.reduce((sum, source) => sum + source.recordCount, 0)
         console.info(`Compiled ${manifest.sources.length} internal-record dump(s), ${count} record(s)`)

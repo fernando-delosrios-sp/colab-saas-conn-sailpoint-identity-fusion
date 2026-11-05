@@ -251,20 +251,10 @@ describe('DefinitionService per base value counter', () => {
 
         const account = createAccount({ prefix: 'ab' }, 'a')
         await expect(registered.refreshUniqueAttributes(account)).rejects.toThrow(
-            /Unique attribute "UID" rendered "ab1".*hide \$counter.*lost or reset.*managed-source or customizer.*truncation/s
+            /Unique attribute "UID" rendered "ab1".*hide \$counter.*lost or reset.*managed-source or Internal Record.*truncation/s
         )
         expect(account.attributes.UID).toBeUndefined()
         expect(await registered.getStateObject()).toEqual({ UID: { ab: 1 } })
-
-        const fromCustomizer = createService([uniqueDef({ counterPerBase: true })])
-        await fromCustomizer.initializeCounters()
-        fromCustomizer.setCustomizerValueStore({
-            has: (attribute: string, candidate: string) => attribute === 'UID' && candidate === 'ab1',
-        } as any)
-        const other = createAccount({ prefix: 'ab' }, 'b')
-        await expect(fromCustomizer.refreshUniqueAttributes(other)).rejects.toThrow(/rendered "ab1"/)
-        expect(other.attributes.UID).toBeUndefined()
-        expect(await fromCustomizer.getStateObject()).toEqual({ UID: { ab: 1 } })
     })
 
     it('Bases that differ past the reserved width share a counter', async () => {

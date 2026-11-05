@@ -8,7 +8,6 @@ import {
 import { formatCorrelationSummaryValue } from '../../services/logService/operationRunContext'
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
-import { validateConfiguredInternalRecords } from '../../services/sourceService/internalRecordFormat'
 import { buildReferencedAttributeSet } from '../../services/sourceService/referencedAttributeSet'
 import { generateReport } from './generateReport'
 import { buildReportAggregationStats, buildTerminalSummary, DryRunInput, type FetchResult } from './accountListHelpers'
@@ -20,7 +19,6 @@ export interface PhaseOptions {
     isPersistent: boolean
     tracker?: AggregationTracker
     streamProgress?: { sent: number }
-    customizerIndicesDir?: string
     customizerInternalRecordsDir?: string
 }
 
@@ -92,7 +90,13 @@ export async function setupPhase(
 
     if (tracker) fusion.setTracker(tracker)
 
+    const internalRecordsDir = options.customizerInternalRecordsDir ?? serviceRegistry.customizerInternalRecordsDir
+    serviceRegistry.setCustomizerInternalRecordsDir(internalRecordsDir)
+
     await sources.fetchAllSources(isPersistent)
+    for (const source of sources.managedSources) {
+        if (source.internalProvenance) fusion.configSourceNames.add(source.name)
+    }
     log.detail({ sources: sources.managedSources.length })
     if (!sources.hasFusionSource) {
         throw new Error(
@@ -149,16 +153,6 @@ export async function setupPhase(
 
     await definition.initializeCounters()
     log.detail({ action: 'attribute counters initialized' })
-
-    const customizerDir = options.customizerIndicesDir ?? serviceRegistry.customizerIndicesDir
-    if (customizerDir) {
-        serviceRegistry.setCustomizerIndicesDir(customizerDir)
-    }
-    const internalRecordsDir =
-        options.customizerInternalRecordsDir ?? serviceRegistry.customizerInternalRecordsDir
-    serviceRegistry.setCustomizerInternalRecordsDir(internalRecordsDir)
-    validateConfiguredInternalRecords(config.sources, internalRecordsDir)
-    definition.initializeCustomizerStore(customizerDir)
     return true
 }
 

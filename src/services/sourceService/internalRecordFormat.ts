@@ -1,11 +1,17 @@
 import * as fs from 'fs'
 import * as path from 'path'
+import { compileAccountPageJmespathFilter } from './accountFilters'
+import {
+    INTERNAL_RECORD_CONFIGURATION_FILE,
+    type InternalRecordConfiguration,
+    type InternalRecordConfigurationEntry,
+    type InternalRecordSchemaField,
+} from './internalRecordConfiguration'
 
-const INTERNAL_RECORD_FORMAT_VERSION = 1
+const INTERNAL_RECORD_FORMAT_VERSION = 2
 const INTERNAL_RECORD_MAGIC = Buffer.from('HRB1')
 export const INTERNAL_RECORD_DIRECTORY = 'internal-records'
 const INTERNAL_RECORD_MANIFEST = 'manifest.json'
-const INTERNAL_RECORD_IDENTITY_HEADER = 'nativeIdentity'
 /** Records per shard. Fixed so two builds of the same dump produce the same files. */
 const INTERNAL_RECORD_SHARD_SIZE = 10_000
 
@@ -28,34 +34,62 @@ export interface InternalRecordManifest {
     sources: InternalRecordSourceManifest[]
 }
 
+/** One CSV cell, keeping the raw text so a later split can tell quoted semicolons from unquoted ones. */
+interface CsvField {
+    value: string
+    raw: string
+    unquotedSemicolon: boolean
+}
+
 interface CsvParseState {
     inQuotes: boolean
     field: string
-    fields: string[]
+    raw: string
+    unquotedSemicolon: boolean
+    fields: CsvField[]
     row: number
     sawCr: boolean
+}
+
+function pushField(state: CsvParseState): void {
+    state.fields.push({
+        value: state.field,
+        raw: state.raw,
+        unquotedSemicolon: state.unquotedSemicolon,
+    })
+    state.field = ''
+    state.raw = ''
+    state.unquotedSemicolon = false
 }
 
 /**
  * Stream a headered CSV file and invoke `onRecord` once per data row.
  * Quoted commas, doubled quotes, and embedded line breaks follow RFC 4180.
+ * Each cell keeps its raw text and whether it contained an unquoted semicolon.
  */
-export async function forEachCsvRecord(
+async function forEachCsvRecordDetailed(
     csvPath: string,
-    onRecord: (rowNumber: number, fields: string[]) => Promise<void> | void
+    onRecord: (rowNumber: number, fields: CsvField[]) => Promise<void> | void
 ): Promise<void> {
     const stream = fs.createReadStream(csvPath, { encoding: 'utf8' })
-    const state: CsvParseState = { inQuotes: false, field: '', fields: [], row: 1, sawCr: false }
+    const state: CsvParseState = {
+        inQuotes: false,
+        field: '',
+        raw: '',
+        unquotedSemicolon: false,
+        fields: [],
+        row: 1,
+        sawCr: false,
+    }
     let quoteMayContinue = false
 
     const finishRecord = async () => {
-        state.fields.push(state.field)
-        state.field = ''
+        pushField(state)
         const fields = state.fields
         const rowNumber = state.row
         state.fields = []
         state.row += 1
-        if (fields.length === 1 && fields[0] === '') return
+        if (fields.length === 1 && fields[0].value === '' && fields[0].raw === '') return
         await onRecord(rowNumber, fields)
     }
 
@@ -68,6 +102,7 @@ export async function forEachCsvRecord(
                     quoteMayContinue = false
                     if (char === '"') {
                         state.field += '"'
+                        state.raw += '"'
                         state.sawCr = false
                         continue
                     }
@@ -78,14 +113,18 @@ export async function forEachCsvRecord(
                         const next = text[i + 1]
                         if (next === '"') {
                             state.field += '"'
+                            state.raw += '""'
                             i++
                         } else if (next === undefined) {
+                            state.raw += '"'
                             quoteMayContinue = true
                         } else {
+                            state.raw += '"'
                             state.inQuotes = false
                         }
                     } else {
                         state.field += char
+                        state.raw += char
                     }
                     state.sawCr = false
                     continue
@@ -93,12 +132,12 @@ export async function forEachCsvRecord(
 
                 if (char === '"') {
                     state.inQuotes = true
+                    state.raw += '"'
                     state.sawCr = false
                     continue
                 }
                 if (char === ',') {
-                    state.fields.push(state.field)
-                    state.field = ''
+                    pushField(state)
                     state.sawCr = false
                     continue
                 }
@@ -115,8 +154,10 @@ export async function forEachCsvRecord(
                     await finishRecord()
                     continue
                 }
+                if (char === ';') state.unquotedSemicolon = true
                 state.sawCr = false
                 state.field += char
+                state.raw += char
             }
         }
     } finally {
@@ -131,8 +172,124 @@ export async function forEachCsvRecord(
             `Malformed CSV in "${path.basename(csvPath)}" at row ${state.row}: a quoted field was not closed`
         )
     }
-    if (state.field.length > 0 || state.fields.length > 0) {
+    if (state.field.length > 0 || state.raw.length > 0 || state.fields.length > 0) {
         await finishRecord()
+    }
+}
+
+/**
+ * Stream a headered CSV file and invoke `onRecord` once per data row.
+ * Quoted commas, doubled quotes, and embedded line breaks follow RFC 4180.
+ */
+export async function forEachCsvRecord(
+    csvPath: string,
+    onRecord: (rowNumber: number, fields: string[]) => Promise<void> | void
+): Promise<void> {
+    await forEachCsvRecordDetailed(csvPath, async (rowNumber, fields) => {
+        await onRecord(
+            rowNumber,
+            fields.map((field) => field.value)
+        )
+    })
+}
+
+/** Turn one raw CSV cell back into its parsed text. */
+function unescapeCsvField(raw: string): string {
+    let out = ''
+    let inQuotes = false
+    for (let i = 0; i < raw.length; i++) {
+        const char = raw[i]
+        if (inQuotes) {
+            if (char === '"') {
+                if (raw[i + 1] === '"') {
+                    out += '"'
+                    i++
+                } else {
+                    inQuotes = false
+                }
+            } else {
+                out += char
+            }
+            continue
+        }
+        if (char === '"') {
+            inQuotes = true
+            continue
+        }
+        out += char
+    }
+    return out
+}
+
+/**
+ * Split a raw CSV cell on semicolons that sit outside quotes.
+ * A quoted semicolon stays inside one entry. Empty entries are dropped.
+ */
+export function splitUnquotedSemicolons(raw: string): string[] {
+    const parts: string[] = []
+    let current = ''
+    let inQuotes = false
+    for (let i = 0; i < raw.length; i++) {
+        const char = raw[i]
+        if (inQuotes) {
+            current += char
+            if (char === '"') {
+                if (raw[i + 1] === '"') {
+                    current += '"'
+                    i++
+                } else {
+                    inQuotes = false
+                }
+            }
+            continue
+        }
+        if (char === '"') {
+            current += char
+            inQuotes = true
+            continue
+        }
+        if (char === ';') {
+            parts.push(current)
+            current = ''
+            continue
+        }
+        current += char
+    }
+    parts.push(current)
+    return parts.map((part) => unescapeCsvField(part)).filter((part) => part.length > 0)
+}
+
+/**
+ * Infer one schema field per header.
+ * A field starts multi-valued when any cell contains an unquoted semicolon.
+ */
+export async function inferInternalRecordSchema(
+    csvPath: string
+): Promise<{ headers: string[]; schema: InternalRecordSchemaField[] }> {
+    const fileName = path.basename(csvPath)
+    let headers: string[] | undefined
+    const unquoted = new Set<string>()
+    await forEachCsvRecordDetailed(csvPath, (rowNumber, fields) => {
+        if (!headers) {
+            headers = fields.map((field) => field.value)
+            assertHeaders(fileName, headers)
+            return
+        }
+        if (fields.length !== headers.length) {
+            throw new InternalRecordFormatError(
+                `Internal-record dump "${fileName}" row ${rowNumber} has ${fields.length} fields; expected ${headers.length}`
+            )
+        }
+        fields.forEach((field, index) => {
+            if (field.unquotedSemicolon) unquoted.add(headers![index])
+        })
+    })
+    if (!headers) {
+        throw new InternalRecordFormatError(`Internal-record dump "${fileName}" has no header row`)
+    }
+    return {
+        headers,
+        schema: headers.map((name) => ({ name, multiValued: unquoted.has(name) })),
     }
 }
 
@@ -143,27 +300,24 @@ function assertHeaders(fileName: string, headers: string[]): void {
             throw new InternalRecordFormatError(`Internal-record dump "${fileName}" has an empty header`)
         }
         if (seen.has(header)) {
-            throw new InternalRecordFormatError(
-                `Internal-record dump "${fileName}" has duplicate header "${header}"`
-            )
+            throw new InternalRecordFormatError(`Internal-record dump "${fileName}" has duplicate header "${header}"`)
         }
         seen.add(header)
-    }
-    if (!seen.has(INTERNAL_RECORD_IDENTITY_HEADER)) {
-        throw new InternalRecordFormatError(
-            `Internal-record dump "${fileName}" is missing required header "${INTERNAL_RECORD_IDENTITY_HEADER}"`
-        )
     }
 }
 
 function shardName(fileName: string, index: number): string {
-    const stem = fileName.replace(/\.csv$/i, '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'records'
+    const stem =
+        fileName
+            .replace(/\.csv$/i, '')
+            .replace(/[^A-Za-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '') || 'records'
     return `${stem}-${String(index).padStart(4, '0')}.hrb`
 }
 
-function writeFrame(chunks: Buffer[], headers: string[], values: string[]): void {
+function writeFrame(chunks: Buffer[], values: string[]): void {
     const count = Buffer.allocUnsafe(4)
-    count.writeUInt32LE(headers.length, 0)
+    count.writeUInt32LE(values.length, 0)
     chunks.push(count)
     for (const value of values) {
         const bytes = Buffer.from(value, 'utf8')
@@ -173,29 +327,66 @@ function writeFrame(chunks: Buffer[], headers: string[], values: string[]): void
     }
 }
 
+function listDumpFileNames(recordsDir: string): string[] {
+    if (!fs.existsSync(recordsDir)) return []
+    return fs
+        .readdirSync(recordsDir)
+        .filter((file) => file.toLowerCase().endsWith('.csv'))
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+}
+
+function assertConfiguration(
+    configuration: InternalRecordConfiguration,
+    fileNames: string[]
+): Map<string, InternalRecordConfigurationEntry> {
+    const byFile = new Map<string, InternalRecordConfigurationEntry>()
+    const sourceNames = new Set<string>()
+    for (const entry of configuration.sources) {
+        if (byFile.has(entry.fileName)) {
+            throw new InternalRecordFormatError(
+                `Internal-record dump "${entry.fileName}" has more than one saved Internal Record configuration`
+            )
+        }
+        byFile.set(entry.fileName, entry)
+        if (sourceNames.has(entry.sourceName)) {
+            throw new InternalRecordFormatError(
+                `Internal Record source "${entry.sourceName}" is used by more than one dump`
+            )
+        }
+        sourceNames.add(entry.sourceName)
+        compileAccountPageJmespathFilter(entry.sourceName, entry.accountJmespathFilter)
+    }
+    for (const fileName of fileNames) {
+        if (!byFile.has(fileName)) {
+            throw new InternalRecordFormatError(
+                `Internal-record dump "${fileName}" has no saved Internal Record configuration`
+            )
+        }
+    }
+    return byFile
+}
+
 /**
- * Compile every `*.csv` internal-record dump in `recordsDir` into a manifest and binary shards.
- * The original CSV files are not copied to `outputDir`.
+ * Compile each configured Internal-record dump into a manifest and binary shards.
+ * The original CSV files are not copied. The saved configuration is written beside the manifest.
+ * Shard frames store raw CSV cells so the connector can split unquoted semicolons later.
  */
-export async function compileInternalRecordDumps(recordsDir: string, outputDir: string): Promise<InternalRecordManifest> {
+export async function compileInternalRecordDumps(
+    recordsDir: string,
+    outputDir: string,
+    configuration: InternalRecordConfiguration
+): Promise<InternalRecordManifest> {
+    const fileNames = listDumpFileNames(recordsDir)
+    const byFile = assertConfiguration(configuration, fileNames)
     const destination = path.join(outputDir, INTERNAL_RECORD_DIRECTORY)
     fs.rmSync(destination, { recursive: true, force: true })
     fs.mkdirSync(destination, { recursive: true })
 
-    if (!fs.existsSync(recordsDir)) {
-        const empty: InternalRecordManifest = { formatVersion: INTERNAL_RECORD_FORMAT_VERSION, sources: [] }
-        fs.writeFileSync(path.join(destination, INTERNAL_RECORD_MANIFEST), `${JSON.stringify(empty, null, 2)}\n`)
-        return empty
-    }
-
-    const fileNames = fs
-        .readdirSync(recordsDir)
-        .filter((file) => file.toLowerCase().endsWith('.csv'))
-        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-
     const sources: InternalRecordSourceManifest[] = []
     for (const fileName of fileNames) {
-        const source = await compileOneDump(path.join(recordsDir, fileName), fileName, destination)
+        const entry = byFile.get(fileName)
+        if (!entry) continue
+        const source = await compileOneDump(path.join(recordsDir, fileName), entry, destination)
         sources.push(source)
     }
 
@@ -204,11 +395,22 @@ export async function compileInternalRecordDumps(recordsDir: string, outputDir: 
         sources,
     }
     fs.writeFileSync(path.join(destination, INTERNAL_RECORD_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`)
+    fs.writeFileSync(
+        path.join(destination, INTERNAL_RECORD_CONFIGURATION_FILE),
+        `${JSON.stringify(configuration, null, 2)}\n`
+    )
     return manifest
 }
 
-async function compileOneDump(csvPath: string, fileName: string, destination: string): Promise<InternalRecordSourceManifest> {
+async function compileOneDump(
+    csvPath: string,
+    entry: InternalRecordConfigurationEntry,
+    destination: string
+): Promise<InternalRecordSourceManifest> {
+    const fileName = entry.fileName
     let headers: string[] | undefined
+    let identityIndex = -1
+    const seenIds = new Set<string>()
     let recordCount = 0
     let shardIndex = 0
     let inShard = 0
@@ -222,6 +424,7 @@ async function compileOneDump(csvPath: string, fileName: string, destination: st
         shards.push(name)
         inShard = 0
         stream = fs.createWriteStream(path.join(destination, name))
+        stream.on('error', () => undefined)
         stream.write(INTERNAL_RECORD_MAGIC)
     }
 
@@ -246,10 +449,30 @@ async function compileOneDump(csvPath: string, fileName: string, destination: st
     }
 
     try {
-        await forEachCsvRecord(csvPath, async (rowNumber, fields) => {
+        await forEachCsvRecordDetailed(csvPath, async (rowNumber, fields) => {
             if (!headers) {
-                headers = fields
+                headers = fields.map((field) => field.value)
                 assertHeaders(fileName, headers)
+                const schemaNames = entry.schema.map((field) => field.name)
+                if (
+                    headers.length !== schemaNames.length ||
+                    headers.some((header, index) => header !== schemaNames[index])
+                ) {
+                    throw new InternalRecordFormatError(
+                        `Internal-record dump "${fileName}" headers do not match the saved Internal Record schema`
+                    )
+                }
+                identityIndex = headers.indexOf(entry.accountIdField)
+                if (identityIndex < 0) {
+                    throw new InternalRecordFormatError(
+                        `Internal-record dump "${fileName}" is missing Account ID field "${entry.accountIdField}"`
+                    )
+                }
+                if (!headers.includes(entry.accountNameField)) {
+                    throw new InternalRecordFormatError(
+                        `Internal-record dump "${fileName}" is missing Account Name field "${entry.accountNameField}"`
+                    )
+                }
                 return
             }
             if (fields.length !== headers.length) {
@@ -257,17 +480,26 @@ async function compileOneDump(csvPath: string, fileName: string, destination: st
                     `Internal-record dump "${fileName}" row ${rowNumber} has ${fields.length} fields; expected ${headers.length}`
                 )
             }
-            const identityIndex = headers.indexOf(INTERNAL_RECORD_IDENTITY_HEADER)
-            if (fields[identityIndex].length === 0) {
+            const accountId = fields[identityIndex].value
+            if (accountId.length === 0) {
                 throw new InternalRecordFormatError(
-                    `Internal-record dump "${fileName}" row ${rowNumber} is missing ${INTERNAL_RECORD_IDENTITY_HEADER}`
+                    `Internal-record dump "${fileName}" row ${rowNumber} has a blank Account ID`
                 )
             }
+            if (seenIds.has(accountId)) {
+                throw new InternalRecordFormatError(
+                    `Internal-record dump "${fileName}" row ${rowNumber} has duplicate Account ID "${accountId}"`
+                )
+            }
+            seenIds.add(accountId)
             if (!stream || inShard >= INTERNAL_RECORD_SHARD_SIZE) {
                 await closeShard()
                 openShard()
             }
-            writeFrame(pending, headers, fields)
+            writeFrame(
+                pending,
+                fields.map((field) => field.raw)
+            )
             inShard += 1
             recordCount += 1
             if (pending.reduce((sum, chunk) => sum + chunk.length, 0) > 64 * 1024) {
@@ -275,7 +507,15 @@ async function compileOneDump(csvPath: string, fileName: string, destination: st
             }
         })
     } catch (error) {
-        stream?.destroy()
+        const current = stream
+        stream = undefined
+        if (current) {
+            await new Promise<void>((resolve) => {
+                current.once('close', () => resolve())
+                current.on('error', () => undefined)
+                current.destroy()
+            })
+        }
         throw error
     }
 
@@ -306,6 +546,19 @@ export function loadInternalRecordManifest(directory: string): InternalRecordMan
     return manifest
 }
 
+/** Read the packaged Internal Record configuration. Absent file means the package has no Internal Record sources. */
+export function loadPackagedInternalRecordConfiguration(directory: string): InternalRecordConfiguration | undefined {
+    const filePath = path.join(directory, INTERNAL_RECORD_CONFIGURATION_FILE)
+    if (!fs.existsSync(filePath)) return undefined
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as InternalRecordConfiguration
+    if (!parsed || !Array.isArray(parsed.sources)) {
+        throw new InternalRecordFormatError(
+            `Internal Record configuration in "${directory}" must contain a sources array`
+        )
+    }
+    return parsed
+}
+
 export function findInternalRecordSource(
     manifest: InternalRecordManifest,
     fileName: string
@@ -315,6 +568,7 @@ export function findInternalRecordSource(
 
 /**
  * Decode one shard sequentially. The generator retains only the frame currently being parsed.
+ * Frames contain raw CSV cells.
  */
 async function* readInternalRecordShard(shardPath: string): AsyncGenerator<string[]> {
     const stream = fs.createReadStream(shardPath)
@@ -378,17 +632,19 @@ async function* readInternalRecordShard(shardPath: string): AsyncGenerator<strin
 export async function* iterateInternalRecords(
     directory: string,
     fileName: string
-): AsyncGenerator<{ headers: string[]; values: string[] }> {
+): AsyncGenerator<{ headers: string[]; values: string[]; rawValues: string[] }> {
     const manifest = loadInternalRecordManifest(directory)
     const source = findInternalRecordSource(manifest, fileName)
     if (!source) {
-        throw new InternalRecordFormatError(
-            `Internal record file "${fileName}" is not in the customizer package. Rebuild and upload the Records Customizer with that internal-record dump.`
-        )
+        throw new InternalRecordFormatError(internalPackageMessage(fileName))
     }
     for (const shard of source.shards) {
-        for await (const values of readInternalRecordShard(path.join(directory, shard))) {
-            yield { headers: source.headers, values }
+        for await (const rawValues of readInternalRecordShard(path.join(directory, shard))) {
+            yield {
+                headers: source.headers,
+                values: rawValues.map((raw) => unescapeCsvField(raw)),
+                rawValues,
+            }
         }
     }
 }
@@ -397,25 +653,28 @@ export function internalRecordSourceId(fileName: string): string {
     return `internal-record:${encodeURIComponent(fileName)}`
 }
 
-export function validateConfiguredInternalRecords(
-    sources: Array<{ internalRecordFile?: string }>,
-    directory: string | undefined
-): void {
-    const configured = sources.filter(
-        (source) => typeof source.internalRecordFile === 'string' && source.internalRecordFile.length > 0
-    )
-    if (configured.length === 0) return
-    if (!directory) {
-        throw new InternalRecordFormatError(internalPackageMessage(configured[0].internalRecordFile!))
-    }
-    const manifest = loadInternalRecordManifest(directory)
-    for (const source of configured) {
-        if (!findInternalRecordSource(manifest, source.internalRecordFile!)) {
-            throw new InternalRecordFormatError(internalPackageMessage(source.internalRecordFile!))
-        }
-    }
-}
-
 export function internalPackageMessage(fileName: string): string {
     return `Internal record file "${fileName}" is not in the customizer package. Rebuild and upload the Records Customizer with that internal-record dump.`
+}
+
+/** Build account attributes from one streamed account using the saved Internal Record schema. */
+export function internalRecordAttributes(
+    entry: InternalRecordConfigurationEntry,
+    headers: string[],
+    values: string[],
+    rawValues: string[]
+): { nativeIdentity: string; name: string; attributes: Record<string, string | string[]> } {
+    const attributes: Record<string, string | string[]> = {}
+    const multiValued = new Set(entry.schema.filter((field) => field.multiValued).map((field) => field.name))
+    headers.forEach((header, index) => {
+        const parsed = values[index] ?? ''
+        attributes[header] = multiValued.has(header) ? splitUnquotedSemicolons(rawValues[index] ?? parsed) : parsed
+    })
+    const nativeIdentity = values[headers.indexOf(entry.accountIdField)] ?? ''
+    const accountName = values[headers.indexOf(entry.accountNameField)] ?? ''
+    return {
+        nativeIdentity,
+        name: accountName.length > 0 ? accountName : nativeIdentity,
+        attributes,
+    }
 }

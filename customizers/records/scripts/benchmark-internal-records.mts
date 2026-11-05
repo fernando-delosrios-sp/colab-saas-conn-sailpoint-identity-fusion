@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import {
     compileInternalRecordDumps,
     forEachCsvRecord,
+    inferInternalRecordSchema,
     INTERNAL_RECORD_DIRECTORY,
     iterateInternalRecords,
 } from '../../../src/services/sourceService/internalRecordFormat.ts'
@@ -73,7 +74,20 @@ async function measure(reader: string, fixture: string): Promise<Measurement> {
     let artifactDir: string | undefined
     if (reader === 'compiled') {
         const outputDir = path.join(root, 'data')
-        await compileInternalRecordDumps(recordsDir, outputDir)
+        const inferred = await inferInternalRecordSchema(csvPath)
+        await compileInternalRecordDumps(recordsDir, outputDir, {
+            sources: [
+                {
+                    fileName: sourceName,
+                    sourceName: sourceName.replace(/\.csv$/i, ''),
+                    includeRecordAccountsInMatch: false,
+                    accountJmespathFilter: '',
+                    accountIdField: inferred.headers[0],
+                    accountNameField: inferred.headers[1] ?? inferred.headers[0],
+                    schema: inferred.schema,
+                },
+            ],
+        })
         artifactDir = path.join(outputDir, INTERNAL_RECORD_DIRECTORY)
         packageBytes = directoryBytes(artifactDir)
         const collector = global as { gc?: () => void }

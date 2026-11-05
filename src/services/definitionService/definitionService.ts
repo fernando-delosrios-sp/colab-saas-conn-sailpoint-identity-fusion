@@ -21,7 +21,6 @@ import { FusionRun } from '../../model/fusionRun'
 import { MappingService } from '../mappingService'
 import { promiseAllBatched, getFusionParallelBatchSize } from '../fusionService/collections'
 import { buildUniqueRegistrationPlan, UniqueRegistrationPlan } from './uniqueRegistrationPlan'
-import { CustomizerValueStore, type CustomizerStoreLoadResult } from './customizerValueStore'
 import { IDENTITIES_SOURCE_NAME } from '../../model/fusionAccount'
 import type { SourceService } from '../sourceService'
 
@@ -52,8 +51,6 @@ export class DefinitionService {
     private readonly reverseSources: SourceConfig[]
     readonly registrationPlan: UniqueRegistrationPlan
     private readonly includeIdentities: boolean
-    private customizerValueStore: CustomizerValueStore = new CustomizerValueStore()
-
     constructor(
         private config: FusionConfig,
         private schemas: SchemaService,
@@ -82,56 +79,15 @@ export class DefinitionService {
         this.stateWrapper = new StateWrapper(state, this.locks)
     }
 
-    public getCustomizerValueStore(): CustomizerValueStore {
-        return this.customizerValueStore
-    }
-
-    public setCustomizerValueStore(store: CustomizerValueStore): void {
-        this.customizerValueStore = store
-    }
-
     /**
-     * Initializes the CustomizerValueStore with binary index files from the given directory.
-     * Emits structured log traces detailing loaded attributes, unique value counts, and timings.
-     *
-     * @param indicesDir - Directory containing pre-compiled .bin files
-     * @returns CustomizerStoreLoadResult or undefined if no directory provided
-     */
-    public initializeCustomizerStore(indicesDir?: string): CustomizerStoreLoadResult | undefined {
-        if (!indicesDir) {
-            this.log.debug('No customizer unique value store was attached')
-            return undefined
-        }
-
-        const timer = this.log.timer()
-        const result = this.customizerValueStore.load(indicesDir)
-        const attrNames = Object.keys(result.attributeCounts)
-
-        this.log.info(
-            `Loaded customizer unique index store from ${result.directory}: ${attrNames.length} attribute(s), ${result.totalCount} total value(s) in ${result.durationMs}ms`
-        )
-        this.log.detail({
-            action: 'customizer unique store loaded',
-            directory: result.directory,
-            attributes: result.attributeCounts,
-            totalValues: result.totalCount,
-            durationMs: result.durationMs,
-        })
-        timer.end(`Customizer unique store initialized (${result.totalCount} values)`)
-        return result
-    }
-
-    /**
-     * Checks whether a candidate value is unique for an attribute, querying the customizer store first.
+     * Checks whether a candidate value is unique for an attribute.
+     * A candidate is unique when it is absent from the registered set.
      *
      * @param attributeName - Name of the attribute
      * @param candidate - Candidate string value
-     * @returns True if unique, false if colliding with customizer store or registered accounts
+     * @returns True if unique, false if already registered
      */
     public isCandidateValueUnique(attributeName: string, candidate: string): boolean {
-        if (this.customizerValueStore.has(attributeName, candidate)) {
-            return false
-        }
         return !this.getUniqueValues(attributeName).has(candidate)
     }
 
@@ -924,9 +880,6 @@ export class DefinitionService {
 
     private async tryRegisterUniqueValue(definitionName: string, strValue: string): Promise<boolean> {
         return this.locks.withLock(`unique:${definitionName}`, async () => {
-            if (this.customizerValueStore.has(definitionName, strValue)) {
-                return false
-            }
             const registeredValues = this.getUniqueValues(definitionName)
             if (registeredValues.has(strValue)) return false
             registeredValues.add(strValue)
@@ -1045,7 +998,7 @@ export class DefinitionService {
         throw new ConnectorError(
             `Unique attribute "${definition.name}" rendered "${strValue}", which is already registered. ` +
                 'The expression may hide $counter, Fusion state may have been lost or reset, ' +
-                'a managed-source or customizer value may already hold it, or truncation may have merged two bases.',
+                'a managed-source or Internal Record value may already hold it, or truncation may have merged two bases.',
             ConnectorErrorType.Generic
         )
     }
@@ -1237,10 +1190,6 @@ export class DefinitionService {
         if (transformed === '') return false
 
         const finalVal = String(transformed)
-        if (this.customizerValueStore.has(definition.name, finalVal)) {
-            return false
-        }
-
         return !this.getUniqueValues(definition.name).has(finalVal)
     }
 

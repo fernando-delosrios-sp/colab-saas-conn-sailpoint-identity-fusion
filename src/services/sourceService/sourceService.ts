@@ -1067,6 +1067,7 @@ export class SourceService {
                 workgroupMemberIdsByWorkgroupId: this.workgroupMemberIdsByWorkgroupId,
                 accountJmespathFiltersBySourceName: this.accountJmespathFiltersBySourceName,
             },
+            ...(this.internalRecordsDir ? { internalRecordsDir: this.internalRecordsDir } : {}),
         }
     }
 

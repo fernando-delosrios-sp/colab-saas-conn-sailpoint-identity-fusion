@@ -3,7 +3,7 @@ import * as fs from 'fs'
 import { createConnectorCustomizer } from '@sailpoint/connector-sdk'
 
 /**
- * Resolves the directory containing pre-compiled customizer index files.
+ * Resolves the customizer data directory.
  *
  * @param baseDir - Directory relative to which data/ is located (defaults to __dirname)
  * @returns Absolute path to data/ directory
@@ -32,14 +32,14 @@ export function resolveInternalRecordsDir(baseDir: string = __dirname): string |
 
 /**
  * SaaS Connectivity customizer entry point for Records Customizer.
+ * Returns the packaged Internal Record directory (configuration, manifest, and shards)
+ * and does not return a unique-value index directory.
  */
 export const connectorCustomizer = async () => {
     return createConnectorCustomizer().beforeStdAccountList(async (_context, input) => {
-        const customizerIndicesDir = resolveDataDir()
         const customizerInternalRecordsDir = resolveInternalRecordsDir()
         return {
             ...input,
-            customizerIndicesDir,
             ...(customizerInternalRecordsDir ? { customizerInternalRecordsDir } : {}),
         }
     })
