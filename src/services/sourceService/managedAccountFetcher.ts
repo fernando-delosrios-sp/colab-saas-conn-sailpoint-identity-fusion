@@ -7,9 +7,10 @@ import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { LogService } from '../logService'
 import { CompiledAccountJmespathFilter, compileAccountPageJmespathFilter } from './accountFilters'
 import {
+    createInternalRecordAccountBuilder,
     findInternalRecordSource,
     internalPackageMessage,
-    internalRecordAttributes,
+    type InternalRecordAccountBuilder,
     InternalRecordFormatError,
     iterateInternalRecords,
     loadInternalRecordManifest,
@@ -211,12 +212,13 @@ async function collectAccountsFromBatch(
 
 const INTERNAL_RECORD_BATCH_SIZE = 100
 
-function internalRecordAccount(source: SourceInfo, headers: string[], values: string[], rawValues: string[]): Account {
-    const entry = source.internalRecord
-    if (!entry) {
-        throw new InternalRecordFormatError(internalPackageMessage(source.name))
-    }
-    const built = internalRecordAttributes(entry, headers, values, rawValues)
+function internalRecordAccount(
+    source: SourceInfo,
+    build: InternalRecordAccountBuilder,
+    values: string[],
+    rawValues: string[]
+): Account {
+    const built = build(values, rawValues)
     return {
         nativeIdentity: built.nativeIdentity,
         name: built.name,
@@ -247,6 +249,9 @@ async function fetchInternalRecordSource(
     }
     sourceProgress.set(source.id, { registered: 0, total: packaged.recordCount })
     reportAggregateFetchProgress()
+    deps.log.info(
+        `Loading Internal Record source "${source.name}" from "${fileName}" (${packaged.recordCount} accounts)`
+    )
 
     let collectedCount = 0
     let discardedMachineCount = 0
@@ -270,9 +275,15 @@ async function fetchInternalRecordSource(
         batch = []
     }
 
+    const entry = source.internalRecord
+    if (!entry) {
+        throw new InternalRecordFormatError(internalPackageMessage(source.name))
+    }
+    // Only referenced columns are built, so the later prune has nothing to drop and does not rebuild the bag.
+    const build = createInternalRecordAccountBuilder(entry, packaged.headers, deps.referencedAttributeSet)
     for await (const record of iterateInternalRecords(deps.internalRecordsDir, fileName)) {
         if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
-        batch.push(internalRecordAccount(source, record.headers, record.values, record.rawValues))
+        batch.push(internalRecordAccount(source, build, record.values, record.rawValues))
         if (batch.length >= INTERNAL_RECORD_BATCH_SIZE) await flush()
     }
     await flush()
@@ -323,7 +334,9 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
 
         await Promise.all(
             sourcesWithLimits.map(async ({ source, effectiveLimit }) => {
-                log.info(`Fetching accounts from source: ${source.name}`)
+                if (!source.internalProvenance) {
+                    log.info(`Fetching accounts from source: ${source.name}`)
+                }
                 let collectedCount = 0
                 let discardedMachineCount = 0
 
@@ -340,7 +353,7 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
                     const current = sourceProgress.get(source.id) ?? {}
                     sourceProgress.set(source.id, { ...current, registered: collectedCount })
                     reportAggregateFetchProgress()
-                    log.info(`Source ${source.name}: collected ${collectedCount} account(s)`)
+                    log.info(`Internal Record source "${source.name}": collected ${collectedCount} account(s)`)
                     if (discardedMachineCount > 0) {
                         log.warn(
                             `Source ${source.name}: discarded ${discardedMachineCount} managed machine account(s) where isMachine=true`

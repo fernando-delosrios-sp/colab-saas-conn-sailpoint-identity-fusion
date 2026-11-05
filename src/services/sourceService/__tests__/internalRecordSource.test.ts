@@ -189,6 +189,7 @@ describe('Internal Record sources', () => {
         )
         const run = new FusionRun()
         const listAccounts = vi.fn()
+        const info = vi.fn()
         await fetchAllSources({
             log: { debug: vi.fn(), warn: vi.fn() } as any,
             client: iscClient([]) as any,
@@ -200,7 +201,7 @@ describe('Internal Record sources', () => {
         await fetchManagedAccounts({
             log: {
                 debug: vi.fn(),
-                info: vi.fn(),
+                info,
                 warn: vi.fn(),
                 setFetchPopulationProgress: vi.fn(),
             } as any,
@@ -214,6 +215,10 @@ describe('Internal Record sources', () => {
             fetchAccountsBySourceIdGenerator: listAccounts as any,
         })
 
+        expect(info).toHaveBeenCalledWith(
+            'Loading Internal Record source "Sample Records" from "Sample Records.csv" (2 accounts)'
+        )
+        expect(info).toHaveBeenCalledWith('Internal Record source "Sample Records": collected 1 account(s)')
         expect(listAccounts).not.toHaveBeenCalled()
         const registered = [...run.managedAccountsById.values()]
         expect(registered.map((account) => account.nativeIdentity)).toEqual(['h-1'])

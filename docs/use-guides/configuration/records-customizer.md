@@ -57,7 +57,7 @@ npm run pack-zip
 
 On an interactive terminal, each `records/*.csv` that has no saved entry prompts for:
 
-- Source name
+- Source name (Enter uses the file name without `.csv`)
 - Include record accounts in Match
 - Accounts JMESPath filter
 - Account ID field

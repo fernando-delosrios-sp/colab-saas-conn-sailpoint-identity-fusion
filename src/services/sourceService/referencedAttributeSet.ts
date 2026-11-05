@@ -82,6 +82,16 @@ export function pruneManagedAccountAttributes(
 ): Account {
     const attributes = account.attributes
     if (!attributes || typeof attributes !== 'object') return account
+    // Rebuilding the bag with keyed stores turns it into a dictionary-mode object, which costs several
+    // times the memory of a fast-property object. Keep the existing bag when nothing is dropped.
+    let hasUnreferenced = false
+    for (const key in attributes) {
+        if (!referencedAttributeSet.has(key)) {
+            hasUnreferenced = true
+            break
+        }
+    }
+    if (!hasUnreferenced) return account
     const prunedAttributes: Record<string, unknown> = {}
     for (const key of referencedAttributeSet) {
         if (Object.prototype.hasOwnProperty.call(attributes, key)) {

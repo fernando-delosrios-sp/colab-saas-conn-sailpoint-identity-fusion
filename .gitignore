@@ -18,6 +18,7 @@ node_modules/
 dist/
 customizers/records/data/
 customizers/records/records/*.csv
+customizers/records/records-full/
 coverage/
 reports/
 exportedObjects/

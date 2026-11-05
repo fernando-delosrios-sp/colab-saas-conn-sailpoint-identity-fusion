@@ -141,7 +141,9 @@ export function createCliInternalRecordPrompter(): InternalRecordPrompter {
                 output.write('Use toggle <field>, rescan, or continue.\n')
             }
 
-            const sourceName = (await rl.question('Source name: ')).trim()
+            const defaultSourceName = context.fileName.replace(/\.csv$/i, '')
+            const sourceNameAnswer = (await rl.question(`Source name [${defaultSourceName}]: `)).trim()
+            const sourceName = sourceNameAnswer.length > 0 ? sourceNameAnswer : defaultSourceName
             const matchAnswer = (await rl.question('Include record accounts in Match? [y/n]: ')).trim().toLowerCase()
             const accountJmespathFilter = (await rl.question('Accounts JMESPath filter: ')).trim()
             const accountIdField = (await rl.question('Account ID field: ')).trim()

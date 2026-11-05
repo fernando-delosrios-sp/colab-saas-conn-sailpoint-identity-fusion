@@ -189,6 +189,15 @@ describe('pruneManagedAccountAttributes', () => {
         expect(attributes).toEqual({ unreferenced: 'drop', email: 'keep@example.com' })
     })
 
+    it('keeps the same attribute bag when nothing is dropped', () => {
+        const attributes = { email: 'keep@example.com', lastName: 'Doe' }
+        const account = makeAccount(attributes)
+
+        const pruned = pruneManagedAccountAttributes(account, new Set(['email', 'lastName', 'other']))
+
+        expect(pruned.attributes).toBe(attributes)
+    })
+
     it('keeps an unmapped attribute whose name matches a Fusion schema attribute (implicit Map merge parity)', () => {
         const set = buildReferencedAttributeSet(baseConfig, schemaAttributeNames)
         const account = makeAccount({ email: 'kept@example.com', nickname: 'dropped' })

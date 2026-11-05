@@ -127,7 +127,17 @@ async function measure(reader: string, fixture: string): Promise<Measurement> {
 function runChild(reader: string, fixture: string): Measurement {
     const result = spawnSync(
         process.execPath,
-        ['--expose-gc', '--experimental-strip-types', scriptFile, '--reader', reader, '--fixture', fixture],
+        [
+            '--expose-gc',
+            '--experimental-strip-types',
+            '--import',
+            fileURLToPath(new URL('./register-ts-specifiers.mjs', import.meta.url)),
+            scriptFile,
+            '--reader',
+            reader,
+            '--fixture',
+            fixture,
+        ],
         { encoding: 'utf8', env: process.env }
     )
     if (result.status !== 0) {

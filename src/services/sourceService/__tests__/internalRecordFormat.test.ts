@@ -6,6 +6,7 @@ import {
     INTERNAL_RECORD_DIRECTORY,
     InternalRecordFormatError,
     compileInternalRecordDumps,
+    createInternalRecordAccountBuilder,
     inferInternalRecordSchema,
     internalRecordAttributes,
     iterateInternalRecords,
@@ -208,5 +209,57 @@ describe('internal-record dumps', () => {
             ['n-1', '"hello;world"']
         )
         expect(built.attributes.NOTES).toEqual(['hello;world'])
+    })
+
+    describe('account builder', () => {
+        const entry = {
+            fileName: 'people.csv',
+            sourceName: 'People',
+            includeRecordAccountsInMatch: false,
+            accountJmespathFilter: '',
+            accountIdField: 'id',
+            accountNameField: 'name',
+            schema: [
+                { name: 'id', multiValued: false },
+                { name: 'name', multiValued: false },
+                { name: 'DEPT', multiValued: false },
+                { name: 'AFFILS', multiValued: true },
+                { name: 'EXTRA', multiValued: false },
+            ],
+        }
+        const headers = ['id', 'name', 'DEPT', 'AFFILS', 'EXTRA']
+
+        it('builds only the kept columns and still reads Account ID and Name from the full record', () => {
+            const build = createInternalRecordAccountBuilder(entry, headers, new Set(['DEPT', 'AFFILS']))
+            const built = build(['p-1', 'Pat', 'IT', 'staff;faculty', 'x'], ['p-1', 'Pat', 'IT', 'staff;faculty', 'x'])
+
+            expect(built.nativeIdentity).toBe('p-1')
+            expect(built.name).toBe('Pat')
+            expect(built.attributes).toEqual({ DEPT: 'IT', AFFILS: ['staff', 'faculty'] })
+        })
+
+        it('falls back to the Account ID when the Account Name is empty', () => {
+            const build = createInternalRecordAccountBuilder(entry, headers)
+            const built = build(['p-2', '', 'HR', '', 'y'], ['p-2', '', 'HR', '', 'y'])
+
+            expect(built.name).toBe('p-2')
+            expect(built.attributes.EXTRA).toBe('y')
+        })
+
+        it('keeps a header named __proto__ as an own attribute', () => {
+            const protoEntry = {
+                ...entry,
+                accountIdField: 'id',
+                accountNameField: 'id',
+                schema: [
+                    { name: 'id', multiValued: false },
+                    { name: '__proto__', multiValued: false },
+                ],
+            }
+            const build = createInternalRecordAccountBuilder(protoEntry, ['id', '__proto__'])
+            const built = build(['p-5', 'v'], ['p-5', 'v'])
+
+            expect(Object.keys(built.attributes).sort()).toEqual(['__proto__', 'id'])
+        })
     })
 })

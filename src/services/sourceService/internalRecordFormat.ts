@@ -657,24 +657,100 @@ export function internalPackageMessage(fileName: string): string {
     return `Internal record file "${fileName}" is not in the customizer package. Rebuild and upload the Records Customizer with that internal-record dump.`
 }
 
+export type InternalRecordAccountParts = {
+    nativeIdentity: string
+    name: string
+    attributes: Record<string, string | string[]>
+}
+
+export type InternalRecordAccountBuilder = (values: string[], rawValues: string[]) => InternalRecordAccountParts
+
+/** Distinct values remembered per column so repeated values share one string. Bounded to cap memory. */
+const INTERNAL_RECORD_INTERN_LIMIT = 4096
+
+/**
+ * Create a builder that turns one streamed record into account parts.
+ *
+ * The attribute bag is produced by a generated object literal. Filling an object with `bag[header] = value`
+ * makes V8 switch it to dictionary mode after a few properties, which costs several times the memory of a
+ * fast-property object. A literal keeps every bag on one shared hidden class, which matters for a dump with
+ * hundreds of thousands of records. Repeated values in a column share one string.
+ *
+ * @param entry - Saved Internal Record configuration for the dump
+ * @param headers - Column names in manifest order
+ * @param keep - When set, only columns named in this set become attributes
+ * @returns Builder to call once per record
+ */
+export function createInternalRecordAccountBuilder(
+    entry: InternalRecordConfigurationEntry,
+    headers: string[],
+    keep?: ReadonlySet<string>
+): InternalRecordAccountBuilder {
+    const multiValued = new Set(entry.schema.filter((field) => field.multiValued).map((field) => field.name))
+    const idIndex = headers.indexOf(entry.accountIdField)
+    const nameIndex = headers.indexOf(entry.accountNameField)
+    const columns: number[] = []
+    headers.forEach((header, index) => {
+        if (!keep || keep.has(header)) columns.push(index)
+    })
+    const names = columns.map((index) => headers[index])
+    const generated = names.every((name) => name !== '__proto__')
+    const literal = generated
+        ? (new Function(
+              'cells',
+              `return {${names.map((name, position) => `${JSON.stringify(name)}: cells[${position}]`).join(',')}}`
+          ) as (cells: Array<string | string[]>) => Record<string, string | string[]>)
+        : undefined
+    const interned = columns.map(() => new Map<string, string>())
+
+    return (values, rawValues) => {
+        const cells: Array<string | string[]> = new Array(columns.length)
+        for (let position = 0; position < columns.length; position++) {
+            const index = columns[position]
+            const parsed = values[index] ?? ''
+            if (multiValued.has(headers[index])) {
+                cells[position] = splitUnquotedSemicolons(rawValues[index] ?? parsed)
+                continue
+            }
+            const known = interned[position]
+            const shared = known.get(parsed)
+            if (shared !== undefined) {
+                cells[position] = shared
+            } else {
+                if (known.size < INTERNAL_RECORD_INTERN_LIMIT) known.set(parsed, parsed)
+                cells[position] = parsed
+            }
+        }
+        let attributes: Record<string, string | string[]>
+        if (literal) {
+            attributes = literal(cells)
+        } else {
+            attributes = {}
+            names.forEach((name, position) => {
+                Object.defineProperty(attributes, name, {
+                    value: cells[position],
+                    enumerable: true,
+                    writable: true,
+                    configurable: true,
+                })
+            })
+        }
+        const nativeIdentity = values[idIndex] ?? ''
+        const accountName = values[nameIndex] ?? ''
+        return {
+            nativeIdentity,
+            name: accountName.length > 0 ? accountName : nativeIdentity,
+            attributes,
+        }
+    }
+}
+
 /** Build account attributes from one streamed account using the saved Internal Record schema. */
 export function internalRecordAttributes(
     entry: InternalRecordConfigurationEntry,
     headers: string[],
     values: string[],
     rawValues: string[]
-): { nativeIdentity: string; name: string; attributes: Record<string, string | string[]> } {
-    const attributes: Record<string, string | string[]> = {}
-    const multiValued = new Set(entry.schema.filter((field) => field.multiValued).map((field) => field.name))
-    headers.forEach((header, index) => {
-        const parsed = values[index] ?? ''
-        attributes[header] = multiValued.has(header) ? splitUnquotedSemicolons(rawValues[index] ?? parsed) : parsed
-    })
-    const nativeIdentity = values[headers.indexOf(entry.accountIdField)] ?? ''
-    const accountName = values[headers.indexOf(entry.accountNameField)] ?? ''
-    return {
-        nativeIdentity,
-        name: accountName.length > 0 ? accountName : nativeIdentity,
-        attributes,
-    }
+): InternalRecordAccountParts {
+    return createInternalRecordAccountBuilder(entry, headers)(values, rawValues)
 }
