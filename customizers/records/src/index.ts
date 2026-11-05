@@ -31,16 +31,31 @@ export function resolveInternalRecordsDir(baseDir: string = __dirname): string |
 }
 
 /**
+ * Adds the packaged Internal Record directory to a `beforeStdAccountList` input.
+ * Omits the directory when the package has no manifest, and never adds a unique-value index directory.
+ *
+ * @param input - Input object Identity Security Cloud passed to the hook
+ * @param baseDir - Directory relative to which data/ is located
+ * @returns Input plus the Internal Record package location when a manifest is present
+ */
+export function withInternalRecordsLocation<T extends Record<string, unknown>>(
+    input: T,
+    baseDir: string = __dirname
+): T & { customizerInternalRecordsDir?: string } {
+    const customizerInternalRecordsDir = resolveInternalRecordsDir(baseDir)
+    return {
+        ...input,
+        ...(customizerInternalRecordsDir ? { customizerInternalRecordsDir } : {}),
+    }
+}
+
+/**
  * SaaS Connectivity customizer entry point for Records Customizer.
  * Returns the packaged Internal Record directory (configuration, manifest, and shards)
  * and does not return a unique-value index directory.
  */
 export const connectorCustomizer = async () => {
     return createConnectorCustomizer().beforeStdAccountList(async (_context, input) => {
-        const customizerInternalRecordsDir = resolveInternalRecordsDir()
-        return {
-            ...input,
-            ...(customizerInternalRecordsDir ? { customizerInternalRecordsDir } : {}),
-        }
+        return withInternalRecordsLocation(input)
     })
 }
