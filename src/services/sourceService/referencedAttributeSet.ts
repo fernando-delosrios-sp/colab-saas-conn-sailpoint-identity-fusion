@@ -1,5 +1,6 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionConfig } from '../../model/config'
+import { readLinkedAccountNativeIdentity } from '../../model/managedAccountKey'
 import { fusionAccountSchemaAttributes } from '../../data/schema'
 
 /**
@@ -147,8 +148,10 @@ export interface FilterIdentityAccountsOptions {
 
 /**
  * Filters `identity.accounts` to retain only accounts belonging to configured Fusion
- * and managed sources. Retained account summaries are pruned to essential fields
- * (`id`, `nativeIdentity`, `name`, `disabled`, `source: { id, name }`).
+ * and managed sources. Retained account summaries keep the fields later blend and
+ * rebuild read: `id`, `nativeIdentity`, `accountId`, `name`, `disabled`, and
+ * `source: { id, name }`. Identity search puts the source native identity on
+ * `accountId`; that value is copied onto both fields so neither reader misses it.
  * Mutates in place.
  */
 export function filterIdentityAccounts(
@@ -168,18 +171,22 @@ export function filterIdentityAccounts(
             const isManaged = Boolean(sourceName && managedSourceNames?.has(sourceName))
             return isFusion || isManaged
         })
-        .map((account) => ({
-            id: account.id,
-            nativeIdentity: account.nativeIdentity,
-            name: account.name,
-            disabled: account.disabled,
-            source: account.source
-                ? {
-                      id: account.source.id,
-                      name: account.source.name,
-                  }
-                : undefined,
-        }))
+        .map((account) => {
+            const nativeIdentity = readLinkedAccountNativeIdentity(account)
+            return {
+                id: account.id,
+                nativeIdentity,
+                accountId: nativeIdentity,
+                name: account.name,
+                disabled: account.disabled,
+                source: account.source
+                    ? {
+                          id: account.source.id,
+                          name: account.source.name,
+                      }
+                    : undefined,
+            }
+        })
 
     return identity
 }

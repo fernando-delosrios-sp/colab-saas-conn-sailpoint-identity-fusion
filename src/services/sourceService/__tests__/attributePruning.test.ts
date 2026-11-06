@@ -427,6 +427,7 @@ describe('filterIdentityAccounts', () => {
             {
                 id: 'acc-fusion',
                 nativeIdentity: 'jdoe-fusion-native',
+                accountId: 'jdoe-fusion-native',
                 name: 'jdoe-fusion',
                 disabled: false,
                 source: { id: 'fusion-source-id', name: 'Fusion' },
@@ -434,9 +435,37 @@ describe('filterIdentityAccounts', () => {
             {
                 id: 'acc-managed',
                 nativeIdentity: 'jdoe-hr-native',
+                accountId: 'jdoe-hr-native',
                 name: 'jdoe-hr',
                 disabled: true,
                 source: { id: 'hr-source-id', name: 'HR Source' },
+            },
+        ])
+    })
+
+    it('copies identity-search accountId onto nativeIdentity so blend and rebuild can read it', () => {
+        const identity: IdentityDocument = {
+            id: 'id-search',
+            accounts: [
+                {
+                    id: 'acc-ad',
+                    name: 'Doe-Jane',
+                    accountId: 'CN=Jane Doe,OU=Users,DC=test',
+                    source: { id: 'ad-test', name: 'AD - Test' },
+                } as any,
+            ],
+        }
+
+        filterIdentityAccounts(identity, { managedSourceNames: new Set(['AD - Test']) })
+
+        expect(identity.accounts).toEqual([
+            {
+                id: 'acc-ad',
+                nativeIdentity: 'CN=Jane Doe,OU=Users,DC=test',
+                accountId: 'CN=Jane Doe,OU=Users,DC=test',
+                name: 'Doe-Jane',
+                disabled: undefined,
+                source: { id: 'ad-test', name: 'AD - Test' },
             },
         ])
     })

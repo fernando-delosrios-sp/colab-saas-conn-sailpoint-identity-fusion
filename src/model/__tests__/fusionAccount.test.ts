@@ -779,6 +779,32 @@ describe('FusionAccount', () => {
             expect(run.managedAccountsByIdentityId.has('id-1')).toBe(false)
         })
 
+        it('blends an identity-search link that stores the native identity on accountId', () => {
+            const identity: IdentityDocument = {
+                id: 'id-1',
+                name: 'Jane Doe',
+                attributes: {},
+                accounts: [
+                    {
+                        source: { name: 'Source A', id: 'src-a' },
+                        accountId: 'CN=Jane Doe,OU=Users',
+                    } as any,
+                ],
+            } as any
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Jane.Doe',
+                sourceName: 'Identity Fusion NG',
+                identityId: 'id-1',
+                attributes: { originSource: 'Identities', statuses: ['baseline'] },
+            } as unknown as Account)
+
+            acc.addIdentityLayer(identity)
+
+            expect(acc.accountIds).toContain('src-a::CN=Jane Doe,OU=Users')
+        })
+
         it('blends identity.accounts links in work queue when not indexed by identityId', () => {
             const WORKDAY_SOURCE_ID = '355fb49e084e4f35adb755410affe0c8'
             const managedKey = `${WORKDAY_SOURCE_ID}::126791`

@@ -12,6 +12,7 @@ import {
     isCompositeManagedAccountKey,
     normalizeCompositeManagedAccountKey,
     parseManagedAccountKey,
+    readLinkedAccountNativeIdentity,
 } from './managedAccountKey'
 import { IDENTITIES_SOURCE_NAME } from './fusionAccount'
 import { FusionMatch } from '../services/matchingService'
@@ -168,7 +169,7 @@ export class FusionLayers {
             if (!this.sourceConfigNamesSet.has(account.source?.name ?? '')) continue
             const managedAccountKey = buildManagedAccountKey({
                 sourceId: account.source?.id,
-                nativeIdentity: readString(account, 'nativeIdentity'),
+                nativeIdentity: readLinkedAccountNativeIdentity(account),
             })
             if (managedAccountKey) {
                 this.collections.accounts.add(managedAccountKey)
