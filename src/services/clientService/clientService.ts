@@ -4,12 +4,34 @@ import { LogService } from '../logService'
 import { FusionConfig } from '../../model/config'
 import { readNumber } from '../../utils/safeRead'
 import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
-import { mergeAbortSignals, invokeAbortable, runWithRequestAbortSignal, isGatewayFailure } from './helpers'
+import {
+    mergeAbortSignals,
+    invokeAbortable,
+    runWithRequestAbortSignal,
+    isGatewayFailure,
+    describeRequestFailure,
+    paginationFailureMessage,
+} from './helpers'
 import { PaginationCircuit, isAbortError } from './paginationCircuit'
 import { internalConfig } from '../../data/config/internal'
 import { IscApiAdapter } from './iscApiAdapter'
 import { IscApiSurface } from './iscApiSurface'
-import type { Search, AccountsV2025Api, IdentitiesV2025Api, IdentityAttributesV2025Api, IdentityProfilesV2025Api, CustomFormsV2025Api, EntitlementsV2025Api, GovernanceGroupsV2025Api, TaskManagementV2025Api, SearchApi, TransformsApi, SourcesV2025Api, WorkflowsV2025Api, Configuration } from 'sailpoint-api-client'
+import type {
+    Search,
+    AccountsV2025Api,
+    IdentitiesV2025Api,
+    IdentityAttributesV2025Api,
+    IdentityProfilesV2025Api,
+    CustomFormsV2025Api,
+    EntitlementsV2025Api,
+    GovernanceGroupsV2025Api,
+    TaskManagementV2025Api,
+    SearchApi,
+    TransformsApi,
+    SourcesV2025Api,
+    WorkflowsV2025Api,
+    Configuration,
+} from 'sailpoint-api-client'
 /**
  * ClientService provides a lean, centralized client for API operations.
  *
@@ -38,7 +60,12 @@ class OffsetPageScheduler<T> {
         initialLoaded: number,
         private readonly progressTotal: number | undefined,
         private readonly fetchPage: (offset: number, extraAbort?: AbortSignal) => Promise<T[]>,
-        private readonly fail: (offset: number, loadedBeforeFailure: number) => PaginationError,
+        private readonly fail: (
+            offset: number,
+            loadedBeforeFailure: number,
+            cause: unknown,
+            shed?: { poolSize: number; threshold: number }
+        ) => PaginationError,
         private readonly onPageComplete: (loaded: number, total?: number) => void,
         private readonly circuit: PaginationCircuit,
         private readonly abortSignal?: AbortSignal
@@ -83,11 +110,12 @@ class OffsetPageScheduler<T> {
                     return
                 }
                 if (!isGatewayFailure(error)) {
-                    throw this.fail(offset, this.loaded)
+                    throw this.fail(offset, this.loaded, error)
                 }
                 if (this.circuit.noteGatewayFailure(key) === 'shed') {
-                    this.circuit.shed(key)
-                    this.failure ??= this.fail(offset, this.loaded)
+                    const shed = { poolSize: this.circuit.poolSize, threshold: this.circuit.threshold }
+                    this.circuit.shed(key, describeRequestFailure(error))
+                    this.failure ??= this.fail(offset, this.loaded, error, shed)
                     return
                 }
             }
@@ -149,14 +177,20 @@ class OffsetPageScheduler<T> {
                     await Promise.race(Array.from(this.inFlight.values()))
                     continue
                 }
-                throw this.failure ?? this.fail(this.lowestUnfilledOffset(), this.loaded)
+                throw (
+                    this.failure ??
+                    this.fail(this.lowestUnfilledOffset(), this.loaded, undefined, {
+                        poolSize: this.circuit.poolSize,
+                        threshold: this.circuit.threshold,
+                    })
+                )
             }
 
             if (this.inFlight.size === 0) {
                 // Every offset has been scheduled and settled, yet the next page in
                 // sequence never landed. Continuing here would spin without awaiting
                 // and starve the event loop for the remainder of the operation.
-                throw this.fail(this.lowestUnfilledOffset(), this.loaded)
+                throw this.fail(this.lowestUnfilledOffset(), this.loaded, new Error('the page never completed'))
             }
 
             await Promise.race(Array.from(this.inFlight.values()))
@@ -168,7 +202,6 @@ class OffsetPageScheduler<T> {
         }
     }
 }
-
 
 export class ClientService {
     private readonly pageSize: number
@@ -306,7 +339,10 @@ export class ClientService {
     ): AsyncGenerator<T[], void, unknown>
 
     public async call<T>(
-        fn: (api: IscApiSurface, params: { search: any; limit: number; count?: boolean }) => Promise<{ data: unknown[] }>,
+        fn: (
+            api: IscApiSurface,
+            params: { search: any; limit: number; count?: boolean }
+        ) => Promise<{ data: unknown[] }>,
         policy: PaginatePolicy & { paginate: { mode: 'searchAfter' } }
     ): Promise<T[]>
 
@@ -316,28 +352,57 @@ export class ClientService {
             return this.execute<T>(() => fn(this.apiSurface), policy ?? {})
         }
         switch (paginate.mode) {
-            case 'sequential': return this.paginateSequential<T>(fn as any, paginate, policy!)
-            case 'parallel': return this.paginateParallelForCall<T>(fn as any, paginate, policy!)
-            case 'searchAfter': return this.paginateSearchAfter<T>(fn as any, paginate, policy!)
+            case 'sequential':
+                return this.paginateSequential<T>(fn as any, paginate, policy!)
+            case 'parallel':
+                return this.paginateParallelForCall<T>(fn as any, paginate, policy!)
+            case 'searchAfter':
+                return this.paginateSearchAfter<T>(fn as any, paginate, policy!)
         }
     }
 
     private get apiSurface(): IscApiSurface {
         const a = this.adapter
         return {
-            get accounts() { return a.accountsApi },
-            get identities() { return a.identitiesApi },
-            get search() { return a.searchApi },
-            get sources() { return a.sourcesApi },
-            get customForms() { return a.customFormsApi },
-            get workflows() { return a.workflowsApi },
-            get entitlements() { return a.entitlementsApi },
-            get transforms() { return a.transformsApi },
-            get governanceGroups() { return a.governanceGroupsApi },
-            get taskManagement() { return a.taskManagementApi },
-            get identityProfiles() { return a.identityProfilesApi },
-            get identityAttributes() { return a.identityAttributesApi },
-            get machineAccounts() { return a.machineAccountsApi },
+            get accounts() {
+                return a.accountsApi
+            },
+            get identities() {
+                return a.identitiesApi
+            },
+            get search() {
+                return a.searchApi
+            },
+            get sources() {
+                return a.sourcesApi
+            },
+            get customForms() {
+                return a.customFormsApi
+            },
+            get workflows() {
+                return a.workflowsApi
+            },
+            get entitlements() {
+                return a.entitlementsApi
+            },
+            get transforms() {
+                return a.transformsApi
+            },
+            get governanceGroups() {
+                return a.governanceGroupsApi
+            },
+            get taskManagement() {
+                return a.taskManagementApi
+            },
+            get identityProfiles() {
+                return a.identityProfilesApi
+            },
+            get identityAttributes() {
+                return a.identityAttributesApi
+            },
+            get machineAccounts() {
+                return a.machineAccountsApi
+            },
         }
     }
 
@@ -376,11 +441,25 @@ export class ClientService {
      * Sequential/searchAfter (and parallel-init) page loader: the page occupies a pool slot
      * on gateway failure and is re-attempted until it succeeds or the pool hits threshold.
      */
+    private pageFailure(
+        position: 'initial' | { offset: number } | { page: number; cursor?: string },
+        collected: number,
+        context: string | undefined,
+        cause: unknown,
+        shed?: { poolSize: number; threshold: number }
+    ): PaginationError {
+        return new PaginationError(
+            paginationFailureMessage({ context, position, collected, cause, shed }),
+            collected,
+            cause
+        )
+    }
+
     private async loadWithCircuit<T>(
         fetchOnce: () => Promise<T>,
         circuit: PaginationCircuit,
         positionLabel: string,
-        fail: () => PaginationError
+        fail: (cause: unknown, shed?: { poolSize: number; threshold: number }) => PaginationError
     ): Promise<T> {
         while (true) {
             try {
@@ -388,15 +467,13 @@ export class ClientService {
                 circuit.recordSuccess(positionLabel)
                 return page
             } catch (error: unknown) {
-                if (isAbortError(error)) {
-                    throw fail()
-                }
-                if (!isGatewayFailure(error)) {
-                    throw fail()
+                if (isAbortError(error) || !isGatewayFailure(error)) {
+                    throw fail(error)
                 }
                 if (circuit.noteGatewayFailure(positionLabel) === 'shed') {
-                    circuit.shed(positionLabel)
-                    throw fail()
+                    const shed = { poolSize: circuit.poolSize, threshold: circuit.threshold }
+                    circuit.shed(positionLabel, describeRequestFailure(error))
+                    throw fail(error, shed)
                 }
             }
         }
@@ -418,19 +495,19 @@ export class ClientService {
         const initialLimit = hasExplicitBaseLimit && bl! < eps ? bl! : eps
         const all: T[] = []
         const circuit = this.createPaginationCircuit({ context }, 1)
-        const fail = (offset: number) =>
-            new PaginationError(
-                offset === 0 && all.length === 0
-                    ? `Pagination failed on initial page (${context ?? 'paginate'}).`
-                    : `Pagination failed at offset ${offset} (${context ?? 'paginate'}). ${all.length} item(s) collected before failure.`,
-                all.length
-            )
         const load = (limit: number, offset: number) =>
             this.loadWithCircuit(
                 () => fetchPage(limit, offset),
                 circuit,
                 `offset ${offset}`,
-                () => fail(offset)
+                (cause, shed) =>
+                    this.pageFailure(
+                        offset === 0 && all.length === 0 ? 'initial' : { offset },
+                        all.length,
+                        context,
+                        cause,
+                        shed
+                    )
             )
 
         const firstPage = await load(initialLimit, 0)
@@ -502,7 +579,12 @@ export class ClientService {
         effectivePageSize: number,
         batchSize: number,
         fetchPageAtOffset: (offset: number, extraAbort?: AbortSignal) => Promise<T[]>,
-        fail: (offset: number, loadedBeforeFailure: number) => PaginationError,
+        fail: (
+            offset: number,
+            loadedBeforeFailure: number,
+            cause: unknown,
+            shed?: { poolSize: number; threshold: number }
+        ) => PaginationError,
         onPageComplete: (loaded: number, total?: number) => void,
         circuit: PaginationCircuit,
         abortSignal?: AbortSignal
@@ -541,7 +623,8 @@ export class ClientService {
         const limit = paginate.limit
         const ctx = (suffix: string) => (policy.context ? `${policy.context} ${suffix}` : suffix)
         const circuit = this.createPaginationCircuit(policy, bs)
-        const failInit = () => new PaginationError(`Pagination failed on initial page (${policy.context ?? 'paginate'}).`, 0)
+        const failInit = (cause: unknown, shed?: { poolSize: number; threshold: number }) =>
+            this.pageFailure('initial', 0, policy.context, cause, shed)
 
         const initialResponse = await this.loadWithCircuit(
             () =>
@@ -588,11 +671,7 @@ export class ClientService {
                 )
                 return response.data ?? Promise.reject(new Error('Paginated page returned no data'))
             },
-            (offset, loaded) =>
-                new PaginationError(
-                    `Pagination failed at offset ${offset} (${policy.context ?? 'paginate'}). ${loaded} item(s) collected before failure.`,
-                    loaded
-                ),
+            (offset, loaded, cause, shed) => this.pageFailure({ offset }, loaded, policy.context, cause, shed),
             (loaded, total) => policy.onPageProgress?.(loaded, total),
             circuit,
             policy.abortSignal
@@ -609,7 +688,12 @@ export class ClientService {
         initialLoaded: number,
         progressTotal: number | undefined,
         fetchPage: (offset: number, extraAbort?: AbortSignal) => Promise<T[]>,
-        fail: (offset: number, loadedBeforeFailure: number) => PaginationError,
+        fail: (
+            offset: number,
+            loadedBeforeFailure: number,
+            cause: unknown,
+            shed?: { poolSize: number; threshold: number }
+        ) => PaginationError,
         onPageComplete: (loaded: number, total?: number) => void,
         circuit: PaginationCircuit,
         abortSignal?: AbortSignal
@@ -633,14 +717,20 @@ export class ClientService {
     }
 
     private async paginateSearchAfter<T>(
-        fn: (api: IscApiSurface, params: { search: any; limit: number; count?: boolean }) => Promise<{ data: unknown[] }>,
+        fn: (
+            api: IscApiSurface,
+            params: { search: any; limit: number; count?: boolean }
+        ) => Promise<{ data: unknown[] }>,
         paginate: { search: any },
         policy: CallPolicy
     ): Promise<T[]> {
         const api = this.apiSurface
         const ps = this.pageSize
         const bs = { ...paginate.search, sort: ['id'] }
-        let sa: string[] | undefined, first = true, more = true, pn = 1
+        let sa: string[] | undefined,
+            first = true,
+            more = true,
+            pn = 1
         const all: T[] = []
         const circuit = this.createPaginationCircuit(policy, 1)
         while (more) {
@@ -650,23 +740,41 @@ export class ClientService {
             const r = await this.loadWithCircuit(
                 () =>
                     this.executePage<{ data: unknown[] }>(
-                        () => fn(api, { search: sa ? { ...bs, searchAfter: sa } : bs, limit: ps, count: first ? true : undefined }),
+                        () =>
+                            fn(api, {
+                                search: sa ? { ...bs, searchAfter: sa } : bs,
+                                limit: ps,
+                                count: first ? true : undefined,
+                            }),
                         { priority: policy.priority, context: pc, abortSignal: policy.abortSignal }
                     ),
                 circuit,
                 cursorLabel,
-                () =>
-                    new PaginationError(
-                        `Search pagination failed at page ${pn} (${policy.context ?? 'search'}). ${all.length} item(s) collected before failure.`,
-                        all.length
+                (cause, shed) =>
+                    this.pageFailure(
+                        { page: pn, cursor: cursorLabel },
+                        all.length,
+                        policy.context ?? 'search',
+                        cause,
+                        shed
                     )
             )
             const items = (r.data ?? []) as T[]
             if (items.length) all.push(...items)
             policy.onPageProgress?.(all.length, undefined)
             if (items.length) await yieldToEventLoop()
-            if (items.length < ps) { more = false } else { const li = (items[items.length - 1] as { id?: string }).id; if (!li) { more = false } else { sa = [li] } }
-            first = false; pn++
+            if (items.length < ps) {
+                more = false
+            } else {
+                const li = (items[items.length - 1] as { id?: string }).id
+                if (!li) {
+                    more = false
+                } else {
+                    sa = [li]
+                }
+            }
+            first = false
+            pn++
         }
         return all
     }
@@ -723,21 +831,8 @@ export class ClientService {
 
             return await fn()
         } catch (error: unknown) {
-            // Extract meaningful details from API errors (axios-style responses)
-            const err = error as {
-                response?: { status?: number; statusText?: string; data?: { message?: string; detailCode?: string } }
-            }
-            const status = err.response?.status
-            const statusText = err.response?.statusText
-            const apiMessage = err.response?.data?.message || err.response?.data?.detailCode
-            const baseMessage = error instanceof Error ? error.message : String(error)
-            let errorDetail = baseMessage
-            if (status) {
-                errorDetail = `HTTP ${status}${statusText ? ` ${statusText}` : ''}${apiMessage ? ` - ${apiMessage}` : ''}`
-            }
-
             const contextHint = context ? ` (${context})` : ''
-            this.log.error(`API request failed${contextHint}: ${errorDetail}`)
+            this.log.error(`API request failed${contextHint}: ${describeRequestFailure(error)}`)
             if (throwOnError) {
                 throw error
             }
@@ -798,10 +893,6 @@ export class ClientService {
             )
         } catch (error) {
             if (error instanceof PaginationError) {
-                const ctx = context ?? 'paginate'
-                if (error.itemsCollected === 0) {
-                    throw new Error(`Pagination failed on initial page (${ctx}). The API call returned no data.`, { cause: error })
-                }
                 throw new Error(error.message, { cause: error })
             }
             throw error
@@ -893,11 +984,8 @@ export class ClientService {
                     ),
                 circuit,
                 cursorLabel,
-                () =>
-                    new PaginationError(
-                        `Search pagination failed at page ${pageNum} (${context ?? 'search'}). ${loaded} item(s) collected before failure.`,
-                        loaded
-                    )
+                (cause, shed) =>
+                    this.pageFailure({ page: pageNum, cursor: cursorLabel }, loaded, context ?? 'search', cause, shed)
             )
 
             const items = (response?.data ?? []) as T[]
@@ -1015,7 +1103,7 @@ export class ClientService {
                 ),
             circuit,
             'offset 0',
-            () => new PaginationError(`Pagination failed on initial page (${context ?? 'paginate'}).`, 0)
+            (cause, shed) => this.pageFailure('initial', 0, context, cause, shed)
         )
 
         const initialItems = initialResponse.data || []
@@ -1036,18 +1124,18 @@ export class ClientService {
             async (offset, extraAbort) => {
                 const params = { ...baseParameters, limit: effectivePageSize, offset } as TRequestParams
                 const pageCtx = context ? `${context} [offset ${offset}]` : `list [offset ${offset}]`
-                const response = await this.executePage<{ data: T[] }>(() => callFunction(params), {
-                    priority,
-                    context: pageCtx,
-                    abortSignal,
-                }, extraAbort)
+                const response = await this.executePage<{ data: T[] }>(
+                    () => callFunction(params),
+                    {
+                        priority,
+                        context: pageCtx,
+                        abortSignal,
+                    },
+                    extraAbort
+                )
                 return response.data ?? Promise.reject(new Error('Paginated page returned no data'))
             },
-            (offset, loaded) =>
-                new PaginationError(
-                    `Pagination failed at offset ${offset} (${context ?? 'paginate'}). ${loaded} item(s) collected before failure.`,
-                    loaded
-                ),
+            (offset, loaded, cause, shed) => this.pageFailure({ offset }, loaded, context, cause, shed),
             () => {},
             circuit,
             abortSignal

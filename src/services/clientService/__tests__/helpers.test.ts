@@ -1,10 +1,16 @@
-import { createRetriesConfig, shouldRetry, isGatewayFailure, calculateRetryDelay, getRequestAbortSignal, runWithRequestAbortSignal, invokeAbortable, mergeAbortSignals } from '../helpers'
 import {
-    BASE_RETRY_DELAY_MS,
-    MAX_RETRY_DELAY_MS,
-    RATE_LIMIT_JITTER_FACTOR,
-    RETRY_JITTER_FACTOR,
-} from '../constants'
+    createRetriesConfig,
+    shouldRetry,
+    isGatewayFailure,
+    describeRequestFailure,
+    paginationFailureMessage,
+    calculateRetryDelay,
+    getRequestAbortSignal,
+    runWithRequestAbortSignal,
+    invokeAbortable,
+    mergeAbortSignals,
+} from '../helpers'
+import { BASE_RETRY_DELAY_MS, MAX_RETRY_DELAY_MS, RATE_LIMIT_JITTER_FACTOR, RETRY_JITTER_FACTOR } from '../constants'
 import axiosRetry from 'axios-retry'
 import type { Mock } from 'vitest'
 
@@ -117,6 +123,60 @@ describe('clientService helpers', () => {
         })
     })
 
+    describe('describeRequestFailure', () => {
+        it('includes the HTTP status, status text, and response message', () => {
+            const error = Object.assign(new Error('Request failed with status code 504'), {
+                response: { status: 504, statusText: 'Gateway Timeout', data: { message: 'upstream timed out' } },
+            })
+            expect(describeRequestFailure(error)).toBe('HTTP 504 Gateway Timeout - upstream timed out')
+        })
+
+        it('appends the error message when the status line would otherwise be only the code', () => {
+            const error = Object.assign(new Error('Gateway Timeout'), { response: { status: 504 } })
+            expect(describeRequestFailure(error)).toBe('HTTP 504 - Gateway Timeout')
+        })
+
+        it('names a timeout that has no HTTP status', () => {
+            const error = Object.assign(new Error('timeout of 60000ms exceeded'), { code: 'ECONNABORTED' })
+            expect(describeRequestFailure(error)).toBe('request timed out (ECONNABORTED): timeout of 60000ms exceeded')
+        })
+
+        it('drops an HTML body', () => {
+            const error = Object.assign(new Error('Request failed with status code 504'), {
+                response: { status: 504, data: '<html>gateway</html>' },
+            })
+            expect(describeRequestFailure(error)).toBe('HTTP 504')
+        })
+    })
+
+    describe('paginationFailureMessage', () => {
+        it('keeps the offset and collected count and appends a non-gateway reason', () => {
+            const message = paginationFailureMessage({
+                context: 'SourceService>fetchAccountsBySourceIdGenerator Jackdaw',
+                position: { offset: 477750 },
+                collected: 477750,
+                cause: Object.assign(new Error('Internal Server Error'), { response: { status: 500 } }),
+            })
+            expect(message).toBe(
+                'Pagination failed at offset 477750 (SourceService>fetchAccountsBySourceIdGenerator Jackdaw). 477750 item(s) collected before failure. Reason: HTTP 500 - Internal Server Error.'
+            )
+        })
+
+        it('says the circuit shed and names the last gateway error', () => {
+            const message = paginationFailureMessage({
+                context: 'pool-trip',
+                position: { offset: 10 },
+                collected: 1,
+                cause: Object.assign(new Error('Gateway Timeout'), { response: { status: 504 } }),
+                shed: { poolSize: 10, threshold: 10 },
+            })
+            expect(message).toContain('pool-trip')
+            expect(message).toContain('1 item(s) collected before failure')
+            expect(message).toContain('Reason: pagination circuit shed (gateway-failure pool 10/10)')
+            expect(message).toContain('Last error: HTTP 504 - Gateway Timeout.')
+        })
+    })
+
     describe('calculateRetryDelay', () => {
         it('should return positive delay for retry count', () => {
             const delay = calculateRetryDelay(1, { response: { status: 500 } })
@@ -221,4 +281,3 @@ describe('clientService helpers', () => {
         })
     })
 })
-

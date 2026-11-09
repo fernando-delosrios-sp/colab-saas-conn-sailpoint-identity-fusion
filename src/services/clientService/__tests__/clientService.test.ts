@@ -81,9 +81,7 @@ describe('ClientService', () => {
         const client = new ClientService(mockAdapter, mockQueue, mockConfig, mockLog)
         activeClients.push(client)
 
-        const result = await client.call(
-            (_api: IscApiSurface) => Promise.resolve('queued-result')
-        )
+        const result = await client.call((_api: IscApiSurface) => Promise.resolve('queued-result'))
 
         expect(mockQueue.enqueue).toHaveBeenCalled()
         expect(result).toBe('queued-result')
@@ -95,10 +93,9 @@ describe('ClientService', () => {
         const apiFn = vi.fn().mockResolvedValue('success')
         mockAdapter.accountsApi = { updateAccount: apiFn } as any
 
-        await client.call(
-            (api: IscApiSurface) => api.accounts.updateAccount({} as any),
-            { priority: QueuePriority.MEDIUM }
-        )
+        await client.call((api: IscApiSurface) => api.accounts.updateAccount({} as any), {
+            priority: QueuePriority.MEDIUM,
+        })
 
         expect(apiFn).toHaveBeenCalled()
     })
@@ -107,10 +104,10 @@ describe('ClientService', () => {
         const client = new ClientService(mockAdapter, null, mockConfig, mockLog)
         activeClients.push(client)
 
-        const result = await client.call(
-            (_api: IscApiSurface) => Promise.reject(new Error('api-error')),
-            { context: 'test', throwOnError: false }
-        )
+        const result = await client.call((_api: IscApiSurface) => Promise.reject(new Error('api-error')), {
+            context: 'test',
+            throwOnError: false,
+        })
 
         expect(result).toBeUndefined()
         expect(mockLog.error).toHaveBeenCalledWith(expect.stringContaining('api-error'))
@@ -122,10 +119,7 @@ describe('ClientService', () => {
         const error = new Error('api-error')
 
         await expect(
-            client.call(
-                (_api: IscApiSurface) => Promise.reject(error),
-                { throwOnError: true }
-            )
+            client.call((_api: IscApiSurface) => Promise.reject(error), { throwOnError: true })
         ).rejects.toThrow(error)
     })
 
@@ -166,10 +160,9 @@ describe('ClientService', () => {
             updateAccount: vi.fn(() => Promise.resolve({ id: 'ok' })),
         } as any
 
-        const promise = client.call(
-            (api: IscApiSurface) => api.accounts.updateAccount({} as any),
-            { throwOnError: true }
-        )
+        const promise = client.call((api: IscApiSurface) => api.accounts.updateAccount({} as any), {
+            throwOnError: true,
+        })
 
         await vi.advanceTimersByTimeAsync(2000)
         blockerResolve!()
@@ -199,10 +192,9 @@ describe('ClientService', () => {
         } as any
 
         try {
-            const promise = client.call(
-                (api: IscApiSurface) => api.accounts.updateAccount({} as any),
-                { throwOnError: true }
-            )
+            const promise = client.call((api: IscApiSurface) => api.accounts.updateAccount({} as any), {
+                throwOnError: true,
+            })
             const assertion = expect(promise).rejects.toThrow(/timed out/i)
             await vi.advanceTimersByTimeAsync(1000)
             await assertion
@@ -246,10 +238,9 @@ describe('ClientService', () => {
             }),
         } as any
 
-        const promise = client.call(
-            (api: IscApiSurface) => api.accounts.updateAccount({} as any),
-            { throwOnError: true }
-        )
+        const promise = client.call((api: IscApiSurface) => api.accounts.updateAccount({} as any), {
+            throwOnError: true,
+        })
 
         await vi.advanceTimersByTimeAsync(2000)
         blockerResolve!()
@@ -268,10 +259,11 @@ describe('ClientService', () => {
         const client = new ClientService(mockAdapter, mockQueue, mockConfig, mockLog)
         activeClients.push(client)
 
-        await client.call(
-            (_api: IscApiSurface) => Promise.resolve('result'),
-            { priority: QueuePriority.HIGH, noRetry: true, context: 'my-context' }
-        )
+        await client.call((_api: IscApiSurface) => Promise.resolve('result'), {
+            priority: QueuePriority.HIGH,
+            noRetry: true,
+            context: 'my-context',
+        })
 
         expect(mockQueue.enqueue).toHaveBeenCalledWith(
             expect.any(Function),
@@ -285,9 +277,10 @@ describe('ClientService', () => {
         let captured: IscApiSurface | undefined
 
         mockAdapter.accountsApi = { listAccounts: vi.fn() } as any
-        await client.call(
-            (api: IscApiSurface) => { captured = api; return Promise.resolve() }
-        )
+        await client.call((api: IscApiSurface) => {
+            captured = api
+            return Promise.resolve()
+        })
 
         expect(captured).toBeDefined()
         expect(captured!.accounts).toBe(mockAdapter.accountsApi)
@@ -338,17 +331,17 @@ describe('ClientService', () => {
         } as any
 
         await expect(
-            client.call(
-                (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-                { context: 'test-seq', paginate: { mode: 'sequential', baseParams: {} } }
-            )
+            client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+                context: 'test-seq',
+                paginate: { mode: 'sequential', baseParams: {} },
+            })
         ).rejects.toThrow(PaginationError)
 
         try {
-            await client.call(
-                (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-                { context: 'test-seq', paginate: { mode: 'sequential', baseParams: {} } }
-            )
+            await client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+                context: 'test-seq',
+                paginate: { mode: 'sequential', baseParams: {} },
+            })
         } catch (e: unknown) {
             const err = e as PaginationError
             expect(err.itemsCollected).toBe(0)
@@ -403,10 +396,10 @@ describe('ClientService', () => {
         } as any
 
         await expect(
-            client.call(
-                (_api: IscApiSurface, params: any) => (_api.search.searchPost as any)(params),
-                { context: 'test-search', paginate: { mode: 'searchAfter', search: { indices: ['identities'], query: { query: '*' } } as any } }
-            )
+            client.call((_api: IscApiSurface, params: any) => (_api.search.searchPost as any)(params), {
+                context: 'test-search',
+                paginate: { mode: 'searchAfter', search: { indices: ['identities'], query: { query: '*' } } as any },
+            })
         ).rejects.toThrow(PaginationError)
     })
 
@@ -430,13 +423,10 @@ describe('ClientService', () => {
         } as any
 
         const progressCalls: Array<{ loaded: number; total?: number }> = []
-        const gen = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            {
-                paginate: { mode: 'parallel', baseParams: {} },
-                onPageProgress: (loaded, total) => progressCalls.push({ loaded, total }),
-            }
-        )
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            paginate: { mode: 'parallel', baseParams: {} },
+            onPageProgress: (loaded, total) => progressCalls.push({ loaded, total }),
+        })
 
         const first = await gen.next()
         const collected: any[][] = [first.value!]
@@ -460,10 +450,10 @@ describe('ClientService', () => {
             listAccounts: vi.fn().mockRejectedValue(new Error('network-error')),
         } as any
 
-        const gen = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { context: 'test-para', paginate: { mode: 'parallel', baseParams: {} } }
-        )
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            context: 'test-para',
+            paginate: { mode: 'parallel', baseParams: {} },
+        })
 
         await expect(async () => {
             for await (const _page of gen) {
@@ -494,10 +484,10 @@ describe('ClientService', () => {
             }),
         } as any
 
-        const gen = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { context: 'test-dropped-rejection', paginate: { mode: 'parallel', baseParams: {} } }
-        )
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            context: 'test-dropped-rejection',
+            paginate: { mode: 'parallel', baseParams: {} },
+        })
 
         await expect(async () => {
             for await (const _page of gen) {
@@ -521,10 +511,10 @@ describe('ClientService', () => {
             }),
         } as any
 
-        const gen = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { context: 'test-missing-data', paginate: { mode: 'parallel', baseParams: {} } }
-        )
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            context: 'test-missing-data',
+            paginate: { mode: 'parallel', baseParams: {} },
+        })
 
         await expect(async () => {
             for await (const _page of gen) {
@@ -547,10 +537,9 @@ describe('ClientService', () => {
             }),
         } as any
 
-        const gen = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { paginate: { mode: 'parallel', baseParams: {} } }
-        )
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            paginate: { mode: 'parallel', baseParams: {} },
+        })
 
         const collected: any[][] = []
         for await (const page of gen) {
@@ -598,10 +587,9 @@ describe('ClientService', () => {
             }),
         } as any
 
-        const gen = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { paginate: { mode: 'parallel', baseParams: {}, batchSize: 2 } }
-        )
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            paginate: { mode: 'parallel', baseParams: {}, batchSize: 2 },
+        })
 
         const pages: any[][] = []
         for await (const page of gen) {
@@ -634,10 +622,9 @@ describe('ClientService', () => {
             }),
         } as any
 
-        const gen = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { paginate: { mode: 'parallel', baseParams: {} } }
-        )
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            paginate: { mode: 'parallel', baseParams: {} },
+        })
 
         const collected: any[][] = []
         for await (const page of gen) {
@@ -663,13 +650,10 @@ describe('ClientService', () => {
         } as any
 
         const progressCalls: number[] = []
-        const gen = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            {
-                paginate: { mode: 'parallel', baseParams: {} },
-                onPageProgress: (loaded) => progressCalls.push(loaded),
-            }
-        )
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            paginate: { mode: 'parallel', baseParams: {} },
+            onPageProgress: (loaded) => progressCalls.push(loaded),
+        })
 
         for await (const _page of gen) {
             // consume
@@ -749,10 +733,10 @@ describe('ClientService', () => {
 
         const unrelated = client.call((_api: IscApiSurface) => Promise.resolve('unrelated-ok'))
 
-        const gen = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { context: 'pool-trip', paginate: { mode: 'parallel', baseParams: {}, batchSize: 12 } }
-        )
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            context: 'pool-trip',
+            paginate: { mode: 'parallel', baseParams: {}, batchSize: 12 },
+        })
 
         let thrown: unknown
         const collected: string[] = []
@@ -775,6 +759,10 @@ describe('ClientService', () => {
             expect(thrown).toBeInstanceOf(PaginationError)
             expect((thrown as PaginationError).itemsCollected).toBe(1)
             expect((thrown as PaginationError).message).toContain('pool-trip')
+            expect((thrown as PaginationError).message).toContain(
+                'Reason: pagination circuit shed (gateway-failure pool 10/10)'
+            )
+            expect((thrown as PaginationError).message).toContain('Last error: HTTP 504 - Gateway Timeout.')
             expect(collected).toEqual(['a0'])
             expect(hangAborted).toBe(true)
             expect(mockLog.warn).toHaveBeenCalledWith(expect.stringMatching(/shedding/i))
@@ -809,10 +797,9 @@ describe('ClientService', () => {
             }),
         } as any
 
-        const gen = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { paginate: { mode: 'parallel', baseParams: {}, batchSize: 12 } }
-        )
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            paginate: { mode: 'parallel', baseParams: {}, batchSize: 12 },
+        })
 
         const collected: string[] = []
         for await (const page of gen) {
@@ -845,10 +832,9 @@ describe('ClientService', () => {
             }),
         } as any
 
-        const gen = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { paginate: { mode: 'parallel', baseParams: {}, batchSize: 8 } }
-        )
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            paginate: { mode: 'parallel', baseParams: {}, batchSize: 8 },
+        })
 
         const consume = (async () => {
             for await (const _page of gen) {
@@ -876,15 +862,19 @@ describe('ClientService', () => {
             listAccounts: vi.fn().mockRejectedValue(gateway504()),
         } as any
 
-        const promise = client.call(
-            (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-            { paginate: { mode: 'sequential', baseParams: {} } }
-        )
+        const promise = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            paginate: { mode: 'sequential', baseParams: {} },
+        })
 
         try {
             await expect(promise).rejects.toThrow(PaginationError)
+            await expect(promise).rejects.toThrow(/pagination circuit shed \(gateway-failure pool 1\/1\)/)
+            await expect(promise).rejects.toThrow(/Last error: HTTP 504 - Gateway Timeout/)
             expect(mockAdapter.accountsApi.listAccounts).toHaveBeenCalledTimes(1)
             expect(warnText().some((line: string) => /cooldown/i.test(line))).toBe(false)
+            expect(warnText().some((line: string) => line.includes('Last error: HTTP 504 - Gateway Timeout'))).toBe(
+                true
+            )
         } finally {
             vi.useRealTimers()
         }
@@ -900,15 +890,12 @@ describe('ClientService', () => {
             searchPost: vi.fn().mockRejectedValue(gateway504()),
         } as any
 
-        const promise = client.call(
-            (_api: IscApiSurface, params: any) => (_api.search.searchPost as any)(params),
-            {
-                paginate: {
-                    mode: 'searchAfter',
-                    search: { indices: ['identities'], query: { query: '*' } } as any,
-                },
-            }
-        )
+        const promise = client.call((_api: IscApiSurface, params: any) => (_api.search.searchPost as any)(params), {
+            paginate: {
+                mode: 'searchAfter',
+                search: { indices: ['identities'], query: { query: '*' } } as any,
+            },
+        })
 
         try {
             await expect(promise).rejects.toThrow(PaginationError)
@@ -971,13 +958,13 @@ describe('ClientService', () => {
         } as any
 
         await expect(
-            client.call(
-                (_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params),
-                { paginate: { mode: 'sequential', baseParams: {} } }
-            )
-        ).rejects.toThrow(PaginationError)
+            client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+                paginate: { mode: 'sequential', baseParams: {} },
+            })
+        ).rejects.toThrow(/Pagination failed on initial page \(paginate\)\. Reason: HTTP 500 - Internal Server Error\./)
 
         expect(warnText().some((line: string) => /cooldown/i.test(line))).toBe(false)
+        expect(warnText().some((line: string) => /shedding/i.test(line))).toBe(false)
     })
 
     it('caller abort during paging fails without a cooldown wait', async () => {
@@ -1073,10 +1060,9 @@ describe('ClientService', () => {
         } as any
 
         try {
-            const promise = client.call(
-                (api: IscApiSurface) => api.accounts.updateAccount({} as any),
-                { throwOnError: true }
-            )
+            const promise = client.call((api: IscApiSurface) => api.accounts.updateAccount({} as any), {
+                throwOnError: true,
+            })
             const assertion = expect(promise).rejects.toThrow(/Gateway Timeout/)
             await vi.runAllTimersAsync()
             await assertion
@@ -1135,7 +1121,3 @@ describe('ClientService', () => {
         expect(mockQueue.stop).toHaveBeenCalled()
     })
 })
-
-
-
-

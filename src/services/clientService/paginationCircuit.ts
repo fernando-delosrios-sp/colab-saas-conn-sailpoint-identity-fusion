@@ -80,10 +80,11 @@ export class PaginationCircuit {
         return 'continue'
     }
 
-    shed(positionLabel: string): void {
+    shed(positionLabel: string, reason?: string): void {
         if (this.shedController.signal.aborted) return
+        const why = reason ? `. Last error: ${reason}` : ''
         this.logWarn(
-            `Pagination circuit shedding stream (${this.context ?? 'paginate'}) at ${positionLabel} pool ${this.pool.size}/${this.threshold}`
+            `Pagination circuit shedding stream (${this.context ?? 'paginate'}) at ${positionLabel} pool ${this.pool.size}/${this.threshold}${why}`
         )
         this.shedController.abort(new Error('Pagination circuit shed'))
     }

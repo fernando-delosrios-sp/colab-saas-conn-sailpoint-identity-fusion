@@ -72,7 +72,84 @@ export function isGatewayFailure(error: unknown): boolean {
     return false
 }
 
-const IMF_FIXDATE_REGEX = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/
+const FAILURE_DETAIL_MAX = 300
+
+function clipDetail(text: string): string {
+    const flat = text.replace(/\s+/g, ' ').trim()
+    return flat.length <= FAILURE_DETAIL_MAX ? flat : `${flat.slice(0, FAILURE_DETAIL_MAX - 1)}…`
+}
+
+/**
+ * One-line description of a failed API call: HTTP status and response text, a timeout, or the error message.
+ * HTML bodies are dropped so a gateway error page does not flood the connector log.
+ */
+export function describeRequestFailure(error: unknown): string {
+    if (error == null) return 'unknown error'
+    const err = error as {
+        response?: { status?: number; statusText?: string; data?: { message?: string; detailCode?: string } | string }
+        code?: string
+        message?: string
+    }
+    const status = err.response?.status
+    const statusText = err.response?.statusText
+    const data = err.response?.data
+    let apiMessage: string | undefined
+    if (typeof data === 'string') {
+        apiMessage = data.trimStart().startsWith('<') ? undefined : data
+    } else if (data && typeof data === 'object') {
+        apiMessage = data.message || data.detailCode
+    }
+    const fallback = error instanceof Error ? error.message : typeof error === 'string' ? error : undefined
+
+    if (status) {
+        const head = `HTTP ${status}${statusText ? ` ${statusText}` : ''}`
+        if (apiMessage) return clipDetail(`${head} - ${apiMessage}`)
+        if (fallback && !fallback.includes(String(status))) return clipDetail(`${head} - ${fallback}`)
+        return head
+    }
+
+    if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
+        const detail = fallback && fallback !== err.code ? `: ${fallback}` : ''
+        return clipDetail(`request timed out (${err.code})${detail}`)
+    }
+
+    if (fallback) return clipDetail(fallback)
+    return clipDetail(String(error))
+}
+
+/**
+ * PaginationError text. Keeps the offset and the collected count, and appends why the page failed.
+ * A circuit shed names the gateway-failure pool and the last page error.
+ */
+export function paginationFailureMessage(input: {
+    context?: string
+    position: 'initial' | { offset: number } | { page: number; cursor?: string }
+    collected: number
+    cause?: unknown
+    shed?: { poolSize: number; threshold: number }
+}): string {
+    const ctx = input.context ?? (input.position !== 'initial' && 'page' in input.position ? 'search' : 'paginate')
+    let head: string
+    if (input.position === 'initial') {
+        head = `Pagination failed on initial page (${ctx}).`
+    } else if ('offset' in input.position) {
+        head = `Pagination failed at offset ${input.position.offset} (${ctx}). ${input.collected} item(s) collected before failure.`
+    } else {
+        const cursor = input.position.cursor ? `, ${input.position.cursor}` : ''
+        head = `Search pagination failed at page ${input.position.page}${cursor} (${ctx}). ${input.collected} item(s) collected before failure.`
+    }
+
+    const detail = input.cause != null ? describeRequestFailure(input.cause) : undefined
+    if (input.shed) {
+        const last = detail ? ` Last error: ${detail}.` : ''
+        return `${head} Reason: pagination circuit shed (gateway-failure pool ${input.shed.poolSize}/${input.shed.threshold}).${last}`
+    }
+    if (detail) return `${head} Reason: ${detail}.`
+    return head
+}
+
+const IMF_FIXDATE_REGEX =
+    /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/
 
 /**
  * Parse a Retry-After header value into milliseconds.
@@ -166,4 +243,3 @@ export function invokeAbortable<T>(fn: () => Promise<T>, signal?: AbortSignal): 
             })
     })
 }
-
