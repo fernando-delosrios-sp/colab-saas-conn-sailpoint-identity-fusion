@@ -663,6 +663,7 @@ describe('Identity Document Pruning on Ingest', () => {
             {
                 id: 'acc-fusion',
                 nativeIdentity: 'native-fusion-1',
+                accountId: 'native-fusion-1',
                 name: 'asmith-fusion',
                 disabled: false,
                 source: { id: 'fusion-source-1', name: 'Identity Fusion' },
@@ -670,6 +671,7 @@ describe('Identity Document Pruning on Ingest', () => {
             {
                 id: 'acc-managed',
                 nativeIdentity: 'native-hr-1',
+                accountId: 'native-hr-1',
                 name: 'asmith-hr',
                 disabled: false,
                 source: { id: 'hr-source-id', name: 'HR Source' },
@@ -735,6 +737,7 @@ describe('Identity Document Pruning on Ingest', () => {
             {
                 id: 'acc-hr',
                 nativeIdentity: 'bob-hr-nat',
+                accountId: 'bob-hr-nat',
                 name: 'bob-hr',
                 disabled: false,
                 source: { id: 'hr-source-id', name: 'HR Source' },
