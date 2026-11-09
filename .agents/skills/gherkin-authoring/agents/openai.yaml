@@ -1,5 +1,0 @@
-interface:
-  display_name: Gherkin Authoring
-  short_description: Gherkin acceptance criteria authoring.
-policy:
-  allow_implicit_invocation: false

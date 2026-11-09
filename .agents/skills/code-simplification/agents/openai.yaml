@@ -1,5 +1,0 @@
-interface:
-  display_name: Code Simplification
-  short_description: Simplifies code for clarity without changing behavior.
-policy:
-  allow_implicit_invocation: false
