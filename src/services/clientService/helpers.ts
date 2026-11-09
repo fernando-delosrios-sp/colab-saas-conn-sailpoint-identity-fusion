@@ -113,7 +113,14 @@ export function describeRequestFailure(error: unknown): string {
         return clipDetail(`request timed out (${err.code})${detail}`)
     }
 
-    if (fallback) return clipDetail(fallback)
+    if (fallback && /stream has been aborted/i.test(fallback)) {
+        const code = err.code ? `, ${err.code}` : ''
+        return clipDetail(`the response was cut off before the page arrived (${fallback}${code})`)
+    }
+
+    if (fallback) {
+        return clipDetail(err.code && !fallback.includes(err.code) ? `${fallback} (${err.code})` : fallback)
+    }
     return clipDetail(String(error))
 }
 

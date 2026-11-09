@@ -442,6 +442,40 @@ describe('ClientService', () => {
         ])
     })
 
+    it('reports a cut-off response instead of dropping the page', async () => {
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, parallelBatchSize: 2 }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': '3' } })
+                }
+                if (offset === 1) {
+                    return Promise.reject(
+                        Object.assign(new Error('stream has been aborted'), { code: 'ERR_BAD_RESPONSE' })
+                    )
+                }
+                return Promise.resolve({ data: [{ id: `a${offset}` }] })
+            }),
+        } as any
+
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            context: 'test-stream-abort',
+            paginate: { mode: 'parallel', baseParams: {} },
+        })
+
+        await expect(async () => {
+            for await (const _page of gen) {
+                // offset 1's stream abort must be the failure reason
+            }
+        }).rejects.toThrow(
+            /offset 1 \(test-stream-abort\).*the response was cut off before the page arrived \(stream has been aborted, ERR_BAD_RESPONSE\)/
+        )
+    })
+
     it('throws PaginationError on parallel pagination failure', async () => {
         const client = new ClientService(mockAdapter, null, mockConfig, mockLog)
         activeClients.push(client)
@@ -600,6 +634,46 @@ describe('ClientService', () => {
         expect(maxInFlight).toBeGreaterThan(1)
         expect(offset3StartedWhileOffset2InFlight).toBe(true)
     })
+
+    it.each([
+        [2, 8],
+        [16, 200],
+    ])(
+        'keeps scheduling pages while the consumer awaits between them (window %i, %i pages)',
+        async (windowSize, pageCount) => {
+            const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, parallelBatchSize: windowSize }
+            const client = new ClientService(mockAdapter, null, sc, mockLog)
+            activeClients.push(client)
+
+            mockAdapter.accountsApi = {
+                listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                    const offset = params.offset ?? 0
+                    return new Promise((resolve) => {
+                        setTimeout(() => {
+                            resolve(
+                                offset === 0
+                                    ? { data: [{ id: 'a0' }], headers: { 'x-total-count': String(pageCount) } }
+                                    : { data: [{ id: `a${offset}` }] }
+                            )
+                        }, 0)
+                    })
+                }),
+            } as any
+
+            const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+                paginate: { mode: 'parallel', baseParams: {} },
+            })
+
+            const ids: string[] = []
+            for await (const page of gen) {
+                ids.push(...page.map((item) => item.id))
+                // One timer turn is enough for the in-flight window to settle before the next pull.
+                await new Promise((resolve) => setTimeout(resolve, 0))
+            }
+
+            expect(ids).toEqual(Array.from({ length: pageCount }, (_, index) => `a${index}`))
+        }
+    )
 
     it('yields parallel pages in ascending offset order when completions arrive out of order', async () => {
         const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, parallelBatchSize: 3 }

@@ -141,6 +141,13 @@ describe('clientService helpers', () => {
             expect(describeRequestFailure(error)).toBe('request timed out (ECONNABORTED): timeout of 60000ms exceeded')
         })
 
+        it('says when the response stream was cut off', () => {
+            const error = Object.assign(new Error('stream has been aborted'), { code: 'ERR_BAD_RESPONSE' })
+            expect(describeRequestFailure(error)).toBe(
+                'the response was cut off before the page arrived (stream has been aborted, ERR_BAD_RESPONSE)'
+            )
+        })
+
         it('drops an HTML body', () => {
             const error = Object.assign(new Error('Request failed with status code 504'), {
                 response: { status: 504, data: '<html>gateway</html>' },

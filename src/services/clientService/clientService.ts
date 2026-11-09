@@ -51,6 +51,8 @@ class OffsetPageScheduler<T> {
     private readonly inFlight = new Map<number, Promise<void>>()
     /** First page error, recorded so no task rejection is left unobserved. */
     private failure?: unknown
+    /** Why a page returned without a result. Kept so a gap is not reported as "never completed". */
+    private readonly stopped = new Map<number, unknown>()
     /** Never below 1: a zero window would leave the scheduler unable to schedule any page. */
     private readonly window: number
 
@@ -103,10 +105,12 @@ class OffsetPageScheduler<T> {
                 this.onPageComplete(this.loaded, this.progressTotal)
                 return
             } catch (error: unknown) {
-                if (isAbortError(error, this.circuit.shedSignal) || this.circuit.isShedding) {
-                    return
-                }
-                if (this.abortSignal?.aborted || isAbortError(error, this.abortSignal)) {
+                // Only a caller abort or a circuit shed is a quiet stop. A response whose
+                // stream was aborted (axios: "stream has been aborted") is a real page failure.
+                const quietStop =
+                    this.circuit.isShedding || this.circuit.shedSignal.aborted || this.abortSignal?.aborted === true
+                if (quietStop) {
+                    if (!this.stopped.has(offset)) this.stopped.set(offset, error)
                     return
                 }
                 if (!isGatewayFailure(error)) {
@@ -164,6 +168,9 @@ class OffsetPageScheduler<T> {
                 this.completed.delete(offset)
                 this.yieldIndex++
                 if (page.length > 0) {
+                    // Fill free window slots before suspending. The consumer can
+                    // await between pages, and pump() does not run while yielded.
+                    this.pump()
                     yield page
                 }
             }
@@ -186,11 +193,18 @@ class OffsetPageScheduler<T> {
                 )
             }
 
+            // Pages scheduled before the yield may have settled during the
+            // consumer's await. Refill before treating an empty window as stuck.
+            this.pump()
+            if (this.failure !== undefined) {
+                throw this.failure
+            }
+
             if (this.inFlight.size === 0) {
-                // Every offset has been scheduled and settled, yet the next page in
-                // sequence never landed. Continuing here would spin without awaiting
-                // and starve the event loop for the remainder of the operation.
-                throw this.fail(this.lowestUnfilledOffset(), this.loaded, new Error('the page never completed'))
+                // The next page was scheduled and settled without a result.
+                // Waiting here would spin: nothing in flight can wake the loop.
+                const offset = this.lowestUnfilledOffset()
+                throw this.fail(offset, this.loaded, this.stopped.get(offset) ?? new Error('the page never completed'))
             }
 
             await Promise.race(Array.from(this.inFlight.values()))
