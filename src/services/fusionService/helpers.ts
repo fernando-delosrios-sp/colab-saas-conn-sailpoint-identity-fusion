@@ -79,7 +79,10 @@ export function getFusionIdentityConflictTrackingKey(fusionAccount: FusionAccoun
     return `name:${name}`
 }
 
-/** Fusion candidate keys for report / dry-run rows (works after `fusionIdentity` refs are cleared). */
+/**
+ * Fusion candidate keys for report / dry-run rows. Works after `fusionIdentity` refs are cleared and for
+ * Match Candidate Record matches, using `identityId`, `identityName`, then the projected `attributes`.
+ */
 export function fusionReportMatchCandidateAccountFields(
     match: FusionMatch
 ): Pick<FusionReportMatch, 'accountId' | 'accountName'> {
@@ -91,7 +94,7 @@ export function fusionReportMatchCandidateAccountFields(
     const id = trimStr(match.identityId) ?? ''
     return {
         accountId: id || undefined,
-        accountName: match.identityName,
+        accountName: trimStr(match.identityName) || trimStr(match.attributes?.displayName) || undefined,
     }
 }
 
@@ -170,16 +173,20 @@ export function buildMinimalFusionReportAccount(
     sourceType: string | undefined,
     reportAttributes: string[],
     error?: string,
-    accountIdOverride?: string
+    accountIdOverride?: string,
+    internalProvenance = false
 ): FusionReportAccount {
     const reportAccountId = accountIdOverride ?? fusionAccount.managedAccountId
     const accountUrlId =
         accountIdOverride && !isCompositeManagedAccountKey(accountIdOverride) ? accountIdOverride : undefined
     const row: FusionReportAccount = {
         accountName: getFusionReportAccountLabel(fusionAccount),
-        accountUrl: urlContext.accountManagement(accountUrlId, fusionAccount.isMachine === true),
+        accountUrl: internalProvenance
+            ? undefined
+            : urlContext.accountManagement(accountUrlId, fusionAccount.isMachine === true),
         accountSource: fusionAccount.sourceName,
         sourceType: (sourceType as FusionReportAccount['sourceType']) ?? SourceType.Authoritative,
+        ...(internalProvenance ? { internalProvenance: true } : {}),
         accountId: reportAccountId,
         accountEmail: fusionAccount.email,
         accountAttributes: pickAttributes(fusionAccount.attributes as any, reportAttributes),

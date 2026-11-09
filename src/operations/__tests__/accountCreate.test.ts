@@ -11,8 +11,13 @@ vi.mock('../helpers/reportPipeline', () => ({
     runReportPipeline: vi.fn(),
 }))
 
+vi.mock('../helpers/rebuildFusionAccount', () => ({
+    rebuildFusionAccount: vi.fn(),
+}))
+
 import { createTestRegistry } from './harness/testRegistry'
 import { runReportPipeline } from '../helpers/reportPipeline'
+import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
 
 function createRegistry() {
     const registry = createTestRegistry({
@@ -91,6 +96,58 @@ describe('accountCreate', () => {
         expect(executeActions).toHaveBeenCalledTimes(2)
         expect(registry.fusion.normalizePendingFormStateForOutput).toHaveBeenCalledTimes(1)
         expect(registry.res.send).toHaveBeenCalledWith({ id: 'isc-created' })
+    })
+
+    it('rebuilds an identity that already has a persisted Fusion account so its managed account keys survive', async () => {
+        const registry = createRegistry()
+        const rebuilt = { managedKey: 'fusion-id-1', collections: { statuses: { add: vi.fn() } } }
+        vi.mocked(rebuildFusionAccount).mockResolvedValue(rebuilt as any)
+
+        await accountCreate(registry, {
+            identity: 'Alice Doe',
+            schema: { attributes: [] },
+            attributes: { name: 'Alice Doe' },
+        } as any)
+
+        expect(rebuildFusionAccount).toHaveBeenCalledWith(
+            'fusion-id-1',
+            expect.any(Object),
+            expect.objectContaining({ fusion: registry.fusion, sources: registry.sources }),
+        )
+        expect(rebuilt.collections.statuses.add).toHaveBeenCalledWith(
+            StatusEntitlement.Requested,
+            'Status set by accountCreate operation'
+        )
+        expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(rebuilt)
+    })
+
+    it('keeps the hydrated Fusion account when the rebuild finds nothing', async () => {
+        const registry = createRegistry()
+        vi.mocked(rebuildFusionAccount).mockResolvedValue(undefined)
+
+        await accountCreate(registry, {
+            identity: 'Alice Doe',
+            schema: { attributes: [] },
+            attributes: { name: 'Alice Doe' },
+        } as any)
+
+        expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(registry.fusion.getFusionIdentity())
+    })
+
+    it('does not rebuild a Fusion account that processIdentity just created', async () => {
+        const registry = createRegistry()
+        const created = { managedKey: 'new-1', collections: { statuses: { add: vi.fn() } } }
+        ;(registry.fusion as any).processIdentity = vi.fn().mockResolvedValue(created)
+        ;(registry.fusion as any).getFusionIdentity = vi.fn().mockReturnValue(created)
+
+        await accountCreate(registry, {
+            identity: 'Alice Doe',
+            schema: { attributes: [] },
+            attributes: { name: 'Alice Doe' },
+        } as any)
+
+        expect(rebuildFusionAccount).not.toHaveBeenCalled()
+        expect(registry.fusion.getISCAccount).toHaveBeenCalledWith(created)
     })
 
     it('executes a single report action when actions is a string (not char-split)', async () => {

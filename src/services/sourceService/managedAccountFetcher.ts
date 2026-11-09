@@ -3,8 +3,19 @@ import { OrphanProcessingMode, SourceType } from '../../model/config'
 import { FusionRun } from '../../model/fusionRun'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { wrapConnectorError } from '../../utils/error'
+import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { LogService } from '../logService'
 import { CompiledAccountJmespathFilter, compileAccountPageJmespathFilter } from './accountFilters'
+import {
+    createInternalRecordAccountBuilder,
+    findInternalRecordSource,
+    internalPackageMessage,
+    type InternalRecordAccountBuilder,
+    InternalRecordFormatError,
+    iterateInternalRecords,
+    loadInternalRecordManifest,
+} from './internalRecordFormat'
+import { pruneManagedAccountAttributes } from './referencedAttributeSet'
 import { SourceInfo } from './types'
 
 export interface ManagedAccountFetcherDeps {
@@ -14,6 +25,10 @@ export interface ManagedAccountFetcherDeps {
     batchLimitedSourceNames: Set<string>
     batchCumulativeCount: Record<string, number>
     accountJmespathFiltersBySourceName: Map<string, CompiledAccountJmespathFilter>
+    /** When set, managed source account attributes are pruned to this set at registration. */
+    referencedAttributeSet?: ReadonlySet<string>
+    /** Directory containing the packaged internal-record manifest and shards. */
+    internalRecordsDir?: string
     fetchAccountsBySourceIdGenerator: (
         sourceId: string,
         abortSignal?: AbortSignal,
@@ -96,7 +111,10 @@ function hasEstablishedOwnerIdentity(account: Account): boolean {
 }
 
 export function isOwnershipModeSource(source: SourceInfo | undefined): boolean {
-    return source?.sourceType === SourceType.Orphan && source.config?.orphanProcessingMode === OrphanProcessingMode.Ownership
+    return (
+        source?.sourceType === SourceType.Orphan &&
+        source.config?.orphanProcessingMode === OrphanProcessingMode.Ownership
+    )
 }
 
 /** Machine account on an Ownership-mode source with no established owner identity. */
@@ -141,16 +159,21 @@ function computeAggregateFetchProgress(sourceProgress: Map<string, { registered:
     return { sumRegistered, sumTotal, allTotalsKnown }
 }
 
-function collectAccountsFromBatch(
+/** Accounts examined before registration yields, so one page cannot hold the event loop. */
+export const MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL = 100
+
+async function collectAccountsFromBatch(
     source: SourceInfo,
     batch: Account[],
     effectiveLimit: number | undefined,
     collectedCount: number,
-    deps: Pick<ManagedAccountFetcherDeps, 'run' | 'accountJmespathFiltersBySourceName'>
-): { collectedCount: number; discardedMachineCount: number; reachedLimit: boolean } {
+    deps: Pick<ManagedAccountFetcherDeps, 'run' | 'accountJmespathFiltersBySourceName' | 'referencedAttributeSet'>,
+    onCollected?: (collectedCount: number) => void
+): Promise<{ collectedCount: number; discardedMachineCount: number; reachedLimit: boolean }> {
     const filteredBatch = applyManagedJmespathFilter(source, batch, deps.accountJmespathFiltersBySourceName)
     let nextCollected = collectedCount
     let discardedMachineCount = 0
+    let examinedSinceYield = 0
 
     for (const account of filteredBatch) {
         if (effectiveLimit !== undefined && nextCollected >= effectiveLimit) {
@@ -165,16 +188,106 @@ function collectAccountsFromBatch(
             continue
         }
 
+        if (deps.referencedAttributeSet) {
+            pruneManagedAccountAttributes(account, deps.referencedAttributeSet)
+        }
+
         const accountKey = getManagedAccountKeyFromAccount(account)
         if (!accountKey) {
             continue
         }
         deps.run.setManagedAccount(accountKey, account)
         nextCollected++
+        examinedSinceYield++
+        if (examinedSinceYield >= MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL) {
+            examinedSinceYield = 0
+            onCollected?.(nextCollected)
+            await yieldToEventLoop()
+        }
     }
 
     const reachedLimit = effectiveLimit !== undefined && nextCollected >= effectiveLimit
     return { collectedCount: nextCollected, discardedMachineCount, reachedLimit }
+}
+
+const INTERNAL_RECORD_BATCH_SIZE = 100
+
+function internalRecordAccount(
+    source: SourceInfo,
+    build: InternalRecordAccountBuilder,
+    values: string[],
+    rawValues: string[]
+): Account {
+    const built = build(values, rawValues)
+    return {
+        nativeIdentity: built.nativeIdentity,
+        name: built.name,
+        sourceId: source.id,
+        sourceName: source.name,
+        attributes: built.attributes,
+        disabled: false,
+        locked: false,
+        uncorrelated: true,
+    } as Account
+}
+
+async function fetchInternalRecordSource(
+    source: SourceInfo,
+    effectiveLimit: number | undefined,
+    deps: ManagedAccountFetcherDeps,
+    sourceProgress: Map<string, { registered: number; total?: number }>,
+    reportAggregateFetchProgress: () => void
+): Promise<{ collectedCount: number; discardedMachineCount: number }> {
+    const fileName = source.internalRecord?.fileName
+    if (!fileName || !deps.internalRecordsDir) {
+        throw new InternalRecordFormatError(internalPackageMessage(fileName || source.name))
+    }
+    const manifest = loadInternalRecordManifest(deps.internalRecordsDir)
+    const packaged = findInternalRecordSource(manifest, fileName)
+    if (!packaged) {
+        throw new InternalRecordFormatError(internalPackageMessage(fileName))
+    }
+    sourceProgress.set(source.id, { registered: 0, total: packaged.recordCount })
+    reportAggregateFetchProgress()
+    deps.log.info(
+        `Loading Internal Record source "${source.name}" from "${fileName}" (${packaged.recordCount} accounts)`
+    )
+
+    let collectedCount = 0
+    let discardedMachineCount = 0
+    let batch: Account[] = []
+    const flush = async () => {
+        if (batch.length === 0) return
+        const batchResult = await collectAccountsFromBatch(
+            source,
+            batch,
+            effectiveLimit,
+            collectedCount,
+            deps,
+            (registered) => {
+                const current = sourceProgress.get(source.id) ?? {}
+                sourceProgress.set(source.id, { ...current, registered })
+                reportAggregateFetchProgress()
+            }
+        )
+        collectedCount = batchResult.collectedCount
+        discardedMachineCount += batchResult.discardedMachineCount
+        batch = []
+    }
+
+    const entry = source.internalRecord
+    if (!entry) {
+        throw new InternalRecordFormatError(internalPackageMessage(source.name))
+    }
+    // Only referenced columns are built, so the later prune has nothing to drop and does not rebuild the bag.
+    const build = createInternalRecordAccountBuilder(entry, packaged.headers, deps.referencedAttributeSet)
+    for await (const record of iterateInternalRecords(deps.internalRecordsDir, fileName)) {
+        if (effectiveLimit !== undefined && collectedCount >= effectiveLimit) break
+        batch.push(internalRecordAccount(source, build, record.values, record.rawValues))
+        if (batch.length >= INTERNAL_RECORD_BATCH_SIZE) await flush()
+    }
+    await flush()
+    return { collectedCount, discardedMachineCount }
 }
 
 /**
@@ -221,9 +334,36 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
 
         await Promise.all(
             sourcesWithLimits.map(async ({ source, effectiveLimit }) => {
-                log.info(`Fetching accounts from source: ${source.name}`)
+                if (!source.internalProvenance) {
+                    log.info(`Fetching accounts from source: ${source.name}`)
+                }
                 let collectedCount = 0
                 let discardedMachineCount = 0
+
+                if (source.internalProvenance) {
+                    const internalResult = await fetchInternalRecordSource(
+                        source,
+                        effectiveLimit,
+                        deps,
+                        sourceProgress,
+                        reportAggregateFetchProgress
+                    )
+                    collectedCount = internalResult.collectedCount
+                    discardedMachineCount = internalResult.discardedMachineCount
+                    const current = sourceProgress.get(source.id) ?? {}
+                    sourceProgress.set(source.id, { ...current, registered: collectedCount })
+                    reportAggregateFetchProgress()
+                    log.info(`Internal Record source "${source.name}": collected ${collectedCount} account(s)`)
+                    if (discardedMachineCount > 0) {
+                        log.warn(
+                            `Source ${source.name}: discarded ${discardedMachineCount} managed machine account(s) where isMachine=true`
+                        )
+                    }
+                    if (batchLimitedSourceNames.has(source.name)) {
+                        batchCumulativeCount[source.name] = collectedCount
+                    }
+                    return
+                }
 
                 for await (const batch of fetchAccountsBySourceIdGenerator(
                     source.id,
@@ -234,15 +374,29 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
                         sourceProgress.set(source.id, { ...current, total })
                     }
                 )) {
-                    const batchResult = collectAccountsFromBatch(source, batch, effectiveLimit, collectedCount, {
-                        run,
-                        accountJmespathFiltersBySourceName,
-                    })
+                    const batchResult = await collectAccountsFromBatch(
+                        source,
+                        batch,
+                        effectiveLimit,
+                        collectedCount,
+                        {
+                            run,
+                            accountJmespathFiltersBySourceName,
+                            referencedAttributeSet: deps.referencedAttributeSet,
+                        },
+                        (registered) => {
+                            const current = sourceProgress.get(source.id) ?? {}
+                            sourceProgress.set(source.id, { ...current, registered })
+                            reportAggregateFetchProgress()
+                        }
+                    )
                     collectedCount = batchResult.collectedCount
                     discardedMachineCount += batchResult.discardedMachineCount
                     const current = sourceProgress.get(source.id) ?? {}
                     sourceProgress.set(source.id, { ...current, registered: collectedCount })
                     reportAggregateFetchProgress()
+                    // Completed pages otherwise drain as microtasks and starve keep-alives.
+                    await yieldToEventLoop()
                     if (batchResult.reachedLimit) {
                         log.info(`Source ${source.name}: reached effectiveLimit of ${effectiveLimit}, stopping`)
                         break

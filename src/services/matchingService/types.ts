@@ -54,6 +54,8 @@ export type FusionMatch = {
     identityId: string
     /** Display name for report - always present */
     identityName: string
+    /** Candidate attribute bag (Match Candidate Record projection) for forms and reports without fusionIdentity */
+    attributes?: Record<string, any>
     /** Candidate origin used by downstream workflow routing. */
     candidateType?: MatchCandidateType
     /** Score reports for each matching rule evaluated */

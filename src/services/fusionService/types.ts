@@ -64,6 +64,8 @@ export type FusionReportAccount = {
     accountSource: string
     /** Source processing type (authoritative, record, or orphan) */
     sourceType?: SourceType
+    /** True when the account was packaged as an Internal Record source. */
+    internalProvenance?: boolean
     /** ISC account ID */
     accountId?: string
     /** Email address from the account attributes */
@@ -100,6 +102,8 @@ export type FusionReportDecision = {
     accountSource: string
     /** Source processing type (authoritative, record, or orphan) */
     sourceType?: SourceType
+    /** True when the reviewed account was packaged as an Internal Record source. */
+    internalProvenance?: boolean
     /** Canonical decision identifier used by templates */
     decision: 'merge-existing-identity' | 'create-new-identity' | 'confirm-no-match'
     /** Human-friendly decision text */

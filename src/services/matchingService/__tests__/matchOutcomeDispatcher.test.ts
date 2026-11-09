@@ -58,7 +58,7 @@ describe('MatchOutcomeDispatcher', () => {
             setProgress: vi.fn(),
         } as any
         const run = new FusionRun(log)
-        const matchingService = new MatchingService(config, log)
+        const matchingService = new MatchingService(config, log, run)
         const mappingService = { mapAttributes: vi.fn((account) => account) } as any
         const definitionService = {
             refreshNormalAttributes: vi.fn().mockResolvedValue(undefined),
@@ -1280,10 +1280,7 @@ describe('MatchOutcomeDispatcher', () => {
             const { dispatcher, matchingService, decisionProcessor, run } = createDispatcher({
                 commandType: StandardCommand.StdAccountList,
             })
-            run.sourcesByName.set(
-                SOURCE_NAME,
-                ownershipSource({ disableNonMatchingAccounts: true })
-            )
+            run.sourcesByName.set(SOURCE_NAME, ownershipSource({ disableNonMatchingAccounts: true }))
             const disableSpy = vi.fn().mockResolvedValue(undefined)
             run.setDisableOperationFactory(async (account) => disableSpy(account))
             vi.spyOn(matchingService, 'scoreFusionAccount').mockResolvedValue(0)

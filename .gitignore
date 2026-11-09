@@ -16,6 +16,9 @@ node_modules/
 
 # Build artifacts
 dist/
+customizers/records/data/
+customizers/records/records/*.csv
+customizers/records/records-full/
 coverage/
 reports/
 exportedObjects/
@@ -31,6 +34,7 @@ recordings/
 # Local configs
 input.json
 config.json
+customizers/records/internal-record-configuration.json
 .sentryclirc
 .httpyac.json
 .env*

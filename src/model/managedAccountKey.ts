@@ -33,6 +33,17 @@ export function buildManagedAccountKey(account: ManagedKeyAccountLike): string |
     return undefined
 }
 
+/**
+ * Native identity of an account linked on an identity document.
+ * Account list payloads use `nativeIdentity`. Identity search stores the same value on `accountId`.
+ */
+export function readLinkedAccountNativeIdentity(account: {
+    nativeIdentity?: unknown
+    accountId?: unknown
+}): string | undefined {
+    return trimStr(account.nativeIdentity) ?? trimStr(account.accountId)
+}
+
 export function isCompositeManagedAccountKey(value: string | undefined | null): boolean {
     const normalized = normalizePart(value)
     if (!normalized) return false

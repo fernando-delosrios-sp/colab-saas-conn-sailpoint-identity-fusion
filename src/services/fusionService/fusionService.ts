@@ -405,31 +405,35 @@ export class FusionService {
      * - No snapshot or copy is made of managedAccountsById
      * - All parallel operations work with the direct reference
      * - Deletions physically remove accounts from memory as they're processed
+     * - Raw accounts are streamed straight from the fetch cache iterator in bounded
+     *   batches without materializing a full `Account[]` or accumulating a results array
      *
-     * @returns Processed fusion accounts
+     * @returns Number of fusion accounts processed
      */
-    public async processFusionAccounts(): Promise<FusionAccount[]> {
-        const { fusionAccounts } = this.sources
+    public async processFusionAccounts(): Promise<number> {
+        const fusionAccountCount = this.sources.fusionAccountCount
         this.log.detail({
             action: 'processing fusion accounts',
-            count: fusionAccounts.length,
+            count: fusionAccountCount,
         })
-        const results = await batchProcess(
-            fusionAccounts,
-            'Fusion accounts',
+        const onProgress =
+            fusionAccountCount === 0
+                ? undefined
+                : (completed: number) => this.log.setProgress(completed, fusionAccountCount, 'refreshed')
+
+        const processed = await forEachBatched(
+            this.sources.fusionAccountValues(),
             async (x: Account) => {
-                return await this.processFusionAccount(x)
+                await this.processFusionAccount(x)
             },
-            this.config,
-            this.log,
-            undefined,
-            'refreshed'
+            getFusionParallelBatchSize(this.config),
+            onProgress
         )
         this.log.detail({
             action: 'fusion accounts phase finished',
-            count: results.length,
+            count: processed,
         })
-        return results
+        return processed
     }
 
     /**
@@ -802,6 +806,12 @@ export class FusionService {
         if (claimedIdentityId) {
             this.identities.deleteIdentity(claimedIdentityId)
         }
+
+        // Deplete the raw fetch cache entry-by-entry so the hydrated FusionAccount and its raw
+        // Account payload do not coexist in memory. Recording keeps the cache intact for snapshots.
+        if (!this.run.isRecordMode && fusionAccount.managedKey) {
+            this.sources.deleteFusionAccount(fusionAccount.managedKey)
+        }
     }
 
     // ------------------------------------------------------------------------
@@ -1144,8 +1154,8 @@ export class FusionService {
 
     /**
      * Streams each ISC account to the provided callback as soon as it's ready.
-     * Memory optimization: avoids accumulating the full output array - processes
-     * and sends one at a time instead of building the whole array first.
+     * Walks the Fusion account maps directly and drops each account after it is sent,
+     * so the output pass does not keep a second copy of the full population.
      *
      * @param send - Callback for each account. Async callbacks are awaited so a slow client can apply backpressure.
      * @returns Number of accounts sent and number of eligible accounts
@@ -1154,38 +1164,58 @@ export class FusionService {
         send: (account: StdAccountListOutput) => unknown,
         refreshUniqueAttributes: boolean = false
     ): Promise<{ sent: number; eligible: number }> {
+        this.run.releaseMatchWorkingSets()
         const batchSize = getFusionParallelBatchSize(this.config)
-        let count = 0
+        const isEligible = (account: FusionAccount): boolean =>
+            !(this.deleteEmpty && account.collections.statuses.isOrphan())
 
-        const allAccounts = [...this.run.allFusionAccounts, ...this.run.allFusionIdentities]
-        const eligibleAccounts = this.deleteEmpty
-            ? allAccounts.filter((account) => !account.collections.statuses.isOrphan())
-            : allAccounts
-
-        const totalEligible = eligibleAccounts.length
-        const totalBatches = Math.ceil(totalEligible / batchSize)
-        const logProgressEveryBatch = Math.max(1, Math.min(50, Math.ceil(totalBatches / 20) || 1))
-        for (let i = 0; i < eligibleAccounts.length; i += batchSize) {
-            const batch = eligibleAccounts.slice(i, i + batchSize)
-            count += await this.processOutputBatch(batch, refreshUniqueAttributes, send)
-
-            const processedInLoop = Math.min(i + batch.length, totalEligible)
-            const currentBatch = Math.floor(i / batchSize) + 1
-            if (
-                this.shouldLogBatchProgress(
-                    currentBatch,
-                    totalBatches,
-                    processedInLoop,
-                    totalEligible,
-                    logProgressEveryBatch
-                )
-            ) {
-                this.log.setProgress(processedInLoop, totalEligible, 'sent')
-            }
-            await yieldToEventLoop()
+        let totalEligible = 0
+        for (const account of this.run.fusionAccountsIterable()) {
+            if (isEligible(account)) totalEligible++
+        }
+        for (const account of this.run.allFusionIdentities) {
+            if (isEligible(account)) totalEligible++
         }
 
-        return { sent: count, eligible: totalEligible }
+        const totalBatches = Math.ceil(totalEligible / batchSize)
+        const logProgressEveryBatch = Math.max(1, Math.min(50, Math.ceil(totalBatches / 20) || 1))
+        let sent = 0
+        let processedInLoop = 0
+        let currentBatch = 0
+
+        const drain = async (accounts: Iterable<FusionAccount>): Promise<void> => {
+            let batch: FusionAccount[] = []
+            const flush = async (): Promise<void> => {
+                if (batch.length === 0) return
+                currentBatch++
+                sent += await this.processOutputBatch(batch, refreshUniqueAttributes, send)
+                processedInLoop += batch.length
+                if (
+                    this.shouldLogBatchProgress(
+                        currentBatch,
+                        totalBatches,
+                        processedInLoop,
+                        totalEligible,
+                        logProgressEveryBatch
+                    )
+                ) {
+                    this.log.setProgress(processedInLoop, totalEligible, 'sent')
+                }
+                batch = []
+                await yieldToEventLoop()
+            }
+
+            for (const account of accounts) {
+                if (!isEligible(account)) continue
+                batch.push(account)
+                if (batch.length >= batchSize) await flush()
+            }
+            await flush()
+        }
+
+        await drain(this.run.fusionAccountsIterable())
+        await drain(this.run.allFusionIdentities)
+        return { sent, eligible: totalEligible }
     }
 
     /**

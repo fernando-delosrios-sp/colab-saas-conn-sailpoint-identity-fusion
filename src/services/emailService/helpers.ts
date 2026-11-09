@@ -102,7 +102,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
               <div style="font-size:14px; font-weight:900; color:#0f172a; line-height:1.3;">
                 {{decisionLabel}}
                 {{#if sourceType}}
-                <span style="display:inline-block; margin-left:6px; padding:2px 8px; line-height:14px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:10px; font-weight:700; text-transform:uppercase; vertical-align:middle; white-space:nowrap;">{{sourceTypeLabel sourceType}}</span>
+                <span style="display:inline-block; margin-left:6px; padding:2px 8px; line-height:14px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:10px; font-weight:700; text-transform:uppercase; vertical-align:middle; white-space:nowrap;">{{sourceTypeLabel sourceType}}</span>{{#if internalProvenance}}<span style="display:inline-block; margin-left:4px; padding:2px 8px; line-height:14px; border-radius:6px; background:#fff4e5; color:#8a5a00; border:1px solid #f0c36d; font-size:10px; font-weight:700; vertical-align:middle; white-space:nowrap;">INTERNAL</span>{{/if}}
                 {{/if}}
                 {{#if automaticMerge}}
                 <span style="display:inline-block; margin-left:6px; padding:2px 8px; line-height:14px; border-radius:6px; background:#e0f2fe; color:#0b5cab; border:1px solid #7dd3fc; font-size:11px; font-weight:700; text-transform:uppercase; vertical-align:middle; white-space:nowrap;">{{i18n "auto"}}</span>
@@ -216,7 +216,7 @@ const DEFAULT_FUSION_REPORT_TEMPLATE = `<!DOCTYPE html>
                       <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
                         <tr>
                           <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">{{i18n "source"}}</td>
-                          <td style="padding:2px 8px; line-height:1.4;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:2px 8px; line-height:14px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:10px; font-weight:700; text-transform:uppercase; vertical-align:middle; white-space:nowrap;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
+                          <td style="padding:2px 8px; line-height:1.4;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:2px 8px; line-height:14px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:10px; font-weight:700; text-transform:uppercase; vertical-align:middle; white-space:nowrap;">{{sourceTypeLabel sourceType}}</span>{{#if internalProvenance}}<span style="display:inline-block; margin-left:4px; padding:2px 8px; line-height:14px; border-radius:6px; background:#fff4e5; color:#8a5a00; border:1px solid #f0c36d; font-size:10px; font-weight:700; vertical-align:middle; white-space:nowrap;">INTERNAL</span>{{/if}}{{/if}}</td>
                         </tr>
                         {{#if accountEmail}}
                         <tr>
@@ -429,7 +429,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                 {{#if accountSource}}
                                                 <div style="color:#5f6b7a; font-size:12px; margin-top:8px; font-weight:600;">
                                                     Source: <span style="color:#0b5cab;">{{accountSource}}</span>
-                                                    {{#if sourceType}}<span style="display:inline-block; margin-left:6px; padding:2px 8px; line-height:14px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:10px; font-weight:700; text-transform:uppercase; vertical-align:middle; white-space:nowrap;">{{sourceTypeLabel sourceType}}</span>{{/if}}
+                                                    {{#if sourceType}}<span style="display:inline-block; margin-left:6px; padding:2px 8px; line-height:14px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:10px; font-weight:700; text-transform:uppercase; vertical-align:middle; white-space:nowrap;">{{sourceTypeLabel sourceType}}</span>{{#if internalProvenance}}<span style="display:inline-block; margin-left:4px; padding:2px 8px; line-height:14px; border-radius:6px; background:#fff4e5; color:#8a5a00; border:1px solid #f0c36d; font-size:10px; font-weight:700; vertical-align:middle; white-space:nowrap;">INTERNAL</span>{{/if}}{{/if}}
                                                 </div>
                                                 {{/if}}
                                                 {{/each}}
@@ -460,7 +460,7 @@ const DEFAULT_FUSION_REVIEW_TEMPLATE = `<!DOCTYPE html>
                                                             <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%; border-collapse:collapse;">
                                                                 <tr>
                                                                     <td style="font-weight:800; white-space:nowrap; padding:2px 8px 2px 0;">{{i18n "source"}}</td>
-                                                                    <td style="padding:2px 8px; line-height:1.4;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:2px 8px; line-height:14px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:10px; font-weight:700; text-transform:uppercase; vertical-align:middle; white-space:nowrap;">{{sourceTypeLabel sourceType}}</span>{{/if}}</td>
+                                                                    <td style="padding:2px 8px; line-height:1.4;">{{accountSource}} {{#if sourceType}}<span style="display:inline-block; margin-left:4px; padding:2px 8px; line-height:14px; border-radius:6px; background:#eef2f7; color:#5f6b7a; border:1px solid #b0bec5; font-size:10px; font-weight:700; text-transform:uppercase; vertical-align:middle; white-space:nowrap;">{{sourceTypeLabel sourceType}}</span>{{#if internalProvenance}}<span style="display:inline-block; margin-left:4px; padding:2px 8px; line-height:14px; border-radius:6px; background:#fff4e5; color:#8a5a00; border:1px solid #f0c36d; font-size:10px; font-weight:700; vertical-align:middle; white-space:nowrap;">INTERNAL</span>{{/if}}{{/if}}</td>
                                                                 </tr>
                                                                 {{#if accountEmail}}
                                                                 <tr>

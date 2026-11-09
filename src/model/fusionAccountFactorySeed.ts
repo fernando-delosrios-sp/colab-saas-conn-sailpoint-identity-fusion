@@ -12,5 +12,4 @@ export type FusionAccountFactorySeed = {
     sourceName?: string
     isMachine?: boolean
     attributeBagCurrent?: Attributes
-    attributeBagPrevious?: Attributes
 }

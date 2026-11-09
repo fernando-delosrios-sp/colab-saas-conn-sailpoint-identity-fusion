@@ -31,6 +31,7 @@ import {
     matchesManagedJmespathFilter,
     type ManagedAccountFetcherDeps,
 } from './managedAccountFetcher'
+import { pruneManagedAccountAttributes } from './referencedAttributeSet'
 import {
     aggregateDelayedSources as aggregateDelayedSourcesImpl,
     aggregateManagedSource as aggregateManagedSourceImpl,
@@ -76,6 +77,7 @@ export class SourceService {
     private sourcesById: Map<string, SourceInfo> = new Map()
     private aggregationDateCache: Map<string, Promise<Date>> = new Map()
     private allSourcesValue?: SourceInfo[]
+    public internalRecordsDir?: string
     private fusionSourceIdValue?: string
     private fusionSourceOwnerValue?: OwnerDto
     private fusionSourceManagementWorkgroupId?: string
@@ -86,7 +88,30 @@ export class SourceService {
     /** Per-run cache: managed source names that passed reverse-correlation setup/assert this session. */
     private reverseCorrelationReadinessBySourceName = new Set<string>()
 
+    /**
+     * Referenced attribute set for managed source account attribute pruning at Bulk ingest.
+     * Initialized once per run by pipelines that load the Fusion account schema
+     * (account-list and Fusion report). Single-account operations never initialize it,
+     * so their single-account fetches keep unpruned bodies (pre-change behavior).
+     */
+    private referencedAttributeSetValue?: ReadonlySet<string>
+
     public fusionAccountsByNativeIdentity?: Map<string, Account>
+
+    /**
+     * Install the referenced attribute set used to prune managed source account
+     * attributes at ingest. See {@link referencedAttributeSet}.
+     */
+    public setReferencedAttributeSet(referencedAttributeSet: ReadonlySet<string>): void {
+        this.referencedAttributeSetValue = referencedAttributeSet
+    }
+
+    /**
+     * Get the active referenced attribute set if configured for this run.
+     */
+    public get referencedAttributeSet(): ReadonlySet<string> | undefined {
+        return this.referencedAttributeSetValue
+    }
 
     /**
      * Clear managed accounts cache to free memory after processing.
@@ -104,6 +129,26 @@ export class SourceService {
             this.fusionAccountsByNativeIdentity.clear()
         }
         this.log.debug('Fusion accounts cache cleared from memory')
+    }
+
+    /**
+     * Streaming iterator over the raw fusion account cache. Returns the map's
+     * values iterator directly so callers can consume entries in batches without
+     * first materializing a full `Account[]`.
+     */
+    public fusionAccountValues(): IterableIterator<Account> {
+        assert(this.fusionAccountsByNativeIdentity, 'Fusion accounts have not been loaded')
+        return this.fusionAccountsByNativeIdentity.values()
+    }
+
+    /**
+     * Delete a single raw fusion account from the fetch cache by native identity.
+     * Used during Refresh to deplete the cache incrementally as each hydrated
+     * FusionAccount is registered, preventing raw and hydrated representations from
+     * coexisting in memory.
+     */
+    public deleteFusionAccount(nativeIdentity: string): void {
+        this.fusionAccountsByNativeIdentity?.delete(nativeIdentity)
     }
 
     // Config settings
@@ -560,6 +605,9 @@ export class SourceService {
                 `Discarded managed machine account for native identity "${nativeIdentity}" on source "${sourceInfo.name}" where isMachine=true`
             )
             return undefined
+        }
+        if (sourceInfo.isManaged && candidate && this.referencedAttributeSet) {
+            pruneManagedAccountAttributes(candidate, this.referencedAttributeSet)
         }
         return candidate
     }
@@ -1019,6 +1067,7 @@ export class SourceService {
                 workgroupMemberIdsByWorkgroupId: this.workgroupMemberIdsByWorkgroupId,
                 accountJmespathFiltersBySourceName: this.accountJmespathFiltersBySourceName,
             },
+            ...(this.internalRecordsDir ? { internalRecordsDir: this.internalRecordsDir } : {}),
         }
     }
 
@@ -1031,6 +1080,8 @@ export class SourceService {
             batchCumulativeCount: this.batchCumulativeCount,
             accountJmespathFiltersBySourceName: this.accountJmespathFiltersBySourceName,
             fetchAccountsBySourceIdGenerator: this.fetchAccountsBySourceIdGenerator.bind(this),
+            ...(this.referencedAttributeSet ? { referencedAttributeSet: this.referencedAttributeSet } : {}),
+            ...(this.internalRecordsDir ? { internalRecordsDir: this.internalRecordsDir } : {}),
         }
     }
 

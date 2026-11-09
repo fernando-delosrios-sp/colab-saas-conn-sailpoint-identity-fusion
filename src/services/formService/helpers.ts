@@ -126,10 +126,13 @@ export const buildCandidateList = (fusionAccount: FusionAccount, maxCandidates: 
     const ordered = [...fusionAccount.fusionMatches].sort(compareMatchesForForm).slice(0, maxCandidates)
 
     return ordered.map((match) => {
-        assert(match.fusionIdentity, 'Fusion identity is required in match')
-        assert(match.fusionIdentity.identityId, 'Fusion identity ID is required')
-        const attrs: Record<string, any> = match.fusionIdentity.attributes || {}
-        const id = match.fusionIdentity.identityId
+        const id = match.identityId || match.fusionIdentity?.identityId
+        assert(id, 'Candidate identity ID is required in match')
+        assert(
+            match.attributes || match.fusionIdentity?.attributes,
+            'Candidate attributes or fusion identity are required in match'
+        )
+        const attrs: Record<string, any> = match.attributes || match.fusionIdentity?.attributes || {}
         return {
             id,
             name: resolveCandidateDisplayName(match, attrs, id),

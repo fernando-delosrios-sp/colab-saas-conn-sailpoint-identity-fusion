@@ -47,7 +47,8 @@ const toReportDecision = (
         isMachine?: boolean
     ) => string | undefined,
     resolveIdentityContext?: (identityId?: string) => { selectedIdentityName?: string; selectedIdentityUrl?: string },
-    locale?: string
+    locale?: string,
+    internalProvenance = false
 ): FusionReportDecision => {
     const account = decision.account || ({} as any)
     const sourceType = decision.sourceType ?? resolveSourceType?.(account.sourceName) ?? SourceType.Authoritative
@@ -91,14 +92,17 @@ const toReportDecision = (
         reviewerEmail: submitter.email || undefined,
         managedAccountKey,
         accountName,
-        accountUrl: resolveAccountUrl?.(
-            managedAccountKey,
-            decision.identityId,
-            account.iscAccountId,
-            account.isMachine
-        ),
+        accountUrl: internalProvenance
+            ? undefined
+            : resolveAccountUrl?.(
+                  managedAccountKey,
+                  decision.identityId,
+                  account.iscAccountId,
+                  account.isMachine
+              ),
         accountSource: account.sourceName || '',
         sourceType,
+        ...(internalProvenance ? { internalProvenance: true } : {}),
         decision: decisionType,
         decisionLabel,
         selectedIdentityId: decision.identityId || undefined,
@@ -125,6 +129,10 @@ class FusionReviewDecisionResolver {
 
     resolveSourceType(sourceName?: string): SourceType | undefined {
         return this.sources?.getSourceByNameSafe?.(sourceName)?.sourceType
+    }
+
+    resolveInternalProvenance(sourceName?: string): boolean {
+        return this.sources?.getSourceByNameSafe?.(sourceName)?.internalProvenance === true
     }
 
     resolveReviewerName(reviewerId?: string): string | undefined {
@@ -392,7 +400,8 @@ export class ReportService {
                 (managedAccountKey, identityId, iscAccountId, isMachine) =>
                     resolver.resolveAccountUrl(managedAccountKey, identityId, iscAccountId, isMachine),
                 (identityId) => resolver.resolveIdentityContext(identityId),
-                locale
+                locale,
+                resolver.resolveInternalProvenance(decision.account?.sourceName)
             )
         )
     }

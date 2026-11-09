@@ -6,6 +6,8 @@ import { assert } from '../utils/assert'
 import { normalizeActionTokens } from '../utils/attributes'
 import { resolveIdentityNameFromCreateInput } from '../utils/identityName'
 import { executeActions } from './actions'
+import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
+import { ATTR_OPS_NONE } from '../services/definitionService/types'
 
 /**
  * Account create operation - Creates a new fusion account for an identity.
@@ -58,11 +60,24 @@ export const accountCreate = async (serviceRegistry: ServiceRegistry, input: Std
         log.stepEnd('load-fusion-accounts', { count: preProcessedAccounts.length })
 
         log.stepStart('process-identity')
-        await fusion.processIdentity(identity)
+        const createdFusionIdentity = await fusion.processIdentity(identity)
 
-        const fusionIdentity = fusion.getFusionIdentity(identity.id)
+        let fusionIdentity = fusion.getFusionIdentity(identity.id)
         assert(fusionIdentity, `Fusion identity not found for identity ID: ${identity.id}`)
         log.debug(`Found fusion identity: ${fusionIdentity.managedKey}`)
+
+        // An identity that already has a persisted Fusion account is only hydrated here: its
+        // `accounts` list loads as previous keys and no layer rebuilds the current keys. Output
+        // would then write an empty `accounts` list and the next aggregation would blend again.
+        if (!createdFusionIdentity && fusionIdentity.managedKey) {
+            const rebuilt = await rebuildFusionAccount(fusionIdentity.managedKey, ATTR_OPS_NONE, {
+                fusion,
+                identities,
+                sources,
+                log,
+            })
+            if (rebuilt) fusionIdentity = rebuilt
+        }
         fusionIdentity.collections.statuses.add(StatusEntitlement.Requested, 'Status set by accountCreate operation')
 
         await definition.refreshUniqueAttributes(fusionIdentity)

@@ -639,6 +639,56 @@ describe('ReportService', () => {
         expect(sendEmail).toHaveBeenCalledTimes(1)
     })
 
+    it('shows an INTERNAL badge for an Internal Record reference and omits it for a configured Record source', () => {
+        const { service } = createService()
+        const internal = service.renderFusionReportHtml(
+            {
+                accounts: [
+                    {
+                        accountName: 'Ada Lovelace',
+                        accountSource: 'Internal Records.csv',
+                        sourceType: SourceType.Record,
+                        internalProvenance: true,
+                        matches: [],
+                    },
+                ],
+                fusionReviewDecisions: [
+                    {
+                        decisionLabel: 'Confirm no match',
+                        accountName: 'Ada Lovelace',
+                        accountSource: 'Internal Records.csv',
+                        sourceType: SourceType.Record,
+                        internalProvenance: true,
+                    },
+                ],
+                matches: 0,
+            } as any,
+            'fusion'
+        )
+        expect(internal).toContain('>Record<')
+        expect(internal).toContain('>INTERNAL<')
+        expect(internal).not.toContain('>Ada Lovelace</a>')
+
+        const configured = service.renderFusionReportHtml(
+            {
+                accounts: [
+                    {
+                        accountName: 'Configured Record',
+                        accountUrl: 'https://tenant.identitynow.com/ui/a/admin/accounts/configured-1',
+                        accountSource: 'HR Records',
+                        sourceType: SourceType.Record,
+                        matches: [],
+                    },
+                ],
+                matches: 0,
+            } as any,
+            'aggregation'
+        )
+        expect(configured).toContain('>Record<')
+        expect(configured).not.toContain('>INTERNAL<')
+        expect(configured).toContain('https://tenant.identitynow.com/ui/a/admin/accounts/configured-1')
+    })
+
     it('includes tenant host and fusion source in the aggregation report header', () => {
         const { service } = createService()
         const html = service.renderFusionReportHtml({ accounts: [], matches: 0 } as any, 'aggregation')

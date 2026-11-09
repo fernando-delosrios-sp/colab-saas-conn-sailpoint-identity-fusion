@@ -3,7 +3,9 @@
 ## Purpose
 
 The source service (`src/services/sourceService/`) is the connector's read/write adapter for managed sources. It wraps the SailPoint API client's `AccountV2025` resource, provides jmespath-based account filtering, manages the source-specific reverse-correlation error vocabulary, and exposes the per-source type definitions. This spec defines the contract for how the connector resolves accounts from a source, applies the configured filters, and surfaces source-specific failure modes.
+
 ## Requirements
+
 ### Requirement: The source service MUST resolve accounts using the source's configured filters
 
 The source service MUST resolve accounts from a managed source by applying configured filter expressions at fetch time. **Accounts API filter** (`accountFilter`) SHALL be composed into the ISC `listAccounts` `filters` query (server-side). **Accounts JMESPath filter** (`accountJmespathFilter`) SHALL be applied client-side to each fetched account page before accounts are registered on FusionRun. Source-specific reverse-correlation errors MUST be surfaced using the dedicated error vocabulary in `sourceReverseCorrelationErrors.ts` so the rest of the connector can distinguish them from generic upstream failures.
@@ -227,3 +229,142 @@ Assignment-mode Orphan sources, Authoritative sources, and Records sources SHALL
 - **WHEN** the connector fetches accounts for that source
 - **THEN** the machine account SHALL NOT be registered for processing
 
+### Requirement: Managed source account attribute pruning at Bulk ingest
+
+The source service SHALL prune each managed source account's `attributes` to the **referenced attribute set** during Bulk ingest, before work-queue registration. Pruning is enforced (no configuration surface disables it), runs after all fetch filters and the machine-account discard, and applies to managed source accounts only — never raw Fusion accounts. The work queue, claimed account retention, and source snapshot materialization SHALL carry only the pruned body.
+
+#### Scenario: Referenced attribute set initialized per pipeline
+
+- **WHEN** the account-list or Fusion report pipeline completes Setup
+- **THEN** the referenced attribute set SHALL be initialized and managed source account pruning SHALL apply at Bulk ingest
+- **AND** single-account operations SHALL NOT initialize the set
+
+#### Scenario: Referenced attribute set composition
+
+- **WHEN** the referenced attribute set is computed for a run
+- **THEN** it SHALL be the union of every Fusion schema attribute name, every `attributeMaps[].existingAttributes` entry, every attribute name textually referenced in Normal/Unique definition and form Velocity templates (dot, bracket, and quoted styles), and every match rule attribute name
+
+#### Scenario: Unreferenced attributes dropped at ingest
+
+- **GIVEN** a managed source account whose `attributes` contain 50 keys
+- **AND** 8 of those keys are in the referenced attribute set
+- **WHEN** the account is ingested during Fetch
+- **THEN** the work queue SHALL hold only the 8 referenced attributes plus system fields
+- **AND** claimed account retention and source snapshot materialization for that account SHALL expose only the pruned attributes
+
+#### Scenario: Unmapped schema-named attribute kept
+
+- **GIVEN** a managed source account attribute named `email`
+- **AND** `email` is a Fusion schema attribute with no explicit attribute mapping row
+- **WHEN** the referenced attribute set is computed
+- **THEN** `email` SHALL be in the set so implicit Map merge parity is preserved
+
+#### Scenario: Template-referenced attribute kept
+
+- **GIVEN** a Normal definition whose Velocity template reads `$sources.get('AD')[0].department`
+- **AND** `department` has no attribute mapping row and is not a Fusion schema attribute
+- **WHEN** the referenced attribute set is computed
+- **THEN** `department` SHALL be in the set
+
+#### Scenario: Bracket and quoted template references kept
+
+- **GIVEN** a Unique definition whose Velocity template reads `$accounts[0]['custom-attr']` and `$account.employeeNumber`
+- **WHEN** the referenced attribute set is computed
+- **THEN** `custom-attr` and `employeeNumber` SHALL be in the set
+
+#### Scenario: Filters evaluate before pruning
+
+- **GIVEN** a managed source with an Accounts JMESPath filter that references an attribute outside the referenced attribute set
+- **WHEN** accounts are fetched
+- **THEN** the filter SHALL still include or exclude accounts exactly as before pruning was introduced
+
+#### Scenario: Machine account discard precedes pruning
+
+- **GIVEN** a managed machine account (`isMachine=true`) on a source that discards machine accounts
+- **WHEN** the account is fetched
+- **THEN** it SHALL be discarded before pruning work is spent on it
+
+#### Scenario: Record mode captures raw pages and prunes at registration
+
+- **GIVEN** recording mode `record`
+- **WHEN** managed source accounts are fetched
+- **THEN** the recorded API capture SHALL contain the raw unpruned pages
+- **AND** the registered work-queue bodies SHALL be pruned exactly as in a live run
+
+#### Scenario: Single-account operations ingest unpruned bodies
+
+- **GIVEN** a single-account operation (for example account-read) that never initializes the referenced attribute set
+- **WHEN** a managed source account is fetched for that operation
+- **THEN** the account body SHALL be registered unpruned, matching pre-change behavior
+
+### Requirement: Source service SHALL resolve configured Internal Record sources from the customizer package
+
+When the customizer package contains an Internal Record configuration, SourceService SHALL resolve each entry as an Internal Record source with Record type and internal provenance. The source name, Include record accounts in Match flag, and Accounts JMESPath filter SHALL come from that entry. SourceService SHALL NOT require an Identity Security Cloud managed source or source ID for that entry, and SHALL NOT read an internal-record file from Source Settings. It SHALL keep Identity Security Cloud discovery and fetch behavior unchanged for configured sources that do not share an Internal Record source name.
+
+#### Scenario: Named packaged dump becomes an Internal Record source
+- **REMOVED** — superseded by **Packaged configuration becomes an Internal Record source**. Discovery reads the saved configuration, not a Source Settings file field.
+
+#### Scenario: Configured internal file is absent
+- **REMOVED** — superseded by **Packaged file is absent from the manifest**. Setup names the file missing from the packaged manifest.
+
+#### Scenario: Packaged configuration becomes an Internal Record source
+- **GIVEN** the attached customizer contains a saved entry for `Sample Records.csv` named `Sample Records`
+- **WHEN** source discovery completes
+- **THEN** `Sample Records` SHALL be available to the aggregation pipeline with Record type and internal provenance
+- **AND** SourceService SHALL NOT call Identity Security Cloud account listing for that source
+
+#### Scenario: Packaged file is absent from the manifest
+- **GIVEN** the Internal Record configuration names `Sample Records.csv`
+- **AND** the attached manifest does not contain that file
+- **WHEN** setup validates sources
+- **THEN** setup SHALL fail before Fetch
+- **AND** the error SHALL name `Sample Records.csv`
+
+### Requirement: Internal Record sources SHALL use existing Record-source processing controls
+
+Internal Record sources SHALL honor the Include record accounts in Match value saved in the Internal Record configuration. When that value is enabled they SHALL enter Map, Define, and Match processing. When it is disabled they SHALL use selective Map and unique-attribute registration without Match scoring. In either case they SHALL NOT create a Fusion account solely because they are unmatched.
+
+#### Scenario: Internal record enters Match by default
+- **REMOVED** — superseded by **Saved Match flag scores the record**. Match follows the flag saved in the Internal Record configuration.
+
+#### Scenario: Internal record skips Match when configured
+- **REMOVED** — superseded by **Saved Match flag skips scoring**. Skipping Match is the saved flag, not a Source Settings field.
+
+#### Scenario: Saved Match flag scores the record
+- **GIVEN** an Internal Record source whose saved Include record accounts in Match value is enabled
+- **WHEN** its record is processed
+- **THEN** it SHALL follow the existing Record source Match path
+- **AND** an unmatched record SHALL NOT create a Fusion account
+
+#### Scenario: Saved Match flag skips scoring
+- **GIVEN** an Internal Record source whose saved Include record accounts in Match value is disabled
+- **WHEN** its record is processed
+- **THEN** it SHALL register mapped unique attributes without Match scoring
+- **AND** it SHALL be released from the work queue after registration
+
+### Requirement: Source service SHALL reject an Internal Record source name that matches a configured source
+
+When an Internal Record source name equals the name of a configured source, setup SHALL fail before Fetch. The error SHALL name the shared source. A configured source with no Internal Record entry of the same name SHALL keep its Identity Security Cloud account feed.
+
+#### Scenario: Shared name fails setup
+- **GIVEN** the packaged Internal Record configuration names a source `Sample Records`
+- **AND** Source Settings contains a source named `Sample Records`
+- **WHEN** setup resolves sources
+- **THEN** setup SHALL fail before Fetch
+- **AND** the error SHALL name `Sample Records`
+
+#### Scenario: Distinct names keep the Identity Security Cloud feed
+- **GIVEN** Source Settings contains `Workday`
+- **AND** no Internal Record source is named `Workday`
+- **WHEN** setup resolves sources
+- **THEN** `Workday` SHALL be fetched from Identity Security Cloud
+
+### Requirement: Internal Record sources SHALL apply the saved Accounts JMESPath filter
+
+SourceService SHALL apply the Accounts JMESPath filter saved for an Internal Record source while streaming its accounts. An empty filter SHALL accept every account. An invalid expression SHALL fail packaging, before a zip is produced.
+
+#### Scenario: Saved filter drops non-matching rows
+- **GIVEN** an Internal Record source whose saved filter keeps only `department` equal to `Engineering`
+- **WHEN** the connector streams that source
+- **THEN** rows outside Engineering SHALL NOT be registered
+- **AND** rows inside Engineering SHALL be registered

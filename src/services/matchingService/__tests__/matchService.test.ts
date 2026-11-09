@@ -5,6 +5,7 @@ import { FusionAccount } from '../../../model/account'
 import { MatchCandidateType } from '../types'
 import { FusionConfig } from '../../../model/config'
 import { FusionRun } from '../../../model/fusionRun'
+import { createMatchCandidateRecord } from '../../../model/matchCandidateRecord'
 import * as scoringHelpers from '../scoringHelpers'
 import { extractTrigrams } from '../trigramIndex'
 
@@ -355,7 +356,7 @@ describe('MatchingService', () => {
             const candidates = service.getCandidates(managed, mockLog)
 
             expect(candidates).toBeDefined()
-            expect(candidates?.has(identityWithoutEmail)).toBe(true)
+            expect([...candidates!].map(({ identityId }) => identityId)).toContain('id-1')
         })
     })
 
@@ -602,7 +603,7 @@ describe('MatchingService', () => {
 
             const candidates = service.getCandidates(managed, mockLog)
 
-            expect(candidates && [...candidates]).toEqual([exactIdentity])
+            expect(candidates && [...candidates].map(({ identityId }) => identityId)).toEqual(['id-exact'])
             expect(run.fullScanFallbackCount).toBe(0)
         })
 
@@ -631,8 +632,7 @@ describe('MatchingService', () => {
 
             const candidates = service.getCandidates(managed, mockLog)
 
-            expect(candidates?.has(withinBound)).toBe(true)
-            expect(candidates?.has(outsideBound)).toBe(false)
+            expect([...candidates!].map(({ identityId }) => identityId)).toEqual(['id-within'])
         })
 
         it('keeps a Jaro-Winkler near-miss with no shared padded trigram reachable', async () => {
@@ -699,22 +699,33 @@ describe('MatchingService', () => {
             const candidates = service.getCandidates(managed, mockLog)
 
             expect(candidates?.size).toBe(2)
-            expect(candidates?.has(binaryHitSimilarName)).toBe(true)
-            expect(candidates?.has(binaryHitUnrelatedName)).toBe(true)
-            expect(candidates?.has(otherEmployee)).toBe(false)
+            expect([...candidates!].map(({ identityId }) => identityId)).toEqual([
+                'id-binary-similar',
+                'id-binary-unrelated',
+            ])
             expect(run.fullScanFallbackCount).toBe(0)
         })
 
         it('builds Binary and LIG3 blocking indexes on FusionRun and not on MatchingService', () => {
             const run = new FusionRun(mockLog)
             const service = new MatchingService(
-                { matchingConfigs: [binaryRule, lig3Rule, jaroWinklerRule], fusionManualReviewScore: 80 } as any,
+                {
+                    matchingConfigs: [binaryRule, lig3Rule, jaroWinklerRule],
+                    fusionFormAttributes: ['department'],
+                    fusionManualReviewScore: 80,
+                } as any,
                 mockLog,
                 run
             )
             const identity = FusionAccount.fromIdentity({
                 id: 'id-1',
-                attributes: { employeeId: 'E123', lastName: 'Anderson', displayName: 'Alice Anderson' },
+                attributes: {
+                    employeeId: 'E123',
+                    lastName: 'Anderson',
+                    displayName: 'Alice Anderson',
+                    department: 'Engineering',
+                    unused: 'not projected',
+                },
             } as any)
 
             service.buildTrigramIndex([identity])
@@ -725,7 +736,19 @@ describe('MatchingService', () => {
             expect(run.binaryIndexByAttribute.has('displayName')).toBe(false)
             expect(run.lig3LengthIndexByAttribute.has('displayName')).toBe(false)
             expect(run.indexedMandatoryAttributes).toEqual(['employeeId', 'lastName'])
-            expect(run.blockingIdentityRoster).toContain(identity)
+            expect(run.blockingIdentityRoster).toEqual([
+                {
+                    identityId: 'id-1',
+                    identityName: identity.name ?? '',
+                    attributes: {
+                        employeeId: 'E123',
+                        lastName: 'Anderson',
+                        displayName: 'Alice Anderson',
+                        department: 'Engineering',
+                    },
+                },
+            ])
+            expect(run.blockingIdentityRoster[0]).not.toBe(identity)
 
             const serviceFields = Object.keys(service as unknown as Record<string, unknown>)
             expect(serviceFields.filter((field) => /index|roster|blocking/i.test(field))).toEqual([])
@@ -1033,6 +1056,158 @@ describe('MatchingService', () => {
                 scores: m.scores.map((s) => ({ attribute: s.attribute, score: s.score })),
             }))
             expect(cachedScores).toEqual(uncachedScores)
+        })
+    })
+
+    describe('Match candidate projection indexing', () => {
+        const binaryRule = {
+            attribute: 'employeeId',
+            algorithm: 'binary' as const,
+            fusionScore: 100,
+            mandatory: true,
+        }
+        const lig3Rule = {
+            attribute: 'lastName',
+            algorithm: 'lig3' as const,
+            fusionScore: 80,
+            mandatory: true,
+        }
+
+        const managedWith = (attributes: Record<string, string>) =>
+            FusionAccount.fromManagedAccount({
+                sourceId: 'src-1',
+                nativeIdentity: 'acc-1',
+                attributes,
+            } as any)
+
+        it('Candidate roster indexes projected candidate records', () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule, lig3Rule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const exact = createMatchCandidateRecord('id-exact', 'Jane Andersen', {
+                employeeId: 'E123',
+                lastName: 'Andersen',
+            })
+            const otherEmployee = createMatchCandidateRecord('id-other', 'John Anderson', {
+                employeeId: 'E999',
+                lastName: 'Anderson',
+            })
+            const outsideBound = createMatchCandidateRecord('id-short', 'Al And', {
+                employeeId: 'E123',
+                lastName: 'And',
+            })
+
+            service.buildTrigramIndex([exact, otherEmployee, outsideBound])
+
+            expect(run.blockingIdentityRoster).toEqual([exact, otherEmployee, outsideBound])
+            const candidates = service.getCandidates(managedWith({ employeeId: 'E123', lastName: 'Anderson' }), mockLog)
+            expect(candidates && [...candidates]).toEqual([exact])
+            expect(run.fullScanFallbackCount).toBe(0)
+        })
+
+        it('Candidate roster excludes projected candidate records by identity id', () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const record = createMatchCandidateRecord('id-1', 'Jane Doe', { employeeId: 'E123' })
+            service.buildTrigramIndex([record])
+
+            const candidates = service.getCandidates(
+                managedWith({ employeeId: 'E123' }),
+                mockLog,
+                new Set(['id-1'])
+            )
+
+            expect(candidates?.size).toBe(0)
+        })
+
+        it('Candidate records provide attributes for matching, forms, and reporting', async () => {
+            const run = new FusionRun(mockLog)
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule, lig3Rule], fusionManualReviewScore: 80 } as any,
+                mockLog,
+                run
+            )
+            const attributes = { employeeId: 'E123', lastName: 'Anderson', displayName: 'Jane Anderson' }
+            const record = createMatchCandidateRecord('id-1', 'Jane Anderson', attributes)
+            const managed = managedWith({ employeeId: 'E123', lastName: 'Anderson' })
+
+            const compared = await service.scoreFusionAccount(managed, [record])
+
+            expect(compared).toBe(1)
+            expect(managed.fusionMatchesRaw).toHaveLength(1)
+            const [match] = managed.fusionMatchesRaw
+            expect(match.fusionIdentity).toBeUndefined()
+            expect(match.identityId).toBe('id-1')
+            expect(match.identityName).toBe('Jane Anderson')
+            expect(match.attributes).toEqual(attributes)
+            expect(match.candidateType).toBe(MatchCandidateType.Identity)
+            expect(match.scores.find((s) => s.attribute === COMBINED_SCORE_ROW_ATTRIBUTE)?.score).toBe(100)
+        })
+
+        it('scores candidate records identically to Fusion identities with the same attributes', async () => {
+            const service = new MatchingService(
+                {
+                    matchingConfigs: [
+                        { attribute: 'displayName', algorithm: 'jaro-winkler', fusionScore: 70, mandatory: false },
+                        lig3Rule,
+                    ],
+                    fusionManualReviewScore: 50,
+                } as any,
+                mockLog,
+                new FusionRun(mockLog)
+            )
+            const attributes = { displayName: 'Jane Andersen', lastName: 'Anderson' }
+            const identity = FusionAccount.fromIdentity({ id: 'id-1', attributes } as any)
+            const record = createMatchCandidateRecord('id-1', 'Jane Andersen', attributes)
+            const viaIdentity = managedWith({ displayName: 'Jane Anderson', lastName: 'Anderson' })
+            const viaRecord = managedWith({ displayName: 'Jane Anderson', lastName: 'Anderson' })
+
+            await service.scoreFusionAccount(viaIdentity, [identity])
+            await service.scoreFusionAccount(viaRecord, [record])
+
+            expect(viaIdentity.fusionMatchesRaw).toHaveLength(1)
+            expect(viaRecord.fusionMatchesRaw).toHaveLength(1)
+            expect(viaRecord.fusionMatchesRaw[0].scores).toEqual(viaIdentity.fusionMatchesRaw[0].scores)
+        })
+
+        it('keeps the Fusion identity reference and attributes when the candidate is a FusionAccount', async () => {
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
+                mockLog
+            )
+            const identity = FusionAccount.fromIdentity({ id: 'id-1', attributes: { employeeId: 'E123' } } as any)
+            const managed = managedWith({ employeeId: 'E123' })
+
+            await service.scoreFusionAccount(managed, [identity])
+
+            const [match] = managed.fusionMatchesRaw
+            expect(match.fusionIdentity).toBe(identity)
+            expect(match.identityId).toBe('id-1')
+            expect(match.attributes).toBe(identity.attributes)
+        })
+
+        it('scores candidate records on the deferred full-breakdown path without errors', async () => {
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
+                mockLog
+            )
+            const record = createMatchCandidateRecord('id-1', '', { employeeId: 'E123' })
+            const managed = managedWith({ employeeId: 'E123' })
+
+            const compared = await service.scoreFusionAccount(managed, [record], MatchCandidateType.Deferred)
+
+            expect(compared).toBe(1)
+            const [match] = managed.fusionMatchesRaw
+            expect(match.candidateType).toBe(MatchCandidateType.Deferred)
+            expect(match.identityName).toBe('id-1')
+            expect(match.attributes).toEqual({ employeeId: 'E123' })
         })
     })
 })

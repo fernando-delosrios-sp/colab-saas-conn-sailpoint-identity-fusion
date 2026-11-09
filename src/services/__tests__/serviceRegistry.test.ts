@@ -110,5 +110,3 @@ describe('ServiceRegistry.activateDryRunMode', () => {
         expect(inner.accountsApi.updateAccount).not.toHaveBeenCalled()
     })
 })
-
-

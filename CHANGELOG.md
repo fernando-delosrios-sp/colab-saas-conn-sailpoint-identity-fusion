@@ -1,8 +1,66 @@
+<!-- markdownlint-disable MD024 -->
 # Changelog
 
 All notable changes to **Identity Fusion NG** — the ISC connector for Map → Define → Match identity fusion, scenario recording/replay, and supporting tooling.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
+
+## 2026-11-05 · v4.0.0
+
+### ⚠️ Breaking Changes
+
+- **Internal Record sources come from the package** — Packaging each `records/*.csv` saves the source name, Internal Record schema, Include record accounts in Match, Accounts JMESPath filter, Account ID, and Account Name in `internal-record-configuration.json`. The connector reads that package. It no longer reads an internal-record file from Source Settings, and the dump no longer needs a `nativeIdentity` column. A field starts multi-valued when a cell contains an unquoted semicolon; the saved flag is what aggregation uses. An empty Account Name falls back to the Account ID. Packaging fails when two dumps share a source name. Setup fails before Fetch when an Internal Record source name matches a configured source.
+  - **Migration:** Run an interactive pack, commit `internal-record-configuration.json`, upload the new customizer zip, and remove any Source Settings internal-record file value. A non-interactive pack fails until every dump has a saved entry.
+
+- **Reserved-value indexes are removed** — `values/` is no longer compiled, and the Customizer Value Store is gone. A unique value is reserved when record registration stores it from an account, including an Internal Record account. A bare list of usernames no longer reserves those usernames. The per-base collision error names a managed-source or Internal Record value instead of a customizer index.
+  - **Migration:** Replace each reserved-value list with an Internal-record dump that carries those values on a unique attribute, then pack that dump. An older customizer that shipped only `.bin` indexes stops reserving values until that dump is uploaded.
+
+---
+
+## 2026-11-04 · v3.0.0
+
+### ⚠️ Breaking Changes
+
+- **Per base value counter** — A unique attribute can turn on **Per base value counter?** (`counterPerBase`) when **Use incremental counter?** is already on. Each base value then keeps its own sequence, so one expression can produce `ab1`, `ab2`, `bb1`, and `ab3`. The base value is the expression rendered with `$counter` empty, after trim, case, spaces, and normalize, then cut so a configured maximum length still has room for **Minimum counter digits**. The last issued number is stored in `connectorAttributes.fusionState` under that readable base value. The option defaults to off. Existing definitions that leave it off keep one counter for the attribute, including raising that counter from a kept value's trailing digits.
+  - **Migration:** An incremental expression must reference `$counter`, `${counter}`, `$!counter`, or `$!{counter}`. A `$UUID` reference does not count. An expression that omits the counter now fails at startup instead of retrying until **Maximum attempts**. Turning **Per base value counter?** on or off against saved state of the other shape fails until you switch the option back or reset Fusion state. With the option and a maximum length both on, a counter wider than **Minimum counter digits** ends the operation; raise **Minimum counter digits**. A per-base value that is already registered ends the operation and does not try the next number. Compare `$counter` with zero (`#if($counter == 0)`) when the first value should omit the counter.
+
+### 📚 Documentation
+
+- **Base value and per-base counting** — The defining-attributes guide and the glossary define **Base value**, **Per base value counter**, and the updated **Incremental counter** and **$counter** behavior, including the zero comparison, the width rule, and the startup failures.
+
+---
+
+## 2026-11-03 · v2.4.0
+
+### ✨ New Features
+
+- **Internal Record sources** — The Records Customizer can compile a headered internal-record dump, such as `Internal Records.csv`, into a versioned manifest and compact binary shards. A Records source can name that file and stream the records through Map, Define, unique-attribute registration, and the existing Match toggle without an Identity Security Cloud source of the same name.
+- **INTERNAL report badge** — Fusion, aggregation, dry-run, and review-decision reports keep the Record label for packaged internal records and add an `INTERNAL` badge. Those references do not link to an ISC account.
+- **Internal-record memory measurement** — `npm run benchmark:internal-records` compares streaming CSV with the compiled artifact and records package size, throughput, heap, external memory, RSS, and filesystem type. The runtime filesystem may be a ramfs, so those files still count toward the memory budget.
+
+## 2026-11-02
+
+### 🔧 Improvements
+
+- **Remove early Fusion account emission** — Developer Settings no longer offers **Drop Fusion accounts after emission?** (`fusionDropAccountsAfterEmit`). Accounts stay resident through matching and are sent once during Output, which keeps unique attributes, review entitlements, and auto-merge updates on the copy Identity Security Cloud receives.
+- **Release aggregation memory as Output sends accounts** — Output drops Match indexes, the candidate roster, and deferred-match registrations before sending, then removes each Fusion account as its batch is sent instead of holding a second full copy. Claimed managed accounts keep only the fields later rematerialization and blend reports read.
+
+## 2026-10-29 · v2.3.0
+
+### ✨ New Features
+
+- **Unique Values Customizer for zero-heap reserved attribute pools** — A standalone SaaS Connectivity customizer template (`customizers/unique-ids/`) that allows tenant administrators to maintain single-column CSV files of reserved unique attribute values (such as legacy IDs, reserved usernames, and service accounts) without modifying connector code. When built with `npm run pack-zip`, values are compiled into compact, sorted 64-bit FNV-1a binary index files (`.bin`) and passed to Identity Fusion via the `beforeStdAccountList` hook. During unique attribute generation, candidate values are verified against the pre-compiled index via sub-microsecond binary search in the `CustomizerValueStore`, eliminating V8 string heap allocations and preventing container out-of-memory errors on large reserved datasets.
+- **Structured audit logging for customizer index metrics** — Aggregation runs now emit structured logs during the Setup phase detailing the attached customizer index directory, loaded unique attribute names, indexed value counts, and load durations. When no customizer is attached, a debug message confirms normal in-memory operation.
+
+---
+
+## 2026-10-27 · v2.2.0
+
+### 🔧 Improvements
+
+- **Prune IdentityDocument attributes and filter linked accounts on ingest** — During Phase 2 (Fetch), incoming identity documents from the ISC Search API are now pruned on page arrival: unreferenced attributes outside the referenced attribute set are discarded while preserving standard core attributes (`displayName`, `email`, `name`, `id`, `firstname`, `lastname`, `uid`, `cloudLifecycleState`), and linked accounts are filtered to retain only accounts belonging to configured Fusion and managed sources. This reduces peak memory consumption for `identityMap` in large tenant aggregations by 60 to 80 percent with zero change to mapping, correlation, or output schemas.
+- **Drop Fusion accounts after emission reduces memory footprint during aggregation** — When **Drop Fusion accounts after emission?** is enabled in Developer Settings (`fusionDropAccountsAfterEmit`), accounts ready for ISC output are streamed to the connector response during identity assembly (Phases 3 and 4) rather than held in memory until Phase 5. The full `FusionAccount` instances are cleared prior to the uncorrelated match sweep, while candidate blocking and scoring rosters retain compact `MatchCandidateRecord` projections. If an uncorrelated account auto-matches a dropped identity, the identity is re-fetched and re-evaluated on-demand, streaming the updated account via last-write-wins.
+- **Lower Phase 3 (Refresh) peak memory usage** — Refresh now streams existing Fusion accounts directly from the fetch cache in bounded concurrent batches instead of materializing a full account array, deletes each raw account payload as its hydrated Fusion account is registered, and reuses a single precomputed set of managed source names plus single-pass attribute seeding during account construction. Together these cut Phase 3 peak heap consumption by roughly 40 to 50 percent with no change to aggregation behavior, configuration, or ISC account output.
 
 ---
 
@@ -16,10 +74,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ## 2026-10-22 · v2.2.0
 
+### ✨ New Features
+
+- **Choose the platform log level** — Advanced Settings now has a **Log Settings** section with a **Log level** radio (Error, Warn, Info, Debug; default Info). Messages below the selected level are skipped before they are built, so quieter levels also reduce logging work. The platform debug toggle still forces Debug, and external delivery keeps its own **External logging level** in External Settings.
+
 ### 🐛 Fixes
 
+- **Record sources no longer keep a Fusion account alive** — A Fusion account whose only remaining source accounts came from Record sources was never treated as orphan, so **Delete accounts with no managed accounts left?** left it in place. Record sources enrich a Fusion account but do not contribute to it, so they no longer count when the orphan decision is made. With the toggle enabled, such an account is now removed from aggregation output even if a record account still matched it on that same run, so review record-only Fusion accounts before turning the toggle on. The account also shows the `orphan` status entitlement and stops attribute refresh, because no contributing account remains.
 - **Ownership decisions no longer reissue a Fusion review on the same run** — When a reviewer selects an owner for a machine account on an Orphan source in Ownership mode, the connector writes `ownerIdentity` but deliberately does not correlate the account or attach it to a Fusion account. The decided account was left on the Match work queue, so the same run's uncorrelated sweep re-scored the stale, owner-less snapshot, opened a duplicate review form, and listed the account again under **Fusion Reviews** beside its own processed decision. The account is now claimed off the work queue once the owner is written, matching every other decision path. The ownership no-match path already claimed its account and is unchanged.
 - **Review decisions from older forms report the correct source type** — Fusion review form definitions created before the form input carried `sourceType` produced decisions classified as authoritative. An Orphan-source decision therefore showed an **Authoritative** badge in the report's Fusion Review Decisions section, was counted under the wrong source type in the statistics, and a confirmed no-match on an Orphan source was not dropped as an orphan. The decision now resolves its source type from the managed source when the form input omits it.
+
+### 🔧 Improvements
+
+- **Lower memory usage for large aggregations** — Fetch now keeps only the managed source account attributes your configuration actually references (schema attributes, attribute mappings, attributes named in Map/Define/Match templates, and match rule attributes) instead of holding every attribute for the whole run, and the raw Fusion account download is released right after Refresh instead of at the end of the run. Always on — no configuration change needed. Velocity templates must reference attributes by name; dynamically computed attribute names (e.g. `$account[$name]`) are unsupported.
 
 ### 🗑️ Removed
 

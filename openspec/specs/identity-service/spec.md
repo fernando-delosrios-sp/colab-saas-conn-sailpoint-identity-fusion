@@ -3,10 +3,12 @@
 ## Purpose
 
 The identity service (`src/services/identityService.ts`) is the connector's read-side adapter for SailPoint identities. It wraps the SailPoint API client's `AccountsApi` and `Search` resources and exposes identity-document operations used by correlation, change-detection, and the report operation. This spec defines the contract for how the connector searches, reads, and resolves identities on the upstream side.
+
 ## Requirements
+
 ### Requirement: Identity-origin Fusion accounts become orphan when origin identity leaves scope
 
-A Fusion account created from an ISC identity MUST be considered orphan when it has no managed source accounts and its origin identity is not present in the configured identity scope.
+A Fusion account created from an ISC identity MUST be considered orphan when it has no contributing accounts and its origin identity is not present in the configured identity scope. A Record-source managed account is enrichment only: it is not a contributing account.
 
 Feature: Identity-origin orphan detection
 
@@ -26,18 +28,25 @@ Feature: Identity-origin orphan detection
 - **THEN** the account is marked `orphan`
 - **AND** the account retains the `baseline` status
 
-#### Scenario: Identity-origin account with managed accounts is not orphan even when origin identity is out of scope
+#### Scenario: Identity-origin account with contributing accounts is not orphan even when origin identity is out of scope
 - **GIVEN** a Fusion account was created from identity `idn-1`
 - **AND** `idn-1` is not present in the configured identity scope
-- **AND** the Fusion account still has managed source accounts
+- **AND** the Fusion account still has contributing accounts
 - **WHEN** the aggregation processes the account
 - **THEN** the account is not marked `orphan`
 
-#### Scenario: Managed-origin account without managed accounts still becomes orphan
+#### Scenario: Managed-origin account without contributing accounts still becomes orphan
 - **GIVEN** a Fusion account was created from a managed source account
-- **AND** the account has no managed source accounts left
+- **AND** the account has no contributing accounts left
 - **WHEN** the aggregation processes the account
 - **THEN** the account is marked `orphan`
+
+#### Scenario: Record-source accounts are not contributing accounts
+- **GIVEN** a Fusion account was created from a managed source account
+- **AND** the only managed source accounts left on it come from Record sources
+- **WHEN** the aggregation processes the account
+- **THEN** the account is marked `orphan`
+- **AND** `deleteEmpty` removes it from aggregation output when enabled
 
 #### Scenario: Single-account read detects out-of-scope origin identity
 - **GIVEN** a Fusion account was created from identity `idn-1`
@@ -99,3 +108,27 @@ During identity bulk ingest, `IdentityService` SHALL update the Fetch `identitie
 - **WHEN** Fetch STATUS ticks fire
 - **THEN** STATUS lines SHALL NOT include `identities=`
 
+### Requirement: Identity Document pruning on ingest
+
+IdentityService SHALL prune incoming `IdentityDocument` payloads on page arrival during bulk ingestion and single-identity hydration by filtering `identity.attributes` against the referenced attribute set and filtering `identity.accounts` to only configured Fusion and managed sources.
+
+#### Scenario: Unreferenced identity attributes are dropped on page arrival
+
+- **GIVEN** an incoming page of `IdentityDocument` instances from the Search API
+- **AND** a referenced attribute set configured for the aggregation run
+- **WHEN** `IdentityService.fetchIdentities` ingests each identity
+- **THEN** attributes not present in the referenced attribute set or core identity fields SHALL be pruned from `identity.attributes`
+- **AND** core identity fields (`displayName`, `email`, `name`, `id`, `firstname`, `lastname`) SHALL be preserved
+
+#### Scenario: Non-managed linked accounts are excluded from identity document
+
+- **GIVEN** an `IdentityDocument` containing linked accounts across multiple sources
+- **WHEN** the identity is ingested by `IdentityService`
+- **THEN** accounts belonging to sources other than the Fusion source or configured managed sources SHALL be removed from `identity.accounts`
+- **AND** retained accounts SHALL retain only essential fields (`id`, `nativeIdentity`, `name`, `disabled`, `source`)
+
+#### Scenario: On-demand identity hydration applies pruning
+
+- **GIVEN** an identity fetched on-demand via `IdentityService.fetchIdentityById`
+- **WHEN** the identity document is received from the API
+- **THEN** the same attribute pruning and linked account filtering SHALL be applied before the document is cached or returned

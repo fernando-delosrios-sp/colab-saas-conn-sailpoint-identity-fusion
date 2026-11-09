@@ -1,3 +1,0 @@
-interface:
-  display_name: Changelog Generator
-  short_description: Creates user-facing changelogs from spec changes and git history.

@@ -23,7 +23,7 @@ HH:MM:SS [LEVEL]  [operation] message body…
 **Example:**
 
 ```
-14:30:45 [INFO]  [accountList] STATUS phase=4 step=process progress=1200/5400 api=42/3/891 mem=1992.07MB(96%) cpu=87% elapsed=183s
+14:30:45 [INFO]  [accountList] STATUS phase=4 step=process progress=1200/5400 api=42/3/891 mem=1992.07MB heap=1912.39MB cpu=87% elapsed=183s
 14:30:45 [INFO]  [accountList] EVENT_SUMMARY matches non-match=+12/10s decisions merge=+1/10s
 14:30:55 [WARN]  [accountList] WARN STALL api-queue idle=20s active=GET /v3/accounts?…
 ```
@@ -32,7 +32,9 @@ Optional HTTP header `x-fusion-baseurl` carries the ISC connection base URL so m
 
 ### Log levels
 
-External logging respects **External logging level** (Error, Warn, Info, Debug). ISC debug logging (`spConnDebugLoggingEnabled`) is separate and does not replace external delivery.
+**Log level** (Advanced Settings → Log Settings) is the minimum severity the connector writes to the ISC host log. Options are Error, Warn, Info, and Debug; the default is Info. Messages below it are skipped before they are built (no message formatting or caller-origin capture).
+
+**External logging level** (External Settings) separately controls delivery to the external target or disk sink. Because the two thresholds are independent, a message below the host Log level can still reach an active external sink when the external level admits it. The platform `spConnDebugLoggingEnabled` toggle forces Debug when enabled and overrides the Log level selection.
 
 ### Local HTTP receiver
 
@@ -65,7 +67,7 @@ During long `accountList` aggregations, the connector emits standardized text pr
 Fetch reports independent population counters on the same STATUS line:
 
 ```text
-STATUS phase=Fetch fusion-accounts=42500/102407(Δ+8000/10s) managed-accounts=94044/158951(Δ+5250/10s) api=20a/12q/584c mem=1992.07MB(96%) cpu=12% …
+STATUS phase=Fetch fusion-accounts=42500/102407(Δ+8000/10s) managed-accounts=94044/158951(Δ+5250/10s) api=20a/12q/584c mem=1992.07MB heap=1912.39MB cpu=12% …
 ```
 
 - `fusion-accounts=done/total` — existing Fusion accounts registered into the run cache.
@@ -78,7 +80,9 @@ Identity and Fusion-account **bulk ingest** still yields so heartbeat and keep-a
 
 Other phases retain `progress=done/total unit`. For example, Refresh uses `progress=19032/102407 refreshed(Δ+192/10s)`. Process and Output may use units such as `processed`, `analyzed`, or `sent`.
 
-When a previous sample exists, STATUS includes `cpu={percent}%` immediately after `mem=` and before `elapsed=`. The percent is one-core relative over the actual sample window (not the configured heartbeat interval) and may exceed 100 when the process uses more than one core. `cpu=` is omitted when there is no previous sample or wall-clock elapsed is zero. See [Monitor aggregation progress](../use-guides/operation/monitor-aggregation-progress.md) for how to read `cpu=` with progress Δ and `api=`.
+`mem=` is the process resident set in megabytes. `heap=` is V8 heap used, also in megabytes. Heap can be larger than RSS when the kernel has compressed pages or dropped them from the resident set; that is not usage above 100%. Watch `heap=` for connector growth and `mem=` for what the OS currently has resident.
+
+When a previous sample exists, STATUS includes `cpu={percent}%` immediately after `heap=` and before `elapsed=`. The percent is one-core relative over the actual sample window (not the configured heartbeat interval) and may exceed 100 when the process uses more than one core. `cpu=` is omitted when there is no previous sample or wall-clock elapsed is zero. See [Monitor aggregation progress](../use-guides/operation/monitor-aggregation-progress.md) for how to read `cpu=` with progress Δ and `api=`.
 
 ## Correlation activity format
 

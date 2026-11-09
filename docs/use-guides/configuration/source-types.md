@@ -84,11 +84,17 @@ Register unique attribute values **without** emitting Fusion accounts for non-ma
 
 | Use case | Example |
 | --- | --- |
-| Username pool | Generate and reserve usernames from a CSV source before HR onboarding |
+| Username pool | Generate and reserve usernames from an Internal Record source before HR onboarding |
 | Employee number registry | Register IDs globally to prevent collisions across aggregations |
 | Pre-Match dedup check | Keep Match on to find duplicates before registering a unique value |
 
 **Deployment note:** Records sources usually sit in **side-car** deployments (Fusion non-authoritative). Pair with an authoritative HR source when Match should link records to real identities.
+
+### Internal Record sources
+
+An **Internal Record source** is a Record source packaged with the Records Customizer and named in the Internal Record configuration. It is not selected by a Source Settings file field, and Identity Security Cloud is not queried for its accounts. Include record accounts in Match and the Accounts JMESPath filter are the values saved for that dump.
+
+The dump is a headered CSV. Account ID and Account Name are columns chosen while packaging. Reports keep the Record label and add an **INTERNAL** badge. Those accounts have no ISC account link. See [Records Customizer](records-customizer.md).
 
 ## Orphan accounts
 

@@ -18,11 +18,7 @@ import { applyNonAuthoritativeNoMatch } from '../matchingService/matchOutcomeDis
 import { isOwnershipModeSource } from '../sourceService/managedAccountFetcher'
 import type { SourceService } from '../sourceService'
 import { AccountAssembly } from '../accountAssembly'
-import {
-    formatDecisionCountsSegment,
-    logFusionDecisionApplied,
-    summarizeDecisionCounts,
-} from './decisionLogging'
+import { formatDecisionCountsSegment, logFusionDecisionApplied, summarizeDecisionCounts } from './decisionLogging'
 
 export interface DecisionProcessorDeps {
     forms: FormService
@@ -39,7 +35,7 @@ export class DecisionProcessor {
         private config: FusionConfig,
         private log: LogService,
         private run: FusionRun,
-        private deps: DecisionProcessorDeps,
+        private deps: DecisionProcessorDeps
     ) {}
 
     /**
@@ -127,8 +123,12 @@ export class DecisionProcessor {
             count: fusionIdentityDecisions.length,
         })
 
-        const results = await batchProcess(fusionIdentityDecisions, 'Fusion identity decisions', (x) =>
-            this.processFusionIdentityDecision(x), this.config, this.log
+        const results = await batchProcess(
+            fusionIdentityDecisions,
+            'Fusion identity decisions',
+            (x) => this.processFusionIdentityDecision(x),
+            this.config,
+            this.log
         )
         const applied = compact(results)
         const discoveredCounts = summarizeDecisionCounts(fusionIdentityDecisions)
@@ -196,12 +196,11 @@ export class DecisionProcessor {
 
         // Enrich submitter and selected identity display names for user-facing output.
         await this.enrichDecisionSubmitter(fusionDecision)
-        let selectedIdentity = await this.enrichDecisionIdentityName(fusionDecision)
-
         const existingIdentityAccount =
             isAuthorizedDecision && fusionDecision.identityId
                 ? this.resolveAuthorizedMergeTarget(fusionDecision.identityId)
                 : undefined
+        let selectedIdentity = await this.enrichDecisionIdentityName(fusionDecision)
         const fusionAccount = existingIdentityAccount ?? FusionAccount.fromFusionDecision(fusionDecision)
 
         if (isAuthorizedDecision && fusionDecision.identityId) {
@@ -225,30 +224,24 @@ export class DecisionProcessor {
         await this.deps.accountAssembly.assembleAccount(fusionAccount, { skipBlendHistoryForManagedKeys })
 
         if (isAuthorizedDecision) {
-            await this.deps.correlationManager.applyPerSourceCorrelationIfNeeded(
-                fusionAccount,
-                fusionDecision,
-                'merge'
-            )
+            await this.deps.correlationManager.applyPerSourceCorrelationIfNeeded(fusionAccount, fusionDecision, 'merge')
             fusionAccount.updateCorrelationStatus(
                 this.deps.accountAssembly.isAggregationAccountListMode()
                     ? undefined
                     : () => this.log.recordCorrelatedActionGranted()
             )
             this.deps.accountAssembly.registerFusionAccount(fusionAccount)
-            logFusionDecisionApplied(
-                this.log,
-                fusionDecision,
-                existingIdentityAccount ? 'reused-target' : 'merged'
-            )
+            logFusionDecisionApplied(this.log, fusionDecision, existingIdentityAccount ? 'reused-target' : 'merged')
         }
 
         if (fusionDecision.newIdentity) {
-            if (await applyNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccountForNoMatch, {
-                definitionService: this.deps.definitionService,
-                mappingService: this.deps.mappingService,
-                run: this.run,
-            })) {
+            if (
+                await applyNonAuthoritativeNoMatch(fusionAccount, sourceType, sourceInfo, managedAccountForNoMatch, {
+                    definitionService: this.deps.definitionService,
+                    mappingService: this.deps.mappingService,
+                    run: this.run,
+                })
+            ) {
                 logFusionDecisionApplied(
                     this.log,
                     fusionDecision,
@@ -294,8 +287,7 @@ export class DecisionProcessor {
 
         try {
             const identity = await this.resolveIdentityBestEffort(submitterId)
-            const label =
-                identity?.displayName || (identity as any)?.attributes?.displayName || identity?.name
+            const label = identity?.displayName || (identity as any)?.attributes?.displayName || identity?.name
             if (label && label !== submitterId) {
                 decision.submitter.name = label
             }
@@ -318,8 +310,7 @@ export class DecisionProcessor {
 
         try {
             const identity = await this.resolveIdentityBestEffort(identityId)
-            const label =
-                identity?.displayName || (identity as any)?.attributes?.displayName || identity?.name
+            const label = identity?.displayName || (identity as any)?.attributes?.displayName || identity?.name
             if (label && label !== identityId) {
                 decision.identityName = label
             }
@@ -352,17 +343,18 @@ export class DecisionProcessor {
     }
 
     /**
-     * Resolve an identity by ID: returns the cached document if available, otherwise
-     * makes a live API call only during aggregation (non-aggregation modes are read-only).
+     * Resolve an identity by ID. A live API call happens only during aggregation;
+     * other modes stay on the cache.
      */
     private async resolveIdentityBestEffort(identityId: string): Promise<IdentityDocument | undefined> {
         try {
             const cached = this.deps.identities.getIdentityById(identityId)
             if (cached) return cached
-            return this.deps.accountAssembly.isAggregationAccountListMode() ? this.deps.identities.fetchIdentityById(identityId) : undefined
+            return this.deps.accountAssembly.isAggregationAccountListMode()
+                ? this.deps.identities.fetchIdentityById(identityId)
+                : undefined
         } catch {
             return undefined
         }
     }
 }
-

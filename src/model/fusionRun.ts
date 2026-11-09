@@ -1,5 +1,6 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount, FusionAccountKind } from './account'
+import { MatchCandidateRecord } from './matchCandidateRecord'
 import { SourceInfo } from '../services/sourceService'
 import { FusionDecision } from './form'
 import { AggregationTracker } from './aggregationTracker'
@@ -35,6 +36,28 @@ export function toManagedAccountInfo(account: Account): ManagedAccountInfo {
         identityId: account.identityId,
         ...(account.isMachine === true ? { isMachine: true } : {}),
     }
+}
+
+/**
+ * Attribute body kept after a managed account leaves the Match work queue.
+ * Shares the original `attributes` object and drops unused payload such as the
+ * nested identity document.
+ */
+function toRetainedAccount(account: Account): Account {
+    const legacySource = (account as Account & { source?: { id?: string; name?: string | null } }).source
+    const sourceId = account.sourceId || legacySource?.id
+    return {
+        id: account.id,
+        name: account.name,
+        sourceId,
+        sourceName: account.sourceName ?? legacySource?.name ?? null,
+        nativeIdentity: account.nativeIdentity,
+        attributes: account.attributes,
+        disabled: account.disabled,
+        modified: account.modified,
+        identityId: account.identityId,
+        ...(account.isMachine === true ? { isMachine: true } : {}),
+    } as Account
 }
 
 export interface RunStateSnapshot {
@@ -96,6 +119,8 @@ export class FusionRun {
     private readonly fusionAccountMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityOwnerIdByManagedKey = new Map<string, string>()
+    /** Reverse of {@link fusionIdentityOwnerIdByManagedKey}: lets ownership be released without scanning the whole map. */
+    private readonly fusionIdentityOwnedKeysByIdentityId = new Map<string, Set<string>>()
     private readonly identityMapValue = new Map<string, IdentityDocument>()
     /** Non-protected identity IDs loaded from ISC during this run (survives cache clears). */
     private readonly identitiesLoadedIds = new Set<string>()
@@ -127,11 +152,11 @@ export class FusionRun {
     private managedAccountProcessingBatchSizeValue: number = 0
     trigramIndexByAttribute: Map<string, Map<string, Set<FusionAccount>>> = new Map()
     /** Compact-id roster for Binary/LIG3 blocking indexes (index = compact identity id). */
-    blockingIdentityRoster: FusionAccount[] = []
+    blockingIdentityRoster: MatchCandidateRecord[] = []
     binaryIndexByAttribute: Map<string, Map<string, number[]>> = new Map()
     lig3LengthIndexByAttribute: Map<string, Map<number, number[]>> = new Map()
-    normalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
-    nameNormalizedCache: WeakMap<FusionAccount, Map<string, string>> = new WeakMap()
+    normalizedCache: WeakMap<MatchCandidateRecord | FusionAccount, Map<string, string>> = new WeakMap()
+    nameNormalizedCache: WeakMap<MatchCandidateRecord | FusionAccount, Map<string, string>> = new WeakMap()
     /** Run-scoped name-matcher token arrays keyed by already-normalized name string. */
     nameMatcherTokenCache: Map<string, string[]> = new Map()
     /** Run-scoped Double Metaphone codes keyed by name-matcher token. */
@@ -253,7 +278,7 @@ export class FusionRun {
     private retainClaimedAccount(accountKey: string): void {
         const account = this.managedAccountsById.get(accountKey)
         if (account) {
-            this.claimedAccountRetention.set(accountKey, account)
+            this.claimedAccountRetention.set(accountKey, toRetainedAccount(account))
         }
     }
 
@@ -438,6 +463,13 @@ export class FusionRun {
         if (managedKey && this.fusionAccountMapValue.get(managedKey) === fa) {
             return this.fusionAccountMapValue.delete(managedKey)
         }
+        // Direct lookup keeps removal O(1); this runs once per account during output.
+        const identityId = fa.identityId
+        if (identityId && this.fusionIdentityMapValue.get(identityId) === fa) {
+            this.removeFusionIdentityOwnership(identityId)
+            return this.fusionIdentityMapValue.delete(identityId)
+        }
+        // Fallback for accounts whose identityId drifted from their map key.
         for (const [id, account] of this.fusionIdentityMapValue.entries()) {
             if (account === fa) {
                 this.removeFusionIdentityOwnership(id)
@@ -448,17 +480,26 @@ export class FusionRun {
     }
 
     private addFusionIdentityOwnership(identityId: string, fusionAccount: FusionAccount): void {
+        let ownedKeys = this.fusionIdentityOwnedKeysByIdentityId.get(identityId)
+        if (!ownedKeys) {
+            ownedKeys = new Set<string>()
+            this.fusionIdentityOwnedKeysByIdentityId.set(identityId, ownedKeys)
+        }
         for (const key of fusionAccount.accountIdsSet) {
             this.fusionIdentityOwnerIdByManagedKey.set(key, identityId)
+            ownedKeys.add(key)
         }
     }
 
     private removeFusionIdentityOwnership(identityId: string): void {
-        for (const [key, ownerIdentityId] of this.fusionIdentityOwnerIdByManagedKey) {
-            if (ownerIdentityId === identityId) {
+        const ownedKeys = this.fusionIdentityOwnedKeysByIdentityId.get(identityId)
+        if (!ownedKeys) return
+        for (const key of ownedKeys) {
+            if (this.fusionIdentityOwnerIdByManagedKey.get(key) === identityId) {
                 this.fusionIdentityOwnerIdByManagedKey.delete(key)
             }
         }
+        this.fusionIdentityOwnedKeysByIdentityId.delete(identityId)
     }
 
     getFusionIdentity(identityId: string): FusionAccount | undefined {
@@ -509,6 +550,25 @@ export class FusionRun {
      */
     clearDeferredCandidates(): void {
         this.candidateRegistry.clear()
+    }
+
+    /**
+     * Drop Match indexes, rosters, and reviewer sets once scoring is finished.
+     * Output still reads the Fusion account maps; these structures only keep extra references alive.
+     */
+    releaseMatchWorkingSets(): void {
+        this.clearDeferredCandidates()
+        this.blockingIdentityRoster = []
+        this.trigramIndexByAttribute.clear()
+        this.binaryIndexByAttribute.clear()
+        this.lig3LengthIndexByAttribute.clear()
+        this.indexedMandatoryAttributes = []
+        this.trigramIndexBuilt = false
+        this.nameMatcherTokenCache.clear()
+        this.nameMatcherPhoneticCache.clear()
+        this.normalizedCache = new WeakMap()
+        this.nameNormalizedCache = new WeakMap()
+        this.reviewersBySourceId.clear()
     }
 
     /**

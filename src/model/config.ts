@@ -84,7 +84,7 @@ export interface NormalAttributeDefinition {
  * Configuration for a unique generated attribute.
  * Value must be unique across all accounts. Supports `$UUID` in the expression
  * (auto-generates a v4 UUID injected into the Velocity context) and an optional
- * incremental counter for sequential numbering or collision disambiguation.
+ * incremental counter for sequential numbering, an optional per-base counter, or collision disambiguation.
  *
  * Unique expressions also receive `$isUnique(value)`, which returns whether `value`
  * (after the same trim/case/spaces/normalize/maxLength rules as the generated value)
@@ -103,6 +103,14 @@ export interface UniqueAttributeDefinition {
     case?: 'same' | 'lower' | 'upper' | 'capitalize'
     /** Use a persistent incremental counter ($counter) that always increments instead of collision-based disambiguation */
     useIncrementalCounter?: boolean
+    /**
+     * When true together with `useIncrementalCounter`, store one counter per base value
+     * instead of one counter for the attribute. Defaults to false. Ignored when
+     * `useIncrementalCounter` is not true. The base value is the expression rendered
+     * with `$counter` empty, after trim, case, spaces, and normalize, then cut so a
+     * configured maximum length still has room for the counter.
+     */
+    counterPerBase?: boolean
     /** Starting value for the incremental counter */
     counterStart?: number
     /** Minimum digits for the counter value (zero-padded) */
@@ -410,6 +418,16 @@ export interface ExternalSettingsSection {
     proxyRequestTimeoutMs?: number
 }
 
+/** Log Settings: master verbosity for the connector's host log stream. */
+export interface LogSettingsSection {
+    /**
+     * Minimum severity written to the ISC host log.
+     * Ordered `debug < info < warn < error`; options Error, Warn, Info, Debug.
+     * Defaults to Info when unset.
+     */
+    logLevel?: 'error' | 'warn' | 'info' | 'debug'
+}
+
 // Advanced Connection Settings Section
 export interface AdvancedConnectionSettingsSection {
     /**
@@ -464,9 +482,9 @@ export interface AdvancedConnectionSettingsSection {
     heartbeatInterval?: number
 }
 
-/** Combined advanced settings: developer, connection tuning, and external infrastructure. */
+/** Combined advanced settings: developer, connection tuning, log verbosity, and external infrastructure. */
 interface AdvancedSettingsMenu
-    extends DeveloperSettingsSection, AdvancedConnectionSettingsSection, ExternalSettingsSection {}
+    extends DeveloperSettingsSection, AdvancedConnectionSettingsSection, LogSettingsSection, ExternalSettingsSection {}
 
 // ============================================================================
 // Internal/Computed fields

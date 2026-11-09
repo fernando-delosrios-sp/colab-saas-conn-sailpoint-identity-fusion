@@ -98,11 +98,12 @@ export interface PaginatePolicy extends CallPolicy {
 }
 
 export class PaginationError extends Error {
-    constructor(message: string, public readonly itemsCollected: number) {
-        super(message)
+    constructor(
+        message: string,
+        public readonly itemsCollected: number,
+        cause?: unknown
+    ) {
+        super(message, cause !== undefined ? { cause } : undefined)
         this.name = 'PaginationError'
     }
 }
-
-
-

@@ -1,5 +1,0 @@
-interface:
-  display_name: Architecture Decision Records
-  short_description: Write and maintain Architecture Decision Records (ADRs) for technical decision documentation.
-policy:
-  allow_implicit_invocation: false

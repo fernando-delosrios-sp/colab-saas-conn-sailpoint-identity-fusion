@@ -819,6 +819,177 @@ The ubiquitous-language glossary **Processing Control** entry SHALL remain the S
 - **THEN** the **Processing Control** entry SHALL list history retention, empty-account deletion, missing-identifier behavior, and the origin-absent main account handoff
 - **AND** the entry SHALL name `promoteMainAccountWhenOriginMissing`
 
+### Requirement: Glossary defines attribute pruning terms
+
+The ubiquitous-language glossary SHALL define **Attribute pruning** (dropping managed source account `attributes` outside the referenced attribute set during Bulk ingest; never applied to raw Fusion accounts) and **Referenced attribute set** (the run-scoped union of attributes pruning keeps). Documentation and specs SHALL NOT call pruning "stripping", "trimming", or "slimming", nor the referenced attribute set a "keep-list" or "allowlist".
+
+#### Scenario: Attribute pruning entry
+
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up how the connector reduces managed source account payloads at Fetch
+- **THEN** an **Attribute pruning** entry SHALL define it as dropping managed source account attributes outside the referenced attribute set during Bulk ingest
+- **AND** it SHALL state that pruning applies to managed source accounts only and runs after all fetch filters
+
+#### Scenario: Referenced attribute set entry
+
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up which managed source account attributes survive pruning
+- **THEN** a **Referenced attribute set** entry SHALL list its constituent sources (schema names, mapping `existingAttributes`, template textual references, match rule attributes)
+- **AND** it SHALL state the set is computed once per run as a union across all managed sources
+
+### Requirement: Glossary defines Log Settings and Log level
+
+The ubiquitous-language glossary SHALL define **Log Settings** as the Advanced Settings section that exposes the connector's host-log verbosity, and **Log level** as the minimum severity the connector writes to the ISC host log, ordered `debug < info < warn < error` with options Error, Warn, Info, and Debug and a default of Info. The **Log level** definition SHALL be distinguished from **External logging level**, which governs external delivery only.
+
+#### Scenario: Glossary entry for Log level
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **Log level** entry
+- **AND** the entry SHALL state that it is the minimum severity written to the ISC host log
+- **AND** the entry SHALL list the options Error, Warn, Info, and Debug with a default of Info
+
+#### Scenario: Glossary entry for Log Settings
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** it SHALL contain a **Log Settings** entry identifying it as the Advanced Settings section that exposes the Log level
+
+#### Scenario: Log level is distinguished from External logging level
+
+- **WHEN** a reader consults the ubiquitous-language spec glossary
+- **THEN** the **Log level** entry SHALL NOT be defined as the external delivery threshold
+- **AND** the glossary SHALL retain **External logging level** as the separate external-delivery term
+
+### Requirement: Glossary defines the match candidate record
+
+The ubiquitous-language glossary SHALL define **Match Candidate Record** (a compact projection of an identity containing only identity identifiers and the attribute union needed for matching, review forms, and reporting). Documentation and code SHALL NOT use synonyms like "lightweight bag".
+
+#### Scenario: Match Candidate Record entry
+
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up how candidate identities are represented during the match sweep
+- **THEN** a **Match Candidate Record** entry SHALL define it as a compact projection holding the identity identifier, display name, and the union of matching, form, and report attributes
+- **AND** it SHALL state that candidate records replace full FusionAccount instances in the matching roster
+
+### Requirement: Glossary defines identity pruning terms
+
+The ubiquitous-language glossary SHALL define **Identity Document Pruning** (dropping unreferenced attributes from `identity.attributes` upon page arrival during identity fetch) and **Identity Account Filtering** (filtering `identity.accounts` to retain only accounts belonging to configured Fusion and managed sources). Documentation and code SHALL NOT refer to identity pruning as "identity trimming" or "account purging".
+
+#### Scenario: Identity Document Pruning entry
+
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up how the connector reduces identity memory at Fetch
+- **THEN** an **Identity Document Pruning** entry SHALL define it as dropping unreferenced attributes outside the referenced attribute set on page arrival
+- **AND** it SHALL state that core identity fields and configured references are always preserved
+
+#### Scenario: Identity Account Filtering entry
+
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up how linked accounts on identities are handled
+- **THEN** an **Identity Account Filtering** entry SHALL define it as filtering the `identity.accounts` list to only the Fusion source and managed sources
+- **AND** it SHALL specify that external third-party accounts are discarded immediately on ingest
+
+### Requirement: Glossary defines iterable batching and raw account depletion terms
+
+The ubiquitous-language glossary SHALL define **Iterable Batching** (processing collections directly from an `Iterable<T>` in bounded concurrent batches without allocating an intermediate `T[]` array or accumulating an `R[]` result array) and **Raw Account Depletion** (incrementally deleting raw `Account` instances from the source fetch cache as each corresponding `FusionAccount` is constructed and registered). Documentation and code SHALL NOT refer to raw account depletion as "post-phase cache purge" or "bulk cache flush".
+
+#### Scenario: Iterable Batching entry
+
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up how collection processing is streamed without array copies
+- **THEN** an **Iterable Batching** entry SHALL define it as batch processing directly over an iterator without allocating an array of all items or accumulating an array of all results
+- **AND** it SHALL state that completion count is tracked via a scalar counter
+
+#### Scenario: Raw Account Depletion entry
+
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up how raw accounts are freed during the Refresh phase
+- **THEN** a **Raw Account Depletion** entry SHALL define it as deleting raw accounts from the fetch cache incrementally as each `FusionAccount` is registered
+- **AND** it SHALL specify that depletion is bypassed when record mode is active
+
+### Requirement: Glossary defines Customizer Value Store and Records Customizer
+
+The ubiquitous-language glossary SHALL define **Records Customizer** as the standalone SailPoint SaaS Connectivity customizer project that packages Internal-record dumps and the Internal Record configuration for Identity Fusion. The glossary SHALL state that the **Customizer Value Store** is retired and SHALL NOT define it as a current binary index of reserved unique values. Documentation and code SHALL NOT refer to a reserved-value index as a static cache or disk table.
+
+#### Scenario: Customizer Value Store entry
+- **REMOVED** — superseded by **Customizer Value Store is retired**. The glossary no longer defines a current hash index of reserved values.
+
+#### Scenario: Records Customizer entry
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up the customizer package
+- **THEN** a **Records Customizer** entry SHALL define it as the project that packages Internal-record dumps and the Internal Record configuration
+
+#### Scenario: Customizer Value Store is retired
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up the Customizer Value Store
+- **THEN** the entry SHALL state that it is retired
+- **AND** it SHALL NOT describe a current hash index of reserved values
+
+### Requirement: Internal Record terminology SHALL be canonical
+
+Project code, configuration, documentation, and reports SHALL use **Internal Record source** for a Record source packaged with the Records Customizer and named in the Internal Record configuration, **Internal-record dump** for its headered CSV input, **Internal Record schema** for its saved field list, **Internal Record configuration** for the saved packaging decisions, and **INTERNAL badge** for report provenance that differentiates it from a configured managed source. An Internal Record source SHALL NOT be identified by a Source Settings file field.
+
+#### Scenario: New terms are available to project artifacts
+- **GIVEN** a project artifact refers to packaged internal account data
+- **WHEN** it names the source, file, schema, configuration, or report provenance
+- **THEN** it SHALL use Internal Record source, Internal-record dump, Internal Record schema, Internal Record configuration, or INTERNAL badge as applicable
+- **AND** it SHALL NOT use the retired terms internal source, CSV source, source record, raw account, or managed row for those concepts
+
+### Requirement: Glossary defines Internal Record schema
+
+The ubiquitous-language glossary SHALL define **Internal Record schema** as the saved field list for one Internal Record source, including the Account ID field, the Account Name field, and which fields are multi-valued. Documentation and code SHALL NOT call this a discovered schema or an inferred type.
+
+#### Scenario: Internal Record schema entry
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up the saved fields of an Internal Record source
+- **THEN** an **Internal Record schema** entry SHALL define it as that field list, including Account ID, Account Name, and multi-valued fields
+
+### Requirement: Glossary defines Internal Record configuration
+
+The ubiquitous-language glossary SHALL define **Internal Record configuration** as the saved packaging decisions for the Internal Record sources in a Records Customizer package: source name, Internal Record schema, Include record accounts in Match, and Accounts JMESPath filter. Documentation and code SHALL NOT call this internal sources config or Source Settings.
+
+#### Scenario: Internal Record configuration entry
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up the packaging decisions for Internal Record sources
+- **THEN** an **Internal Record configuration** entry SHALL define it as those saved decisions
+
+### Requirement: Glossary defines Base value
+
+The ubiquitous-language glossary SHALL define **Base value** as the unique-attribute expression rendered with `$counter` empty, after trim, case, spaces, and normalize, then cut so a configured maximum length still has room for the counter.
+
+#### Scenario: Base value entry
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up the text a per-base counter is stored against
+- **THEN** a **Base value** entry SHALL define it as the expression rendered with `$counter` empty, after trim, case, spaces, and normalize, then cut to leave room for the counter
+
+### Requirement: Glossary defines Per base value counter
+
+The ubiquitous-language glossary SHALL define **Per base value counter** as an incremental counter stored per base value rather than once for the attribute. The label SHALL be **Per base value counter?** and the key SHALL be `counterPerBase`. The entry SHALL state that the option defaults to off and applies only when **Use incremental counter?** is on. Documentation and configuration SHALL NOT call this a bound counter, a restart counter, or a sequence scope.
+
+#### Scenario: Per base value counter entry
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up the option that counts each base value separately
+- **THEN** a **Per base value counter** entry SHALL define it as an incremental counter stored per base value
+- **AND** the entry SHALL state that **Per base value counter?** defaults to off and applies only when **Use incremental counter?** is on
+
+### Requirement: Glossary incremental counter entry names the per-base option
+
+The **Incremental counter** glossary entry SHALL state that **Use incremental counter?** keeps one persistent counter for the attribute unless **Per base value counter?** is on.
+
+#### Scenario: Incremental counter entry names the per-base option
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up **Incremental counter**
+- **THEN** the entry SHALL state that the attribute has one persistent counter unless **Per base value counter?** is on
+
+### Requirement: Glossary $counter entry distinguishes incremental mode
+
+The **$counter** glossary entry SHALL state that collision-based disambiguation renders `$counter` empty on the first attempt, and that incremental mode renders the next padded number. The entry SHALL state that a conditional expression may omit the counter when it equals zero. The entry SHALL NOT describe `$counter` as empty on the first attempt for incremental mode.
+
+#### Scenario: $counter entry distinguishes incremental mode
+- **GIVEN** a reader consults the ubiquitous-language spec glossary
+- **WHEN** they look up **$counter**
+- **THEN** the entry SHALL state that incremental mode renders the next padded number
+- **AND** the entry SHALL state that a conditional expression may omit the counter when it equals zero
+
 ## Canonical Terms
 
 ### Account taxonomy
@@ -955,7 +1126,7 @@ Architecture vocabulary for how a `FusionAccount` is organized. These terms MUST
 | **Baseline** | An existing identity that is included in the identity scope and used as a comparison point during the **Match** step. |
 | **Uncorrelated** | A Fusion account or managed source account that is not yet linked to a known identity. |
 | **Non-matched / `nonMatched`** | A managed source account that completed the **Match** step without finding any acceptable identity candidate. The status entitlement value is `nonMatched`; the matching status string is `non-matched`. |
-| **Orphan** | A Fusion account that no longer has any contributing managed source accounts. Depending on configuration, orphan accounts may be removed or disabled. |
+| **Orphan** | A Fusion account that no longer has any contributing managed source accounts. Record-source accounts are enrichment only and are not contributing accounts. Depending on configuration, orphan accounts may be removed or disabled. |
 | **Deferred** | A match result where the best candidate is a deferred candidate from the same source in the same operation run. The connector defers creating a new identity until a later aggregation can compare against the established baseline. |
 
 ### Entitlement system
@@ -988,7 +1159,7 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 | **Uncorrelated** | `uncorrelated` | The Fusion account has managed source accounts that are not yet linked to a known identity. |
 | **Baseline** | `baseline` | The identity existed before this Fusion source aggregation and is included as a comparison point during Match. |
 | **Non-matched** | `nonMatched` | A managed source account completed the Match step without finding any acceptable identity candidate. |
-| **Orphan** | `orphan` | A Fusion account that no longer has any contributing managed source accounts. |
+| **Orphan** | `orphan` | A Fusion account that no longer has any contributing managed source accounts. Record-source accounts are not contributing accounts. |
 | **Authorized** | `authorized` | A managed source account was manually correlated to an identity by a reviewer. |
 | **Auto** | `auto` | A managed source account was automatically assigned to an identity after an exact attribute match (all rules scored 100). |
 | **Manual** | `manual` | A new Fusion account was manually approved by a reviewer. |
@@ -1056,11 +1227,13 @@ Fusion accounts carry two kinds of entitlements in their schema, distinguished b
 | **$sources** | A Map keyed by source name containing per-source account snapshots. Accessible via dot notation (`$sources.Workday`). |
 | **$identity** | The correlated ISC identity object, available when the Fusion account is linked to an identity. |
 | **$previous** | The Fusion account's attributes from the previous aggregation. Used for change detection. |
-| **$counter** | In unique attribute definitions: renders empty on the first attempt and a zero-padded digit suffix on subsequent collision-retry attempts. Controlled by **Minimum counter digits** and **Maximum attempts**. |
+| **$counter** | In unique attribute definitions: collision-based disambiguation renders `$counter` empty on the first attempt and a zero-padded digit suffix on later attempts. Incremental mode renders the next padded number. A conditional expression may omit the counter when it equals zero (`#if($counter == 0)`). Controlled by **Minimum counter digits** and **Maximum attempts**. |
 | **$UUID** | Generates a fresh random v4 UUID. Referencing it in the expression triggers a new UUID per attempt. |
 | **$isUnique(value)** | Returns `true` when the given value (after applying the definition's case, trim, spaces, normalize, and maxLength transformations) is not already registered as in use. Allows branching between candidate formats before falling back to `$counter`. |
 | **$originSource** | In Define templates, resolves to the name of the source that originally created this Fusion account. Distinct from the **$originSource Source-name token** in Map Source name fields. |
-| **Incremental counter** | A persistent, always-incrementing counter that survives across aggregations. Controlled by **Use incremental counter?** and **Counter start value**. When off, collision-based disambiguation is used instead. |
+| **Base value** | The unique-attribute expression rendered with `$counter` empty, after trim, case, spaces, and normalize, then cut so a configured maximum length still has room for the counter. |
+| **Per base value counter** | An incremental counter stored per base value rather than once for the attribute. The label is **Per base value counter?** and the key is `counterPerBase`. Defaults to off and applies only when **Use incremental counter?** is on. |
+| **Incremental counter** | A persistent counter that survives across aggregations. **Use incremental counter?** keeps one counter for the attribute unless **Per base value counter?** is on. Controlled by **Use incremental counter?**, **Per base value counter?**, and **Counter start value**. When **Use incremental counter?** is off, collision-based disambiguation is used instead. |
 | **Collision-based disambiguation** | The default unique-value strategy: the expression is re-evaluated with an incrementing `$counter` suffix until a value is found that is not already in use, up to **Maximum attempts**. |
 
 ### Configuration vocabulary
@@ -1125,8 +1298,10 @@ Configuration is organized into menus and sections in the connector source in IS
 | Term | Definition |
 |---|---|
 | **Proxy mode** | A deployment option where connector logic runs on an external server and communicates with ISC via a lightweight proxy connector. Offloads processing from ISC infrastructure. |
+| **Log Settings** | The Advanced Settings section that exposes the connector's host-log verbosity. Contains the **Log level** setting. |
+| **Log level** | The minimum severity the connector writes to the ISC host log, ordered `debug < info < warn < error`. Options: Error, Warn, Info, Debug. Default: Info. Messages below it are skipped before they are built. Distinct from **External logging level**. |
 | **External logging** | Sending connector log output to an external endpoint (e.g., Splunk, Datadog) for centralized monitoring. Controlled by the external logging URL and level settings. |
-| **External logging level** | The minimum severity for logs sent to the external endpoint. Options: Error, Warn, Info, Debug. |
+| **External logging level** | The minimum severity for logs sent to the external endpoint. Options: Error, Warn, Info, Debug. Distinct from **Log level**, which governs the host stream. |
 | **Concurrency check** | A safeguard that prevents overlapping connector aggregations from running simultaneously. Controlled by **Enable concurrency check?** in Developer Settings. |
 | **Priority processing** | When enabled, the connector expedites its processing queue. Controlled by **Enable priority processing?** in Developer Settings. |
 | **Cascade aggregation** | When `cascadeAggregationEnabled` is true, single-account operations (e.g., accountRead) trigger managed-source aggregation for sources referenced by the Fusion account before fetching managed account data. Per-source cascade failures are logged and the operation continues with available data. |

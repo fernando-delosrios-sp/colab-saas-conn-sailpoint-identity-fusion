@@ -2,12 +2,15 @@ import { assert } from '../../utils/assert'
 import { promiseAllBatched } from '../../services/fusionService/collections'
 import { FusionAccount } from '../../model/account'
 import { AttributeOperations } from '../../services/definitionService/types'
-import { buildManagedAccountKey, parseManagedAccountKey } from '../../model/managedAccountKey'
+import {
+    buildManagedAccountKey,
+    parseManagedAccountKey,
+    readLinkedAccountNativeIdentity,
+} from '../../model/managedAccountKey'
 import { FusionAttribute } from '../../data/schema'
 import { getAccountStringAttribute, toSetFromAttribute as attributeToSet } from '../../utils/attributes'
 import { isIdentityOriginFusionAccount } from '../../model/fusionAccountUtils'
 import { StatusEntitlement } from '../../model/statusEntitlement'
-import { readString } from '../../utils/safeRead'
 import { IdentityDocument } from 'sailpoint-api-client'
 import type { FusionService } from '../../services/fusionService'
 import type { IdentityService } from '../../services/identityService'
@@ -56,7 +59,7 @@ function collectManagedAccountKeys(
         if (!sourceName || !isManagedSource(sourceName)) continue
         const managedAccountKey = buildManagedAccountKey({
             sourceId: identityAccount.source?.id,
-            nativeIdentity: readString(identityAccount, 'accountId'),
+            nativeIdentity: readLinkedAccountNativeIdentity(identityAccount),
         })
         if (managedAccountKey) {
             accountIds.add(managedAccountKey)

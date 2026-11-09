@@ -1,4 +1,5 @@
 import { SourceService } from '../sourceService'
+import { MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL } from '../managedAccountFetcher'
 import { buildIdentityAttributeCreateErrorMessage } from '../sourceReverseCorrelationErrors'
 import { SourceInfo } from '../types'
 import { OrphanProcessingMode, SourceType } from '../../../model/config'
@@ -380,6 +381,55 @@ describe('SourceService Ownership fetch registration', () => {
     })
 })
 
+describe('SourceService.fetchManagedAccounts bulk ingest', () => {
+    it('yields between managed account pages so keep-alives can run', async () => {
+        const { service, log } = createService()
+        const setImmediateSpy = vi.spyOn(global, 'setImmediate')
+
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(
+            async function* (_sourceId, _abort, _limit, onPageProgress) {
+                onPageProgress?.(1, 2)
+                yield [{ id: 'a1', sourceId: 'managed-source-id', nativeIdentity: 'native-1' } as any]
+                expect(service.run.managedAccountsById.has('managed-source-id::native-1')).toBe(true)
+                onPageProgress?.(2, 2)
+                yield [{ id: 'a2', sourceId: 'managed-source-id', nativeIdentity: 'native-2' } as any]
+            }
+        )
+
+        await service.fetchManagedAccounts()
+
+        expect(service.run.managedAccountsById.has('managed-source-id::native-2')).toBe(true)
+        expect(setImmediateSpy).toHaveBeenCalledTimes(2)
+        expect(log.setFetchPopulationProgress).toHaveBeenLastCalledWith('managed-accounts', 2, 2)
+        setImmediateSpy.mockRestore()
+    })
+
+    it('yields while storing one managed account page', async () => {
+        const { service, log } = createService()
+        const setImmediateSpy = vi.spyOn(global, 'setImmediate')
+        const accounts = Array.from({ length: MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL }, (_, index) => ({
+            id: `a${index}`,
+            sourceId: 'managed-source-id',
+            nativeIdentity: `native-${index}`,
+        }))
+
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* () {
+            yield accounts as any
+        })
+
+        await service.fetchManagedAccounts()
+
+        expect(service.run.managedAccountsById.size).toBe(MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL)
+        expect(setImmediateSpy).toHaveBeenCalledTimes(2)
+        expect(log.setFetchPopulationProgress).toHaveBeenCalledWith(
+            'managed-accounts',
+            MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL,
+            MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL
+        )
+        setImmediateSpy.mockRestore()
+    })
+})
+
 describe('SourceService.fetchFusionAccounts bulk ingest', () => {
     it('registers each page before requesting the next and reports Fusion population progress', async () => {
         const { service, log } = createService()
@@ -427,6 +477,50 @@ describe('SourceService.fetchFusionAccounts bulk ingest', () => {
             expect.anything()
         )
         expect(log.detail).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'ingesting fusion-accounts' }))
+    })
+})
+
+describe('SourceService fusion account cache streaming and depletion', () => {
+    it('fusionAccountValues streams the raw cache map values iterator', () => {
+        const { service } = createService()
+        service.fusionAccountsByNativeIdentity = new Map([
+            ['native-1', { id: 'f1', nativeIdentity: 'native-1' } as any],
+            ['native-2', { id: 'f2', nativeIdentity: 'native-2' } as any],
+        ])
+
+        const values = service.fusionAccountValues()
+
+        expect(Array.from(values).map((account) => account.id)).toEqual(['f1', 'f2'])
+    })
+
+    it('fusionAccountValues throws when the cache has not been loaded', () => {
+        const { service } = createService()
+        service.fusionAccountsByNativeIdentity = undefined
+
+        expect(() => service.fusionAccountValues()).toThrow('Fusion accounts have not been loaded')
+    })
+
+    it('deleteFusionAccount removes a single entry by native identity', () => {
+        const { service } = createService()
+        service.fusionAccountsByNativeIdentity = new Map([
+            ['native-1', { id: 'f1', nativeIdentity: 'native-1' } as any],
+            ['native-2', { id: 'f2', nativeIdentity: 'native-2' } as any],
+        ])
+
+        service.deleteFusionAccount('native-1')
+
+        expect(service.fusionAccountsByNativeIdentity.has('native-1')).toBe(false)
+        expect(service.fusionAccountsByNativeIdentity.has('native-2')).toBe(true)
+    })
+
+    it('deleteFusionAccount is a no-op when the cache is unset or the key is absent', () => {
+        const { service } = createService()
+        service.fusionAccountsByNativeIdentity = undefined
+        expect(() => service.deleteFusionAccount('missing')).not.toThrow()
+
+        service.fusionAccountsByNativeIdentity = new Map()
+        service.deleteFusionAccount('missing')
+        expect(service.fusionAccountsByNativeIdentity.size).toBe(0)
     })
 })
 

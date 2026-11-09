@@ -110,6 +110,27 @@ describe('FusionRun', () => {
         expect(run.isAutoMerged('id-3')).toBe(false)
     })
 
+    it('releases match indexes and rosters without dropping Fusion accounts', () => {
+        FusionAccount.configure({ sources: [] } as any)
+        const run = new FusionRun()
+        const identity = FusionAccount.fromIdentity({ id: 'identity-1', name: 'Kept', attributes: {} } as any)
+        run.registerFusionAccount(identity)
+        run.blockingIdentityRoster = [{ identityId: 'identity-1', identityName: 'Kept', attributes: {} } as any]
+        run.trigramIndexBuilt = true
+        run.nameMatcherTokenCache.set('kept', ['kept'])
+        run.reviewersBySourceId.set('source-1', new Set([identity]))
+        run.registerPersistedDeferredCandidate(identity)
+
+        run.releaseMatchWorkingSets()
+
+        expect(run.getFusionIdentity('identity-1')).toBe(identity)
+        expect(run.blockingIdentityRoster).toEqual([])
+        expect(run.trigramIndexBuilt).toBe(false)
+        expect(run.nameMatcherTokenCache.size).toBe(0)
+        expect(run.reviewersBySourceId.size).toBe(0)
+        expect(run.deferredCandidateCount).toBe(0)
+    })
+
     describe('simulated recording time', () => {
         it('setSimulatedTime, clearSimulatedTime, and currentTimeMs use ISO and epoch inputs', () => {
             const run = new FusionRun()
@@ -223,6 +244,25 @@ describe('FusionRun', () => {
 
             expect(run.getFusionIdentity('identity-dup')).toBe(first)
             expect(run.fusionIdentityMap.size).toBe(1)
+        })
+
+        it('removes a Fusion identity account and releases only its managed-account ownership', () => {
+            const run = new FusionRun()
+            const a = makeAccount('fusion-a', 'identity-a', 'A')
+            const b = makeAccount('fusion-b', 'identity-b', 'B')
+            a.accountIdsSet.add('src::acct-a')
+            b.accountIdsSet.add('src::acct-b')
+            run.registerFusionAccount(a)
+            run.registerFusionAccount(b)
+            expect(run.isManagedAccountForeignOwned('src::acct-a', 'someone-else')).toBe(true)
+
+            expect(run.removeFusionAccount(a)).toBe(true)
+
+            expect(run.getFusionIdentity('identity-a')).toBeUndefined()
+            expect(run.getFusionIdentity('identity-b')).toBe(b)
+            expect(run.isManagedAccountForeignOwned('src::acct-a', 'someone-else')).toBe(false)
+            expect(run.isManagedAccountForeignOwned('src::acct-b', 'someone-else')).toBe(true)
+            expect(run.removeFusionAccount(a)).toBe(false)
         })
     })
 
@@ -372,12 +412,18 @@ describe('FusionRun', () => {
             nativeIdentity: 'native-1',
             name: 'Test User',
             attributes: { givenName: 'Nadya' },
+            identity: { id: 'identity-1', attributes: { biography: 'not needed after claim' } },
+            recommendation: { type: 'unused' },
         } as Account
         run.setManagedAccount('src-a::native-1', account)
         run.claimAccount('src-a::native-1')
 
         expect(run.get('src-a::native-1')).toBeUndefined()
-        expect(run.getRetainedAccount('src-a::native-1')?.attributes?.givenName).toBe('Nadya')
+        const retained = run.getRetainedAccount('src-a::native-1')
+        expect(retained?.attributes?.givenName).toBe('Nadya')
+        expect(retained).not.toBe(account)
+        expect(retained).not.toHaveProperty('identity')
+        expect(retained).not.toHaveProperty('recommendation')
     })
 
     it('Retention clears with managed account state', () => {

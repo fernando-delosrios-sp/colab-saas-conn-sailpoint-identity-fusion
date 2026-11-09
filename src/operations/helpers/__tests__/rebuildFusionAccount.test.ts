@@ -25,6 +25,11 @@ describe('rebuildFusionAccount', () => {
                     source: { id: 'source-a-id', name: 'Source A' },
                     accountId: 'user-from-identity',
                 },
+                {
+                    id: 'acct-native-only',
+                    source: { id: 'source-a-id', name: 'Source A' },
+                    nativeIdentity: 'user-from-native-identity',
+                },
             ],
         })
 
@@ -66,9 +71,10 @@ describe('rebuildFusionAccount', () => {
             log: registry.log,
         })
 
-        expect(fetchManagedAccount).toHaveBeenCalledTimes(2)
+        expect(fetchManagedAccount).toHaveBeenCalledTimes(3)
         expect(fetchManagedAccount).toHaveBeenCalledWith('source-a-id', 'user-stored')
         expect(fetchManagedAccount).toHaveBeenCalledWith('source-a-id', 'user-from-identity')
+        expect(fetchManagedAccount).toHaveBeenCalledWith('source-a-id', 'user-from-native-identity')
         expect(fetchManagedAccount).not.toHaveBeenCalledWith(expect.anything(), 'acct-other')
     })
 

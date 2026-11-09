@@ -148,4 +148,3 @@ describe('developerSettings readSettings', () => {
         expect(result.concurrencyCheckEnabled).toBe(true)
     })
 })
-

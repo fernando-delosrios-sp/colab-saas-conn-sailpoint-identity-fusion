@@ -68,23 +68,42 @@ function createBatchProgressUpdater(
 }
 
 /**
- * Processes items in batches without collecting results (fire-and-forget style).
- * Useful when the mapping function has side effects but no meaningful return value.
+ * Processes items from an `Iterable<T>` in fixed-size concurrent batches without
+ * collecting results. Unlike {@link promiseAllBatched}, it never materializes the
+ * whole input into a `T[]` and never accumulates a `R[]` result array — it pulls
+ * items straight from the iterator, so peak memory stays flat regardless of
+ * collection size.
  *
- * @param items - Array of items to process
+ * @param iterable - Source to stream items from (e.g. `Map.prototype.values()`)
  * @param fn - Async function to apply to each item
  * @param batchSize - Maximum number of concurrent promises (default: 50)
+ * @param onProgress - Optional callback invoked with the cumulative completed count after each batch
+ * @returns Total number of items processed
  */
 export async function forEachBatched<T>(
-    items: T[],
+    iterable: Iterable<T>,
     fn: (item: T) => Promise<void>,
-    batchSize: number = 50
-): Promise<void> {
-    for (let i = 0; i < items.length; i += batchSize) {
-        const batch = items.slice(i, i + batchSize)
-        await Promise.all(batch.map(fn))
-        await yieldToEventLoop()
+    batchSize: number = 50,
+    onProgress?: (completed: number) => void
+): Promise<number> {
+    let completed = 0
+    let batch: T[] = []
+    for (const item of iterable) {
+        batch.push(item)
+        if (batch.length >= batchSize) {
+            await Promise.all(batch.map(fn))
+            completed += batch.length
+            onProgress?.(completed)
+            batch = []
+            await yieldToEventLoop()
+        }
     }
+    if (batch.length > 0) {
+        await Promise.all(batch.map(fn))
+        completed += batch.length
+        onProgress?.(completed)
+    }
+    return completed
 }
 
 // ============================================================================

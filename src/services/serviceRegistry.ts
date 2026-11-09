@@ -62,6 +62,7 @@ export class ServiceRegistry {
     public matchOutcomeDispatcher: MatchOutcomeDispatcher
     public run: FusionRun
     public runContext: OperationRunContext
+    public customizerInternalRecordsDir?: string
     private readonly clientUsesInjection: boolean
 
     /**
@@ -169,9 +170,7 @@ export class ServiceRegistry {
         this.definition =
             context.definitionService ??
             new DefinitionService(this.config, this.schemas, this.log, this.locks, this.sources)
-        this.matching =
-            context.matchingService ??
-            new MatchingService(this.config, this.log, this.run)
+        this.matching = context.matchingService ?? new MatchingService(this.config, this.log, this.run)
 
         // Initialize FusionService last (depends on multiple services)
         this.fusion =
@@ -290,6 +289,12 @@ export class ServiceRegistry {
         return reg
     }
 
+    /** Sets the packaged Internal Record directory used by Record sources from the customizer. */
+    setCustomizerInternalRecordsDir(dir?: string): void {
+        this.customizerInternalRecordsDir = dir
+        this.sources.internalRecordsDir = dir
+    }
+
     /** Snapshot for the operation heartbeat (queue, memory, run context). */
     getHeartbeatSnapshot(): HeartbeatSnapshot {
         const queueItems = this.client.getQueueItems()
@@ -323,22 +328,3 @@ export class ServiceRegistry {
         void this.storage.getStore()?.log?.flush()
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -106,10 +106,33 @@ describe('operation heartbeat formatters', () => {
         expect(line).toContain('progress=537/800 analyzed(Δ+87/30s)')
         expect(line).toContain('matches(2n/1m/1a/0d)')
         expect(line).toContain('api=10a/97q/537c(Δ+0/30s)')
-        expect(line).toContain('mem=482.00MB(100%)')
+        expect(line).toContain('mem=482.00MB heap=480.00MB')
+        expect(line).not.toMatch(/mem=\d+\.\d+MB\(\d+%\)/)
         expect(line).not.toContain('cpu=')
         expect(line.endsWith(' elapsed=5.0S')).toBe(true)
         vi.useRealTimers()
+    })
+
+    it('reports heap larger than RSS in megabytes without a percent', () => {
+        const runContext = new OperationRunContext()
+        const line = formatStatusLine(
+            {
+                runContext,
+                memory: {
+                    rss: 512 * 1024 * 1024,
+                    heapUsed: 1024 * 1024 * 1024,
+                    heapTotal: 1100 * 1024 * 1024,
+                    external: 0,
+                    arrayBuffers: 0,
+                },
+                intervalMs: 10_000,
+            },
+            {},
+            10_000
+        )
+
+        expect(line).toContain('mem=512.00MB heap=1024.00MB')
+        expect(line).not.toMatch(/mem=\d+\.\d+MB\(\d+%\)/)
     })
 
     it('STATUS includes cpu after mem', () => {
@@ -127,7 +150,7 @@ describe('operation heartbeat formatters', () => {
             { previousCpu: { user: 0, system: 0 }, previousCpuAt: Date.parse('2020-01-01T00:00:00.000Z') },
             10_000
         )
-        expect(line).toMatch(/mem=482\.00MB\(100%\) cpu=87% elapsed=/)
+        expect(line).toMatch(/mem=482\.00MB heap=480\.00MB cpu=87% elapsed=/)
         vi.useRealTimers()
     })
 
@@ -146,7 +169,7 @@ describe('operation heartbeat formatters', () => {
             10_000
         )
         expect(line).not.toContain('cpu=')
-        expect(line).toContain('mem=482.00MB(100%)')
+        expect(line).toContain('mem=482.00MB heap=480.00MB')
         vi.useRealTimers()
     })
 
@@ -669,7 +692,7 @@ describe('OperationHeartbeat timing', () => {
         cpu = { user: 8_700_000, system: 0 }
         vi.advanceTimersByTime(10_000)
 
-        expect(info.mock.calls[0][0]).toMatch(/mem=482\.00MB\(100%\) cpu=87% elapsed=/)
+        expect(info.mock.calls[0][0]).toMatch(/mem=482\.00MB heap=480\.00MB cpu=87% elapsed=/)
 
         heartbeat.stop()
         vi.useRealTimers()

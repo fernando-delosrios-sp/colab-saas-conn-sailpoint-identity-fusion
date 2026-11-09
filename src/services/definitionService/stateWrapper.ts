@@ -31,21 +31,40 @@ function logError(message: string): void {
 // StateWrapper Class
 // ============================================================================
 
+/** One attribute counter, or one number per base value. */
+export type AttributeCounterState = number | Record<string, number>
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function copyIncomingCounter(value: unknown): AttributeCounterState | undefined {
+    if (typeof value === 'number') return value
+    if (isPlainObject(value)) return { ...value } as Record<string, number>
+    if (value === undefined) return undefined
+    return value as AttributeCounterState
+}
+
 /**
- * Wrapper for managing counter state across connector runs
+ * Wrapper for managing counter state across connector runs.
+ * An attribute counter is one number, or a map of base value to number when
+ * per-base counting is on.
  */
 export class StateWrapper {
-    private state: Map<string, number> = new Map()
+    private state: Map<string, AttributeCounterState> = new Map()
     private locks?: InMemoryLockService
 
     constructor(state?: any, locks?: InMemoryLockService) {
         this.locks = locks
         let keyCount = 0
         try {
-            keyCount =
-                state && typeof state === 'object' && !Array.isArray(state) ? Object.keys(state).length : 0
-            if (state && typeof state === 'object' && Object.keys(state).length > 0) {
-                this.state = new Map(Object.entries(state))
+            keyCount = state && typeof state === 'object' && !Array.isArray(state) ? Object.keys(state).length : 0
+            if (state && typeof state === 'object' && !Array.isArray(state) && Object.keys(state).length > 0) {
+                this.state = new Map()
+                for (const [key, value] of Object.entries(state)) {
+                    const copied = copyIncomingCounter(value)
+                    if (copied !== undefined) this.state.set(key, copied)
+                }
                 logDebug(`Loaded ${this.state.size} counter values from state`)
             } else {
                 this.state = new Map()
@@ -84,6 +103,12 @@ export class StateWrapper {
                 if (currentValue === undefined) {
                     throw new ConnectorError(
                         `Counter "${key}" was not initialized. Ensure the attribute definition for "${key}" is configured and initializeCounters() has been called.`,
+                        ConnectorErrorType.Generic
+                    )
+                }
+                if (typeof currentValue !== 'number') {
+                    throw new ConnectorError(
+                        `Counter "${key}" is stored per base value and cannot increment as one number.`,
                         ConnectorErrorType.Generic
                     )
                 }
@@ -128,10 +153,64 @@ export class StateWrapper {
     }
 
     /**
-     * Get the state as a plain object for saving
+     * Issue the next number for one base value.
+     * The lock is `counter:<attribute>:<base>`, so different bases do not block each other.
+     * When `maxDigits` is set, a next number wider than that width is rejected and not stored.
      */
-    public getState(): { [key: string]: number } {
-        return Object.fromEntries(this.state)
+    async allocateBaseCounter(attribute: string, base: string, start: number, maxDigits?: number): Promise<number> {
+        const lockKey = `counter:${attribute}:${base}`
+        const allocate = async () => {
+            const map = this.ensureBaseMap(attribute)
+            if (map[base] === undefined) {
+                map[base] = start - 1
+            }
+            const next = map[base] + 1
+            if (maxDigits !== undefined && String(next).length > maxDigits) {
+                throw new ConnectorError(
+                    `Unique attribute "${attribute}" counter does not fit Minimum counter digits.`,
+                    ConnectorErrorType.Generic
+                )
+            }
+            map[base] = next
+            logDebug(`Per-base counter ${attribute}[${base}] incremented to ${next}`)
+            return next
+        }
+        if (this.locks) {
+            return await this.locks.withLock(lockKey, allocate)
+        }
+        return await allocate()
+    }
+
+    private ensureBaseMap(attribute: string): Record<string, number> {
+        const existing = this.state.get(attribute)
+        if (existing === undefined) {
+            const created: Record<string, number> = {}
+            this.state.set(attribute, created)
+            return created
+        }
+        if (typeof existing === 'number' || !isPlainObject(existing)) {
+            throw new ConnectorError(
+                `Unique attribute "${attribute}" saved counter state does not match Per base value counter?. Switch Per base value counter? back or reset Fusion state.`,
+                ConnectorErrorType.Generic
+            )
+        }
+        return existing
+    }
+
+    /**
+     * Get the state as a plain object for saving.
+     * Base-value keys are copied so the saved object is the readable base value.
+     */
+    public getState(): { [key: string]: AttributeCounterState } {
+        const out: { [key: string]: AttributeCounterState } = {}
+        for (const [key, value] of this.state) {
+            if (typeof value === 'number') {
+                out[key] = value
+            } else {
+                out[key] = { ...value }
+            }
+        }
+        return out
     }
 
     /**
@@ -144,21 +223,26 @@ export class StateWrapper {
     /**
      * Get an iterator over [key, value] entries.
      */
-    public entries(): Iterable<[string, number]> {
+    public entries(): Iterable<[string, AttributeCounterState]> {
         return this.state.entries()
     }
 
     /**
      * Get value for a key.
      */
-    public get(key: string): number | undefined {
+    public get(key: string): AttributeCounterState | undefined {
         return this.state.get(key)
     }
 
     /**
      * Set value for a key.
+     * A base-value map is copied so later edits to the caller's object do not change saved state.
      */
-    public set(key: string, value: number): void {
-        this.state.set(key, value)
+    public set(key: string, value: AttributeCounterState): void {
+        if (typeof value === 'number') {
+            this.state.set(key, value)
+            return
+        }
+        this.state.set(key, { ...value })
     }
 }

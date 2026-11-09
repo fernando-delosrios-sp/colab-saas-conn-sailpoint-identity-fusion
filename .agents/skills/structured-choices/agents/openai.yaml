@@ -1,3 +1,0 @@
-interface:
-  display_name: Structured Choices
-  short_description: Present user gates as structured interactive choices at forks, confirmations, and permission pauses.

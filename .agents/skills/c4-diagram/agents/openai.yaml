@@ -1,5 +1,0 @@
-interface:
-  display_name: C4 Diagram
-  short_description: C4 Container diagrams as editable .drawio XML files.
-policy:
-  allow_implicit_invocation: false

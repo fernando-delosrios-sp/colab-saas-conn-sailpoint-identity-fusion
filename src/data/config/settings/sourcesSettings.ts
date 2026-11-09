@@ -51,8 +51,12 @@ export function readSettings(raw: Record<string, unknown>): SourcesSection {
                 typeof rawTimeout === 'number' && Number.isFinite(rawTimeout) && rawTimeout >= 0
                     ? rawTimeout
                     : runtimeDefaults.source.aggregationTimeoutMinutes
+            const { internalRecordFile: _ignoredInternalRecordFile, ...sourceWithoutInternalFile } =
+                sourceConfig as SourceConfig & {
+                    internalRecordFile?: string
+                }
             return {
-                ...sourceConfig,
+                ...sourceWithoutInternalFile,
                 enabled: extractBoolean(sourceConfig, 'enabled') ?? runtimeDefaults.source.enabled,
                 aggregationMode: sourceConfig.aggregationMode ?? runtimeDefaults.source.aggregationMode,
                 aggregationTimeout,
@@ -62,11 +66,14 @@ export function readSettings(raw: Record<string, unknown>): SourcesSection {
                 accountFilter: sourceConfig.accountFilter ?? undefined,
                 accountJmespathFilter: sourceConfig.accountJmespathFilter ?? undefined,
                 correlationMode: sourceConfig.correlationMode ?? runtimeDefaults.source.correlationMode,
-                deferredMatching: extractBoolean(sourceConfig, 'deferredMatching') ?? runtimeDefaults.source.deferredMatching,
+                deferredMatching:
+                    extractBoolean(sourceConfig, 'deferredMatching') ?? runtimeDefaults.source.deferredMatching,
                 includeRecordAccountsForMatching:
-                    extractBoolean(sourceConfig, 'includeRecordAccountsForMatching') ?? runtimeDefaults.source.includeRecordAccountsForMatching,
+                    extractBoolean(sourceConfig, 'includeRecordAccountsForMatching') ??
+                    runtimeDefaults.source.includeRecordAccountsForMatching,
                 disableNonMatchingAccounts:
-                    extractBoolean(sourceConfig, 'disableNonMatchingAccounts') ?? runtimeDefaults.source.disableNonMatchingAccounts,
+                    extractBoolean(sourceConfig, 'disableNonMatchingAccounts') ??
+                    runtimeDefaults.source.disableNonMatchingAccounts,
                 orphanProcessingMode: readOrphanProcessingMode(sourceConfig),
             }
         })

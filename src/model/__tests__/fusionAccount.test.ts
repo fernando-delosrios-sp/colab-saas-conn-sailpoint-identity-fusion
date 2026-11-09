@@ -46,6 +46,25 @@ describe('FusionAccount', () => {
         FusionAccount.configure(minimalConfig)
     })
 
+    describe('static managed source names', () => {
+        afterEach(() => {
+            FusionAccount.configure(minimalConfig)
+        })
+
+        it('precomputes a shared ReadonlySet and reuses it across instances', () => {
+            FusionAccount.configure(aliasConfig)
+
+            expect(FusionAccount.managedSourceNames).toEqual(new Set(['HR', 'CRM']))
+
+            const first = FusionAccount.createForFactory()
+            const second = FusionAccount.createForFactory()
+
+            expect((first.layers as any).sourceConfigNamesSet).toBe(FusionAccount.managedSourceNames)
+            expect((second.layers as any).sourceConfigNamesSet).toBe(FusionAccount.managedSourceNames)
+            expect((first.layers as any).sourceConfigNamesSet).toBe((second.layers as any).sourceConfigNamesSet)
+        })
+    })
+
     describe('1. Factory Methods', () => {
         it('fromIdentity initializes correctly', () => {
             const identity: IdentityDocument = {
@@ -144,6 +163,21 @@ describe('FusionAccount', () => {
 
             expect(acc.attributeBag.previous).not.toHaveProperty('department')
             expect(acc.attributeBag.previous).not.toHaveProperty('notes')
+            expect(acc.attributeBag.previous.name).toBe('Ada Wong')
+        })
+
+        it('seeds previous as a distinct frozen snapshot of the current bag', () => {
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-lean-snapshot',
+                sourceName: 'Identity Fusion NG',
+                attributes: { department: null, name: 'Ada Wong' },
+            } as Account)
+
+            expect(acc.attributeBag.previous).not.toBe(acc.attributeBag.current)
+            expect(acc.attributeBag.previous).toEqual({ name: 'Ada Wong' })
+
+            acc.attributes.name = 'Mutated Name'
+            expect(acc.attributeBag.current.name).toBe('Mutated Name')
             expect(acc.attributeBag.previous.name).toBe('Ada Wong')
         })
 
@@ -745,6 +779,32 @@ describe('FusionAccount', () => {
             expect(run.managedAccountsByIdentityId.has('id-1')).toBe(false)
         })
 
+        it('blends an identity-search link that stores the native identity on accountId', () => {
+            const identity: IdentityDocument = {
+                id: 'id-1',
+                name: 'Jane Doe',
+                attributes: {},
+                accounts: [
+                    {
+                        source: { name: 'Source A', id: 'src-a' },
+                        accountId: 'CN=Jane Doe,OU=Users',
+                    } as any,
+                ],
+            } as any
+            const acc = FusionAccount.fromFusionAccount({
+                nativeIdentity: 'fusion-1',
+                id: 'isc-1',
+                name: 'Jane.Doe',
+                sourceName: 'Identity Fusion NG',
+                identityId: 'id-1',
+                attributes: { originSource: 'Identities', statuses: ['baseline'] },
+            } as unknown as Account)
+
+            acc.addIdentityLayer(identity)
+
+            expect(acc.accountIds).toContain('src-a::CN=Jane Doe,OU=Users')
+        })
+
         it('blends identity.accounts links in work queue when not indexed by identityId', () => {
             const WORKDAY_SOURCE_ID = '355fb49e084e4f35adb755410affe0c8'
             const managedKey = `${WORKDAY_SOURCE_ID}::126791`
@@ -907,6 +967,89 @@ describe('FusionAccount', () => {
             acc.addManagedAccountLayer(run, { pruneDeleted: true })
 
             expect(acc.collections.statuses.isOrphan()).toBe(false)
+        })
+
+        describe('record-source accounts do not contribute', () => {
+            const recordAccount = {
+                id: 'isc-crm-1',
+                sourceId: 'src-crm',
+                sourceName: 'CRM',
+                nativeIdentity: 'rec-1',
+                attributes: {},
+            } as unknown as Account
+            const authoritativeAccount = {
+                id: 'isc-hr-1',
+                sourceId: 'src-hr',
+                sourceName: 'HR',
+                nativeIdentity: 'hr-1',
+                attributes: {},
+            } as unknown as Account
+
+            const persistedWith = (attributes: Record<string, unknown>) =>
+                FusionAccount.fromFusionAccount({
+                    nativeIdentity: 'fusion-1',
+                    id: 'isc-1',
+                    name: 'Persisted Account',
+                    sourceName: 'Identity Fusion NG',
+                    attributes,
+                } as unknown as Account)
+
+            beforeEach(() => FusionAccount.configure(aliasConfig))
+            afterEach(() => FusionAccount.configure(minimalConfig))
+
+            it('marks managed-origin account orphan when only record-source accounts remain', () => {
+                const acc = persistedWith({ accounts: ['src-crm::rec-1'] })
+                const run = new FusionRun()
+                run.setManagedAccount('src-crm::rec-1', recordAccount)
+
+                acc.addManagedAccountLayer(run)
+
+                expect(acc.accountIds).toContain('src-crm::rec-1')
+                expect(acc.collections.statuses.isOrphan()).toBe(true)
+            })
+
+            it('does not mark orphan when an authoritative source account remains', () => {
+                const acc = persistedWith({ accounts: ['src-crm::rec-1', 'src-hr::hr-1'] })
+                const run = new FusionRun()
+                run.setManagedAccount('src-crm::rec-1', recordAccount)
+                run.setManagedAccount('src-hr::hr-1', authoritativeAccount)
+
+                acc.addManagedAccountLayer(run)
+
+                expect(acc.collections.statuses.isOrphan()).toBe(false)
+            })
+
+            it('marks identity-origin account orphan when only record-source accounts remain and identity is out of scope', () => {
+                const acc = persistedWith({
+                    originSource: IDENTITIES_SOURCE_NAME,
+                    originAccount: 'id-1',
+                    accounts: ['src-crm::rec-1'],
+                    statuses: ['baseline'],
+                })
+                acc.setOriginIdentityInScope(false)
+                const run = new FusionRun()
+                run.setManagedAccount('src-crm::rec-1', recordAccount)
+
+                acc.addManagedAccountLayer(run)
+
+                expect(acc.collections.statuses.isOrphan()).toBe(true)
+            })
+
+            it('retains the account when a linked account has no resolvable source name', () => {
+                const acc = persistedWith({ accounts: ['src-crm::rec-1'] })
+                const run = new FusionRun()
+                run.setManagedAccount('src-crm::rec-1', {
+                    id: 'isc-crm-1',
+                    sourceId: 'src-crm',
+                    nativeIdentity: 'rec-1',
+                    attributes: {},
+                } as unknown as Account)
+
+                acc.addManagedAccountLayer(run)
+
+                expect(acc.accountIds).toContain('src-crm::rec-1')
+                expect(acc.collections.statuses.isOrphan()).toBe(false)
+            })
         })
     })
 

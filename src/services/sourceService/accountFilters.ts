@@ -1,7 +1,7 @@
-import { AccountV2025 as Account } from 'sailpoint-api-client'
+import type { AccountV2025 as Account } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
 import jmespath from 'jmespath'
-import { SourceInfo } from './types'
+import type { SourceInfo } from './types'
 
 export type CompiledAccountJmespathFilter = {
     expression: string

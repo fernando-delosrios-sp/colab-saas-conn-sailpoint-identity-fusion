@@ -1,4 +1,3 @@
-import { FusionAccount } from '../../model/account'
 import { missing } from '../../utils/safeRead'
 import { lig3LengthUpperBound, normalizeLIG3 } from './scoringHelpers'
 
@@ -9,12 +8,14 @@ export type CompactIdentityId = number
 export type ExactValueIndex = Map<string, CompactIdentityId[]>
 /** LIG3-normalized length to compact identity-id postings. */
 export type LengthBucketIndex = Map<number, CompactIdentityId[]>
+/** Any roster entry exposing an attribute bag (MatchCandidateRecord or FusionAccount). */
+type AttributeHolder = { attributes: Record<string, any> }
 
 /**
  * Build a Binary exact-value index: raw attribute string → compact identity ids.
  * Empty strings are omitted (Binary scores them 0).
  */
-export function buildExactValueIndex(identities: FusionAccount[], attribute: string): ExactValueIndex {
+export function buildExactValueIndex(identities: readonly AttributeHolder[], attribute: string): ExactValueIndex {
     const index: ExactValueIndex = new Map()
     for (let i = 0; i < identities.length; i++) {
         const raw = identities[i].attributes[attribute]
@@ -37,7 +38,7 @@ export function queryExactValueIndex(index: ExactValueIndex, accountValue: strin
 /**
  * Build LIG3 length buckets keyed by LIG3-normalized string length.
  */
-export function buildLig3LengthIndex(identities: FusionAccount[], attribute: string): LengthBucketIndex {
+export function buildLig3LengthIndex(identities: readonly AttributeHolder[], attribute: string): LengthBucketIndex {
     const index: LengthBucketIndex = new Map()
     for (let i = 0; i < identities.length; i++) {
         const raw = identities[i].attributes[attribute]
@@ -67,9 +68,12 @@ export function queryLig3LengthIndex(
     return result
 }
 
-/** Resolve compact postings to their Fusion identity objects. */
-export function compactIdsToIdentities(ids: Iterable<CompactIdentityId>, roster: FusionAccount[]): Set<FusionAccount> {
-    const result = new Set<FusionAccount>()
+/** Resolve compact postings to their roster entries (Match Candidate Records or Fusion identities). */
+export function compactIdsToIdentities<T extends AttributeHolder>(
+    ids: Iterable<CompactIdentityId>,
+    roster: readonly T[]
+): Set<T> {
+    const result = new Set<T>()
     for (const id of ids) {
         const identity = roster[id]
         if (identity) result.add(identity)

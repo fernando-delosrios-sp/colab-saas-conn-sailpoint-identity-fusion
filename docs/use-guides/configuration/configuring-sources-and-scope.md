@@ -120,11 +120,11 @@ When disabled:
 
 | Field | Description | Required | Notes |
 | --- | --- | --- | --- |
-| **Source name** | Exact ISC source name | Yes | Case-sensitive |
+| **Source name** | Report label and processing name | Yes | Exact ISC source name. An Internal Record source is named in the package and must not reuse this name |
 | **Enabled** | Include in processing | No | Default on |
 | **Source type** | Authoritative accounts, Records, or Orphan accounts | Yes | See [Source types](source-types.md) |
 | **Orphan processing mode** | Assignment or Ownership | No (Orphan only) | Default Assignment. See [Source types](source-types.md#orphan-accounts) |
-| **Include record accounts in Match** | Match scoring for Records sources | No (Records only) | Default on |
+| **Include record accounts in Match** | Match scoring for Records sources | No (Records only) | Default on for a configured Records source. An Internal Record source uses the value saved in the Internal Record configuration. See [Records Customizer](records-customizer.md) |
 | **Disable non-matching accounts** | Disable orphan non-matches | No (Orphan only) | Background disable on managed source. Applies in Assignment mode and Ownership mode |
 | **[Deferred candidate matching](../../glossary.md#candidates)** | Same-run deferred-candidate comparison | No (Authoritative only) | Same source only; never cross-source |
 | **Accounts API filter** | Server-side account list filter | No | ISC `filters` parameter |
@@ -195,7 +195,7 @@ Conditional PAT scopes apply: `idn:task-management:read` for **before** mode; `s
 | Field | Description | Default | Notes |
 | --- | --- | --- | --- |
 | **Maximum history messages** | Audit history entries per Fusion account | 10 | Older entries discarded |
-| **Delete accounts with no managed accounts left?** | Remove Fusion account when all source accounts are gone | Off | Useful for leaver cleanup |
+| **Delete accounts with no managed accounts left?** | Remove Fusion account when all contributing accounts or identity are gone; record sources do not contribute | Off | Useful for leaver cleanup |
 | **Skip accounts with missing unique ID?** | Skip managed source accounts without the Fusion identity attribute | Off | Logged for review |
 | **Promote first found managed account to main account when origin account is missing** | While on, set `mainAccount` to the first live managed account while the origin is not a current contributor, and clear `mainAccount` when the origin is a current contributor again | Off | `originAccount` stays unchanged. Turning the toggle off later leaves the current `mainAccount` in place |
 

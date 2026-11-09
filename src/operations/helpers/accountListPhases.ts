@@ -8,6 +8,7 @@ import {
 import { formatCorrelationSummaryValue } from '../../services/logService/operationRunContext'
 import { SourceType } from '../../model/config'
 import { AggregationTracker } from '../../services/fusionService'
+import { buildReferencedAttributeSet } from '../../services/sourceService/referencedAttributeSet'
 import { generateReport } from './generateReport'
 import { buildReportAggregationStats, buildTerminalSummary, DryRunInput, type FetchResult } from './accountListHelpers'
 import { sendWithBackpressure } from '../../utils/responseBackpressure'
@@ -18,6 +19,7 @@ export interface PhaseOptions {
     isPersistent: boolean
     tracker?: AggregationTracker
     streamProgress?: { sent: number }
+    customizerInternalRecordsDir?: string
 }
 
 // --- Private helpers ---
@@ -82,13 +84,19 @@ export async function setupPhase(
     schema: any,
     options: PhaseOptions
 ): Promise<boolean> {
-    const { log, fusion, schemas, sources, definition, config } = serviceRegistry
+    const { log, fusion, schemas, sources, definition, config, identities } = serviceRegistry
     const { isPersistent, tracker } = options
     const forceAttributeRefresh = isPersistent && config.forceAttributeRefresh
 
     if (tracker) fusion.setTracker(tracker)
 
+    const internalRecordsDir = options.customizerInternalRecordsDir ?? serviceRegistry.customizerInternalRecordsDir
+    serviceRegistry.setCustomizerInternalRecordsDir(internalRecordsDir)
+
     await sources.fetchAllSources(isPersistent)
+    for (const source of sources.managedSources) {
+        if (source.internalProvenance) fusion.configSourceNames.add(source.name)
+    }
     log.detail({ sources: sources.managedSources.length })
     if (!sources.hasFusionSource) {
         throw new Error(
@@ -137,6 +145,11 @@ export async function setupPhase(
     await sources.aggregateManagedSources()
     log.detail({ action: 'managed sources aggregated' })
     aggregateManagedSourcesOp.done({ sources: sources.managedSources.length })
+
+    const referencedAttributeSet = buildReferencedAttributeSet(config, schemas.listSchemaAttributeNames())
+    sources.setReferencedAttributeSet(referencedAttributeSet)
+    identities.setReferencedAttributeSet(referencedAttributeSet)
+    log.debug(`Referenced attribute set computed: ${referencedAttributeSet.size} attribute(s)`)
 
     await definition.initializeCounters()
     log.detail({ action: 'attribute counters initialized' })
@@ -194,7 +207,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
 // --- Phase 3: Refresh ---
 
 export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<void> {
-    const { log, fusion } = serviceRegistry
+    const { log, fusion, sources } = serviceRegistry
     const ctx = log.getRunContext()
     if (ctx && ctx.phase !== 'Refresh') {
         ctx.phase = 'Refresh'
@@ -203,8 +216,14 @@ export async function refreshPhase(serviceRegistry: ServiceRegistry): Promise<vo
     log.detail({ action: 'refreshing fusion accounts' })
     await fusion.ensureGlobalReviewerOwnersInScope()
     const refreshOp = log.track('refreshPhase.processFusionAccounts')
-    const processedFusionAccounts = await fusion.processFusionAccounts()
-    refreshOp.done({ count: processedFusionAccounts.length })
+    const processedCount = await fusion.processFusionAccounts()
+    refreshOp.done({ count: processedCount })
+    if (!sources.run.isRecordMode) {
+        sources.clearFusionAccounts()
+        log.detail({ action: 'raw fusion account fetch cache cleared from memory' })
+    } else {
+        log.detail({ cache: 'raw fusion account fetch cache retained for recording' })
+    }
     const summary = log.flushRefreshMetricsSummary()
     if (summary) {
         log.detail({ action: 'refresh workload', ...summary })
@@ -352,14 +371,21 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
             }, true),
         {
             track: 'outputPhase.sendAccounts',
-            trackDone: (result) => ({ sent: result.sent, eligible: result.eligible }),
-            endDetail: (result) => ({ sent: result.sent, eligible: result.eligible }),
+            trackDone: (result) => ({
+                sent: options.streamProgress?.sent ?? result.sent,
+                eligible: result.eligible + (options.streamProgress?.sent ?? 0) - result.sent,
+            }),
+            endDetail: (result) => ({
+                sent: options.streamProgress?.sent ?? result.sent,
+                eligible: result.eligible + (options.streamProgress?.sent ?? 0) - result.sent,
+            }),
         }
     )
-    log.detail({ sent, action: 'accounts sent to platform' })
+    const totalSent = options.streamProgress?.sent ?? sent
+    log.detail({ sent: totalSent, action: 'accounts sent to platform' })
 
     if (!isPersistent) {
-        return sent
+        return totalSent
     }
 
     await log.runStep('form-cleanup', () => forms.cleanUpForms(), {
@@ -383,7 +409,7 @@ export async function outputPhase(serviceRegistry: ServiceRegistry, options: Pha
 
     await log.runStep('await-form-deletes', () => forms.awaitPendingDeleteOperations())
     log.detail({ action: 'queued form deletions completed' })
-    return sent
+    return totalSent
 }
 
 // --- Epilogue ---

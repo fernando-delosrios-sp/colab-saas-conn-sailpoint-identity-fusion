@@ -1,5 +1,0 @@
-interface:
-  display_name: Tdd
-  short_description: Test-driven development with strict red-green-refactor loop.
-policy:
-  allow_implicit_invocation: false

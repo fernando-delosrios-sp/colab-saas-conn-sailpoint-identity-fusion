@@ -2,6 +2,7 @@ import { AccountV2025 as Account } from 'sailpoint-api-client'
 import { StandardCommand } from '@sailpoint/connector-sdk'
 import { FusionConfig, SourceType } from '../../model/config'
 import { FusionAccount } from '../../model/account'
+import { MatchCandidateRecord } from '../../model/matchCandidateRecord'
 import { FusionDecision } from '../../model/form'
 import { FusionRun } from '../../model/fusionRun'
 import { LogService } from '../logService'
@@ -234,7 +235,7 @@ async function scoreIdentityCandidates(
         const excludeIds =
             config.fusionEnableAutoMerge && run.autoMergedIdentityIds.size > 0 ? run.autoMergedIdentityIds : undefined
         const candidateSet = matchingService.getCandidates(fusionAccount, log, excludeIds)
-        const identityPool: Iterable<FusionAccount> =
+        const identityPool: Iterable<MatchCandidateRecord | FusionAccount> =
             candidateSet ?? (excludeIds ? run.fusionIdentitiesExcluding(excludeIds) : run.allFusionIdentities)
         if (candidateSet) {
             run.identityCandidateSetSizeSum += candidateSet.size
@@ -779,7 +780,14 @@ export class MatchOutcomeDispatcher {
         const { fusionAccount, account, sourceInfo, sourceType } = analysis
 
         try {
-            return await this.dispatchScoredOutcome(scored, fusionAccount, account, sourceInfo, sourceType, serializeExactMatch)
+            return await this.dispatchScoredOutcome(
+                scored,
+                fusionAccount,
+                account,
+                sourceInfo,
+                sourceType,
+                serializeExactMatch
+            )
         } finally {
             this.claimScoredOwnershipAccount(account)
         }

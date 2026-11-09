@@ -338,3 +338,76 @@ describe('LogService phase and detail boundaries', () => {
 
 
 
+
+describe('LogService Log level gate', () => {
+    beforeEach(() => {
+        mockLogger.level = 'info'
+        mockLogger.debug.mockClear()
+        mockLogger.info.mockClear()
+        mockLogger.warn.mockClear()
+        mockLogger.error.mockClear()
+    })
+
+    it('skips debug and info below a warn Log level', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false, logLevel: 'warn' })
+
+        log.debug('debug detail')
+        log.info('status')
+
+        expect(mockLogger.debug).not.toHaveBeenCalled()
+        expect(mockLogger.info).not.toHaveBeenCalled()
+
+        log.warn('warning')
+        expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('warning'))
+    })
+
+    it('emits info at the info Log level', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false, logLevel: 'info' })
+
+        log.info('PHASE 4 Process START')
+
+        expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('PHASE 4 Process START'))
+    })
+
+    it('skips an assertion below the Log level', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false, logLevel: 'error' })
+
+        log.assert(false, 'check failed', undefined, 'warn')
+
+        expect(mockLogger.warn).not.toHaveBeenCalled()
+    })
+
+    it('crash always emits error and throws', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false, logLevel: 'error' })
+
+        expect(() => log.crash('fatal')).toThrow('fatal')
+        expect(mockLogger.error).toHaveBeenCalledWith(expect.stringContaining('fatal'))
+    })
+
+    it('still tracks warn issues below the host Log level', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false, logLevel: 'error' })
+
+        log.warn('slow request')
+
+        expect(mockLogger.warn).not.toHaveBeenCalled()
+        expect(log.getAggregationIssueSummary().warningCount).toBe(1)
+    })
+
+    it('platform debug toggle forces debug over a restrictive Log level', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: true, logLevel: 'error' })
+
+        log.debug('debug detail')
+
+        expect(mockLogger.debug).toHaveBeenCalledWith(expect.stringContaining('debug detail'))
+    })
+
+    it('uses the selected level when the debug toggle is off', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false, logLevel: 'warn' })
+
+        log.info('status')
+        expect(mockLogger.info).not.toHaveBeenCalled()
+
+        log.warn('warning')
+        expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining('warning'))
+    })
+})
