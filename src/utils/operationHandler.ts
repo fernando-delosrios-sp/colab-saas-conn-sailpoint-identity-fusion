@@ -34,6 +34,9 @@ function resolveRunMode(
     return { runMode, isProxyServer }
 }
 
+/** Upper bound on the keep-alive period, leaving headroom under the 180s platform limit for event-loop stalls. */
+const MAX_KEEP_ALIVE_INTERVAL_MS = 45_000
+
 function scheduleKeepAlive(
     handlerOptions: OperationHandlerOptions,
     config: FusionConfig,
@@ -41,7 +44,12 @@ function scheduleKeepAlive(
     isProxyServer: boolean,
     res: { keepAlive: () => void }
 ): ReturnType<typeof setInterval> | undefined {
-    const everyMs = handlerOptions.keepAliveIntervalMs ?? config.processingWait
+    // processingWait defaults to the platform's 180s ceiling, so one blocked tick would exceed it.
+    // Keep-alive is a no-cost call: always fire well inside the ceiling.
+    const everyMs = Math.min(
+        handlerOptions.keepAliveIntervalMs ?? config.processingWait ?? MAX_KEEP_ALIVE_INTERVAL_MS,
+        MAX_KEEP_ALIVE_INTERVAL_MS
+    )
 
     if (handlerOptions.keepAlive === 'memory') {
         if (isProxyServer) {

@@ -119,6 +119,8 @@ export class FusionRun {
     private readonly fusionAccountMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityOwnerIdByManagedKey = new Map<string, string>()
+    /** Reverse of {@link fusionIdentityOwnerIdByManagedKey}: lets ownership be released without scanning the whole map. */
+    private readonly fusionIdentityOwnedKeysByIdentityId = new Map<string, Set<string>>()
     private readonly identityMapValue = new Map<string, IdentityDocument>()
     /** Non-protected identity IDs loaded from ISC during this run (survives cache clears). */
     private readonly identitiesLoadedIds = new Set<string>()
@@ -461,6 +463,13 @@ export class FusionRun {
         if (managedKey && this.fusionAccountMapValue.get(managedKey) === fa) {
             return this.fusionAccountMapValue.delete(managedKey)
         }
+        // Direct lookup keeps removal O(1); this runs once per account during output.
+        const identityId = fa.identityId
+        if (identityId && this.fusionIdentityMapValue.get(identityId) === fa) {
+            this.removeFusionIdentityOwnership(identityId)
+            return this.fusionIdentityMapValue.delete(identityId)
+        }
+        // Fallback for accounts whose identityId drifted from their map key.
         for (const [id, account] of this.fusionIdentityMapValue.entries()) {
             if (account === fa) {
                 this.removeFusionIdentityOwnership(id)
@@ -471,17 +480,26 @@ export class FusionRun {
     }
 
     private addFusionIdentityOwnership(identityId: string, fusionAccount: FusionAccount): void {
+        let ownedKeys = this.fusionIdentityOwnedKeysByIdentityId.get(identityId)
+        if (!ownedKeys) {
+            ownedKeys = new Set<string>()
+            this.fusionIdentityOwnedKeysByIdentityId.set(identityId, ownedKeys)
+        }
         for (const key of fusionAccount.accountIdsSet) {
             this.fusionIdentityOwnerIdByManagedKey.set(key, identityId)
+            ownedKeys.add(key)
         }
     }
 
     private removeFusionIdentityOwnership(identityId: string): void {
-        for (const [key, ownerIdentityId] of this.fusionIdentityOwnerIdByManagedKey) {
-            if (ownerIdentityId === identityId) {
+        const ownedKeys = this.fusionIdentityOwnedKeysByIdentityId.get(identityId)
+        if (!ownedKeys) return
+        for (const key of ownedKeys) {
+            if (this.fusionIdentityOwnerIdByManagedKey.get(key) === identityId) {
                 this.fusionIdentityOwnerIdByManagedKey.delete(key)
             }
         }
+        this.fusionIdentityOwnedKeysByIdentityId.delete(identityId)
     }
 
     getFusionIdentity(identityId: string): FusionAccount | undefined {

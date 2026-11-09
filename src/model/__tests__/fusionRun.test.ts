@@ -245,6 +245,25 @@ describe('FusionRun', () => {
             expect(run.getFusionIdentity('identity-dup')).toBe(first)
             expect(run.fusionIdentityMap.size).toBe(1)
         })
+
+        it('removes a Fusion identity account and releases only its managed-account ownership', () => {
+            const run = new FusionRun()
+            const a = makeAccount('fusion-a', 'identity-a', 'A')
+            const b = makeAccount('fusion-b', 'identity-b', 'B')
+            a.accountIdsSet.add('src::acct-a')
+            b.accountIdsSet.add('src::acct-b')
+            run.registerFusionAccount(a)
+            run.registerFusionAccount(b)
+            expect(run.isManagedAccountForeignOwned('src::acct-a', 'someone-else')).toBe(true)
+
+            expect(run.removeFusionAccount(a)).toBe(true)
+
+            expect(run.getFusionIdentity('identity-a')).toBeUndefined()
+            expect(run.getFusionIdentity('identity-b')).toBe(b)
+            expect(run.isManagedAccountForeignOwned('src::acct-a', 'someone-else')).toBe(false)
+            expect(run.isManagedAccountForeignOwned('src::acct-b', 'someone-else')).toBe(true)
+            expect(run.removeFusionAccount(a)).toBe(false)
+        })
     })
 
     describe('disable operations', () => {
