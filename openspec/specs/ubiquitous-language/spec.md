@@ -1280,7 +1280,8 @@ Configuration is organized into menus and sections in the connector source in IS
 | **Review Settings** | The section configuring the manual review workflow: form attributes, form expiration, maximum candidates per form, and global reviewer behavior. |
 | **Advanced Settings** | The top-level configuration menu for developer and integration settings. Contains Developer Settings, Advanced Connection Settings, and Proxy Settings. |
 | **Developer Settings** | The section for operation tuning: provisioning timeout, batch size, processing wait, priority processing, concurrency checks, forced refresh, and account reset. |
-| **Installed connector version** | The semver string in `package.json` `version` for the connector package installed in ISC. It is not a git SHA, CI build number, or ISC platform version. |
+| **Installed connector version** | The semver string in `package.json` `version` for the connector package installed in ISC. It is a release label, not build identity: to tell whether a tenant runs a current build, use the **Connector build stamp**. It is not a git SHA, CI build number, or ISC platform version. |
+| **Connector build stamp** | The identifier of the exact tree a connector package was built from: short commit SHA, commit date, and branch, shown as `Build: <sha> <date> <branch>` in the Developer Settings section help. A `-dirty` suffix on the SHA marks a package built from uncommitted changes. It is not the **Installed connector version**. |
 | **Advanced Connection Settings** | The section for API communication tuning: request rate limiting, retry behavior, and external logging configuration. |
 | **Proxy Settings** | The section configuring proxy mode for running connector logic on an external server. |
 

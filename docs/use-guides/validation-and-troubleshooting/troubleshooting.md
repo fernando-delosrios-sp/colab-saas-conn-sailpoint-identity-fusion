@@ -20,7 +20,7 @@ For log phase mapping during diagnosis, see [Config to account-list phases](../.
 | --- | --- | --- |
 | **Configuration** | Source settings, mappings, Match settings | ISC connector configuration |
 | **Logs** | Connector logs, aggregation history, external logs | ISC Application Logs; [Monitor aggregation progress](../operation/monitor-aggregation-progress.md) |
-| **Environment** | Tenant, connector version, recent changes | Change records, deployment notes |
+| **Environment** | Tenant, connector build stamp (Developer Settings help), recent changes | Change records, deployment notes; [Verify a deployed connector build](../operation/verify-deployed-connector-build.md) |
 
 ---
 

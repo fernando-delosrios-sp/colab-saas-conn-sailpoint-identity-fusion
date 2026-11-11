@@ -14,6 +14,7 @@ Each guide has one practical goal. For field keys, types, defaults, and constrai
 | **Run connector logic on your infrastructure** | [Run the connector via proxy](run-via-proxy.md) | [Monitor aggregation progress](monitor-aggregation-progress.md) |
 | **Record and replay API traffic for regression** | [Capture scenarios for replay](capture-scenarios-for-replay.md) | [Testing and validation](../validation-and-troubleshooting/testing-and-validation.md) |
 | **Rebuild accounts or clear review forms** | [Reset Fusion state](reset-fusion-state.md) | [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md) |
+| **Confirm which build a tenant runs** | [Verify a deployed connector build](verify-deployed-connector-build.md) | [Troubleshooting](../validation-and-troubleshooting/troubleshooting.md) |
 
 ## Reading order
 
@@ -25,6 +26,7 @@ If you prefer to read top to bottom, follow this sequence — each step builds o
 4. **[Run the connector via proxy](run-via-proxy.md)** — self-hosted processing
 5. **[Capture scenarios for replay](capture-scenarios-for-replay.md)** — regression recording and CI replay
 6. **[Reset Fusion state](reset-fusion-state.md)** — recovery when you need a clean rebuild
+7. **[Verify a deployed connector build](verify-deployed-connector-build.md)** — compare the connector build stamp in ISC with your checkout
 
 For first-time setup, start with [Getting started](../../getting-started/index.md). For configuration, see [Configuration guides overview](../configuration/index.md).
 

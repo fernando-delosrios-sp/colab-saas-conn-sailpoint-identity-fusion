@@ -5,6 +5,23 @@ All notable changes to **Identity Fusion NG** — the ISC connector for Map → 
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
 
+## 2026-11-11 · v4.1.0
+
+### ✨ New Features
+
+- **Connector build stamp in Developer Settings help** — A packaged connector now shows `Build: <commit> <commit date> <branch>` next to the installed connector version in the Developer Settings section help, so you can tell which exact build a tenant runs even when many previews share one version number. A `-dirty` suffix marks a package built from uncommitted changes, and `Build: unknown` appears when git facts are unavailable.
+- **`npm run build:stamp`** — Prints the stamp your current checkout would pack, so you can compare it side by side with the line shown in ISC without building or packaging.
+
+### 🔧 Improvements
+
+- **`npm run pack-zip` keeps the committed spec clean** — The stamp is written into `connector-spec.json` only while the package command runs, then the original file is restored whether packaging succeeds or fails.
+
+### 📚 Documentation
+
+- **Verify a deployed connector build** — New operation guide explaining where the stamp appears, how to compare it with `npm run build:stamp`, and what equal, different, `-dirty`, and missing stamps mean. The glossary, Reset Fusion state guide, and troubleshooting **Environment** evidence now point to it.
+
+---
+
 ## 2026-11-11 · v4.0.1
 
 ### 🔧 Improvements

@@ -19,7 +19,7 @@ Use this guide when you need to **safely rebuild Fusion account data or clear re
 | Stuck `processing` config option | **Reset accounts?** once | Removes the `processing` connector attribute left by an unfinished run |
 | Production environment | ⚠️ **Rarely** | High impact; coordinate with stakeholders |
 
-The **Developer Settings** section help in the ISC source configuration UI displays the **installed connector version**. Use it to confirm which build is deployed.
+The **Developer Settings** section help in the ISC source configuration UI displays the **installed connector version** and, in a packaged connector, the **connector build stamp**. To confirm which build is deployed, see [Verify a deployed connector build](verify-deployed-connector-build.md).
 
 ![Developer Settings - Configuration](../../assets/images/advanced-settings-developer.png)
 

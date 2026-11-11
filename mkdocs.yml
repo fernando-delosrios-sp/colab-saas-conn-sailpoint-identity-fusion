@@ -53,6 +53,7 @@ nav:
                 - Run the connector via proxy: use-guides/operation/run-via-proxy.md
                 - Capture scenarios for replay: use-guides/operation/capture-scenarios-for-replay.md
                 - Reset Fusion state: use-guides/operation/reset-fusion-state.md
+                - Verify a deployed connector build: use-guides/operation/verify-deployed-connector-build.md
           - Validation and troubleshooting:
                 - Testing and validation: use-guides/validation-and-troubleshooting/testing-and-validation.md
                 - Troubleshooting: use-guides/validation-and-troubleshooting/troubleshooting.md
