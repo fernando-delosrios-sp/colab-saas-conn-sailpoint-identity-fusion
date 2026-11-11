@@ -206,9 +206,7 @@ function injectBuildStamp(spec, stamp) {
     if (sentenceEnd === -1) {
         section.sectionHelpMessage = `${message}<br><br>${htmlStamp}`
     } else {
-        section.sectionHelpMessage = `${message.slice(0, sentenceEnd)}<br><br>${htmlStamp}${message.slice(
-            sentenceEnd
-        )}`
+        section.sectionHelpMessage = `${message.slice(0, sentenceEnd)}<br><br>${htmlStamp}${message.slice(sentenceEnd)}`
     }
 
     return spec

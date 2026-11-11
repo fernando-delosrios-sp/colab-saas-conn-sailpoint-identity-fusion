@@ -1,11 +1,7 @@
 /* global describe, it, expect */
 const fs = require('fs')
 const path = require('path')
-const {
-    formatBuildStamp,
-    resolveBuildStamp,
-    injectBuildStamp,
-} = require('../connector-build-stamp.cjs')
+const { formatBuildStamp, resolveBuildStamp, injectBuildStamp } = require('../connector-build-stamp.cjs')
 const { collectViolations } = require('../connector-spec-help-lib.cjs')
 
 const rootDir = path.resolve(__dirname, '..', '..')
@@ -13,9 +9,7 @@ const specPath = path.join(rootDir, 'connector-spec.json')
 
 function developerSettingsMessage(spec) {
     const menu = spec.sourceConfig.find((entry) => entry.type === 'menu')
-    const section = menu.items.find(
-        (item) => item.type === 'section' && item.sectionTitle === 'Developer Settings'
-    )
+    const section = menu.items.find((item) => item.type === 'section' && item.sectionTitle === 'Developer Settings')
     return section.sectionHelpMessage
 }
 
@@ -62,15 +56,15 @@ function gitExec({ sha, date, branch, status }) {
 
 describe('formatBuildStamp', () => {
     it('renders the canonical clean stamp', () => {
-        expect(
-            formatBuildStamp({ sha: 'def5678', date: '2026-11-01', branch: '2.2.0/preview', dirty: false })
-        ).toBe('Build: def5678 2026-11-01 2.2.0/preview')
+        expect(formatBuildStamp({ sha: 'def5678', date: '2026-11-01', branch: '2.2.0/preview', dirty: false })).toBe(
+            'Build: def5678 2026-11-01 2.2.0/preview'
+        )
     })
 
     it('marks dirty input', () => {
-        expect(
-            formatBuildStamp({ sha: 'def5678', date: '2026-11-01', branch: '2.2.0/preview', dirty: true })
-        ).toBe('Build: def5678-dirty 2026-11-01 2.2.0/preview')
+        expect(formatBuildStamp({ sha: 'def5678', date: '2026-11-01', branch: '2.2.0/preview', dirty: true })).toBe(
+            'Build: def5678-dirty 2026-11-01 2.2.0/preview'
+        )
     })
 
     it('renders unknown when every fact is missing', () => {
@@ -199,9 +193,7 @@ describe('injectBuildStamp', () => {
         const spec = specWithDeveloperSettings(baseHelp)
         spec.sourceConfig[0].items[0].sectionTitle = 'Sources'
 
-        expect(() => injectBuildStamp(spec, 'Build: def5678 2026-11-01 2.2.0/preview')).toThrow(
-            /Developer Settings/
-        )
+        expect(() => injectBuildStamp(spec, 'Build: def5678 2026-11-01 2.2.0/preview')).toThrow(/Developer Settings/)
     })
 
     it('injects Build: unknown without throwing when git facts were unavailable', () => {
