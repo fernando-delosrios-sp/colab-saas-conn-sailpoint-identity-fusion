@@ -7,7 +7,7 @@ import {
     OwnerDto,
 } from 'sailpoint-api-client'
 import { ConnectorError, ConnectorErrorType } from '@sailpoint/connector-sdk'
-import { FusionConfig, SourceConfig } from '../../model/config'
+import { ConnectorAttributes, FusionConfig, SourceConfig } from '../../model/config'
 import { ClientService, QueuePriority } from '../clientService'
 import { LogService } from '../logService'
 import { assert } from '../../utils/assert'
@@ -165,6 +165,8 @@ export class SourceService {
     private readonly batchLimitedSourceNames: Set<string>
     // Batch mode cumulative count per source (persisted across runs)
     private batchCumulativeCount: Record<string, number>
+    // Batch mode watermark timestamp per source (persisted across runs)
+    private batchWatermarkTimestamp: Record<string, string>
 
     constructor(
         config: FusionConfig,
@@ -188,6 +190,17 @@ export class SourceService {
         this.batchCumulativeCount = Object.fromEntries(
             Object.entries(persistedCount).filter(
                 ([sourceName, count]) => this.batchLimitedSourceNames.has(sourceName) && typeof count === 'number'
+            )
+        )
+
+        const rawWatermark = config.batchWatermarkTimestamp
+        const persistedWatermark =
+            rawWatermark && typeof rawWatermark === 'object' && !Array.isArray(rawWatermark)
+                ? (rawWatermark as Record<string, string>)
+                : {}
+        this.batchWatermarkTimestamp = Object.fromEntries(
+            Object.entries(persistedWatermark).filter(
+                ([sourceName, ts]) => this.batchLimitedSourceNames.has(sourceName) && typeof ts === 'string'
             )
         )
     }
@@ -412,7 +425,10 @@ export class SourceService {
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
         const filters = buildIscAccountsQueryFilter(sourceInfo)
-        const sorters = 'id'
+        const sorters =
+            sourceInfo.config?.accountLimit != null && Number.isFinite(sourceInfo.config.accountLimit)
+                ? 'created,id'
+                : 'id'
 
         const requestParameters: AccountsApiListAccountsRequest = {
             filters,
@@ -448,7 +464,10 @@ export class SourceService {
         assert(sourceInfo, `Source not found for id: ${sourceId}`)
 
         const filters = buildIscAccountsQueryFilter(sourceInfo)
-        const sorters = 'id'
+        const sorters =
+            sourceInfo.config?.accountLimit != null && Number.isFinite(sourceInfo.config.accountLimit)
+                ? 'created,id'
+                : 'id'
 
         const requestParameters: AccountsApiListAccountsRequest = {
             filters,
@@ -839,7 +858,7 @@ export class SourceService {
             currentSource,
             'Failed to fetch fusion source to remove the processing config option. The API call returned no data.'
         )
-        const attributes = currentSource.connectorAttributes as Record<string, unknown> | undefined
+        const attributes = currentSource.connectorAttributes as ConnectorAttributes | undefined
         if (!attributes || !Object.prototype.hasOwnProperty.call(attributes, 'processing')) {
             this.processLockAcquired = false
             return
@@ -877,10 +896,50 @@ export class SourceService {
     }
 
     // ------------------------------------------------------------------------
-    // Public Batch Cumulative Count Methods
+    // Public Batch Cumulative Count & Watermark Methods
     // ------------------------------------------------------------------------
 
+    public getBatchCumulativeCount(): Readonly<Record<string, number>> {
+        return this.batchCumulativeCount
+    }
+
+    public getBatchWatermarkTimestamp(): Readonly<Record<string, string>> {
+        return this.batchWatermarkTimestamp
+    }
+
+    public async saveBatchWatermarkTimestamp(): Promise<void> {
+        if (Object.keys(this.batchWatermarkTimestamp).length === 0) {
+            return
+        }
+
+        const fusionSourceId = this.fusionSourceId
+        this.log.info(`Saving batch watermark timestamp: ${JSON.stringify(this.batchWatermarkTimestamp)}`)
+        await this.patchSourceConfig(
+            fusionSourceId,
+            '/connectorAttributes/batchWatermarkTimestamp',
+            this.batchWatermarkTimestamp,
+            'SourceService>saveBatchWatermarkTimestamp'
+        )
+    }
+
+    public async resetBatchWatermarkTimestamp(): Promise<void> {
+        if (Object.keys(this.batchWatermarkTimestamp).length === 0) {
+            return
+        }
+
+        this.batchWatermarkTimestamp = {}
+        const fusionSourceId = this.fusionSourceId
+        this.log.info('Resetting batch watermark timestamp')
+        await this.patchSourceConfig(
+            fusionSourceId,
+            '/connectorAttributes/batchWatermarkTimestamp',
+            {},
+            'SourceService>resetBatchWatermarkTimestamp'
+        )
+    }
+
     public async saveBatchCumulativeCount(): Promise<void> {
+        await this.saveBatchWatermarkTimestamp()
         if (Object.keys(this.batchCumulativeCount).length === 0) {
             return
         }
@@ -896,6 +955,7 @@ export class SourceService {
     }
 
     public async resetBatchCumulativeCount(): Promise<void> {
+        await this.resetBatchWatermarkTimestamp()
         if (Object.keys(this.batchCumulativeCount).length === 0) {
             return
         }
@@ -1078,6 +1138,7 @@ export class SourceService {
             managedSources: this.managedSources,
             batchLimitedSourceNames: this.batchLimitedSourceNames,
             batchCumulativeCount: this.batchCumulativeCount,
+            batchWatermarkTimestamp: this.batchWatermarkTimestamp,
             accountJmespathFiltersBySourceName: this.accountJmespathFiltersBySourceName,
             fetchAccountsBySourceIdGenerator: this.fetchAccountsBySourceIdGenerator.bind(this),
             ...(this.referencedAttributeSet ? { referencedAttributeSet: this.referencedAttributeSet } : {}),

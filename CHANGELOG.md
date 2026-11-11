@@ -5,6 +5,20 @@ All notable changes to **Identity Fusion NG** — the ISC connector for Map → 
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
 
+## 2026-11-11 · v4.0.1
+
+### 🔧 Improvements
+
+- **Progressive onboarding ramp on dynamic datasets** — When **Aggregation batch size** (`accountLimit`) is configured on a managed source, the connector sorts accounts by creation timestamp (`created,id`) so newly created accounts append at the tail rather than displacing older accounts across batch windows. Full aggregations without batch limits retain fast primary-key `id` sorting for optimal database index performance.
+- **Monotonic cumulative count** — `batchCumulativeCount` is updated monotonically (`Math.max`) across aggregation runs so transient network drops, rate limits, or upstream account deletions cannot roll back onboarding progress.
+- **Creation watermark timestamp checkpoint** — The connector captures the newest account creation timestamp (`account.attributes.created` or `account.created`) and persists it in `batchWatermarkTimestamp` alongside `batchCumulativeCount` on `/connectorAttributes/` for auditability and verification of prefix integrity.
+
+### 📚 Documentation
+
+- **Progressive Onboarding Ramp reframing** — Updated `docs/use-guides/configuration/configuring-sources-and-scope.md`, `docs/glossary.md`, and `openspec/specs/ubiquitous-language/spec.md` to remove the static-dataset limitation warning and define **Progressive Onboarding Ramp** and **Monotonic Cumulative Count** as canonical domain terms.
+
+---
+
 ## 2026-11-05 · v4.0.0
 
 ### ⚠️ Breaking Changes

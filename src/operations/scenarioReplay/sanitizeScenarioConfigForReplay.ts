@@ -23,6 +23,7 @@ export interface ScenarioConfig {
 export function sanitizeScenarioConfigForReplay(config: ScenarioConfig): ScenarioConfig {
     const clean = { ...config }
     delete clean.batchCumulativeCount
+    delete clean.batchWatermarkTimestamp
     delete clean.acctAggregationStart
     delete clean.acctAggregationEnd
     delete clean.cloudCacheUpdate

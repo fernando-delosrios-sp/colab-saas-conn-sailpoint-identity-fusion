@@ -5,7 +5,10 @@ import { SourceInfo } from '../types'
 import { OrphanProcessingMode, SourceType } from '../../../model/config'
 import { FusionRun } from '../../../model/fusionRun'
 
-const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
+const createService = (
+    sourceConfigOverrides: Record<string, unknown> = {},
+    configOverrides: Record<string, unknown> = {}
+) => {
     const config: any = {
         sources: [
             {
@@ -17,9 +20,11 @@ const createService = (sourceConfigOverrides: Record<string, unknown> = {}) => {
         spConnectorInstanceId: 'fusion-id',
         concurrencyCheckEnabled: true,
         batchCumulativeCount: {},
+        batchWatermarkTimestamp: {},
         attributeMaps: [],
         normalAttributeDefinitions: [],
         uniqueAttributeDefinitions: [],
+        ...configOverrides,
     }
     const log: any = {
         debug: vi.fn(),
@@ -753,7 +758,7 @@ describe('SourceService source lookup boundaries', () => {
 })
 
 describe('SourceService account pagination sorter stability', () => {
-    it('uses sorters=id for paginated fetch by source id', async () => {
+    it('Non-generator account fetch requests id sort order when accountLimit is not configured', async () => {
         const { service, client } = createService()
         client.paginate.mockResolvedValue([])
 
@@ -767,7 +772,21 @@ describe('SourceService account pagination sorter stability', () => {
         )
     })
 
-    it('uses sorters=id for generator-based fetch by source id', async () => {
+    it('Non-generator account fetch requests created,id sort order when accountLimit is configured', async () => {
+        const { service, client } = createService({ accountLimit: 50 })
+        client.paginate.mockResolvedValue([])
+
+        await service.fetchAccountsBySourceId('managed-source-id')
+
+        expect(client.paginate).toHaveBeenCalledWith(
+            expect.any(Function),
+            expect.objectContaining({ sorters: 'created,id' }),
+            expect.anything(),
+            expect.any(String)
+        )
+    })
+
+    it('Accounts generator requests id sort order when accountLimit is not configured', async () => {
         const { service, client } = createService()
         client.paginateParallel.mockImplementation(async function* () {
             yield []
@@ -780,7 +799,33 @@ describe('SourceService account pagination sorter stability', () => {
         expect(client.call).toHaveBeenCalledWith(
             expect.any(Function),
             expect.objectContaining({
-                paginate: expect.objectContaining({ mode: 'parallel' }),
+                paginate: expect.objectContaining({
+                    mode: 'parallel',
+                    baseParams: expect.objectContaining({ sorters: 'id' }),
+                }),
+                priority: expect.anything(),
+                context: expect.any(String),
+            })
+        )
+    })
+
+    it('Accounts generator requests created,id sort order when accountLimit is configured', async () => {
+        const { service, client } = createService({ accountLimit: 50 })
+        client.paginateParallel.mockImplementation(async function* () {
+            yield []
+        })
+
+        for await (const _batch of service.fetchAccountsBySourceIdGenerator('managed-source-id')) {
+            // consume generator
+        }
+
+        expect(client.call).toHaveBeenCalledWith(
+            expect.any(Function),
+            expect.objectContaining({
+                paginate: expect.objectContaining({
+                    mode: 'parallel',
+                    baseParams: expect.objectContaining({ sorters: 'created,id' }),
+                }),
                 priority: expect.anything(),
                 context: expect.any(String),
             })
@@ -1342,3 +1387,135 @@ describe('SourceService.removeProcessingAttribute', () => {
         expect(client.sourcesApi.updateSource).not.toHaveBeenCalled()
     })
 })
+
+describe('SourceService batch aggregation cumulative count monotonicity', () => {
+    it('Scenario: Run collects fewer accounts than previously recorded high-water mark', async () => {
+        const { service } = createService({ accountLimit: 50 }, { batchCumulativeCount: { 'HR Source': 100 } })
+        let requestedLimit: number | undefined
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* (
+            _sourceId,
+            _abortSignal,
+            limit
+        ) {
+            requestedLimit = limit
+            const accounts = Array.from({ length: 80 }, (_, i) => ({
+                id: `acc-${i}`,
+                sourceId: 'managed-source-id',
+                nativeIdentity: `user-${i}`,
+            }))
+            yield accounts as any
+        })
+
+        await service.fetchManagedAccounts()
+
+        expect(service.getBatchCumulativeCount()['HR Source']).toBe(100)
+        expect(requestedLimit).toBe(150)
+    })
+
+    it('Scenario: Run collects more accounts than previously recorded high-water mark', async () => {
+        const { service } = createService({ accountLimit: 50 }, { batchCumulativeCount: { 'HR Source': 100 } })
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* () {
+            const accounts = Array.from({ length: 150 }, (_, i) => ({
+                id: `acc-${i}`,
+                sourceId: 'managed-source-id',
+                nativeIdentity: `user-${i}`,
+            }))
+            yield accounts as any
+        })
+
+        await service.fetchManagedAccounts()
+
+        expect(service.getBatchCumulativeCount()['HR Source']).toBe(150)
+    })
+})
+
+describe('SourceService creation watermark timestamp persistence', () => {
+    it('Scenario: Creation watermark timestamp is persisted', async () => {
+        const { service, client } = createService({ accountLimit: 50 })
+        ;(service as any).fusionSourceIdValue = 'fusion-source-id'
+        client.sourcesApi.updateSource = vi.fn().mockResolvedValue({ data: {} })
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* () {
+            yield [
+                {
+                    id: '1',
+                    sourceId: 'managed-source-id',
+                    nativeIdentity: 'u1',
+                    attributes: { created: '2026-01-01T00:00:00Z' },
+                },
+                {
+                    id: '2',
+                    sourceId: 'managed-source-id',
+                    nativeIdentity: 'u2',
+                    attributes: { created: '2026-02-15T12:00:00Z' },
+                },
+                {
+                    id: '3',
+                    sourceId: 'managed-source-id',
+                    nativeIdentity: 'u3',
+                    created: '2026-02-10T12:00:00Z',
+                },
+            ] as any
+        })
+
+        await service.fetchManagedAccounts()
+
+        expect(service.getBatchWatermarkTimestamp()['HR Source']).toBe('2026-02-15T12:00:00Z')
+
+        await service.saveBatchWatermarkTimestamp()
+
+        expect(client.sourcesApi.updateSource).toHaveBeenCalledWith(
+            expect.objectContaining({
+                id: 'fusion-source-id',
+                jsonPatchOperationV2025: [
+                    {
+                        op: 'add',
+                        path: '/connectorAttributes/batchWatermarkTimestamp',
+                        value: { 'HR Source': '2026-02-15T12:00:00Z' },
+                    },
+                ],
+            })
+        )
+    })
+
+    it('resets watermark timestamp alongside cumulative count', async () => {
+        const { service, client } = createService(
+            { accountLimit: 50 },
+            {
+                batchCumulativeCount: { 'HR Source': 100 },
+                batchWatermarkTimestamp: { 'HR Source': '2026-02-15T12:00:00Z' },
+            }
+        )
+        ;(service as any).fusionSourceIdValue = 'fusion-source-id'
+        client.sourcesApi.updateSource = vi.fn().mockResolvedValue({ data: {} })
+
+        await service.resetBatchCumulativeCount()
+
+        expect(service.getBatchCumulativeCount()).toEqual({})
+        expect(service.getBatchWatermarkTimestamp()).toEqual({})
+        expect(client.sourcesApi.updateSource).toHaveBeenCalledWith(
+            expect.objectContaining({
+                id: 'fusion-source-id',
+                jsonPatchOperationV2025: [
+                    {
+                        op: 'add',
+                        path: '/connectorAttributes/batchWatermarkTimestamp',
+                        value: {},
+                    },
+                ],
+            })
+        )
+        expect(client.sourcesApi.updateSource).toHaveBeenCalledWith(
+            expect.objectContaining({
+                id: 'fusion-source-id',
+                jsonPatchOperationV2025: [
+                    {
+                        op: 'add',
+                        path: '/connectorAttributes/batchCumulativeCount',
+                        value: {},
+                    },
+                ],
+            })
+        )
+    })
+})
+

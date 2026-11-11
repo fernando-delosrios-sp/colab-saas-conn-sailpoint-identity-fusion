@@ -129,7 +129,7 @@ When disabled:
 | **[Deferred candidate matching](../../glossary.md#candidates)** | Same-run deferred-candidate comparison | No (Authoritative only) | Same source only; never cross-source |
 | **Accounts API filter** | Server-side account list filter | No | ISC `filters` parameter |
 | **Accounts JMESPath filter** | Client-side page filter | No | Applied to `{ "accounts": [...] }` |
-| **Aggregation batch size** | Cap accounts per aggregation for a large, static onboarding set | No | Empty = all accounts. Onboarding only — see the warning below |
+| **Aggregation batch size** | Progressive Onboarding Ramp: throttle account intake across multiple runs | No | Empty = all accounts. Progressive onboarding ramp — see details below |
 | **Account aggregation mode** | none / before / delayed | Yes | See [Aggregation timing](#aggregation-timing) |
 | **Aggregation wait timeout (minutes)** | Max wait for before-mode task | No (before mode) | Default 10; polls every 30s |
 | **Aggregation delay (minutes)** | Delay before delayed aggregation | Yes (delayed mode) | Default 5 |
@@ -138,13 +138,12 @@ When disabled:
 | **Correlation attribute name** | Reverse-correlation attribute technical name | Yes (reverse) | |
 | **Correlation display name** | Reverse-correlation display name | Yes (reverse) | |
 
-!!! warning "Aggregation batch size is for onboarding only"
-    Set **Aggregation batch size** only to load a large, **static** set of managed accounts during onboarding. The connector stores a cumulative count per source and raises the effective limit by the batch size on each run, so every run resumes where the previous one stopped. That only holds while the account set does not change:
+!!! note "Progressive Onboarding Ramp (Aggregation batch size)"
+    Set **Aggregation batch size** to throttle initial managed account ingestion during onboarding across multiple runs. The connector maintains a monotonically non-decreasing cumulative count and creation watermark timestamp per source, progressively expanding the ingestion window by the configured batch size on each run. Accounts are sorted by creation date (`created,id`) during batch runs to guarantee deterministic windowing on active datasets.
 
-    - Accounts **added** or **removed** between runs shift the offset, so the connector can skip or re-read accounts.
-    - For regular operation, leave the field empty so every run aggregates the full account set.
+    For regular operation without batch limits, leave the field empty so every run aggregates the full account set using fast primary-key sorting.
 
-    **Reset accounts?** clears the stored cumulative count. See [Reset Fusion state](../operation/reset-fusion-state.md).
+    **Reset accounts?** clears the stored cumulative state and watermark timestamp. See [Reset Fusion state](../operation/reset-fusion-state.md).
 
 !!! note "Machine accounts"
     Accounts with `isMachine=true` are excluded client-side after fetch, except on an Orphan source in **Ownership mode**. Ownership mode keeps machine accounts that have no established owner identity and skips the rest. This is not an ISC account-list filter. See [Source types](source-types.md#ownership-mode).

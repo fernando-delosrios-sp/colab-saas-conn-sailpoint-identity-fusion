@@ -526,14 +526,29 @@ interface InternalConfig {
     }
     readonly fusionState?: Record<string, any>
     /**
-     * Persisted cumulative count of accounts fetched per source in batch mode.
+     * Persisted cumulative count of accounts fetched per source in batch mode (Progressive Onboarding Ramp).
      * Used when a source has an `accountLimit`: the effective limit for each run
      * is `batchCumulativeCount[sourceName] + accountLimit`, ensuring previously
-     * fetched accounts are always included. Updated after each successful run
-     * and cleared on reset.
+     * fetched accounts are always included and the count is monotonically non-decreasing.
+     * Updated after each successful run and cleared on reset.
      */
     readonly batchCumulativeCount?: Record<string, number>
+    /**
+     * Persisted newest account creation timestamp (`account.attributes.created` or `account.created`)
+     * observed per source during batch progressive onboarding. Updated alongside `batchCumulativeCount`
+     * and cleared on reset.
+     */
+    readonly batchWatermarkTimestamp?: Record<string, string>
     readonly isProxy?: boolean
+}
+
+/**
+ * Persisted connector attributes stored on the ISC source configuration.
+ */
+export interface ConnectorAttributes {
+    readonly batchCumulativeCount?: Record<string, number>
+    readonly batchWatermarkTimestamp?: Record<string, string>
+    readonly [key: string]: unknown
 }
 
 // ============================================================================

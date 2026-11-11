@@ -24,6 +24,7 @@ export interface ManagedAccountFetcherDeps {
     managedSources: SourceInfo[]
     batchLimitedSourceNames: Set<string>
     batchCumulativeCount: Record<string, number>
+    batchWatermarkTimestamp?: Record<string, string>
     accountJmespathFiltersBySourceName: Map<string, CompiledAccountJmespathFilter>
     /** When set, managed source account attributes are pruned to this set at registration. */
     referencedAttributeSet?: ReadonlySet<string>
@@ -159,6 +160,19 @@ function computeAggregateFetchProgress(sourceProgress: Map<string, { registered:
     return { sumRegistered, sumTotal, allTotalsKnown }
 }
 
+function extractAccountCreatedTimestamp(account: Account): string | undefined {
+    const raw =
+        (account.attributes as Record<string, unknown> | undefined)?.created ??
+        (account as unknown as Record<string, unknown>).created
+    if (typeof raw === 'string' && raw.trim().length > 0) {
+        return raw.trim()
+    }
+    if (raw instanceof Date && !isNaN(raw.getTime())) {
+        return raw.toISOString()
+    }
+    return undefined
+}
+
 /** Accounts examined before registration yields, so one page cannot hold the event loop. */
 export const MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL = 100
 
@@ -169,15 +183,16 @@ async function collectAccountsFromBatch(
     collectedCount: number,
     deps: Pick<ManagedAccountFetcherDeps, 'run' | 'accountJmespathFiltersBySourceName' | 'referencedAttributeSet'>,
     onCollected?: (collectedCount: number) => void
-): Promise<{ collectedCount: number; discardedMachineCount: number; reachedLimit: boolean }> {
+): Promise<{ collectedCount: number; discardedMachineCount: number; reachedLimit: boolean; newestCreated?: string }> {
     const filteredBatch = applyManagedJmespathFilter(source, batch, deps.accountJmespathFiltersBySourceName)
     let nextCollected = collectedCount
     let discardedMachineCount = 0
     let examinedSinceYield = 0
+    let newestCreated: string | undefined
 
     for (const account of filteredBatch) {
         if (effectiveLimit !== undefined && nextCollected >= effectiveLimit) {
-            return { collectedCount: nextCollected, discardedMachineCount, reachedLimit: true }
+            return { collectedCount: nextCollected, discardedMachineCount, reachedLimit: true, newestCreated }
         }
         if (isOwnershipModeSource(source)) {
             if (!isMachineManagedAccount(account) || hasEstablishedOwnerIdentity(account)) {
@@ -198,6 +213,10 @@ async function collectAccountsFromBatch(
         }
         deps.run.setManagedAccount(accountKey, account)
         nextCollected++
+        const created = extractAccountCreatedTimestamp(account)
+        if (created && (!newestCreated || created > newestCreated)) {
+            newestCreated = created
+        }
         examinedSinceYield++
         if (examinedSinceYield >= MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL) {
             examinedSinceYield = 0
@@ -207,7 +226,7 @@ async function collectAccountsFromBatch(
     }
 
     const reachedLimit = effectiveLimit !== undefined && nextCollected >= effectiveLimit
-    return { collectedCount: nextCollected, discardedMachineCount, reachedLimit }
+    return { collectedCount: nextCollected, discardedMachineCount, reachedLimit, newestCreated }
 }
 
 const INTERNAL_RECORD_BATCH_SIZE = 100
@@ -237,7 +256,7 @@ async function fetchInternalRecordSource(
     deps: ManagedAccountFetcherDeps,
     sourceProgress: Map<string, { registered: number; total?: number }>,
     reportAggregateFetchProgress: () => void
-): Promise<{ collectedCount: number; discardedMachineCount: number }> {
+): Promise<{ collectedCount: number; discardedMachineCount: number; newestCreated?: string }> {
     const fileName = source.internalRecord?.fileName
     if (!fileName || !deps.internalRecordsDir) {
         throw new InternalRecordFormatError(internalPackageMessage(fileName || source.name))
@@ -255,6 +274,7 @@ async function fetchInternalRecordSource(
 
     let collectedCount = 0
     let discardedMachineCount = 0
+    let newestCreated: string | undefined
     let batch: Account[] = []
     const flush = async () => {
         if (batch.length === 0) return
@@ -272,6 +292,9 @@ async function fetchInternalRecordSource(
         )
         collectedCount = batchResult.collectedCount
         discardedMachineCount += batchResult.discardedMachineCount
+        if (batchResult.newestCreated && (!newestCreated || batchResult.newestCreated > newestCreated)) {
+            newestCreated = batchResult.newestCreated
+        }
         batch = []
     }
 
@@ -287,18 +310,19 @@ async function fetchInternalRecordSource(
         if (batch.length >= INTERNAL_RECORD_BATCH_SIZE) await flush()
     }
     await flush()
-    return { collectedCount, discardedMachineCount }
+    return { collectedCount, discardedMachineCount, newestCreated }
 }
 
 /**
  * Fetch and cache managed accounts from all managed sources.
  *
- * Batch Mode (cumulative):
- * When a source has an `accountLimit`, the effective limit grows across runs
+ * Progressive Onboarding Ramp (Batch Mode):
+ * When a source has an `accountLimit`, the effective limit grows monotonically across runs
  * so that previously fetched accounts are always included in subsequent runs.
  * The effective limit is `batchCumulativeCount[sourceName] + accountLimit`.
  * After fetching, the actual number of accounts retrieved is stored as the
- * new cumulative count for that source.
+ * new cumulative count (monotonically non-decreasing via Math.max) and the newest
+ * account creation timestamp is recorded in `batchWatermarkTimestamp`.
  */
 export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abortSignal?: AbortSignal): Promise<void> {
     const {
@@ -307,6 +331,7 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
         managedSources,
         batchLimitedSourceNames,
         batchCumulativeCount,
+        batchWatermarkTimestamp,
         accountJmespathFiltersBySourceName,
         fetchAccountsBySourceIdGenerator,
     } = deps
@@ -360,11 +385,21 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
                         )
                     }
                     if (batchLimitedSourceNames.has(source.name)) {
-                        batchCumulativeCount[source.name] = collectedCount
+                        batchCumulativeCount[source.name] = Math.max(
+                            batchCumulativeCount[source.name] ?? 0,
+                            collectedCount
+                        )
+                        if (internalResult.newestCreated && batchWatermarkTimestamp) {
+                            const previous = batchWatermarkTimestamp[source.name]
+                            if (!previous || internalResult.newestCreated > previous) {
+                                batchWatermarkTimestamp[source.name] = internalResult.newestCreated
+                            }
+                        }
                     }
                     return
                 }
 
+                let newestCreated: string | undefined
                 for await (const batch of fetchAccountsBySourceIdGenerator(
                     source.id,
                     abortSignal,
@@ -392,6 +427,9 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
                     )
                     collectedCount = batchResult.collectedCount
                     discardedMachineCount += batchResult.discardedMachineCount
+                    if (batchResult.newestCreated && (!newestCreated || batchResult.newestCreated > newestCreated)) {
+                        newestCreated = batchResult.newestCreated
+                    }
                     const current = sourceProgress.get(source.id) ?? {}
                     sourceProgress.set(source.id, { ...current, registered: collectedCount })
                     reportAggregateFetchProgress()
@@ -411,8 +449,17 @@ export async function fetchManagedAccounts(deps: ManagedAccountFetcherDeps, abor
                 }
 
                 if (batchLimitedSourceNames.has(source.name)) {
-                    batchCumulativeCount[source.name] = collectedCount
-                    log.debug(`Source ${source.name}: updated cumulative count to ${collectedCount}`)
+                    batchCumulativeCount[source.name] = Math.max(
+                        batchCumulativeCount[source.name] ?? 0,
+                        collectedCount
+                    )
+                    if (newestCreated && batchWatermarkTimestamp) {
+                        const previous = batchWatermarkTimestamp[source.name]
+                        if (!previous || newestCreated > previous) {
+                            batchWatermarkTimestamp[source.name] = newestCreated
+                        }
+                    }
+                    log.debug(`Source ${source.name}: updated cumulative count to ${batchCumulativeCount[source.name]}`)
                 }
             })
         )
