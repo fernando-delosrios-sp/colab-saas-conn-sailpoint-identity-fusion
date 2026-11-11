@@ -203,6 +203,28 @@ describe('injectBuildStamp', () => {
             /Developer Settings/
         )
     })
+
+    it('injects Build: unknown without throwing when git facts were unavailable', () => {
+        const spec = specWithDeveloperSettings(baseHelp)
+
+        injectBuildStamp(spec, formatBuildStamp({}))
+
+        const help = developerSettingsMessage(spec)
+        expect(help).toContain('Build: unknown')
+        expect(help.match(/Build:/g)).toHaveLength(1)
+    })
+
+    it('uses the commit date rather than the pack date', () => {
+        const today = new Date().toISOString().slice(0, 10)
+        const stamp = resolveBuildStamp({
+            cwd: '/repo',
+            env: {},
+            exec: gitExec({ sha: 'def5678', date: '2026-11-01', branch: '2.2.0/preview', status: '' }),
+        })
+
+        expect(stamp).toContain('2026-11-01')
+        expect(stamp).not.toContain(today)
+    })
 })
 
 describe('formatting guard', () => {

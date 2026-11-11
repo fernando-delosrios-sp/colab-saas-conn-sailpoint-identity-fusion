@@ -18,11 +18,11 @@
 ## 3. Verification
 
 - [x] 3.1 Confirm canonical test command: `npm test` (redirect to a file when output is long; do not pipe to `tail` or `head`).
-- [ ] 3.2 Run `npm run pack-zip` twice from a clean tree and confirm both zips carry the same `Build:` line, and that `git status --porcelain` is empty afterwards.
-- [ ] 3.3 Run `npm run pack-zip` with an uncommitted source edit and confirm the stamp carries `-dirty`.
-- [ ] 3.4 Force the package command to fail and confirm `connector-spec.json` is unchanged and the exit code is non-zero.
+- [x] 3.2 Run `npm run pack-zip` twice from a clean tree and confirm both zips carry the same `Build:` line, and that `git status --porcelain` is empty afterwards.
+- [x] 3.3 Run `npm run pack-zip` with an uncommitted source edit and confirm the stamp carries `-dirty`.
+- [x] 3.4 Force the package command to fail and confirm `connector-spec.json` is unchanged and the exit code is non-zero.
 - [x] 3.5 Run `npm run lint` (ESLint, connector spec help check, knip) and `npm run typecheck`.
-- [ ] 3.6 All delta spec scenarios covered by named automated tests or the manual checks above (coverage evidence for `/opsx:verify`).
+- [x] 3.6 All delta spec scenarios covered by named automated tests or the manual checks above (coverage evidence for `/opsx:verify`).
 
 ## 4. Documentation
 
