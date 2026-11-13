@@ -5,7 +5,7 @@ All notable changes to **Identity Fusion NG** — the ISC connector for Map → 
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
 
-## 2026-11-11 · v4.1.0
+## 2026-11-11 · v2.2.0
 
 ### ✨ New Features
 
@@ -22,7 +22,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
-## 2026-11-11 · v4.0.1
+## 2026-11-11 · v2.2.0
 
 ### 🔧 Improvements
 
@@ -36,7 +36,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
-## 2026-11-05 · v4.0.0
+## 2026-11-05 · v2.2.0
 
 ### ⚠️ Breaking Changes
 
@@ -48,7 +48,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
-## 2026-11-04 · v3.0.0
+## 2026-11-04 · v2.2.0
 
 ### ⚠️ Breaking Changes
 
@@ -61,7 +61,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
-## 2026-11-03 · v2.4.0
+## 2026-11-03 · v2.2.0
 
 ### ✨ New Features
 
@@ -76,7 +76,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 - **Remove early Fusion account emission** — Developer Settings no longer offers **Drop Fusion accounts after emission?** (`fusionDropAccountsAfterEmit`). Accounts stay resident through matching and are sent once during Output, which keeps unique attributes, review entitlements, and auto-merge updates on the copy Identity Security Cloud receives.
 - **Release aggregation memory as Output sends accounts** — Output drops Match indexes, the candidate roster, and deferred-match registrations before sending, then removes each Fusion account as its batch is sent instead of holding a second full copy. Claimed managed accounts keep only the fields later rematerialization and blend reports read.
 
-## 2026-10-29 · v2.3.0
+## 2026-10-29 · v2.2.0
 
 ### ✨ New Features
 
@@ -218,7 +218,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
-## 2026-09-09 · v2.2.2
+## 2026-09-09 · v2.2.0
 
 ### 🔧 Improvements
 
@@ -226,7 +226,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ---
 
-## 2026-09-08 · v2.2.1
+## 2026-09-08 · v2.2.0
 
 ### 🔧 Improvements
 

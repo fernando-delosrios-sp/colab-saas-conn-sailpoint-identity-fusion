@@ -6,6 +6,7 @@ context: |
 rules:
   global:
     - "Always use the `changelog-generator` skill to maintain and enforce a changelog for all changes."
+    - "Changelog headings use the current package.json version. Never write a higher version. The version changes only when the user releases."
   discovery: []
   proposal: []
   design:

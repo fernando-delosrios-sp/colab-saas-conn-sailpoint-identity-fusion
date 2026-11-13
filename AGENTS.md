@@ -20,7 +20,7 @@ Requires Node.js 24 (see `.nvmrc`).
 | `npm run build` | Build to `dist/` |
 | `npm test` | Unit tests (Vitest) |
 | `npm run test:scenario` | Scenario recording tests |
-| `npm run lint` | ESLint, connector spec check, dead code check |
+| `npm run lint` | ESLint, connector spec check, changelog version check, dead code check |
 | `npm run lint:markdown` | Markdown lint for README and docs |
 | `npm run lint:docs-guides` | Use-guide structure check |
 | `npm run prettier` | Format all files |
@@ -75,6 +75,7 @@ Leave `integrity` unchanged.
 
 - MkDocs site lives in `docs/`. Keep one topic per use guide and cross-link related guides instead of copying them.
 - Verify docs changes with `npm run lint:markdown` and `npm run docs:prepare`.
+- `CHANGELOG.md` headings use the current `package.json` `version`. Do not invent a higher version. That version changes only when this package is released. `npm run lint` rejects a heading above the package version.
 
 ## Ubiquitous Language
 

@@ -12,6 +12,7 @@ These scripts prepare the `docs/` tree for MkDocs and optional local builds.
 | `check-lean-ctx-docs.cjs`     | Fails if any file under `docs/` contains `lean-ctx: omitted` placeholder corruption.                                  |
 | `copy-license-for-docs.cjs`   | Copies `LICENSE.txt` into `docs/LICENSE.txt` so the home page can link to it for MkDocs validation.                |
 | `copy-changelog-for-docs.cjs` | Copies `CHANGELOG.md` into `docs/CHANGELOG.md` so the home page can link to it for MkDocs validation.              |
+| `check-changelog-version.cjs` | Fails when a changelog heading version is above `package.json` `version` (runs in `npm run lint`). The changelog stays on the current version until that version is released. |
 | `slim-connector-spec-help.cjs` | Refreshes section overviews and `docLink` fields; strips markdown from field `helpKey` strings. |
 | `slim-connector-spec-helpkeys.cjs` | Deprecated alias for `slim-connector-spec-help.cjs`. |
 | `docs-venv.cjs`             | Creates or uses `.venv`, installs `requirements-docs.txt`, and runs `mkdocs build` or `mkdocs serve`.                   |
