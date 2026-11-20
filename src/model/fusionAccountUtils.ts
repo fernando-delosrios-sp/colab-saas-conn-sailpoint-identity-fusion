@@ -76,13 +76,18 @@ function identityDisplayNameFromAccount(account: Account): string | undefined {
  * - `id` is mandatory and non-empty. Without it, no IdentityInfo is returned.
  * - `name` is the identity alias and comes only from `IdentityDocument.name`. Account references
  *   (`account.identity.name`) and `FusionDecision.identityName` carry the identity display name,
- *   not the alias, so they never populate it. Correlated authoritative managed accounts recover the
- *   alias from their own account name in `buildFromManagedAccount`.
+ *   not the alias, so they never populate it. A correlated authoritative managed account may copy
+ *   its account name in `buildFromManagedAccount` until the identity alias is loaded. A blank
+ *   identity name does not clear that value.
  * - `displayName` is the identity display name chain:
  *   identity.attributes.displayName || identity.displayName || identity.name || account.identity?.name || account.name.
  */
 export function buildIdentityInfo(
-    source: IdentityDocument | Account | FusionDecision | { id?: string | null; name?: string | null; displayName?: string | null }
+    source:
+        | IdentityDocument
+        | Account
+        | FusionDecision
+        | { id?: string | null; name?: string | null; displayName?: string | null }
 ): IdentityInfo | undefined {
     let id: string | undefined
     let name: string | undefined
@@ -92,11 +97,16 @@ export function buildIdentityInfo(
     if ('account' in source && ('identityName' in source || 'identityId' in source)) {
         const decision = source as FusionDecision
         id = trimStr(decision.identityId)
-        displayName =
-            trimStr(decision.identityName) ?? trimStr(decision.account.name) ?? trimStr(decision.account.id)
+        displayName = trimStr(decision.identityName) ?? trimStr(decision.account.name) ?? trimStr(decision.account.id)
     }
     // Account
-    else if ('sourceId' in source || 'nativeIdentity' in source || 'accountId' in source || 'identityId' in source || 'identity' in source) {
+    else if (
+        'sourceId' in source ||
+        'nativeIdentity' in source ||
+        'accountId' in source ||
+        'identityId' in source ||
+        'identity' in source
+    ) {
         const account = source as Account
         id = trimStr(account.identityId)
         displayName = identityDisplayNameFromAccount(account)
@@ -126,6 +136,3 @@ export function buildIdentityInfo(
         displayName: displayName ?? name ?? '',
     }
 }
-
-
-

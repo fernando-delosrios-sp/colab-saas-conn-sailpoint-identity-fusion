@@ -576,6 +576,22 @@ describe('FusionAccount', () => {
             }
         })
 
+        it('keeps a resolved alias when the identity layer name is blank', () => {
+            FusionAccount.configure(aliasConfig)
+            try {
+                const acc = FusionAccount.fromManagedAccount(correlatedHrAccount())
+                acc.addIdentityLayer({
+                    id: 'identity-vincent',
+                    name: '',
+                    displayName: '',
+                } as unknown as IdentityDocument)
+
+                expect(acc.identityAlias).toBe('vincent.mccoy')
+            } finally {
+                FusionAccount.configure(minimalConfig)
+            }
+        })
+
         it('adds fusion match', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1' } as any)
             acc.layers.addFusionMatch({ fusionIdentity: {} as any, score: 100 } as any)

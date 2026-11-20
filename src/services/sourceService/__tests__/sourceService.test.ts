@@ -1519,3 +1519,88 @@ describe('SourceService creation watermark timestamp persistence', () => {
     })
 })
 
+describe('SourceService.listSourceSchemas', () => {
+    it('returns the saved Internal Record schema without calling Identity Security Cloud', async () => {
+        const { service, client } = createService()
+        const internal: SourceInfo = {
+            id: 'internal-record:ACMaint%20Database.csv',
+            name: 'ACMaint Database',
+            isManaged: true,
+            sourceType: SourceType.Record,
+            internalProvenance: true,
+            internalRecord: {
+                fileName: 'ACMaint Database.csv',
+                sourceName: 'ACMaint Database',
+                includeRecordAccountsInMatch: false,
+                accountJmespathFilter: '',
+                accountIdField: 'EMPLID',
+                accountNameField: 'NAME',
+                schema: [
+                    { name: 'EMPLID', multiValued: false },
+                    { name: 'NAME', multiValued: false },
+                    { name: 'department', multiValued: false },
+                    { name: 'AFFILS', multiValued: true },
+                ],
+            },
+        }
+        ;(service as any).allSourcesValue = [internal]
+
+        const schemas = await service.listSourceSchemas(internal.id)
+        const again = await service.listSourceSchemas(internal.id)
+
+        expect(client.call).not.toHaveBeenCalled()
+        expect(schemas).toEqual(again)
+        expect(schemas).toEqual([
+            {
+                id: internal.id,
+                name: 'account',
+                nativeObjectType: 'account',
+                identityAttribute: 'EMPLID',
+                displayAttribute: 'NAME',
+                attributes: [
+                    {
+                        name: 'EMPLID',
+                        type: 'STRING',
+                        isMulti: false,
+                        isEntitlement: false,
+                        isGroup: false,
+                    },
+                    {
+                        name: 'NAME',
+                        type: 'STRING',
+                        isMulti: false,
+                        isEntitlement: false,
+                        isGroup: false,
+                    },
+                    {
+                        name: 'department',
+                        type: 'STRING',
+                        isMulti: false,
+                        isEntitlement: false,
+                        isGroup: false,
+                    },
+                    {
+                        name: 'AFFILS',
+                        type: 'STRING',
+                        isMulti: true,
+                        isEntitlement: false,
+                        isGroup: false,
+                    },
+                ],
+            },
+        ])
+    })
+
+    it('still loads an Identity Security Cloud source schema from the API', async () => {
+        const { service, client, sourceInfo } = createService()
+        client.sourcesApi.getSourceSchemas = vi.fn().mockResolvedValue({
+            data: [{ name: 'account', identityAttribute: 'id', attributes: [] }],
+        })
+
+        const schemas = await service.listSourceSchemas(sourceInfo.id)
+
+        expect(client.call).toHaveBeenCalled()
+        expect(schemas).toEqual([{ name: 'account', identityAttribute: 'id', attributes: [] }])
+    })
+})
+

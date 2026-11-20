@@ -25,6 +25,18 @@ function makeIdentity(id: string, overrides: Partial<IdentityDocument> = {}): Id
     } as unknown as IdentityDocument
 }
 
+/** Identities API shape: `alias` is the identity alias, `name` is the display name. */
+function profileFor(identity: IdentityDocument): Record<string, unknown> {
+    return {
+        id: identity.id,
+        alias: identity.name,
+        name: identity.displayName ?? identity.name,
+        emailAddress: identity.email,
+        attributes: identity.attributes ?? {},
+        protected: identity.protected === true,
+    }
+}
+
 function makeClient(searchResultsByQuery: Record<string, IdentityDocument[]> = {}): ClientServiceStub {
     return {
         call: vi.fn(async (_fn: any, policy?: any) => {
@@ -96,7 +108,13 @@ function makeService(
         referencedAttributeSet?: ReadonlySet<string>
         run?: FusionRun
     } = {}
-): { service: IdentityService; client: ClientServiceStub; log: LogService; run: FusionRun; sources: SourceServiceStub } {
+): {
+    service: IdentityService
+    client: ClientServiceStub
+    log: LogService
+    run: FusionRun
+    sources: SourceServiceStub
+} {
     const log = makeLog()
     const client = makeClient(overrides.searchResultsByQuery)
     const sources = makeSources(overrides.sources)
@@ -261,9 +279,12 @@ describe('IdentityService.isIdentityInScope', () => {
     it('returns true when identity fetching is disabled but the identity is hydrated in cache', async () => {
         const { service, client } = makeService({
             config: { includeIdentities: false, identityScopeQuery: 'source.name:Employees' },
-            searchResultsByQuery: {
-                'id:"id-1"': [makeIdentity('id-1')],
-            },
+        })
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            if (policy?.context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return profileFor(makeIdentity('id-1'))
+            }
+            return []
         })
 
         await service.fetchIdentityById('id-1')
@@ -296,9 +317,12 @@ describe('IdentityService.isIdentityInScope', () => {
     it('returns true for universal scope when the identity is already hydrated in cache', async () => {
         const { service, client } = makeService({
             config: { identityScopeQuery: '*' },
-            searchResultsByQuery: {
-                'id:"id-1"': [makeIdentity('id-1')],
-            },
+        })
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            if (policy?.context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return profileFor(makeIdentity('id-1'))
+            }
+            return []
         })
 
         await service.fetchIdentityById('id-1')
@@ -356,13 +380,21 @@ describe('IdentityService.ensureIdentityById', () => {
         expect(client.call).not.toHaveBeenCalled()
     })
 
-    it('falls back to profile fetch when search hydration returns nothing', async () => {
+    it('loads a single identity from the Identities API', async () => {
         const owner = makeIdentity('owner-profile')
         const { service, client } = makeService()
+        const contexts: string[] = []
         ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
             const context = policy?.context ?? ''
+            contexts.push(context)
             if (context === 'IdentityService>fetchIdentityProfileById getIdentity') {
-                return { id: owner.id, name: owner.name, emailAddress: 'owner@example.com', attributes: {} }
+                return {
+                    id: owner.id,
+                    alias: owner.name,
+                    name: owner.name,
+                    emailAddress: 'owner@example.com',
+                    attributes: {},
+                }
             }
             return []
         })
@@ -370,7 +402,9 @@ describe('IdentityService.ensureIdentityById', () => {
         const result = await service.ensureIdentityById('owner-profile')
 
         expect(result?.id).toBe('owner-profile')
+        expect(result?.name).toBe('owner-profile')
         expect(service.getIdentityById('owner-profile')).toBeDefined()
+        expect(contexts).toEqual(['IdentityService>fetchIdentityProfileById getIdentity'])
     })
 })
 
@@ -380,11 +414,8 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
         const { service, client } = makeService()
         ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
             const context = policy?.context ?? ''
-            if (
-                context === 'IdentityService>fetchIdentityById searchPost' ||
-                context === 'IdentityService>hydrateMissingIdentitiesById searchPost'
-            ) {
-                return [owner]
+            if (context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return profileFor(owner)
             }
             return []
         })
@@ -410,11 +441,8 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
         const { service, client } = makeService()
         ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
             const context = policy?.context ?? ''
-            if (
-                context === 'IdentityService>fetchIdentityById searchPost' ||
-                context === 'IdentityService>hydrateMissingIdentitiesById searchPost'
-            ) {
-                return [protectedOwner]
+            if (context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return profileFor(protectedOwner)
             }
             return []
         })
@@ -437,11 +465,8 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
         ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
             const context = policy?.context ?? ''
             const queryStr = policy?.paginate?.search?.query?.query ?? ''
-            if (
-                context === 'IdentityService>fetchIdentityById searchPost' ||
-                context === 'IdentityService>hydrateMissingIdentitiesById searchPost'
-            ) {
-                return [owner]
+            if (context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return profileFor(owner)
             }
             return queryStr === 'source.name:Employees' ? [scoped] : []
         })
@@ -457,11 +482,8 @@ describe('IdentityService.fetchIdentities with additionalIdentityIds (global rev
         const { service, client } = makeService()
         ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
             const context = policy?.context ?? ''
-            if (
-                context === 'IdentityService>fetchIdentityById searchPost' ||
-                context === 'IdentityService>hydrateMissingIdentitiesById searchPost'
-            ) {
-                return [owner]
+            if (context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return profileFor(owner)
             }
             return []
         })
@@ -488,6 +510,127 @@ describe('IdentityService.fetchIdentityProfileById', () => {
         expect(doc?.email).toBe('owner@example.com')
         expect((doc?.attributes as any)?.email).toBe('owner@example.com')
         expect(service.getIdentityById('owner-1')?.email).toBe('owner@example.com')
+    })
+
+    it('maps the Identities API alias to the identity alias and the profile name to the display name', async () => {
+        const { service, client } = makeService()
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            if (policy?.context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return {
+                    id: '2ac5f4d9',
+                    name: 'Erdem Erdogan',
+                    alias: 'erdem.erdogan',
+                    attributes: {},
+                }
+            }
+            return []
+        })
+
+        const doc = await service.fetchIdentityProfileById('2ac5f4d9')
+
+        expect(doc?.name).toBe('erdem.erdogan')
+        expect(doc?.displayName).toBe('Erdem Erdogan')
+        expect((doc?.attributes as any)?.displayName).toBe('Erdem Erdogan')
+    })
+})
+
+describe('IdentityService.hydrateMissingIdentitiesById alias repair', () => {
+    it('loads a single identity from the Identities API alias', async () => {
+        const { service, client } = makeService()
+        const contexts: string[] = []
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            const context = policy?.context ?? ''
+            contexts.push(context)
+            if (context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return {
+                    id: '2ac5f4d9',
+                    name: 'Erdem Erdogan',
+                    alias: 'erdem.erdogan',
+                    attributes: {},
+                }
+            }
+            return []
+        })
+
+        await service.hydrateMissingIdentitiesById(['2ac5f4d9'])
+
+        expect(service.getIdentityById('2ac5f4d9')?.name).toBe('erdem.erdogan')
+        expect(service.getIdentityById('2ac5f4d9')?.displayName).toBe('Erdem Erdogan')
+        expect(contexts).toEqual(['IdentityService>fetchIdentityProfileById getIdentity'])
+    })
+
+    it('loads the identity alias when a multi-identity Search hit has a blank name', async () => {
+        const { service, client } = makeService()
+        const contexts: string[] = []
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            const context = policy?.context ?? ''
+            contexts.push(context)
+            if (context === 'IdentityService>hydrateMissingIdentitiesById searchPost') {
+                return [
+                    { id: 'id-named', name: 'cristian.grau', displayName: 'Cristian Grau', protected: false },
+                    { id: '2ac5f4d9', name: '', displayName: '', protected: false },
+                ]
+            }
+            if (context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return {
+                    id: '2ac5f4d9',
+                    name: 'Erdem Erdogan',
+                    alias: 'erdem.erdogan',
+                    attributes: {},
+                }
+            }
+            return []
+        })
+
+        await service.hydrateMissingIdentitiesById(['id-named', '2ac5f4d9'])
+
+        expect(service.getIdentityById('id-named')?.name).toBe('cristian.grau')
+        expect(service.getIdentityById('2ac5f4d9')?.name).toBe('erdem.erdogan')
+        expect(service.getIdentityById('2ac5f4d9')?.displayName).toBe('Erdem Erdogan')
+        expect(contexts).toContain('IdentityService>hydrateMissingIdentitiesById searchPost')
+        expect(contexts).toContain('IdentityService>fetchIdentityProfileById getIdentity')
+    })
+
+    it('does not call the Identities API when Search already returned an alias', async () => {
+        const { service, client } = makeService()
+        const contexts: string[] = []
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            const context = policy?.context ?? ''
+            contexts.push(context)
+            if (context === 'IdentityService>hydrateMissingIdentitiesById searchPost') {
+                return [
+                    { id: 'id-1', name: 'cristian.grau', displayName: 'Cristian Grau', protected: false },
+                    { id: 'id-2', name: 'jonathan.mueller', displayName: 'Jonathan Mueller', protected: false },
+                ]
+            }
+            return []
+        })
+
+        await service.hydrateMissingIdentitiesById(['id-1', 'id-2'])
+
+        expect(service.getIdentityById('id-1')?.name).toBe('cristian.grau')
+        expect(contexts).not.toContain('IdentityService>fetchIdentityProfileById getIdentity')
+    })
+
+    it('replaces a cached blank Search name with the profile alias', async () => {
+        const { service, client } = makeService()
+        service.run.addIdentity('2ac5f4d9', { id: '2ac5f4d9', name: '' } as IdentityDocument)
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            if (policy?.context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return {
+                    id: '2ac5f4d9',
+                    name: 'Erdem Erdogan',
+                    alias: 'erdem.erdogan',
+                    attributes: {},
+                }
+            }
+            return []
+        })
+
+        const result = await service.ensureIdentityById('2ac5f4d9')
+
+        expect(result?.name).toBe('erdem.erdogan')
+        expect(client.call).toHaveBeenCalledTimes(1)
     })
 })
 
@@ -535,7 +678,9 @@ describe('IdentityService.correlateAccounts', () => {
         await service.correlateAccounts(makeFusionAccount(), ['src-hr::acct-1'])
 
         expect(log.recordCorrelationCompleted).not.toHaveBeenCalled()
-        expect(log.error).toHaveBeenCalledWith(expect.stringContaining('Failed to correlate managed key src-hr::acct-1'))
+        expect(log.error).toHaveBeenCalledWith(
+            expect.stringContaining('Failed to correlate managed key src-hr::acct-1')
+        )
     })
 
     it('records merge correlation activity when kind is merge', async () => {
@@ -712,8 +857,7 @@ describe('Identity Document Pruning on Ingest', () => {
         })
 
         const referencedAttributeSet = new Set(['costCenter'])
-        const { service, run } = makeService({
-            searchResultsByQuery: { [`id:"${identityId}"`]: [rawIdentity] },
+        const { service, client, run } = makeService({
             referencedAttributeSet,
             sources: {
                 hasFusionSource: true,
@@ -721,10 +865,23 @@ describe('Identity Document Pruning on Ingest', () => {
                 managedSources: [{ id: 'hr-source-id', name: 'HR Source' }],
             },
         })
+        ;(client.call as Mock).mockImplementation(async (_fn: any, policy: any) => {
+            if (policy?.context === 'IdentityService>fetchIdentityProfileById getIdentity') {
+                return {
+                    id: identityId,
+                    alias: 'bob.ondemand',
+                    name: 'Bob OnDemand',
+                    emailAddress: 'bob@example.com',
+                    attributes: rawIdentity.attributes,
+                }
+            }
+            return []
+        })
 
         const result = await service.fetchIdentityById(identityId)
 
-        // Verifies return value is pruned
+        // Verifies return value is pruned. The Identities API profile has no linked accounts.
+        expect(result.name).toBe('bob.ondemand')
         expect(result.attributes).toEqual({
             displayName: 'Bob OnDemand',
             email: 'bob@example.com',
@@ -733,16 +890,7 @@ describe('Identity Document Pruning on Ingest', () => {
             lastname: 'OnDemand',
             costCenter: 'CC-99',
         })
-        expect(result.accounts).toEqual([
-            {
-                id: 'acc-hr',
-                nativeIdentity: 'bob-hr-nat',
-                accountId: 'bob-hr-nat',
-                name: 'bob-hr',
-                disabled: false,
-                source: { id: 'hr-source-id', name: 'HR Source' },
-            },
-        ])
+        expect(result.accounts).toEqual([])
 
         // Verifies cached value in run is also pruned
         const cached = run.getIdentity(identityId)

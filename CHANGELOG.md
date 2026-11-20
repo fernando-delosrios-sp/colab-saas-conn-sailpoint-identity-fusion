@@ -5,6 +5,15 @@ All notable changes to **Identity Fusion NG** — the ISC connector for Map → 
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
 
+## 2026-11-20 · v2.2.0
+
+### 🐛 Fixes
+
+- **Internal Record schemas no longer query Identity Security Cloud** — Setup asked Identity Security Cloud for the account schema of every managed source, including Internal Record sources. Those sources exist only in the Records Customizer package, so the call returned HTTP 404 and their attributes were skipped. `listSourceSchemas` now builds the account schema from the saved Internal Record schema and does not call Identity Security Cloud for that source.
+- **Fusion account name stays the identity alias** — A Fusion account built from an identity, or from a correlated managed account, takes its name from the identity alias. Search is still used when several identities are loaded, and its `name` is the alias. One identity is loaded with the Identities API, and the alias is that profile's `alias`. A Search hit with a blank name is completed the same way. A blank name no longer clears an alias already on the Fusion account.
+
+---
+
 ## 2026-11-11 · v2.2.0
 
 ### ✨ New Features

@@ -130,5 +130,38 @@ IdentityService SHALL prune incoming `IdentityDocument` payloads on page arrival
 #### Scenario: On-demand identity hydration applies pruning
 
 - **GIVEN** an identity fetched on-demand via `IdentityService.fetchIdentityById`
-- **WHEN** the identity document is received from the API
-- **THEN** the same attribute pruning and linked account filtering SHALL be applied before the document is cached or returned
+- **WHEN** the identity document is built from the Identities API profile
+- **THEN** attribute pruning SHALL be applied before the document is cached or returned
+
+### Requirement: Identity reads use Search for a batch and the Identities API for one identity
+
+IdentityService SHALL load more than one identity with Search. The identity alias for a Search document SHALL be `IdentityDocument.name`. IdentityService SHALL load one identity by id with the Identities API (`getIdentity`). The identity alias for that profile SHALL be `alias`, and the profile `name` SHALL be stored as the display name. When a Search hit has a blank `name`, IdentityService SHALL load that identity with the Identities API and SHALL use `alias` as the identity alias. A cached Search document with a blank name SHALL NOT block that lookup.
+
+#### Scenario: Several identities are loaded with Search
+
+- **GIVEN** two identity ids are hydrated together
+- **AND** Search returns a name for each
+- **WHEN** the identities are hydrated
+- **THEN** the connector SHALL read them with Search
+- **AND** it SHALL NOT call `getIdentity`
+- **AND** each cached identity document `name` SHALL be the Search `name`
+
+#### Scenario: One identity is loaded with the Identities API
+
+- **GIVEN** a single identity id is fetched
+- **AND** `getIdentity` returns `alias` `"erdem.erdogan"` and `name` `"Erdem Erdogan"`
+- **WHEN** the identity is fetched by id
+- **THEN** the connector SHALL call `getIdentity`
+- **AND** it SHALL NOT query Search for that id
+- **AND** the cached identity document `name` SHALL be `"erdem.erdogan"`
+- **AND** the cached display name SHALL be `"Erdem Erdogan"`
+
+#### Scenario: Search hit without a name is completed from the identity alias
+
+- **GIVEN** several identity ids are hydrated together
+- **AND** Search returns one identity with a blank `name`
+- **AND** `getIdentity` for that id returns `alias` `"erdem.erdogan"` and `name` `"Erdem Erdogan"`
+- **WHEN** the identities are hydrated
+- **THEN** the connector SHALL call `getIdentity` for the blank hit
+- **AND** the cached identity document `name` SHALL be `"erdem.erdogan"`
+- **AND** the cached display name SHALL be `"Erdem Erdogan"`

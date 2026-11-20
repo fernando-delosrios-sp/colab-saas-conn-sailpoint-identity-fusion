@@ -5,14 +5,12 @@ import { ClientService, QueuePriority } from './clientService'
 import { promiseAllBatched } from './fusionService/collections'
 import { LogService } from './logService'
 import { wrapConnectorError } from '../utils/error'
+import { trimStr } from '../utils/safeRead'
 import { FusionAccount } from '../model/account'
 import { SourceService } from './sourceService'
 import { FusionRun } from '../model/fusionRun'
 import { forEachChunked } from '../utils/yieldToEventLoop'
-import {
-    pruneIdentityDocumentAttributes,
-    filterIdentityAccounts,
-} from './sourceService/referencedAttributeSet'
+import { pruneIdentityDocumentAttributes, filterIdentityAccounts } from './sourceService/referencedAttributeSet'
 
 // ============================================================================
 // Constants
@@ -239,6 +237,7 @@ export class IdentityService {
                         }
                     )
                     ingested += page.length
+                    await this.repairIdentitiesMissingAlias(page.filter((identity) => !identity.protected))
                 }
                 this.identityScopeFetchCompleted = true
             }, `Failed to fetch identities using scope query "${this.identityScopeQuery}"`)
@@ -299,28 +298,19 @@ export class IdentityService {
     }
 
     /**
-     * Fetches a single identity by ID and adds it to the cache.
+     * Fetches a single identity by ID from the Identities API and adds it to the cache.
+     * The identity alias is the profile `alias`, not Search `name`.
      *
      * @param id - The ISC identity ID to fetch
      * @returns The fetched identity document
      */
     public async fetchIdentityById(id: string): Promise<IdentityDocument> {
         this.log.debug(`Fetching identity ${id}.`)
-
-        const query = buildIdentityQuery(`id:"${id}"`)
-
-        return wrapConnectorError(async () => {
-            const identities = await this.client.call<IdentityDocument>(searchPostPaginated, {
-                paginate: { mode: 'searchAfter', search: query as any },
-                priority: QueuePriority.HIGH,
-                context: 'IdentityService>fetchIdentityById searchPost',
-            })
-            identities.forEach((identity) => {
-                this.pruneIdentityDocument(identity)
-                this.run.addIdentity(identity.id, identity)
-            })
-            return identities[0]
-        }, `Failed to fetch identity by ID "${id}"`)
+        const doc = await this.fetchIdentityProfileById(id)
+        if (!doc) {
+            throw new ConnectorError(`Failed to fetch identity by ID "${id}"`, ConnectorErrorType.Generic)
+        }
+        return doc
     }
 
     /**
@@ -368,6 +358,11 @@ export class IdentityService {
         }, `Failed to fetch identity profile by ID "${id}"`)
     }
 
+    /**
+     * Identities API `alias` is the account name (the identity alias). `name` on that API is the
+     * display name. Search `IdentityDocument.name` is already the alias, so only this mapping
+     * has to translate the two fields.
+     */
     private identityDocumentFromProfile(profile: any): IdentityDocument {
         const attributes =
             profile.attributes && typeof profile.attributes === 'object'
@@ -377,15 +372,43 @@ export class IdentityService {
         if (emailAddress && !attributes.email) {
             attributes.email = emailAddress
         }
+        const alias = trimStr(profile.alias)
+        const displayName = trimStr(profile.name)
+        if (displayName && !trimStr(attributes.displayName)) {
+            attributes.displayName = displayName
+        }
         return {
             id: profile.id,
-            name: profile.name,
+            name: alias ?? displayName ?? '',
+            displayName: displayName ?? alias,
             email: profile.email ?? profile.emailAddress ?? undefined,
             attributes,
             accounts: [],
             disabled: profile.identityStatus === 'INACTIVE',
-            protected: false,
+            protected: profile.protected === true,
         } as IdentityDocument
+    }
+
+    /**
+     * Search can return an identity id with a blank name before the alias is indexed. That blank
+     * is not an alias. The Identities API profile carries the alias on `alias`.
+     */
+    private async repairIdentitiesMissingAlias(identities: IdentityDocument[]): Promise<void> {
+        const missing = identities.filter((identity) => identity.id && !trimStr(identity.name))
+        if (missing.length === 0) return
+
+        const label = missing.length === 1 ? 'identity' : 'identities'
+        this.log.debug(
+            `Loading identity alias from the Identities API for ${missing.length} ${label} with a blank Search name.`
+        )
+        await promiseAllBatched(missing, async (identity) => {
+            try {
+                await this.fetchIdentityProfileById(identity.id)
+            } catch (err) {
+                const detail = err instanceof Error ? err.message : String(err)
+                this.log.debug(`Failed to load identity alias for ${identity.id}: ${detail}`)
+            }
+        })
     }
 
     // ------------------------------------------------------------------------
@@ -404,66 +427,74 @@ export class IdentityService {
     }
 
     public async hydrateMissingIdentitiesById(identityIds: string[]): Promise<void> {
-        const missing = [...new Set(identityIds.filter((id) => id && !this.getIdentityById(id)))]
-        if (missing.length === 0) return
+        const requested = [...new Set(identityIds.filter((id) => id))]
+        const missing = requested.filter((id) => !this.getIdentityById(id))
+        const loadedFromProfile = new Set<string>()
 
-        const BATCH_SIZE = 50
-        const batches: string[][] = []
-        for (let i = 0; i < missing.length; i += BATCH_SIZE) {
-            batches.push(missing.slice(i, i + BATCH_SIZE))
-        }
-
-        await promiseAllBatched(batches, async (batch) => {
-            const queryStr = `id:("${batch.join('" OR "')}")`
-            const query = buildIdentityQuery(queryStr)
+        if (missing.length === 1) {
+            const id = missing[0]
             try {
-                const identities = await this.client.call<IdentityDocument>(searchPostPaginated, {
-                    paginate: { mode: 'searchAfter', search: query as any },
-                    priority: QueuePriority.HIGH,
-                    context: 'IdentityService>hydrateMissingIdentitiesById searchPost',
-                })
-                identities.forEach((identity) => {
-                    this.pruneIdentityDocument(identity)
-                    this.run.addIdentity(identity.id, identity)
-                })
+                await this.fetchIdentityProfileById(id)
+                loadedFromProfile.add(id)
             } catch (err) {
                 const detail = err instanceof Error ? err.message : String(err)
-                this.log.debug(`Failed to hydrate batch of missing identities: ${detail}`)
+                this.log.debug(`Failed to load identity ${id} from the Identities API: ${detail}`)
             }
-        })
+        } else if (missing.length > 1) {
+            const BATCH_SIZE = 50
+            const batches: string[][] = []
+            for (let i = 0; i < missing.length; i += BATCH_SIZE) {
+                batches.push(missing.slice(i, i + BATCH_SIZE))
+            }
+
+            await promiseAllBatched(batches, async (batch) => {
+                const queryStr = `id:("${batch.join('" OR "')}")`
+                const query = buildIdentityQuery(queryStr)
+                try {
+                    const identities = await this.client.call<IdentityDocument>(searchPostPaginated, {
+                        paginate: { mode: 'searchAfter', search: query as any },
+                        priority: QueuePriority.HIGH,
+                        context: 'IdentityService>hydrateMissingIdentitiesById searchPost',
+                    })
+                    identities.forEach((identity) => {
+                        this.pruneIdentityDocument(identity)
+                        this.run.addIdentity(identity.id, identity)
+                    })
+                } catch (err) {
+                    const detail = err instanceof Error ? err.message : String(err)
+                    this.log.debug(`Failed to hydrate batch of missing identities: ${detail}`)
+                }
+            })
+        }
+
+        const unresolved = requested
+            .map((id) => this.getIdentityById(id))
+            .filter(
+                (identity): identity is IdentityDocument =>
+                    !!identity && !loadedFromProfile.has(identity.id) && !trimStr(identity.name)
+            )
+        await this.repairIdentitiesMissingAlias(unresolved)
     }
 
     /**
-     * Load an identity into the run cache when absent, using search hydration and direct API fallbacks.
+     * Load one identity into the run cache from the Identities API.
      * Used for global reviewers and other identities that may sit outside the configured scope query.
      */
     public async ensureIdentityById(id: string): Promise<IdentityDocument | undefined> {
         if (!id) return undefined
 
-        let identity = this.getIdentityById(id)
-        if (identity) return identity
-
-        await this.hydrateMissingIdentitiesById([id])
-        identity = this.getIdentityById(id)
-        if (identity) return identity
+        const cached = this.getIdentityById(id)
+        if (cached && trimStr(cached.name)) return cached
 
         try {
-            identity = await this.fetchIdentityById(id)
-            if (identity) return identity
-        } catch (err) {
-            const detail = err instanceof Error ? err.message : String(err)
-            this.log.debug(`ensureIdentityById search fetch failed for ${id}: ${detail}`)
-        }
-
-        try {
-            identity = await this.fetchIdentityProfileById(id)
-            if (identity) return identity
+            const loaded = await this.fetchIdentityProfileById(id)
+            if (loaded) return loaded
         } catch (err) {
             const detail = err instanceof Error ? err.message : String(err)
             this.log.debug(`ensureIdentityById profile fetch failed for ${id}: ${detail}`)
         }
 
-        return undefined
+        return this.getIdentityById(id)
     }
 
     /** Mark an identity as in-scope for this aggregation run (e.g. global reviewer owners). */

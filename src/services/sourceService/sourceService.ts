@@ -1,6 +1,7 @@
 import {
     AccountV2025 as Account,
     AccountsApiListAccountsRequest,
+    AttributeDefinitionTypeV2025,
     Source,
     SchemaV2025,
     SourcesV2025ApiGetSourceSchemasRequest,
@@ -70,6 +71,32 @@ function isUnknownMachineAccountId(error: unknown): boolean {
     if (!error || typeof error !== 'object') return false
     const withStatus = error as { status?: number; response?: { status?: number } }
     return (withStatus.response?.status ?? withStatus.status) === 404
+}
+
+/**
+ * Account schema for an Internal Record source, taken from the saved Internal Record schema.
+ * Returns undefined when the source is an Identity Security Cloud source.
+ */
+function accountSchemasFromInternalRecord(source: SourceInfo): SchemaV2025[] | undefined {
+    if (!source.internalProvenance) return undefined
+    const entry = source.internalRecord
+    assert(entry, `Internal Record source "${source.name}" has no saved schema`)
+    return [
+        {
+            id: source.id,
+            name: 'account',
+            nativeObjectType: 'account',
+            identityAttribute: entry.accountIdField,
+            displayAttribute: entry.accountNameField,
+            attributes: entry.schema.map((field) => ({
+                name: field.name,
+                type: AttributeDefinitionTypeV2025.String,
+                isMulti: field.multiValued,
+                isEntitlement: false,
+                isGroup: false,
+            })),
+        },
+    ]
 }
 
 export class SourceService {
@@ -763,10 +790,22 @@ export class SourceService {
     // Public Schema Methods
     // ------------------------------------------------------------------------
 
+    /** Identity Security Cloud sources live in `sourcesById`. Internal Record sources live only on `allSources`. */
+    private findLoadedSource(sourceId: string): SourceInfo | undefined {
+        return this.sourcesById.get(sourceId) ?? this.allSourcesValue?.find((source) => source.id === sourceId)
+    }
+
     public async listSourceSchemas(sourceId: string): Promise<SchemaV2025[]> {
         const cachedSchemas = this.sourceSchemasCache.get(sourceId)
         if (cachedSchemas) {
             return cachedSchemas
+        }
+
+        const loadedSource = this.findLoadedSource(sourceId)
+        const packagedSchemas = loadedSource ? accountSchemasFromInternalRecord(loadedSource) : undefined
+        if (packagedSchemas) {
+            this.sourceSchemasCache.set(sourceId, packagedSchemas)
+            return packagedSchemas
         }
 
         const requestParameters: SourcesV2025ApiGetSourceSchemasRequest = {

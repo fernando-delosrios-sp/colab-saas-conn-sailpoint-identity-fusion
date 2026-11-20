@@ -369,6 +369,18 @@ SourceService SHALL apply the Accounts JMESPath filter saved for an Internal Rec
 - **THEN** rows outside Engineering SHALL NOT be registered
 - **AND** rows inside Engineering SHALL be registered
 
+### Requirement: Internal Record source schemas SHALL come from the saved Internal Record schema
+
+`listSourceSchemas` SHALL return the saved Internal Record schema for an Internal Record source and SHALL NOT call Identity Security Cloud `getSourceSchemas` for that source. The returned account schema SHALL use the saved Account ID field as `identityAttribute`, the saved Account Name field as `displayAttribute`, and one attribute per saved schema field. A field saved as multi-valued SHALL be marked multi.
+
+#### Scenario: Internal Record schema is served without an API call
+- **GIVEN** an Internal Record source whose saved schema includes single-valued `department` and multi-valued `AFFILS`
+- **WHEN** `listSourceSchemas` is called with that source id
+- **THEN** the account schema SHALL list `department` as single-valued and `AFFILS` as multi-valued
+- **AND** its identity attribute SHALL be the saved Account ID field
+- **AND** its display attribute SHALL be the saved Account Name field
+- **AND** SourceService SHALL NOT call Identity Security Cloud for that source's schema
+
 ### Requirement: Managed source account fetch SHALL conditionally sort accounts by created time when batch aggregation is configured
 
 When fetching accounts from a managed source via ISC `listAccounts`, `SourceService` SHALL determine `sorters` based on whether the source has `accountLimit` configured:

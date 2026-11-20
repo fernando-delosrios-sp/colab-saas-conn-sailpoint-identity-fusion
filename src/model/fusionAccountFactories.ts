@@ -22,11 +22,11 @@ import { SourceType } from './config'
 import { FusionAccount, IDENTITIES_SOURCE_NAME } from './fusionAccount'
 
 /**
- * Identity alias of a correlated managed account from an authoritative source. ISC derives an
- * identity's alias from its authoritative account name, so that account is itself the alias source
- * when the IdentityDocument cannot be read — Search has not indexed a freshly created identity.
- * Record and orphan account names bear no relation to the alias, and an unknown or untyped source
- * is left unresolved rather than assumed authoritative.
+ * Provisional name for a correlated managed account from an authoritative source, used only until
+ * the identity alias is loaded. The account's API name is the display attribute. It matches the
+ * identity alias only when that attribute is the authoritative account name. Record and orphan
+ * account names bear no relation to the alias, and an unknown or untyped source is left unresolved
+ * rather than assumed authoritative.
  */
 function correlatedAuthoritativeIdentityAlias(account: Account): string | undefined {
     if (account.uncorrelated !== false) return undefined

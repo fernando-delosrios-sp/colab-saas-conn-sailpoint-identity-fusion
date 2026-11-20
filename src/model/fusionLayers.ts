@@ -152,12 +152,15 @@ export class FusionLayers {
         setIdentityInfo?: (info: IdentityInfo) => void
     ): void {
         if (setEmail) setEmail(identity.attributes?.email as string)
+        const previousAlias = trimStr(identityInfo?.name)
         const builtInfo = buildIdentityInfo(identity)
+        const nextAlias = trimStr(builtInfo?.name)
         if (setIdentityInfo && builtInfo) {
-            setIdentityInfo(builtInfo)
+            setIdentityInfo(!nextAlias && previousAlias ? { ...builtInfo, name: previousAlias } : builtInfo)
         }
         attributeBag.identity = identity.attributes ?? {}
-        attributeBag.identity.name = identity.name
+        const alias = trimStr(identity.name) ?? (!nextAlias ? previousAlias : nextAlias)
+        if (alias) attributeBag.identity.name = alias
         // Identity layer enriches Velocity blending only. isIdentity (managed-source
         // correlation) is set by factory methods from source account.uncorrelated.
 
