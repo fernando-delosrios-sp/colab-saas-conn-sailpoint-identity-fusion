@@ -49,7 +49,7 @@ import { resolveManagedAccountIscIdForReport } from './reportAccountResolver'
 import { IdentityProcessor } from './identityProcessor'
 import { CorrelationManager } from '../correlationManager'
 import { DecisionProcessor } from './decisionProcessor'
-import { MatchOutcomeDispatcher, MatchSweepMode } from '../matchingService/matchOutcomeDispatcher'
+import { MatchOutcomeDispatcher, MatchSweepMode, MatchSweepOptions } from '../matchingService/matchOutcomeDispatcher'
 import { sourceHasReviewers, sourceShouldEnterMatchScoring } from '../matchingService/reviewerAvailability'
 import { AccountAssembly } from '../accountAssembly'
 import { FusionRun } from '../../model/fusionRun'
@@ -61,6 +61,7 @@ import { getManagedAccountSnapshotKey } from '../../utils/velocityAccountSnapsho
 // ============================================================================
 
 const MAX_LOGGED_SOURCE_NAMES = 20
+const UNCORRELATED_SWEEP_CHUNK_SIZE = 4_096
 
 /**
  * Formats managed source names for a single aggregated log line.
@@ -1009,9 +1010,9 @@ export class FusionService {
     private async runUncorrelatedManagedAccountSweep(
         queuedAccounts: Account[],
         batchSize: number,
-        _managedAccountProcessingStartedAt: number
+        options?: Pick<MatchSweepOptions, 'progressOffset' | 'progressTotal'>
     ): Promise<number> {
-        const result = await this.dispatcher.runMatchSweep(queuedAccounts, batchSize)
+        const result = await this.dispatcher.runMatchSweep(queuedAccounts, batchSize, options)
         return result.processed
     }
 
@@ -1641,26 +1642,51 @@ export class FusionService {
     }
 
     /**
-     * Uncorrelated scoring sweep: drain remaining work-queue entries after the correlated account sweep.
+     * Uncorrelated scoring sweep: streams remaining work-queue entries in bounded chunks
+     * (`4,096` accounts per chunk) after the correlated account sweep so V8 heap stays bounded.
+     *
      * @returns Processed count and match scoring duration for metric emission.
      */
     public async processUncorrelatedManagedAccounts(): Promise<{ processed: number; matchScoringMs: number }> {
         this.ensureManagedAccountProcessingInitialized()
         const map = this.run.managedAccountsById
-        const queuedAccounts: Account[] = []
-        await forEachIterableChunked(map.values(), (account) => {
-            queuedAccounts.push(account)
-        })
-        const initialQueueSize = queuedAccounts.length
+        const totalQueueSize = map.size
         this.log.detail({
             action: 'processing uncorrelated managed accounts',
-            count: initialQueueSize,
+            count: totalQueueSize,
         })
-        const processed = await this.runUncorrelatedManagedAccountSweep(
-            queuedAccounts,
-            this.run.managedAccountProcessingBatchSize,
-            this.run.managedAccountProcessingBatchSize
-        )
+
+        const batchSize = this.run.managedAccountProcessingBatchSize
+        const yieldEvery = getManagedAccountEventLoopYieldEvery(this.config)
+        let yieldCounter = 0
+        let processed = 0
+        let chunkOffset = 0
+        let chunk: Account[] = []
+
+        for (const account of map.values()) {
+            chunk.push(account)
+            if (yieldEvery > 0 && ++yieldCounter >= yieldEvery) {
+                yieldCounter = 0
+                await yieldToEventLoop()
+            }
+            if (chunk.length >= UNCORRELATED_SWEEP_CHUNK_SIZE) {
+                const currentChunk = chunk
+                chunk = []
+                processed += await this.runUncorrelatedManagedAccountSweep(currentChunk, batchSize, {
+                    progressOffset: chunkOffset,
+                    progressTotal: totalQueueSize,
+                })
+                chunkOffset += currentChunk.length
+            }
+        }
+
+        if (chunk.length > 0) {
+            processed += await this.runUncorrelatedManagedAccountSweep(chunk, batchSize, {
+                progressOffset: chunkOffset,
+                progressTotal: totalQueueSize,
+            })
+        }
+
         // Released only after the uncorrelated sweep: its pre-score gate checks every queued account
         // for an existing Fusion link, and without the index each check scans every loaded Fusion account.
         this.run.clearLinkedAccountIndex()

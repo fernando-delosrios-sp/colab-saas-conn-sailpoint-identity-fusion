@@ -89,9 +89,14 @@ export enum MatchSweepMode {
     AnalysisOnly = 'analysis-only',
 }
 
+/** Options for controlling a match sweep's execution mode, result accumulator, and progress window. */
 export interface MatchSweepOptions {
     mode?: MatchSweepMode
     sweepResult?: MatchSweepResult
+    /** Starting offset within a multi-chunk sweep's overall progress window (default `0`). */
+    progressOffset?: number
+    /** Total item count across a multi-chunk sweep's overall progress window (default `accounts.length`). */
+    progressTotal?: number
 }
 
 // ============================================================================
@@ -605,7 +610,7 @@ export class MatchOutcomeDispatcher {
     public async runMatchSweep(
         accounts: Account[],
         batchSize: number,
-        options?: Pick<MatchSweepOptions, 'mode'>
+        options?: Pick<MatchSweepOptions, 'mode' | 'progressOffset' | 'progressTotal'>
     ): Promise<MatchSweepResult> {
         const mode = options?.mode ?? MatchSweepMode.Dispatch
         if (mode === MatchSweepMode.AnalysisOnly) {
@@ -627,11 +632,13 @@ export class MatchOutcomeDispatcher {
             return result
         }
 
-        const initialQueueSize = accounts.length
+        const progressOffset = options?.progressOffset ?? 0
+        const progressTotal = options?.progressTotal ?? accounts.length
         let processedCount = 0
         const updateProgress = (): void => {
-            log.setProgress(processedCount, initialQueueSize, 'analyzed')
+            log.setProgress(progressOffset + processedCount, progressTotal, 'analyzed')
         }
+        updateProgress()
 
         interface PendingScore {
             account: Account

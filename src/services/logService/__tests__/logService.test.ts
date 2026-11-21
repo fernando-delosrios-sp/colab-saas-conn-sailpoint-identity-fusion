@@ -273,6 +273,23 @@ describe('LogService step boundaries', () => {
         vi.useRealTimers()
     })
 
+    it('Starting a new step clears progress from the previous step', () => {
+        const log = new LogService({ spConnDebugLoggingEnabled: false })
+        const runContext = new OperationRunContext()
+        log.bindRunContext(runContext)
+
+        log.stepStart('correlated-sweep')
+        log.setProgress(130, 130, 'analyzed')
+        expect(runContext.progress).toEqual({ done: 130, total: 130, unit: 'analyzed' })
+
+        log.stepEnd('correlated-sweep')
+        expect(runContext.progress).toBeUndefined()
+
+        log.setProgress(5, 10, 'items')
+        log.stepStart('uncorrelated-sweep', { accounts: 1000 })
+        expect(runContext.progress).toBeUndefined()
+    })
+
     it('runStep emits STEP END without detail when fn throws', async () => {
         const log = new LogService({ spConnDebugLoggingEnabled: false })
         log.bindRunContext(new OperationRunContext())

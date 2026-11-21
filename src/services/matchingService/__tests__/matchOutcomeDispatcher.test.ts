@@ -1921,6 +1921,27 @@ describe('MatchOutcomeDispatcher', () => {
 
             expect(deferredCandidateSources).toEqual([['Source B']])
         })
+
+        it('Chunked runMatchSweep reports offset progress within the overall sweep total', async () => {
+            const { dispatcher, log } = createDispatcher()
+            const setProgressSpy = vi.spyOn(log, 'setProgress')
+            const accounts = Array.from({ length: 5 }, (_, i) =>
+                managedAccount({
+                    id: `acct-${i}`,
+                    nativeIdentity: `native-${i}`,
+                    name: `Account ${i}`,
+                })
+            )
+
+            const result = await dispatcher.runMatchSweep(accounts, 5, {
+                progressOffset: 10,
+                progressTotal: 25,
+            })
+
+            expect(result.processed).toBe(5)
+            expect(setProgressSpy.mock.calls[0]).toEqual([10, 25, 'analyzed'])
+            expect(setProgressSpy).toHaveBeenLastCalledWith(15, 25, 'analyzed')
+        })
     })
 
     describe('runMatchSweep analysis-only', () => {

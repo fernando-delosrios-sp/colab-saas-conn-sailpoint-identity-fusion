@@ -342,10 +342,14 @@ export class LogService {
         }
     }
 
+    /**
+     * Marks the start of a pipeline sub-step and clears any prior step's progress counters.
+     */
     stepStart(step: string, detail?: Record<string, unknown>): void {
         if (this.runContext) {
             this.runContext.step = step
             this.runContext.stepStartedAt = Date.now()
+            this.runContext.progress = undefined
         }
         this.info(`STEP ${step} START${formatDetailSuffix(detail)}`)
     }
@@ -357,6 +361,7 @@ export class LogService {
         if (this.runContext) {
             this.runContext.step = null
             this.runContext.stepStartedAt = undefined
+            this.runContext.progress = undefined
         }
     }
 

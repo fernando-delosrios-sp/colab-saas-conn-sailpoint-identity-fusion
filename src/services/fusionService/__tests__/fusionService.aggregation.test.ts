@@ -1739,6 +1739,55 @@ describe('FusionService — aggregation', () => {
             expect(ctx.run.linkedAccountKeyIndex).toBeUndefined()
         })
 
+        it('Uncorrelated sweep processes multiple chunks without materializing a single full-population array', async () => {
+            const totalAccounts = 4_097
+            const workQueue = new Map<string, Account>(
+                Array.from({ length: totalAccounts }, (_, i) => {
+                    const nativeIdentity = `native-chunk-${i}`
+                    const key = `source-a-id::${nativeIdentity}`
+                    return [
+                        key,
+                        {
+                            id: `acct-chunk-${i}`,
+                            nativeIdentity,
+                            name: `Chunk Account ${i}`,
+                            sourceId: 'source-a-id',
+                            sourceName: 'Source A',
+                            attributes: {},
+                            uncorrelated: true,
+                        } as Account,
+                    ]
+                })
+            )
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+
+            const sweepSpy = vi
+                .spyOn(ctx.fusionService.matchOutcomeDispatcher, 'runMatchSweep')
+                .mockImplementation(async (accounts) => ({
+                    processed: accounts.length,
+                    matchScoringMs: 0,
+                    exact: 0,
+                    partial: 0,
+                    deferred: 0,
+                    nonMatch: 0,
+                    resolved: [],
+                }))
+
+            await ctx.fusionService.initializeManagedAccountProcessing()
+            const result = await ctx.fusionService.processUncorrelatedManagedAccounts()
+
+            expect(sweepSpy).toHaveBeenCalledTimes(2)
+            expect(sweepSpy.mock.calls[0][0]).toHaveLength(4_096)
+            expect(sweepSpy.mock.calls[0][0][0].nativeIdentity).toBe('native-chunk-0')
+            expect(sweepSpy.mock.calls[0][2]).toEqual({ progressOffset: 0, progressTotal: totalAccounts })
+            expect(sweepSpy.mock.calls[1][0]).toHaveLength(1)
+            expect(sweepSpy.mock.calls[1][0][0].nativeIdentity).toBe('native-chunk-4096')
+            expect(sweepSpy.mock.calls[1][2]).toEqual({ progressOffset: 4_096, progressTotal: totalAccounts })
+            expect(result.processed).toBe(totalAccounts)
+            expect(ctx.run.linkedAccountKeyIndex).toBeUndefined()
+        })
+
         it('Saved Match flag scores the record', async () => {
             const mockManagedAccount = {
                 nativeIdentity: 'internal-default-1',

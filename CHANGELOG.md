@@ -7,6 +7,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 
 ## 2026-11-21 · v2.2.0
 
+### 🐛 Fixes
+
+- **Bounded-memory streaming for uncorrelated account sweeps** — `FusionService.processUncorrelatedManagedAccounts()` now streams `managedAccountsById` in bounded `4,096`-account chunks into `MatchOutcomeDispatcher.runMatchSweep()` rather than materializing the entire remaining work queue into a single `Account[]` array in V8 heap, preventing out-of-memory crashes on million-account aggregations while preserving cross-chunk Fusion account and blocking index updates.
+- **Accurate step progress reporting across sweep boundaries** — `LogService.stepStart()` and `LogService.stepEnd()` now clear stale `runContext.progress` counters on step boundaries, and `MatchOutcomeDispatcher.runMatchSweep()` accepts `progressOffset` and `progressTotal` so multi-chunk uncorrelated sweeps report accurate monotonic `analyzed` progress instead of carrying over counts from `correlated-sweep`.
+
 ### 🔧 Improvements
 
 - **Compressed in-memory storage for large account and identity aggregations** — Replaced uncompressed off-heap buffers with `CompressedBlockMap` (raw DEFLATE level 1 over 128-record blocks with a bounded 16-block LRU read cache and source-partitioned composite key indexing) across `FusionRun` (`managedAccountsById`, `claimedAccountRetention`, `managedAccountInventory`, `identityMap`) and `SourceService.fusionAccountsByNativeIdentity`, and compacted `FusionRun.managedAccountsByIdentityId` to avoid per-identity `Set` allocations for single-account identities, cutting container RSS by ~3–5x on million-account runs while preserving full `Map` and snapshot/restore compatibility.
