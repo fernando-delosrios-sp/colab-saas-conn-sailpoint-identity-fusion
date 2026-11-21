@@ -2,7 +2,11 @@ import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionRun } from '../../../model/fusionRun'
 import { FusionConfig, SourceType } from '../../../model/config'
 import type { SourceInfo } from '../types'
-import { fetchManagedAccounts, type ManagedAccountFetcherDeps } from '../managedAccountFetcher'
+import {
+    fetchManagedAccounts,
+    MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL,
+    type ManagedAccountFetcherDeps,
+} from '../managedAccountFetcher'
 import {
     buildReferencedAttributeSet,
     pruneManagedAccountAttributes,
@@ -296,6 +300,56 @@ describe('fetchManagedAccounts pruning at Bulk ingest', () => {
         expect(Object.keys(registered.attributes as object).sort()).toEqual(
             ['junkAttr0', 'junkAttr1', 'junkAttr2', 'junkAttr3', 'lastName'].sort()
         )
+    })
+
+    it('slims unused raw ISC envelope fields at Bulk ingest while retaining fields needed downstream', async () => {
+        const referencedAttributeSet = buildReferencedAttributeSet(baseConfig, schemaAttributeNames)
+        const account = makeAccount(
+            { ...junkAttributes(3), lastName: 'Doe', department: 'Engineering' },
+            {
+                sourceOwner: { id: 'owner-1', name: 'Owner', type: 'IDENTITY' },
+                features: 'PROVISIONING, AUTHENTICATE',
+                description: 'Heavy raw description',
+                recommendation: { method: 'ML' } as any,
+                identity: { id: 'identity-1', name: 'Jane Doe', type: 'IDENTITY' },
+                uncorrelated: false,
+            }
+        )
+        const { deps, run } = makeFetcherDeps([account], { referencedAttributeSet })
+
+        await fetchManagedAccounts(deps)
+
+        const registered = run.managedAccountsById.values().next().value as Account
+        expect(registered.id).toBe('isc-acct-1')
+        expect(registered.nativeIdentity).toBe('native-1')
+        expect(registered.sourceId).toBe('src-1')
+        expect(registered.sourceName).toBe('HR')
+        expect(registered.identityId).toBe('identity-1')
+        expect(registered.uncorrelated).toBe(false)
+        expect(registered.identity).toEqual({ name: 'Jane Doe' })
+        expect((registered as any).sourceOwner).toBeUndefined()
+        expect((registered as any).features).toBeUndefined()
+        expect((registered as any).description).toBeUndefined()
+        expect((registered as any).recommendation).toBeUndefined()
+    })
+
+    it('yields across skipped machine accounts and stops immediately when abortSignal aborts', async () => {
+        const setImmediateSpy = vi.spyOn(global, 'setImmediate')
+        const machineAccounts = Array.from({ length: MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL }, (_, i) =>
+            makeAccount({ lastName: `Bot${i}` }, { id: `m-${i}`, nativeIdentity: `m-${i}`, isMachine: true })
+        )
+        const { deps } = makeFetcherDeps(machineAccounts)
+
+        await fetchManagedAccounts(deps)
+
+        expect(setImmediateSpy).toHaveBeenCalledTimes(2)
+        setImmediateSpy.mockRestore()
+
+        const controller = new AbortController()
+        controller.abort(new Error('cancelled'))
+        const { deps: abortedDeps, run: abortedRun } = makeFetcherDeps([makeAccount({ lastName: 'Doe' })])
+        await expect(fetchManagedAccounts(abortedDeps, controller.signal)).rejects.toThrow(/cancelled/)
+        expect(abortedRun.managedAccountsById.size).toBe(0)
     })
 })
 

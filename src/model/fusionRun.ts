@@ -1,5 +1,6 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount, FusionAccountKind } from './account'
+import { CompactManagedAccountMap } from './compactManagedAccountMap'
 import { MatchCandidateRecord } from './matchCandidateRecord'
 import { SourceInfo } from '../services/sourceService'
 import { FusionDecision } from './form'
@@ -111,11 +112,11 @@ export class FusionRun {
     public readonly skipDuplicateFusionAccounts: boolean
     /** Set when account-list dry-run mode activates write inhibition. */
     public isDryRunMode = false
-    readonly managedAccountsById = new Map<string, Account>()
+    readonly managedAccountsById: Map<string, Account> = new CompactManagedAccountMap()
     readonly managedAccountInventory = new Map<string, ManagedAccountInfo>()
     readonly managedAccountsByIdentityId = new Map<string, Set<string>>()
     /** Post-claim Account bodies keyed by managed account key. Not Match work. */
-    private readonly claimedAccountRetention = new Map<string, Account>()
+    private readonly claimedAccountRetention: Map<string, Account> = new CompactManagedAccountMap()
     private readonly fusionAccountMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityOwnerIdByManagedKey = new Map<string, string>()

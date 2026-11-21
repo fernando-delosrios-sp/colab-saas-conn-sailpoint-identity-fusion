@@ -70,12 +70,109 @@ export function buildReferencedAttributeSet(
     return set
 }
 
+/** Distinct short string values remembered per attribute key so repeated values share one string. */
+const PRUNED_ATTRIBUTE_INTERN_LIMIT = 4096
+/** Maximum string length eligible for interning. */
+const PRUNED_ATTRIBUTE_INTERN_MAX_LENGTH = 128
+/** Cap on distinct compiled attribute-shape factories per referenced attribute set. */
+const PRUNED_ATTRIBUTE_SHAPE_LIMIT = 64
+
+type AttributeBagPruner = (attributes: Record<string, unknown>) => Record<string, unknown>
+
+const prunerByReferencedSet = new WeakMap<ReadonlySet<string>, AttributeBagPruner>()
+
+function createAttributeBagPruner(referencedAttributeSet: ReadonlySet<string>): AttributeBagPruner {
+    const shapeFactories = new Map<string, (values: unknown[]) => Record<string, unknown>>()
+    const internPools = new Map<string, Map<string, string>>()
+
+    const internValue = (key: string, value: unknown): unknown => {
+        if (typeof value !== 'string' || value.length > PRUNED_ATTRIBUTE_INTERN_MAX_LENGTH) {
+            return value
+        }
+        let pool = internPools.get(key)
+        if (!pool) {
+            pool = new Map()
+            internPools.set(key, pool)
+        }
+        const shared = pool.get(value)
+        if (shared !== undefined) return shared
+        if (pool.size < PRUNED_ATTRIBUTE_INTERN_LIMIT) {
+            pool.set(value, value)
+        }
+        return value
+    }
+
+    const getShapeFactory = (keys: string[]): ((values: unknown[]) => Record<string, unknown>) | undefined => {
+        const signature = keys.join('\0')
+        const cached = shapeFactories.get(signature)
+        if (cached) return cached
+        if (shapeFactories.size >= PRUNED_ATTRIBUTE_SHAPE_LIMIT) return undefined
+        if (keys.some((key) => key === '__proto__')) return undefined
+        const literalBody = keys.map((key, idx) => `${JSON.stringify(key)}: values[${idx}]`).join(',')
+        const factory = new Function('values', `return {${literalBody}}`) as (
+            values: unknown[]
+        ) => Record<string, unknown>
+        shapeFactories.set(signature, factory)
+        return factory
+    }
+
+    return (attributes: Record<string, unknown>): Record<string, unknown> => {
+        const keptKeys: string[] = []
+        let hasUnreferenced = false
+        for (const key in attributes) {
+            if (!Object.prototype.hasOwnProperty.call(attributes, key)) continue
+            if (referencedAttributeSet.has(key)) {
+                keptKeys.push(key)
+            } else {
+                hasUnreferenced = true
+            }
+        }
+        if (!hasUnreferenced) return attributes
+
+        const factory = getShapeFactory(keptKeys)
+        if (factory) {
+            const values = new Array<unknown>(keptKeys.length)
+            for (let i = 0; i < keptKeys.length; i++) {
+                const key = keptKeys[i]
+                values[i] = internValue(key, attributes[key])
+            }
+            return factory(values)
+        }
+
+        const prunedAttributes: Record<string, unknown> = {}
+        for (let i = 0; i < keptKeys.length; i++) {
+            const key = keptKeys[i]
+            const value = internValue(key, attributes[key])
+            if (key === '__proto__') {
+                Object.defineProperty(prunedAttributes, key, {
+                    value,
+                    enumerable: true,
+                    writable: true,
+                    configurable: true,
+                })
+            } else {
+                prunedAttributes[key] = value
+            }
+        }
+        return prunedAttributes
+    }
+}
+
+function getAttributeBagPruner(referencedAttributeSet: ReadonlySet<string>): AttributeBagPruner {
+    let pruner = prunerByReferencedSet.get(referencedAttributeSet)
+    if (!pruner) {
+        pruner = createAttributeBagPruner(referencedAttributeSet)
+        prunerByReferencedSet.set(referencedAttributeSet, pruner)
+    }
+    return pruner
+}
+
 /**
  * Attribute pruning: drops a managed source account's `attributes` entries that are not
- * in the referenced attribute set. Replaces the account's attribute bag rather than
- * deleting keys in place, so large API response objects can be collected without
- * leaving dictionary-mode bags in the managed-account work queue. Top-level system
- * fields are never pruned.
+ * in the referenced attribute set. Replaces the account's attribute bag using a shared
+ * object-literal hidden class rather than keyed stores or in-place deletes, so large API
+ * response objects can be collected without turning bags into high-overhead dictionary-mode
+ * objects. Top-level system fields are never pruned here.
  */
 export function pruneManagedAccountAttributes(
     account: Account,
@@ -83,23 +180,8 @@ export function pruneManagedAccountAttributes(
 ): Account {
     const attributes = account.attributes
     if (!attributes || typeof attributes !== 'object') return account
-    // Rebuilding the bag with keyed stores turns it into a dictionary-mode object, which costs several
-    // times the memory of a fast-property object. Keep the existing bag when nothing is dropped.
-    let hasUnreferenced = false
-    for (const key in attributes) {
-        if (!referencedAttributeSet.has(key)) {
-            hasUnreferenced = true
-            break
-        }
-    }
-    if (!hasUnreferenced) return account
-    const prunedAttributes: Record<string, unknown> = {}
-    for (const key of referencedAttributeSet) {
-        if (Object.prototype.hasOwnProperty.call(attributes, key)) {
-            prunedAttributes[key] = (attributes as Record<string, unknown>)[key]
-        }
-    }
-    account.attributes = prunedAttributes
+    const pruner = getAttributeBagPruner(referencedAttributeSet)
+    account.attributes = pruner(attributes as Record<string, unknown>)
     return account
 }
 

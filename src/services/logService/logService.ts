@@ -3,7 +3,7 @@ import { ApiQueue } from '../clientService/queue'
 import { QueuePriority } from '../clientService/types'
 import { getCallerInfo } from './helpers'
 import { HeartbeatSnapshot, OperationHeartbeat, formatDetailSuffix } from './operationHeartbeat'
-import { EventLoopWatchdog, formatRunContextLabel } from './eventLoopWatchdog'
+import { EventLoopWatchdog, formatEventLoopDiagnostics, formatRunContextLabel } from './eventLoopWatchdog'
 import {
     CorrelationSkipReason,
     FetchPopulation,
@@ -468,6 +468,8 @@ export class LogService {
         this.stopEventLoopWatchdog()
         this.eventLoopWatchdog = new EventLoopWatchdog(this, {
             getContext: () => formatRunContextLabel(this.runContext),
+            getDiagnostics: (gcMs) => formatEventLoopDiagnostics(gcMs),
+            observeGc: true,
         })
         this.eventLoopWatchdog.start()
     }

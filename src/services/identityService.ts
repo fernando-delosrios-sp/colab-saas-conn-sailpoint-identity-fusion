@@ -185,7 +185,7 @@ export class IdentityService {
     /**
      * Fetches scoped identities and bulk-ingests search pages without blocking operation timers.
      */
-    public async fetchIdentities(additionalIdentityIds?: string[]): Promise<void> {
+    public async fetchIdentities(additionalIdentityIds?: string[], abortSignal?: AbortSignal): Promise<void> {
         if (!this.includeIdentities && !additionalIdentityIds?.length) {
             this.log.info('Skipping identity fetch.')
             return
@@ -207,7 +207,7 @@ export class IdentityService {
                     query,
                     QueuePriority.HIGH,
                     'IdentityService>fetchIdentities searchPost',
-                    undefined,
+                    abortSignal,
                     (_loaded, total) => {
                         knownTotal = total
                     }

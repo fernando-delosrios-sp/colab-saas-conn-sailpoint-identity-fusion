@@ -55,6 +55,12 @@ class OffsetPageScheduler<T> {
     private readonly stopped = new Map<number, unknown>()
     /** Never below 1: a zero window would leave the scheduler unable to schedule any page. */
     private readonly window: number
+    /**
+     * Upper bound on in-flight + out-of-order completed pages held in memory.
+     * Prevents a single slow or retried head-of-line page from letting `pump()` buffer
+     * hundreds of raw unpruned API pages while waiting to yield in offset order.
+     */
+    private readonly maxBufferedPages: number
 
     constructor(
         private readonly offsets: number[],
@@ -74,6 +80,7 @@ class OffsetPageScheduler<T> {
     ) {
         this.loaded = initialLoaded
         this.window = Math.max(1, windowSize)
+        this.maxBufferedPages = Math.max(this.window + 2, 2)
     }
 
     private lowestUnfilledOffset(): number {
@@ -130,7 +137,11 @@ class OffsetPageScheduler<T> {
         if (this.circuit.isShedding || this.failure !== undefined) {
             return
         }
-        while (this.inFlight.size < this.window && this.scheduleIndex < this.offsets.length) {
+        while (
+            this.inFlight.size < this.window &&
+            this.inFlight.size + this.completed.size < this.maxBufferedPages &&
+            this.scheduleIndex < this.offsets.length
+        ) {
             const offset = this.offsets[this.scheduleIndex++]
             if (this.completed.has(offset) || this.inFlight.has(offset)) {
                 continue

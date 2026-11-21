@@ -1,4 +1,5 @@
 import { writeSync } from 'fs'
+import { PerformanceObserver } from 'perf_hooks'
 import type { LogService } from './logService'
 import { FETCH_POPULATIONS, type OperationRunContext } from './operationRunContext'
 
@@ -12,6 +13,10 @@ export interface EventLoopWatchdogOptions {
     blockThresholdMs?: number
     /** Pipeline position recorded with each sample so a stall can be attributed to a phase or step. */
     getContext?: () => string | undefined
+    /** Optional runtime diagnostics appended to block warnings (e.g. heap/RSS/GC). */
+    getDiagnostics?: (gcMsSinceLastSample: number) => string | undefined
+    /** Enable Node perf_hooks GC observer to measure GC pause time during blocked windows. */
+    observeGc?: boolean
     now?: () => number
     /** Unbuffered channel used alongside the logger; see {@link writeUnbuffered}. */
     emitUnbuffered?: (line: string) => void
@@ -55,17 +60,44 @@ function formatBlockedSeconds(blockedMs: number): string {
     return `${(blockedMs / 1000).toFixed(1)}s`
 }
 
+function formatMb(bytes: number): string {
+    return (bytes / 1024 / 1024).toFixed(2)
+}
+
+/**
+ * Formats memory and GC diagnostics for an event-loop block warning so operators can
+ * immediately tell V8 GC thrashing / heap saturation apart from JS CPU starvation.
+ * Matches the `mem=<rss>MB heap=<heapUsed>MB` convention used by `STATUS` lines.
+ */
+export function formatEventLoopDiagnostics(
+    gcMsSinceLastSample: number,
+    memory: NodeJS.MemoryUsage = process.memoryUsage()
+): string {
+    const parts = [`mem=${formatMb(memory.rss)}MB`, `heap=${formatMb(memory.heapUsed)}MB`]
+    if (gcMsSinceLastSample >= 1) {
+        parts.push(`gc=${Math.round(gcMsSinceLastSample)}ms`)
+    }
+    return parts.join(' ')
+}
+
 /**
  * Formats the warning emitted once the event loop recovers from a blocked window.
  *
  * @param blockedMs - How long timers were starved.
  * @param before - Context recorded at the last healthy sample.
  * @param after - Context recorded once sampling resumed.
+ * @param diagnostics - Optional runtime diagnostics (e.g. heap, rss, gc).
  */
-export function formatBlockedWarning(blockedMs: number, before: string | undefined, after: string | undefined): string {
+export function formatBlockedWarning(
+    blockedMs: number,
+    before: string | undefined,
+    after: string | undefined,
+    diagnostics?: string
+): string {
     const parts = [`WARN EVENT_LOOP blocked ${formatBlockedSeconds(blockedMs)}`]
     if (before) parts.push(`before=${before}`)
     if (after) parts.push(`now=${after}`)
+    if (diagnostics) parts.push(diagnostics)
     return parts.join(' | ')
 }
 
@@ -81,6 +113,8 @@ export class EventLoopWatchdog {
     private readonly now: () => number
     private readonly emitUnbuffered: (line: string) => void
     private timer?: ReturnType<typeof setTimeout>
+    private gcObserver?: PerformanceObserver
+    private gcMsSinceLastSample = 0
     private lastContext?: string
     private maxBlockedMsValue = 0
 
@@ -116,6 +150,19 @@ export class EventLoopWatchdog {
     start(): void {
         if (this.timer) return
         this.lastContext = this.options.getContext?.()
+        this.gcMsSinceLastSample = 0
+        if (this.options.observeGc) {
+            try {
+                this.gcObserver = new PerformanceObserver((list) => {
+                    for (const entry of list.getEntries()) {
+                        this.gcMsSinceLastSample += entry.duration
+                    }
+                })
+                this.gcObserver.observe({ entryTypes: ['gc'] })
+            } catch {
+                this.gcObserver = undefined
+            }
+        }
         this.schedule()
     }
 
@@ -124,10 +171,19 @@ export class EventLoopWatchdog {
             clearTimeout(this.timer)
             this.timer = undefined
         }
+        if (this.gcObserver) {
+            try {
+                this.gcObserver.disconnect()
+            } catch {
+                // Ignore observer teardown errors.
+            }
+            this.gcObserver = undefined
+        }
         if (this.maxBlockedMsValue >= this.blockThresholdMs) {
             this.report(`WARN EVENT_LOOP worst block this run ${formatBlockedSeconds(this.maxBlockedMsValue)}`)
         }
         this.maxBlockedMsValue = 0
+        this.gcMsSinceLastSample = 0
         this.lastContext = undefined
     }
 
@@ -144,9 +200,12 @@ export class EventLoopWatchdog {
     private sample(dueAt: number): void {
         const blockedMs = this.now() - dueAt
         const context = this.options.getContext?.()
+        const gcMs = this.gcMsSinceLastSample
+        this.gcMsSinceLastSample = 0
         if (blockedMs >= this.blockThresholdMs) {
             this.maxBlockedMsValue = Math.max(this.maxBlockedMsValue, blockedMs)
-            this.report(formatBlockedWarning(blockedMs, this.lastContext, context))
+            const diagnostics = this.options.getDiagnostics?.(gcMs)
+            this.report(formatBlockedWarning(blockedMs, this.lastContext, context, diagnostics))
         }
         this.lastContext = context
     }

@@ -63,6 +63,8 @@ export class ServiceRegistry {
     public run: FusionRun
     public runContext: OperationRunContext
     public customizerInternalRecordsDir?: string
+    /** Operation-scoped abort signal wired by createOperationHandler (fires on stream close or superseding run). */
+    public abortSignal?: AbortSignal
     private readonly clientUsesInjection: boolean
 
     /**

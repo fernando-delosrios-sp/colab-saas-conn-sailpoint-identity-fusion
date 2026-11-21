@@ -96,7 +96,7 @@ export function readSettings(raw: Record<string, unknown>): ExternalSettingsSect
         }
     }
 
-    bootstrapLog.detail({ validation: 'success' })
+    bootstrapLog.detail({ section: 'external', validation: 'success' })
 
     return {
         externalProcessingEnabled,

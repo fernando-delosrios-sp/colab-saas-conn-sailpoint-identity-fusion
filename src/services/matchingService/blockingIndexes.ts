@@ -1,4 +1,5 @@
 import { missing } from '../../utils/safeRead'
+import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
 import { lig3LengthUpperBound, normalizeLIG3 } from './scoringHelpers'
 
 /** Compact identity id: index into FusionRun.blockingIdentityRoster. */
@@ -11,6 +12,17 @@ export type LengthBucketIndex = Map<number, CompactIdentityId[]>
 /** Any roster entry exposing an attribute bag (MatchCandidateRecord or FusionAccount). */
 type AttributeHolder = { attributes: Record<string, any> }
 
+const INDEX_BUILD_YIELD_INTERVAL = 5_000
+
+function pushExactValuePosting(index: ExactValueIndex, raw: unknown, id: CompactIdentityId): void {
+    if (missing(raw)) return
+    const key = String(raw)
+    if (key === '') return
+    const bucket = index.get(key)
+    if (bucket) bucket.push(id)
+    else index.set(key, [id])
+}
+
 /**
  * Build a Binary exact-value index: raw attribute string → compact identity ids.
  * Empty strings are omitted (Binary scores them 0).
@@ -18,13 +30,24 @@ type AttributeHolder = { attributes: Record<string, any> }
 export function buildExactValueIndex(identities: readonly AttributeHolder[], attribute: string): ExactValueIndex {
     const index: ExactValueIndex = new Map()
     for (let i = 0; i < identities.length; i++) {
-        const raw = identities[i].attributes[attribute]
-        if (missing(raw)) continue
-        const key = String(raw)
-        if (key === '') continue
-        const bucket = index.get(key)
-        if (bucket) bucket.push(i)
-        else index.set(key, [i])
+        pushExactValuePosting(index, identities[i].attributes[attribute], i)
+    }
+    return index
+}
+
+/**
+ * Yielding variant of {@link buildExactValueIndex} for massive identity rosters.
+ */
+export async function buildExactValueIndexAsync(
+    identities: readonly AttributeHolder[],
+    attribute: string
+): Promise<ExactValueIndex> {
+    const index: ExactValueIndex = new Map()
+    for (let i = 0; i < identities.length; i++) {
+        pushExactValuePosting(index, identities[i].attributes[attribute], i)
+        if ((i + 1) % INDEX_BUILD_YIELD_INTERVAL === 0) {
+            await yieldToEventLoop()
+        }
     }
     return index
 }
@@ -35,18 +58,38 @@ export function queryExactValueIndex(index: ExactValueIndex, accountValue: strin
     return index.get(accountValue) ?? []
 }
 
+function pushLig3LengthPosting(index: LengthBucketIndex, raw: unknown, id: CompactIdentityId): void {
+    if (missing(raw)) return
+    const len = normalizeLIG3(String(raw)).length
+    const bucket = index.get(len)
+    if (bucket) bucket.push(id)
+    else index.set(len, [id])
+}
+
 /**
  * Build LIG3 length buckets keyed by LIG3-normalized string length.
  */
 export function buildLig3LengthIndex(identities: readonly AttributeHolder[], attribute: string): LengthBucketIndex {
     const index: LengthBucketIndex = new Map()
     for (let i = 0; i < identities.length; i++) {
-        const raw = identities[i].attributes[attribute]
-        if (missing(raw)) continue
-        const len = normalizeLIG3(String(raw)).length
-        const bucket = index.get(len)
-        if (bucket) bucket.push(i)
-        else index.set(len, [i])
+        pushLig3LengthPosting(index, identities[i].attributes[attribute], i)
+    }
+    return index
+}
+
+/**
+ * Yielding variant of {@link buildLig3LengthIndex} for massive identity rosters.
+ */
+export async function buildLig3LengthIndexAsync(
+    identities: readonly AttributeHolder[],
+    attribute: string
+): Promise<LengthBucketIndex> {
+    const index: LengthBucketIndex = new Map()
+    for (let i = 0; i < identities.length; i++) {
+        pushLig3LengthPosting(index, identities[i].attributes[attribute], i)
+        if ((i + 1) % INDEX_BUILD_YIELD_INTERVAL === 0) {
+            await yieldToEventLoop()
+        }
     }
     return index
 }

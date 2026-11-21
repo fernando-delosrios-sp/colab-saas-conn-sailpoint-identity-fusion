@@ -37,13 +37,16 @@ import {
 import { normalizeName as normalizeNameForMatcher } from './nameMatching'
 import {
     buildExactValueIndex,
+    buildExactValueIndexAsync,
     buildLig3LengthIndex,
+    buildLig3LengthIndexAsync,
     compactIdsToIdentities,
     intersectCompactIds,
     queryExactValueIndex,
     queryLig3LengthIndex,
     type CompactIdentityId,
 } from './blockingIndexes'
+import { forEachIterableChunked } from '../../utils/yieldToEventLoop'
 import { normalizeCompositeManagedAccountKey } from '../../model/managedAccountKey'
 import { LogService } from '../logService'
 import { FusionRun } from '../../model/fusionRun'
@@ -300,7 +303,7 @@ export class MatchingService {
      *
      * @param identities - All candidate identities to index (Match Candidate Records or Fusion identities)
      */
-    public buildTrigramIndex(identities: Iterable<MatchCandidateRecord | FusionAccount>): void {
+    private resetBlockingIndexes(): void {
         if (!this.run) return
         this.run.trigramIndexByAttribute.clear()
         this.run.binaryIndexByAttribute.clear()
@@ -308,29 +311,44 @@ export class MatchingService {
         this.run.blockingIdentityRoster = []
         this.run.indexedMandatoryAttributes = []
         this.run.trigramIndexBuilt = false
+    }
 
-        const identityArray = Array.from(identities, (identity) => {
-            if (!(identity instanceof FusionAccount)) return identity
-            const identityId = identity.identityId
-            if (!identityId) return undefined
+    private toBlockingCandidateRecord(identity: MatchCandidateRecord | FusionAccount): MatchCandidateRecord | undefined {
+        if (!(identity instanceof FusionAccount)) return identity
+        const identityId = identity.identityId
+        if (!identityId) return undefined
 
-            const attributes: Record<string, string> = {}
-            for (const attribute of this.candidateAttributes) {
-                const value = identity.attributes[attribute]
-                if (value !== undefined && value !== null) {
-                    attributes[attribute] = String(value)
-                }
+        const attributes: Record<string, string> = {}
+        for (const attribute of this.candidateAttributes) {
+            const value = identity.attributes[attribute]
+            if (value !== undefined && value !== null) {
+                attributes[attribute] = String(value)
             }
-            return createMatchCandidateRecord(identityId, identity.displayName ?? identity.name ?? '', attributes)
-        }).filter((identity): identity is MatchCandidateRecord => identity !== undefined)
-        this.run.blockingIdentityRoster = identityArray
+        }
+        return createMatchCandidateRecord(identityId, identity.displayName ?? identity.name ?? '', attributes)
+    }
 
-        const indexableMandatory = this.matchingConfigs.filter(
+    private getIndexableMandatoryConfigs(): MatchingConfig[] {
+        return this.matchingConfigs.filter(
             (config) =>
                 config.mandatory === true &&
                 (config.fusionScore ?? 0) > 0 &&
                 (config.algorithm === 'binary' || config.algorithm === 'lig3')
         )
+    }
+
+    public buildTrigramIndex(identities: Iterable<MatchCandidateRecord | FusionAccount>): void {
+        if (!this.run) return
+        this.resetBlockingIndexes()
+
+        const identityArray: MatchCandidateRecord[] = []
+        for (const identity of identities) {
+            const record = this.toBlockingCandidateRecord(identity)
+            if (record) identityArray.push(record)
+        }
+        this.run.blockingIdentityRoster = identityArray
+
+        const indexableMandatory = this.getIndexableMandatoryConfigs()
         if (indexableMandatory.length === 0) return
 
         for (const config of indexableMandatory) {
@@ -343,6 +361,42 @@ export class MatchingService {
                 this.run.lig3LengthIndexByAttribute.set(
                     config.attribute,
                     buildLig3LengthIndex(identityArray, config.attribute)
+                )
+            }
+            if (!this.run.indexedMandatoryAttributes.includes(config.attribute)) {
+                this.run.indexedMandatoryAttributes.push(config.attribute)
+            }
+        }
+        this.run.trigramIndexBuilt = true
+    }
+
+    /**
+     * Yielding variant of {@link buildTrigramIndex} for massive identity rosters.
+     */
+    public async buildTrigramIndexAsync(identities: Iterable<MatchCandidateRecord | FusionAccount>): Promise<void> {
+        if (!this.run) return
+        this.resetBlockingIndexes()
+
+        const identityArray: MatchCandidateRecord[] = []
+        await forEachIterableChunked(identities, (identity) => {
+            const record = this.toBlockingCandidateRecord(identity)
+            if (record) identityArray.push(record)
+        })
+        this.run.blockingIdentityRoster = identityArray
+
+        const indexableMandatory = this.getIndexableMandatoryConfigs()
+        if (indexableMandatory.length === 0) return
+
+        for (const config of indexableMandatory) {
+            if (config.algorithm === 'binary') {
+                this.run.binaryIndexByAttribute.set(
+                    config.attribute,
+                    await buildExactValueIndexAsync(identityArray, config.attribute)
+                )
+            } else {
+                this.run.lig3LengthIndexByAttribute.set(
+                    config.attribute,
+                    await buildLig3LengthIndexAsync(identityArray, config.attribute)
                 )
             }
             if (!this.run.indexedMandatoryAttributes.includes(config.attribute)) {

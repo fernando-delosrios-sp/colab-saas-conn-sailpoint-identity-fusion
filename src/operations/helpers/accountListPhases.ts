@@ -12,6 +12,7 @@ import { buildReferencedAttributeSet } from '../../services/sourceService/refere
 import { generateReport } from './generateReport'
 import { buildReportAggregationStats, buildTerminalSummary, DryRunInput, type FetchResult } from './accountListHelpers'
 import { sendWithBackpressure } from '../../utils/responseBackpressure'
+import { forEachIterableChunked } from '../../utils/yieldToEventLoop'
 
 export type { FetchResult } from './accountListHelpers'
 
@@ -38,16 +39,16 @@ async function applyFusionAccountReset(serviceRegistry: ServiceRegistry): Promis
     await sources.resetBatchCumulativeCount()
 }
 
-function countManagedAccountsByType(sources: ServiceRegistry['sources']) {
+async function countManagedAccountsByType(sources: ServiceRegistry['sources']) {
     let authoritative = 0,
         record = 0,
         orphan = 0
-    for (const account of sources.run.managedAccountsById.values()) {
+    await forEachIterableChunked(sources.run.managedAccountsById.values(), (account) => {
         const sourceType = sources.getSourceByNameSafe(account.sourceName)?.sourceType ?? SourceType.Authoritative
         if (sourceType === SourceType.Record) record++
         else if (sourceType === SourceType.Orphan) orphan++
         else authoritative++
-    }
+    })
     return {
         managedAccountsFound: sources.run.managedAccountsById.size,
         managedAccountsFoundAuthoritative: authoritative,
@@ -66,11 +67,11 @@ export async function hydrateCorrelatedManagedAccountIdentities(deps: {
     hydrateMissingIdentitiesById: (ids: string[]) => Promise<void>
 }): Promise<{ hydrated: number }> {
     const distinctIds = new Set<string>()
-    for (const managed of deps.managedAccounts) {
-        if (managed.uncorrelated !== false) continue
+    await forEachIterableChunked(deps.managedAccounts, (managed) => {
+        if (managed.uncorrelated !== false) return
         const id = managed.identityId
         if (id) distinctIds.add(id)
-    }
+    })
     if (distinctIds.size === 0) return { hydrated: 0 }
 
     await deps.hydrateMissingIdentitiesById(Array.from(distinctIds))
@@ -169,13 +170,18 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
 
     const ownerIdsPromise = ownerIncluded ? sources.fetchGlobalOwnerIdentityIds() : Promise.resolve([])
 
+    const abortSignal = serviceRegistry.abortSignal
     const fetchTasks: Array<Promise<void>> = [
         ownerIdsPromise.then(async (ownerIds) => {
             fusion.cacheGlobalOwnerIdentityIds(ownerIds)
-            await identities.fetchIdentities(ownerIds)
+            if (abortSignal) {
+                await identities.fetchIdentities(ownerIds, abortSignal)
+            } else {
+                await identities.fetchIdentities(ownerIds)
+            }
         }),
-        sources.fetchManagedAccounts(),
-        sources.fetchFusionAccounts(),
+        abortSignal ? sources.fetchManagedAccounts(abortSignal) : sources.fetchManagedAccounts(),
+        abortSignal ? sources.fetchFusionAccounts(abortSignal) : sources.fetchFusionAccounts(),
         forms.fetchFormInstances({ staleFormCleanup: isPersistent }),
     ]
     if (isPersistent && sources.delayedAggregationSources?.length) {
@@ -195,7 +201,7 @@ export async function fetchPhase(serviceRegistry: ServiceRegistry, options: Phas
         'fusion-review-instances': forms.formInstancesFound,
     })
 
-    const counts = countManagedAccountsByType(sources)
+    const counts = await countManagedAccountsByType(sources)
     log.detail({
         'fusion-accounts': sources.fusionAccountCount,
         identities: identities.identityCount,

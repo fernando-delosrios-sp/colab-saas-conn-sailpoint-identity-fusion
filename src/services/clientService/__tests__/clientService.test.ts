@@ -736,6 +736,60 @@ describe('ClientService', () => {
         expect(progressCalls).toEqual([1, 2, 3])
     })
 
+    it('bounds buffered out-of-order completed pages when a head-of-line page stalls', async () => {
+        const windowSize = 2
+        const totalPages = 10
+        const sc = { ...mockConfig, pageSize: 1, sailPointListMax: 250, parallelBatchSize: windowSize }
+        const client = new ClientService(mockAdapter, null, sc, mockLog)
+        activeClients.push(client)
+
+        let releaseOffset1!: () => void
+        const scheduledOffsets: number[] = []
+        mockAdapter.accountsApi = {
+            listAccounts: vi.fn().mockImplementation((params: { offset?: number }) => {
+                const offset = params.offset ?? 0
+                scheduledOffsets.push(offset)
+                if (offset === 0) {
+                    return Promise.resolve({ data: [{ id: 'a0' }], headers: { 'x-total-count': String(totalPages) } })
+                }
+                if (offset === 1) {
+                    return new Promise((resolve) => {
+                        releaseOffset1 = () => resolve({ data: [{ id: 'a1' }] })
+                    })
+                }
+                return Promise.resolve({ data: [{ id: `a${offset}` }] })
+            }),
+        } as any
+
+        const gen = client.call((_api: IscApiSurface, params: any) => (_api.accounts.listAccounts as any)(params), {
+            paginate: { mode: 'parallel', baseParams: {} },
+        })
+
+        // Consume offset 0; offset 1 stalls while subsequent pages resolve immediately.
+        const first = await gen.next()
+        expect(first.value).toEqual([{ id: 'a0' }])
+
+        const secondPromise = gen.next()
+        // Allow microtasks / pump ticks to settle while offset 1 is still pending.
+        for (let i = 0; i < 10; i++) {
+            await Promise.resolve()
+        }
+
+        // Scheduler must stop scheduling once inFlight + completed hits windowSize + 2 (4),
+        // rather than scheduling all 10 pages into an unbounded completed buffer.
+        expect(scheduledOffsets.length).toBeLessThanOrEqual(1 + windowSize + 2)
+
+        releaseOffset1()
+        const second = await secondPromise
+        expect(second.value).toEqual([{ id: 'a1' }])
+
+        const rest: string[] = []
+        for await (const page of gen) {
+            rest.push(...page.map((item) => item.id))
+        }
+        expect(rest).toEqual(Array.from({ length: totalPages - 2 }, (_, i) => `a${i + 2}`))
+    })
+
     it('preserves configured parallelBatchSize when greater than maxConcurrentRequests', () => {
         const sc = {
             ...mockConfig,

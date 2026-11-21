@@ -1,4 +1,4 @@
-import { forEachChunked } from '../yieldToEventLoop'
+import { forEachChunked, forEachIterableChunked } from '../yieldToEventLoop'
 
 describe('forEachChunked', () => {
     it('processes items in order and reports each chunk boundary', async () => {
@@ -49,5 +49,30 @@ describe('forEachChunked', () => {
         })
 
         expect(events).toEqual(['item:1', 'item:2', 'progress:2', 'item:3', 'progress:3'])
+    })
+})
+
+describe('forEachIterableChunked', () => {
+    it('iterates any Iterable and yields between chunks', async () => {
+        const setImmediateSpy = vi.spyOn(global, 'setImmediate')
+        const seen: Array<[string, number]> = []
+
+        await forEachIterableChunked(
+            new Set(['a', 'b', 'c', 'd', 'e']).values(),
+            (item, index) => {
+                seen.push([item, index])
+            },
+            2
+        )
+
+        expect(seen).toEqual([
+            ['a', 0],
+            ['b', 1],
+            ['c', 2],
+            ['d', 3],
+            ['e', 4],
+        ])
+        expect(setImmediateSpy).toHaveBeenCalledTimes(3)
+        setImmediateSpy.mockRestore()
     })
 })

@@ -68,6 +68,14 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
             if (!phaseResult.continued) return
         } catch (error) {
             runError = error
+            if (serviceRegistry.abortSignal?.aborted) {
+                if (!sources.run.isRecordMode) {
+                    sources.clearManagedAccounts?.()
+                    sources.clearFusionAccounts?.()
+                    serviceRegistry.identities?.clear?.()
+                }
+                throw error
+            }
             log.warn(`Pipeline failed — running report epilogue before propagating: ${(error as Error).message}`)
         }
 
@@ -105,7 +113,7 @@ export const accountList = async (serviceRegistry: ServiceRegistry, input: StdAc
         timer.end(`✓ ${label} completed successfully - ${outputCount ?? 0} account(s) processed`)
     } finally {
         log.stopOperationHeartbeat()
-        if (isPersistent) {
+        if (isPersistent && !serviceRegistry.abortSignal?.aborted) {
             await sources.releaseProcessLock()
         }
     }

@@ -29,7 +29,7 @@ import {
     getManagedAccountEventLoopYieldEvery,
     getFusionParallelBatchSize,
 } from './collections'
-import { yieldToEventLoop } from '../../utils/yieldToEventLoop'
+import { yieldToEventLoop, forEachIterableChunked } from '../../utils/yieldToEventLoop'
 import { measureMs } from '../../utils/measureMs'
 import {
     buildFusionReport,
@@ -948,18 +948,18 @@ export class FusionService {
         }
     }
 
-    private buildLinkedAccountKeyIndex(): void {
+    private async buildLinkedAccountKeyIndex(): Promise<void> {
         // Build a one-shot flat index of every account key already linked in a loaded Fusion account.
         // isManagedAccountLinkedInFusion uses this for O(1) per-account lookups instead
         // of scanning fusionAccountMap + identity-linked Fusion account map (O(A+I)) for every queued
         // managed account in both the correlated and uncorrelated sweeps.
         this.run.initLinkedAccountIndex()
-        for (const fa of this.run.fusionAccountsIterable()) {
+        await forEachIterableChunked(this.run.fusionAccountsIterable(), (fa) => {
             addFusionAccountLinkedKeysToIndex(fa, this.run)
-        }
-        for (const fa of this.run.allFusionIdentities) {
+        })
+        await forEachIterableChunked(this.run.allFusionIdentities, (fa) => {
             addFusionAccountLinkedKeysToIndex(fa, this.run)
-        }
+        })
     }
 
     private async runCorrelatedAccountSweep(map: Map<string, Account>): Promise<void> {
@@ -967,7 +967,12 @@ export class FusionService {
         // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion account)
         // are registered as non-matches in the identity-linked Fusion account map here, so they are immediately visible
         // as deferred-match candidates when uncorrelated accounts are scored in the uncorrelated scoring sweep.
-        const correlatedAccounts = [...map.values()].filter((a) => a.uncorrelated === false)
+        const correlatedAccounts: Account[] = []
+        await forEachIterableChunked(map.values(), (account) => {
+            if (account.uncorrelated === false) {
+                correlatedAccounts.push(account)
+            }
+        })
         if (correlatedAccounts.length === 0) {
             return
         }
@@ -1170,12 +1175,12 @@ export class FusionService {
             !(this.deleteEmpty && account.collections.statuses.isOrphan())
 
         let totalEligible = 0
-        for (const account of this.run.fusionAccountsIterable()) {
+        await forEachIterableChunked(this.run.fusionAccountsIterable(), (account) => {
             if (isEligible(account)) totalEligible++
-        }
-        for (const account of this.run.allFusionIdentities) {
+        })
+        await forEachIterableChunked(this.run.allFusionIdentities, (account) => {
             if (isEligible(account)) totalEligible++
-        }
+        })
 
         const totalBatches = Math.ceil(totalEligible / batchSize)
         const logProgressEveryBatch = Math.max(1, Math.min(50, Math.ceil(totalBatches / 20) || 1))
@@ -1556,21 +1561,25 @@ export class FusionService {
         this.run.clearDeferredCandidates()
         this.run.resetScoringState()
 
-        for (const fusionAccount of this.run.fusionAccountMap.values()) {
+        await forEachIterableChunked(this.run.fusionAccountMap.values(), (fusionAccount) => {
             this.run.registerPersistedDeferredCandidate(fusionAccount)
-        }
-        for (const fusionAccount of this.run.allFusionIdentities) {
+        })
+        await forEachIterableChunked(this.run.allFusionIdentities, (fusionAccount) => {
             this.run.registerPersistedDeferredCandidate(fusionAccount)
-        }
+        })
 
         this.validateManagedSourceReviewers()
 
         // Build the trigram blocking index over all currently-loaded fusion identities so that
         // each managed account can skip the vast majority of identity comparisons.
         // The index is rebuilt each run (identity pool may change between runs).
-        this.matchingService.buildTrigramIndex(this.run.allFusionIdentities)
+        if (typeof this.matchingService.buildTrigramIndexAsync === 'function') {
+            await this.matchingService.buildTrigramIndexAsync(this.run.allFusionIdentities)
+        } else {
+            this.matchingService.buildTrigramIndex(this.run.allFusionIdentities)
+        }
 
-        this.buildLinkedAccountKeyIndex()
+        await this.buildLinkedAccountKeyIndex()
     }
 
     /** Correlated account sweep: resolve linked/correlated managed accounts before uncorrelated scoring. */
@@ -1638,7 +1647,10 @@ export class FusionService {
     public async processUncorrelatedManagedAccounts(): Promise<{ processed: number; matchScoringMs: number }> {
         this.ensureManagedAccountProcessingInitialized()
         const map = this.run.managedAccountsById
-        const queuedAccounts = [...map.values()]
+        const queuedAccounts: Account[] = []
+        await forEachIterableChunked(map.values(), (account) => {
+            queuedAccounts.push(account)
+        })
         const initialQueueSize = queuedAccounts.length
         this.log.detail({
             action: 'processing uncorrelated managed accounts',

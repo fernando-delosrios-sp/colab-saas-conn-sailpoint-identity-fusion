@@ -151,7 +151,7 @@ describe('FusionService — report', () => {
                 configurable: true,
             })
 
-            ctx.mockMatchingService.buildTrigramIndex = vi.fn()
+            ctx.mockMatchingService.buildTrigramIndexAsync = vi.fn().mockResolvedValue(undefined)
             const configureScoring = vi.fn()
             Object.assign(ctx.mockMatchingService, { configureScoring })
 
@@ -180,7 +180,7 @@ describe('FusionService — report', () => {
             expect(
                 (ctx.mockMatchingService as { configureScoring?: ReturnType<typeof vi.fn> }).configureScoring
             ).not.toHaveBeenCalled()
-            expect(ctx.mockMatchingService.buildTrigramIndex).toHaveBeenCalled()
+            expect(ctx.mockMatchingService.buildTrigramIndexAsync).toHaveBeenCalled()
         })
 
         it('does not call configureScoring when report capture is enabled', async () => {
@@ -188,7 +188,7 @@ describe('FusionService — report', () => {
             expect(
                 (ctx.mockMatchingService as { configureScoring?: ReturnType<typeof vi.fn> }).configureScoring
             ).not.toHaveBeenCalled()
-            expect(ctx.mockMatchingService.buildTrigramIndex).toHaveBeenCalled()
+            expect(ctx.mockMatchingService.buildTrigramIndexAsync).toHaveBeenCalled()
         })
 
         it('does not call configureScoring when run is in record mode', async () => {
@@ -203,7 +203,7 @@ describe('FusionService — report', () => {
             })
 
             const configureScoring = vi.fn()
-            ctx.mockMatchingService.buildTrigramIndex = vi.fn()
+            ctx.mockMatchingService.buildTrigramIndexAsync = vi.fn().mockResolvedValue(undefined)
             Object.assign(ctx.mockMatchingService, { configureScoring })
 
             const service = new FusionService({
@@ -224,7 +224,7 @@ describe('FusionService — report', () => {
 
             await service.initializeManagedAccountProcessing()
             expect(configureScoring).not.toHaveBeenCalled()
-            expect(ctx.mockMatchingService.buildTrigramIndex).toHaveBeenCalled()
+            expect(ctx.mockMatchingService.buildTrigramIndexAsync).toHaveBeenCalled()
         })
     })
 

@@ -40,3 +40,30 @@ export async function forEachChunked<T>(
         options.onProgress?.(end, items.length)
     }
 }
+
+/**
+ * Iterates any `Iterable<T>` in bounded synchronous chunks, yielding to the event loop
+ * between chunks so large in-memory Map/Set scans do not starve timers or keep-alives.
+ */
+export async function forEachIterableChunked<T>(
+    iterable: Iterable<T>,
+    fn: (item: T, index: number) => void,
+    chunkSize: number = 5_000
+): Promise<void> {
+    if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
+        throw new RangeError('chunkSize must be a positive integer')
+    }
+    let countInChunk = 0
+    let index = 0
+    for (const item of iterable) {
+        fn(item, index++)
+        countInChunk++
+        if (countInChunk >= chunkSize) {
+            countInChunk = 0
+            await yieldToEventLoop()
+        }
+    }
+    if (countInChunk > 0) {
+        await yieldToEventLoop()
+    }
+}

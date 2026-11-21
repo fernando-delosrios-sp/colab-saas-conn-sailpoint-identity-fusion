@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events'
 import { createOperationHandler, OperationHandlerOptions } from '../operationHandler'
 import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
 import { safeReadConfig } from '../../data/config'
@@ -103,11 +104,22 @@ describe('createOperationHandler', () => {
             expect(defaultFn).not.toHaveBeenCalled()
         })
 
-        it('loads config on each operation invocation', async () => {
+        it('loads config on each operation invocation and announces operation start first', async () => {
+            const callOrder: string[] = []
+            vi.mocked(logger.info).mockImplementation(() => {
+                callOrder.push('log')
+            })
+            vi.mocked(safeReadConfig).mockImplementation(async () => {
+                callOrder.push('config')
+                return mockConfig
+            })
+
             const handler = createOperationHandler(operationName, defaultFn, defaultOptions)
             await handler(context, input, res)
 
             expect(safeReadConfig).toHaveBeenCalledTimes(1)
+            expect(logger.info).toHaveBeenCalledWith(`[${operationName}] DETAIL action=start`)
+            expect(callOrder).toEqual(['log', 'config'])
         })
 
         it('should run in Proxy mode when proxy client', async () => {
@@ -387,7 +399,133 @@ describe('createOperationHandler', () => {
         })
     })
 
+    describe('Abandoned Run Cancellation & Superseding', () => {
+        const makeRegistryWithLifecycle = (_config: any, _context: any, mockRes: any) => ({
+            res: mockRes,
+            log: {
+                detail: vi.fn(),
+                info: vi.fn(),
+                warn: vi.fn(),
+                error: vi.fn(),
+                startEventLoopWatchdog: vi.fn(),
+                stopEventLoopWatchdog: vi.fn(),
+                stopOperationHeartbeat: vi.fn(),
+            },
+            client: {
+                getQueue: vi.fn().mockReturnValue({ clear: vi.fn() }),
+            },
+            run: {
+                clearManagedAccountState: vi.fn(),
+                clearSimulatedTime: vi.fn(),
+            },
+            proxy: {
+                isProxyService: vi.fn().mockReturnValue(false),
+                isProxyMode: vi.fn().mockReturnValue(false),
+                execute: vi.fn(),
+            },
+        })
 
+        it('aborts the operation and stops keep-alive when the response stream closes prematurely', async () => {
+            const registry = makeRegistryWithLifecycle(mockConfig, context, res)
+            ;(ServiceRegistry as any).mockImplementationOnce(() => registry)
+
+            const writable = Object.assign(new EventEmitter(), {
+                write: vi.fn(),
+                destroyed: false,
+                writableFinished: false,
+            })
+            const streamRes = { _writable: writable, keepAlive: vi.fn(), send: vi.fn() }
+
+            let resolveRun!: () => void
+            let capturedSignal: AbortSignal | undefined
+            defaultFn.mockImplementation((reg: any) => {
+                capturedSignal = reg.abortSignal
+                return new Promise<void>((resolve) => {
+                    resolveRun = resolve
+                })
+            })
+
+            const handler = createOperationHandler('accountList', defaultFn, {
+                ...defaultOptions,
+                keepAlive: 'memory',
+            })
+            const promise = handler(context, {}, streamRes)
+            await Promise.resolve()
+            await Promise.resolve()
+
+            expect(capturedSignal?.aborted).toBe(false)
+
+            // Platform disconnects before writableFinished is true
+            writable.emit('close')
+
+            expect(capturedSignal?.aborted).toBe(true)
+            expect(registry.log.stopEventLoopWatchdog).toHaveBeenCalledTimes(1)
+            expect(registry.log.stopOperationHeartbeat).toHaveBeenCalledTimes(1)
+            expect(registry.client.getQueue().clear).toHaveBeenCalledTimes(1)
+            expect(registry.run.clearManagedAccountState).toHaveBeenCalledTimes(1)
+
+            // Keep-alive must no longer fire after premature close
+            vi.advanceTimersByTime(5_000)
+            expect(streamRes.keepAlive).not.toHaveBeenCalled()
+
+            resolveRun()
+            await promise
+        })
+
+        it('supersedes an earlier in-flight persistent accountList for the same connector instance', async () => {
+            const instanceConfig = { processingWait: 1000, spConnectorInstanceId: 'inst-1' } as any
+            vi.mocked(safeReadConfig).mockResolvedValue(instanceConfig)
+
+            const reg1 = makeRegistryWithLifecycle(instanceConfig, context, res)
+            const reg2 = makeRegistryWithLifecycle(instanceConfig, context, res)
+            ;(ServiceRegistry as any)
+                .mockImplementationOnce(() => reg1)
+                .mockImplementationOnce(() => reg2)
+
+            let resolveFirst!: () => void
+            let resolveSecond!: () => void
+            const signals: Array<AbortSignal | undefined> = []
+
+            const fn = vi.fn().mockImplementation((reg: any) => {
+                signals.push(reg.abortSignal)
+                return new Promise<void>((resolve) => {
+                    if (signals.length === 1) resolveFirst = resolve
+                    else resolveSecond = resolve
+                })
+            })
+
+            const handler = createOperationHandler('accountList', fn, {
+                ...defaultOptions,
+                keepAlive: 'memory',
+            })
+
+            const res1 = { keepAlive: vi.fn(), send: vi.fn() }
+            const res2 = { keepAlive: vi.fn(), send: vi.fn() }
+
+            const firstPromise = handler(context, {}, res1)
+            await Promise.resolve()
+            await Promise.resolve()
+
+            const secondPromise = handler(context, {}, res2)
+            await Promise.resolve()
+            await Promise.resolve()
+
+            expect(signals[0]?.aborted).toBe(true)
+            expect(signals[1]?.aborted).toBe(false)
+            expect(reg1.log.stopEventLoopWatchdog).toHaveBeenCalledTimes(1)
+            expect(reg1.client.getQueue().clear).toHaveBeenCalledTimes(1)
+            expect(reg1.run.clearManagedAccountState).toHaveBeenCalledTimes(1)
+
+            // Only the newer run sends keep-alives now
+            vi.advanceTimersByTime(1000)
+            expect(res1.keepAlive).not.toHaveBeenCalled()
+            expect(res2.keepAlive).toHaveBeenCalledTimes(1)
+
+            resolveFirst()
+            resolveSecond()
+            await Promise.all([firstPromise, secondPromise])
+        })
+    })
 })
 
 

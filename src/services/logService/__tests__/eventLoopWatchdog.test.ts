@@ -1,4 +1,9 @@
-import { EventLoopWatchdog, formatBlockedWarning, formatRunContextLabel } from '../eventLoopWatchdog'
+import {
+    EventLoopWatchdog,
+    formatBlockedWarning,
+    formatEventLoopDiagnostics,
+    formatRunContextLabel,
+} from '../eventLoopWatchdog'
 import { OperationRunContext } from '../operationRunContext'
 import { LogService } from '../logService'
 
@@ -186,5 +191,33 @@ describe('EventLoopWatchdog', () => {
         vi.advanceTimersByTime(60_000)
 
         expect(warn).not.toHaveBeenCalled()
+    })
+
+    it('appends heap/rss/gc diagnostics to blocked warnings when getDiagnostics is provided', () => {
+        const warn = vi.fn()
+        const clock = createClock()
+        const watchdog = new EventLoopWatchdog({ warn } as unknown as LogService, {
+            sampleIntervalMs: 1_000,
+            blockThresholdMs: 5_000,
+            now: clock.now,
+            getContext: () => 'phase=Fetch managed-accounts=100/1000',
+            getDiagnostics: () =>
+                formatEventLoopDiagnostics(420, {
+                    rss: 1200 * 1024 * 1024,
+                    heapTotal: 1000 * 1024 * 1024,
+                    heapUsed: 950 * 1024 * 1024,
+                    external: 0,
+                    arrayBuffers: 0,
+                }),
+        })
+
+        watchdog.start()
+        clock.advance(8_000)
+        vi.advanceTimersByTime(1_000)
+
+        expect(warn).toHaveBeenCalledWith(
+            'WARN EVENT_LOOP blocked 7.0s | before=phase=Fetch managed-accounts=100/1000 | now=phase=Fetch managed-accounts=100/1000 | mem=1200.00MB heap=950.00MB gc=420ms'
+        )
+        watchdog.stop()
     })
 })

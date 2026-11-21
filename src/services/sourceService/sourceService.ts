@@ -514,7 +514,7 @@ export class SourceService {
     /**
      * Fetches Fusion accounts and bulk-ingests each page without blocking operation timers.
      */
-    public async fetchFusionAccounts(): Promise<void> {
+    public async fetchFusionAccounts(abortSignal?: AbortSignal): Promise<void> {
         this.log.debug('Fetching fusion accounts')
         await wrapConnectorError(async () => {
             this.fusionAccountsByNativeIdentity = new Map()
@@ -524,7 +524,7 @@ export class SourceService {
 
             for await (const batch of this.fetchAccountsBySourceIdGenerator(
                 this.fusionSourceId,
-                undefined,
+                abortSignal,
                 undefined,
                 (_loaded, total) => {
                     knownTotal = total

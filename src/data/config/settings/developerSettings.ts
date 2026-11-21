@@ -21,7 +21,7 @@ export const runtimeDefaults = {
 } as const
 
 export function readSettings(raw: Record<string, unknown>): DeveloperSettingsSection {
-    bootstrapLog.detail({ validation: 'success' })
+    bootstrapLog.detail({ section: 'developer', validation: 'success' })
 
     return {
         resetAccounts:

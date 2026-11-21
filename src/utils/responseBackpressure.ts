@@ -23,7 +23,7 @@ export async function sendWithBackpressure<T>(res: Response<T>, output: T): Prom
     await waitUntilStreamAcceptsMore(stream)
 }
 
-function unwrapOutputStream(res: Response<unknown>): OutputStream | undefined {
+export function unwrapOutputStream(res: Response<unknown>): OutputStream | undefined {
     let current: unknown = res
     const seen = new Set<unknown>()
     while (current && typeof current === 'object' && !seen.has(current)) {
