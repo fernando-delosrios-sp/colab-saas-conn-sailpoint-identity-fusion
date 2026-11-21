@@ -656,6 +656,95 @@ describe('FusionRun', () => {
 
         expect(run.sourcesByName.get('Source A')).toEqual(sourceInfo)
     })
+
+    it('Single-account identity links do not allocate Sets during bulk ingest', () => {
+        const run = new FusionRun()
+        const acc1 = {
+            id: 'acc-1',
+            name: 'user1',
+            nativeIdentity: 'user1',
+            sourceId: 'src-ad-1',
+            sourceName: 'AD',
+            identityId: 'id-single',
+            attributes: { mail: 'user1@example.com' },
+            disabled: false,
+            uncorrelated: false,
+        } as Account
+
+        run.setManagedAccount('src-ad-1::user1', acc1)
+
+        expect(run.managedAccountsByIdentityId).toBeInstanceOf(Map)
+        expect(typeof Map.prototype.get.call(run.managedAccountsByIdentityId, 'id-single')).toBe('string')
+        expect(run.getKeysForIdentity('id-single')?.has('src-ad-1::user1')).toBe(true)
+        // getKeysForIdentity must not promote the bare string to a Set
+        expect(typeof Map.prototype.get.call(run.managedAccountsByIdentityId, 'id-single')).toBe('string')
+
+        expect(run.claimAccountsForIdentity('id-single')).toBe(1)
+        expect(run.managedAccountsByIdentityId.has('id-single')).toBe(false)
+        expect(run.get('src-ad-1::user1')).toBeUndefined()
+        expect(run.getRetainedAccount('src-ad-1::user1')).toBeDefined()
+        expect(run.hasManagedAccount('src-ad-1::user1')).toBe(true)
+    })
+
+    it('Multi-account identity links and direct Map.get callers remain fully compatible', () => {
+        const run = new FusionRun()
+        const acc1 = {
+            id: 'acc-1',
+            name: 'user1',
+            nativeIdentity: 'user1',
+            sourceId: 'src-ad-1',
+            sourceName: 'AD',
+            identityId: 'id-1',
+            attributes: {},
+            disabled: false,
+            uncorrelated: false,
+        } as Account
+        const acc2 = {
+            id: 'acc-2',
+            name: 'user2',
+            nativeIdentity: 'user2',
+            sourceId: 'src-ad-2',
+            sourceName: 'AD2',
+            identityId: 'id-1',
+            attributes: {},
+            disabled: false,
+            uncorrelated: false,
+        } as Account
+
+        run.setManagedAccount('src-ad-1::user1', acc1)
+        expect(typeof Map.prototype.get.call(run.managedAccountsByIdentityId, 'id-1')).toBe('string')
+
+        run.setManagedAccount('src-ad-2::user2', acc2)
+        const set = run.managedAccountsByIdentityId.get('id-1')
+        expect(set).toBeInstanceOf(Set)
+        expect(Array.from(set ?? [])).toEqual(['src-ad-1::user1', 'src-ad-2::user2'])
+        expect(Array.from(run.getKeysForIdentity('id-1') ?? [])).toEqual(['src-ad-1::user1', 'src-ad-2::user2'])
+    })
+
+    it('Clearing the store releases all compressed blocks and read caches', () => {
+        const run = new FusionRun()
+        run.setManagedAccount('src-ad-1::user1', {
+            id: 'acc-1',
+            name: 'user1',
+            nativeIdentity: 'user1',
+            sourceId: 'src-ad-1',
+            sourceName: 'AD',
+            identityId: 'id-1',
+            attributes: { mail: 'user1@example.com' },
+            disabled: false,
+            uncorrelated: false,
+        } as Account)
+        run.claimAccount('src-ad-1::user1', 'id-1')
+        run.addIdentity('id-1', { id: 'id-1', name: 'User 1' } as any)
+
+        run.clearManagedAccountState()
+        run.clearIdentities()
+
+        expect(run.managedAccountsById.size).toBe(0)
+        expect(run.managedAccountInventory.size).toBe(0)
+        expect(run.getRetainedAccount('src-ad-1::user1')).toBeUndefined()
+        expect(run.identityCount).toBe(0)
+    })
 })
 
 function makeMockRecorder(): ManagedAccountAnalysisRecording & {

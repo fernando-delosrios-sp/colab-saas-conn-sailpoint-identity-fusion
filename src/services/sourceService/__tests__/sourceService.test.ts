@@ -1602,5 +1602,38 @@ describe('SourceService.listSourceSchemas', () => {
         expect(client.call).toHaveBeenCalled()
         expect(schemas).toEqual([{ name: 'account', identityAttribute: 'id', attributes: [] }])
     })
+
+    it('Fetched Fusion accounts are stored in compressed blocks and released on clear', async () => {
+        const { service } = createService()
+        ;(service as any).fusionSourceIdValue = 'fusion-source-id'
+        const fusionAccounts = Array.from({ length: 5 }, (_, i) => ({
+            id: `fusion-${i}`,
+            name: `Fusion ${i}`,
+            nativeIdentity: `fusion-ni-${i}`,
+            sourceId: 'fusion-source-id',
+            attributes: { mail: `f${i}@example.com` },
+        }))
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(
+            async function* (_sourceId, _abortSignal, _filter, onPageProgress) {
+                onPageProgress?.(5, 5)
+                yield fusionAccounts as any
+            }
+        )
+
+        await service.fetchFusionAccounts()
+
+        expect(service.fusionAccountsByNativeIdentity?.constructor.name).toBe('CompressedBlockMap')
+        expect(service.fusionAccountCount).toBe(5)
+        expect(Array.from(service.fusionAccountValues()).map((a) => a.nativeIdentity)).toEqual(
+            fusionAccounts.map((a) => a.nativeIdentity)
+        )
+        expect(service.fusionAccountsByNativeIdentity?.get('fusion-ni-3')?.attributes).toEqual({
+            mail: 'f3@example.com',
+        })
+
+        service.clearFusionAccounts()
+        expect(service.fusionAccountCount).toBe(0)
+        expect(Array.from(service.fusionAccountValues())).toEqual([])
+    })
 })
 

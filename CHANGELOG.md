@@ -5,6 +5,14 @@ All notable changes to **Identity Fusion NG** — the ISC connector for Map → 
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
 
+## 2026-11-21 · v2.2.0
+
+### 🔧 Improvements
+
+- **Compressed in-memory storage for large account and identity aggregations** — Replaced uncompressed off-heap buffers with `CompressedBlockMap` (raw DEFLATE level 1 over 128-record blocks with a bounded 16-block LRU read cache and source-partitioned composite key indexing) across `FusionRun` (`managedAccountsById`, `claimedAccountRetention`, `managedAccountInventory`, `identityMap`) and `SourceService.fusionAccountsByNativeIdentity`, and compacted `FusionRun.managedAccountsByIdentityId` to avoid per-identity `Set` allocations for single-account identities, cutting container RSS by ~3–5x on million-account runs while preserving full `Map` and snapshot/restore compatibility.
+
+---
+
 ## 2026-11-20 · v2.2.0
 
 ### 🐛 Fixes

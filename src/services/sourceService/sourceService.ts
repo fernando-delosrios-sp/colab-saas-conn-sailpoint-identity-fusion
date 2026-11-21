@@ -18,6 +18,7 @@ import { buildSourceConfigPatch, buildSourceConfigRemove } from './helpers'
 import { SourceInfo } from './types'
 import { buildIscAccountsQueryFilter } from './accountFilters'
 import { FusionRun } from '../../model/fusionRun'
+import { CompressedBlockMap } from '../../model/compressedBlockMap'
 import { getManagedAccountKeyFromAccount } from '../../model/managedAccountKey'
 import { forEachChunked } from '../../utils/yieldToEventLoop'
 import {
@@ -123,6 +124,7 @@ export class SourceService {
      */
     private referencedAttributeSetValue?: ReadonlySet<string>
 
+    /** Fusion accounts keyed by nativeIdentity, backed by {@link CompressedBlockMap} during bulk fetch. */
     public fusionAccountsByNativeIdentity?: Map<string, Account>
 
     /**
@@ -517,7 +519,7 @@ export class SourceService {
     public async fetchFusionAccounts(abortSignal?: AbortSignal): Promise<void> {
         this.log.debug('Fetching fusion accounts')
         await wrapConnectorError(async () => {
-            this.fusionAccountsByNativeIdentity = new Map()
+            this.fusionAccountsByNativeIdentity = new CompressedBlockMap<Account>()
             let ingested = 0
             let knownTotal: number | undefined
             let ingestDetailLogged = false
@@ -577,7 +579,7 @@ export class SourceService {
         }
 
         if (!this.fusionAccountsByNativeIdentity) {
-            this.fusionAccountsByNativeIdentity = new Map()
+            this.fusionAccountsByNativeIdentity = new CompressedBlockMap<Account>()
         }
         this.fusionAccountsByNativeIdentity.set(fusionAccount.nativeIdentity!, fusionAccount)
         this.log.debug(`Fetched fusion account: ${fusionAccount.name}`)

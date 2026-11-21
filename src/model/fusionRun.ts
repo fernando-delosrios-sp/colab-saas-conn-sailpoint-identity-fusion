@@ -1,6 +1,7 @@
 import { AccountV2025 as Account, IdentityDocument } from 'sailpoint-api-client'
 import { FusionAccount, FusionAccountKind } from './account'
-import { CompactManagedAccountMap } from './compactManagedAccountMap'
+import { CompressedBlockMap } from './compressedBlockMap'
+import { CompactStringSetMap } from './compactStringSetMap'
 import { MatchCandidateRecord } from './matchCandidateRecord'
 import { SourceInfo } from '../services/sourceService'
 import { FusionDecision } from './form'
@@ -101,9 +102,10 @@ export interface RunStateSnapshot {
 
 /**
  * Run-scoped managed account state:
- * - `managedAccountsById`: mutable Match work queue; entries removed via `claimAccount()`
- * - `managedAccountInventory`: lightweight metadata for every loaded key until output phase
- * - claimed account retention: post-claim attribute bodies for FusionLayers rematerialization
+ * - `managedAccountsById`: mutable Match work queue in compressed block storage; entries removed via `claimAccount()`
+ * - `managedAccountInventory`: lightweight metadata for every loaded key in compressed block storage until output phase
+ * - `managedAccountsByIdentityId`: compact identity-to-account index avoiding per-identity `Set` allocation for single-account identities
+ * - `claimedAccountRetention`: post-claim attribute bodies in compressed block storage for FusionLayers rematerialization
  *   (not a second Match work queue; not inventory)
  */
 export class FusionRun {
@@ -112,17 +114,21 @@ export class FusionRun {
     public readonly skipDuplicateFusionAccounts: boolean
     /** Set when account-list dry-run mode activates write inhibition. */
     public isDryRunMode = false
-    readonly managedAccountsById: Map<string, Account> = new CompactManagedAccountMap()
-    readonly managedAccountInventory = new Map<string, ManagedAccountInfo>()
-    readonly managedAccountsByIdentityId = new Map<string, Set<string>>()
+    readonly managedAccountsById: Map<string, Account> = new CompressedBlockMap({ partitionCompositeKeys: true })
+    readonly managedAccountInventory: Map<string, ManagedAccountInfo> = new CompressedBlockMap({
+        partitionCompositeKeys: true,
+    })
+    readonly managedAccountsByIdentityId: Map<string, Set<string>> = new CompactStringSetMap()
     /** Post-claim Account bodies keyed by managed account key. Not Match work. */
-    private readonly claimedAccountRetention: Map<string, Account> = new CompactManagedAccountMap()
+    private readonly claimedAccountRetention: Map<string, Account> = new CompressedBlockMap({
+        partitionCompositeKeys: true,
+    })
     private readonly fusionAccountMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityMapValue = new Map<string, FusionAccount>()
     private readonly fusionIdentityOwnerIdByManagedKey = new Map<string, string>()
     /** Reverse of {@link fusionIdentityOwnerIdByManagedKey}: lets ownership be released without scanning the whole map. */
     private readonly fusionIdentityOwnedKeysByIdentityId = new Map<string, Set<string>>()
-    private readonly identityMapValue = new Map<string, IdentityDocument>()
+    private readonly identityMapValue: Map<string, IdentityDocument> = new CompressedBlockMap()
     /** Non-protected identity IDs loaded from ISC during this run (survives cache clears). */
     private readonly identitiesLoadedIds = new Set<string>()
     readonly sourcesByName = new Map<string, SourceInfo>()
@@ -287,12 +293,16 @@ export class FusionRun {
         this.managedAccountsById.set(accountKey, account)
         this.managedAccountInventory.set(accountKey, toManagedAccountInfo(account))
         if (account.identityId) {
-            let idSet = this.managedAccountsByIdentityId.get(account.identityId)
-            if (!idSet) {
-                idSet = new Set()
-                this.managedAccountsByIdentityId.set(account.identityId, idSet)
+            if (this.managedAccountsByIdentityId instanceof CompactStringSetMap) {
+                this.managedAccountsByIdentityId.addKey(account.identityId, accountKey)
+            } else {
+                let idSet = this.managedAccountsByIdentityId.get(account.identityId)
+                if (!idSet) {
+                    idSet = new Set()
+                    this.managedAccountsByIdentityId.set(account.identityId, idSet)
+                }
+                idSet.add(accountKey)
             }
-            idSet.add(accountKey)
         }
     }
 
@@ -300,11 +310,15 @@ export class FusionRun {
         this.retainClaimedAccount(accountKey)
         const deleted = this.managedAccountsById.delete(accountKey)
         if (identityId) {
-            const idSet = this.managedAccountsByIdentityId.get(identityId)
-            if (idSet) {
-                idSet.delete(accountKey)
-                if (idSet.size === 0) {
-                    this.managedAccountsByIdentityId.delete(identityId)
+            if (this.managedAccountsByIdentityId instanceof CompactStringSetMap) {
+                this.managedAccountsByIdentityId.deleteKey(identityId, accountKey)
+            } else {
+                const idSet = this.managedAccountsByIdentityId.get(identityId)
+                if (idSet) {
+                    idSet.delete(accountKey)
+                    if (idSet.size === 0) {
+                        this.managedAccountsByIdentityId.delete(identityId)
+                    }
                 }
             }
         }
@@ -312,17 +326,27 @@ export class FusionRun {
     }
 
     claimAccountsForIdentity(identityId: string): number {
-        const idSet = this.managedAccountsByIdentityId.get(identityId)
-        if (!idSet) return 0
+        const keys =
+            this.managedAccountsByIdentityId instanceof CompactStringSetMap
+                ? this.managedAccountsByIdentityId.takeKeys(identityId)
+                : this.takePlainMapKeys(identityId)
+        if (!keys) return 0
         let deleted = 0
-        for (const key of idSet) {
+        for (const key of keys) {
             this.retainClaimedAccount(key)
             if (this.managedAccountsById.delete(key)) {
                 deleted++
             }
         }
-        this.managedAccountsByIdentityId.delete(identityId)
         return deleted
+    }
+
+    private takePlainMapKeys(identityId: string): Set<string> | undefined {
+        const idSet = this.managedAccountsByIdentityId.get(identityId)
+        if (idSet) {
+            this.managedAccountsByIdentityId.delete(identityId)
+        }
+        return idSet
     }
 
     get(key: string): Account | undefined {
@@ -338,6 +362,9 @@ export class FusionRun {
     }
 
     getKeysForIdentity(identityId: string): ReadonlySet<string> | undefined {
+        if (this.managedAccountsByIdentityId instanceof CompactStringSetMap) {
+            return this.managedAccountsByIdentityId.getKeys(identityId)
+        }
         return this.managedAccountsByIdentityId.get(identityId)
     }
 
