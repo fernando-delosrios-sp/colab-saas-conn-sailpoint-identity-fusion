@@ -486,7 +486,7 @@ export class FusionCollections {
     // Sync to attribute bag
     // ============================================================================
 
-    syncToBag(bag: Attributes, originSource?: string, originAccount?: string, identityId?: string): void {
+    syncToBag(bag: Attributes, originSource?: string, originAccount?: string): void {
         bag[FusionAttribute.Reviews] = Array.from(this.reviewsValue)
         bag[FusionAttribute.Accounts] = Array.from(this.accountIdsValue)
         bag[FusionAttribute.Statuses] = Array.from(this.statusesValue)
@@ -496,6 +496,5 @@ export class FusionCollections {
         bag[FusionAttribute.History] = Array.from(this.historyValue)
         if (originSource !== undefined) bag[FusionAttribute.OriginSource] = originSource
         if (originAccount !== undefined) bag[FusionAttribute.OriginAccount] = originAccount
-        if (identityId) bag[FusionAttribute.IdentityId] = identityId
     }
 }

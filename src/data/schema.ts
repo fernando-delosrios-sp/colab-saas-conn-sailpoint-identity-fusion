@@ -24,7 +24,6 @@ export enum FusionAttribute {
     MainAccount = 'mainAccount',
     OriginSource = 'originSource',
     OriginAccount = 'originAccount',
-    IdentityId = 'identityId',
 }
 
 export const fusionAccountSchemaAttributes: SchemaAttribute[] = [
@@ -110,13 +109,6 @@ export const fusionAccountSchemaAttributes: SchemaAttribute[] = [
         name: 'originAccount',
         description:
             'Origin identity ID (Identities source) or composite managed account key sourceId::nativeIdentity (managed source); set on creation, immutable',
-        type: 'string',
-        multi: false,
-        entitlement: false,
-    },
-    {
-        name: 'identityId',
-        description: 'Correlated ISC identity ID (persisted for round-trip when SDK Account lacks identityId)',
         type: 'string',
         multi: false,
         entitlement: false,

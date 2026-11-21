@@ -2,7 +2,6 @@ import { FormElementV2025, FormDefinitionInputV2025 } from 'sailpoint-api-client
 import { ConnectorError, ConnectorErrorType, logger } from '@sailpoint/connector-sdk'
 import { FusionAccount } from '../../model/account'
 import { OrphanProcessingMode, SourceType } from '../../model/config'
-import { FusionAttribute } from '../../data/schema'
 import { UrlContext } from '../../utils/url'
 import { trimStr } from '../../utils/safeRead'
 import { translate, translateWithParams } from '../emailService/localization'
@@ -399,9 +398,9 @@ export const buildFormInputs = (
 
     if (fusionAccount.identityId) {
         formInputs.push({
-            id: FusionAttribute.IdentityId,
+            id: 'identityId',
             type: 'STRING',
-            label: FusionAttribute.IdentityId,
+            label: 'identityId',
             description: fusionAccount.identityId,
         })
     }

@@ -105,7 +105,7 @@ function applyOriginMetadata(
     }
 
     if (!identityInfo?.id) {
-        const identityId = getAccountStringAttribute(account, FusionAttribute.IdentityId)
+        const identityId = getAccountStringAttribute(account, 'identityId')
         if (identityId && identityId.trim().length > 0) {
             fa.setIdentityIdAttribute(identityId.trim())
         }

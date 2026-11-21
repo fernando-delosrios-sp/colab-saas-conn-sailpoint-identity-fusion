@@ -524,8 +524,7 @@ export class FusionAccount {
         this.collections.syncToBag(
             this.attributeBagValue.current,
             this.layers.originSource,
-            this.layers.originAccount,
-            this.identityInfoValue?.id
+            this.layers.originAccount
         )
     }
 

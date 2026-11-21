@@ -7,7 +7,6 @@ import { resolveIdentityDocumentDisplayName } from '../../model/fusionAccountUti
 import { IdentityService } from '../identityService'
 import { assert } from '../../utils/assert'
 import { readString, trimStr } from '../../utils/safeRead'
-import { FusionAttribute } from '../../data/schema'
 
 // ============================================================================
 // Internal Helpers
@@ -62,7 +61,7 @@ function normalizeScalar(value: unknown): string {
  */
 function readCorrelatedIdentityId(formInput: any): string | undefined {
     // Try flat structure first (as sent in createFormInstance)
-    const flat = readString(formInput, FusionAttribute.IdentityId)
+    const flat = readString(formInput, 'identityId')
     if (flat) return flat
 
     // Fall back to dictionary structure (direct key lookup, then id-aligned scan)
@@ -70,7 +69,7 @@ function readCorrelatedIdentityId(formInput: any): string | undefined {
         const dict = formInput as Record<string, any>
         if (!dict) return undefined
 
-        const direct = dict[FusionAttribute.IdentityId]
+        const direct = dict['identityId']
         if (direct && (direct.value || direct.description)) {
             const val = direct.value || direct.description
             if (typeof val === 'string' && val.length > 0) return val
@@ -78,7 +77,7 @@ function readCorrelatedIdentityId(formInput: any): string | undefined {
 
         for (const key in dict) {
             const item = dict[key]
-            if (item?.id === FusionAttribute.IdentityId && (item.value || item.description)) {
+            if (item?.id === 'identityId' && (item.value || item.description)) {
                 const val = item.value || item.description
                 if (typeof val === 'string' && val.length > 0) return val
             }

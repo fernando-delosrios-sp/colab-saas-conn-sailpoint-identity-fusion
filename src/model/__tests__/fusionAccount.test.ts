@@ -450,21 +450,14 @@ describe('FusionAccount', () => {
             expect(restored.managedKey).toBe(`id-1`)
         })
 
-        it('round trips the persisted identityId through attributes', () => {
+        it('does not emit identityId into attributes when syncing to bag', () => {
             const acc = FusionAccount.fromIdentity({ id: 'id-1', attributes: { email: 'a@b.com' } } as any)
             acc.setKey({ simple: { id: 'id-1' } })
             acc.collections.statuses.add(StatusEntitlement.Baseline)
             acc.syncCollectionAttributesToBag()
 
             const iscAccount = acc.toISCAccount()
-            iscAccount.nativeIdentity = 'id-1'
-            iscAccount.id = 'isc-1'
-            // Simulate ISC echo: only attributes + nativeIdentity + id are persisted, no top-level identityId
-            iscAccount.attributes = { ...iscAccount.attributes }
-
-            const restored = FusionAccount.fromFusionAccount(iscAccount)
-            expect(restored.identityId).toBe('id-1')
-            expect(restored.identityIdAttribute).toBe('id-1')
+            expect(iscAccount.attributes.identityId).toBeUndefined()
         })
 
         it('routes via identityIdAttribute fallback when SDK does not expose identityId', () => {

@@ -243,14 +243,14 @@ describe('FusionCollections', () => {
             collections.sources.add('Source A')
 
             const bag: Record<string, any> = {}
-            collections.syncToBag(bag, 'Identities', 'id-1', 'identity-123')
+            collections.syncToBag(bag, 'Identities', 'id-1')
 
             expect(bag['accounts']).toContain('src-a::acc-1')
             expect(bag['missing-accounts']).toContain('src-a::missing-1')
             expect(bag['statuses']).toContain('baseline')
             expect(bag['actions']).toContain('correlated')
             expect(bag['reviews']).toContain('https://review/1')
-            expect(bag['identityId']).toBe('identity-123')
+            expect(bag['identityId']).toBeUndefined()
             expect(bag['originSource']).toBe('Identities')
             expect(bag['originAccount']).toBe('id-1')
         })

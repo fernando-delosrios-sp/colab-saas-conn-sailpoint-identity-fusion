@@ -3,12 +3,13 @@ import { FusionAttribute, fusionAccountSchemaAttributes } from '../schema'
 const enumValues = Object.values(FusionAttribute).filter((v) => typeof v === 'string') as string[]
 
 describe('FusionAttribute', () => {
-    it('declares exactly the eleven current default attributes', () => {
-        expect(enumValues).toHaveLength(11)
+    it('declares exactly the ten current default attributes', () => {
+        expect(enumValues).toHaveLength(10)
     })
 
-    it('persists identityId under the historical runtime key', () => {
-        expect(FusionAttribute.IdentityId).toBe('identityId')
+    it('does not include identityId in the core schema', () => {
+        expect(enumValues).not.toContain('identityId')
+        expect(fusionAccountSchemaAttributes.some((a) => a.name === 'identityId')).toBe(false)
     })
 
     it('does not include the structural identity keys name and id', () => {
