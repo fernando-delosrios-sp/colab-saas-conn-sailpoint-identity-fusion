@@ -611,3 +611,13 @@ MatchingService SHALL support indexing candidate identities as `MatchCandidateRe
 - **WHEN** a candidate record matches or passes the review threshold
 - **THEN** the resulting `FusionMatch` SHALL expose the candidate's `identityId`, `identityName`, and projected `attributes`
 - **AND** review forms and reports SHALL be generated from those projected attributes without initiating secondary API calls
+
+### Requirement: MatchOutcomeDispatcher SHALL support chunked progress windows in runMatchSweep
+
+`MatchOutcomeDispatcher.runMatchSweep()` SHALL accept optional `progressOffset` (default `0`) and `progressTotal` (default `accounts.length`) in `MatchSweepOptions`, initialize progress at `progressOffset / progressTotal` at sweep start, and report `progressOffset + processedCount` to `log.setProgress()` across pre-score, dispatch, and deferred drain phases.
+
+#### Scenario: Chunked runMatchSweep reports offset progress within the overall sweep total
+- **GIVEN** a `MatchOutcomeDispatcher` running `runMatchSweep(chunk, batchSize, { progressOffset: 10, progressTotal: 25 })` on a chunk of `5` accounts
+- **WHEN** the chunk initializes and processes its accounts
+- **THEN** `log.setProgress` SHALL report progress anchored at offset `10` with total `25` and unit `'analyzed'`
+- **AND** final progress for the chunk SHALL reach `15 / 25`
