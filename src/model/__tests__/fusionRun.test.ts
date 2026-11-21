@@ -485,6 +485,29 @@ describe('FusionRun', () => {
         expect(run.getRetainedAccount('src-a::native-1')).toBeDefined()
     })
 
+    it('Uncorrelated managed account shadow identityId is not indexed or stored in inventory', () => {
+        const run = new FusionRun()
+        const account = {
+            id: 'isc-uncorr-1',
+            sourceId: 'src-a',
+            sourceName: 'Source A',
+            nativeIdentity: 'native-uncorr-1',
+            identityId: 'shadow-identity-1',
+            name: 'Uncorrelated User',
+            uncorrelated: true,
+            attributes: { givenName: 'Shadow' },
+        } as Account
+
+        run.setManagedAccount('src-a::native-uncorr-1', account)
+
+        expect(run.managedAccountsByIdentityId.has('shadow-identity-1')).toBe(false)
+        expect(run.getKeysForIdentity('shadow-identity-1')).toBeUndefined()
+        expect(run.getManagedAccountInfo('src-a::native-uncorr-1')?.identityId).toBeUndefined()
+
+        run.claimAccount('src-a::native-uncorr-1')
+        expect(run.getRetainedAccount('src-a::native-uncorr-1')?.identityId).toBeUndefined()
+    })
+
     it('inventory retains identityId after setManagedAccount and claimAccount', () => {
         const run = new FusionRun()
         const account = {

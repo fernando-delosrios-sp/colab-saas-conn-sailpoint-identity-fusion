@@ -182,6 +182,9 @@ export const MANAGED_ACCOUNT_REGISTRATION_YIELD_INTERVAL = 100
  * values across hundreds of thousands of pages share one string reference and unused
  * raw API sub-objects (`sourceOwner`, `recommendation`, `features`, etc.) can be GC'd
  * immediately.
+ *
+ * Omits ISC shadow `identityId` and `identity` when `account.uncorrelated === true`,
+ * and omits `modified` on `SourceType.Record` sources.
  */
 function slimManagedAccountForWorkQueue(account: Account, source: SourceInfo): Account {
     const legacySource = (account as Account & { source?: { id?: string; name?: string | null } }).source
@@ -189,25 +192,29 @@ function slimManagedAccountForWorkQueue(account: Account, source: SourceInfo): A
     const rawSourceName = account.sourceName ?? legacySource?.name ?? null
     const sourceId = rawSourceId === source.id ? source.id : rawSourceId
     const sourceName = rawSourceName === source.name ? source.name : rawSourceName
+    const isUncorrelated = account.uncorrelated === true
+    const isRecordSource = source.sourceType === SourceType.Record
     const slim: Account = {
         id: account.id,
         name: account.name,
         sourceId: sourceId as string,
         sourceName,
         nativeIdentity: account.nativeIdentity,
-        identityId: account.identityId,
+        ...(isUncorrelated ? {} : { identityId: account.identityId }),
         attributes: account.attributes,
         disabled: account.disabled,
-        modified: account.modified,
+        ...(isRecordSource ? {} : { modified: account.modified }),
         uncorrelated: account.uncorrelated,
     } as Account
 
     if (account.isMachine === true) {
         slim.isMachine = true
     }
-    const identityName = account.identity?.name
-    if (typeof identityName === 'string' && identityName.trim().length > 0) {
-        slim.identity = { name: identityName } as Account['identity']
+    if (!isUncorrelated) {
+        const identityName = account.identity?.name
+        if (typeof identityName === 'string' && identityName.trim().length > 0) {
+            slim.identity = { name: identityName } as Account['identity']
+        }
     }
     const ownerIdentityId = account.ownerIdentity?.id
     if (typeof ownerIdentityId === 'string' && ownerIdentityId.trim().length > 0) {
@@ -367,7 +374,7 @@ async function fetchInternalRecordSource(
     if (!entry) {
         throw new InternalRecordFormatError(internalPackageMessage(source.name))
     }
-    // Only referenced columns are built, so the later prune has nothing to drop and does not rebuild the bag.
+    // Only referenced columns are built, matching the referenced attribute set enforced during registration.
     const build = createInternalRecordAccountBuilder(entry, packaged.headers, deps.referencedAttributeSet)
     for await (const record of iterateInternalRecords(deps.internalRecordsDir, fileName)) {
         throwIfAborted(abortSignal)

@@ -1788,6 +1788,131 @@ describe('FusionService — aggregation', () => {
             expect(ctx.run.linkedAccountKeyIndex).toBeUndefined()
         })
 
+        it('Record unique registration short-circuits without scanning the work queue when no Record source disables Match', async () => {
+            const workQueue = new Map<string, Account>([
+                [
+                    'src-rec::native-1',
+                    {
+                        id: 'acct-1',
+                        nativeIdentity: 'native-1',
+                        name: 'Record Match Enabled',
+                        sourceId: 'src-rec',
+                        sourceName: 'Record Match Enabled Source',
+                        attributes: {},
+                        uncorrelated: true,
+                    } as Account,
+                ],
+            ])
+            const valuesSpy = vi.spyOn(workQueue, 'values')
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            ;(ctx.fusionService as any).run.sourcesByName.set('Record Match Enabled Source', {
+                id: 'src-rec',
+                name: 'Record Match Enabled Source',
+                sourceType: 'record',
+                config: { includeRecordAccountsForMatching: true },
+            })
+
+            await ctx.fusionService.initializeManagedAccountProcessing()
+            const result = await ctx.fusionService.processRecordUniqueRegistration()
+
+            expect(result).toEqual({ registered: 0 })
+            expect(valuesSpy).not.toHaveBeenCalled()
+            expect(workQueue.size).toBe(1)
+        })
+
+        it('Record unique registration streams eligible accounts in bounded chunks', async () => {
+            const totalAccounts = 4_097
+            const workQueue = new Map<string, Account>(
+                Array.from({ length: totalAccounts }, (_, i) => {
+                    const nativeIdentity = `native-rec-${i}`
+                    const key = `src-rec-skip::${nativeIdentity}`
+                    return [
+                        key,
+                        {
+                            id: `acct-rec-${i}`,
+                            nativeIdentity,
+                            name: `Record Account ${i}`,
+                            sourceId: 'src-rec-skip',
+                            sourceName: 'Record Skip Match Source',
+                            attributes: { externalId: `EXT-${i}` },
+                            uncorrelated: true,
+                        } as Account,
+                    ]
+                })
+            )
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            ;(ctx.fusionService as any).run.sourcesByName.set('Record Skip Match Source', {
+                id: 'src-rec-skip',
+                name: 'Record Skip Match Source',
+                sourceType: 'record',
+                config: { includeRecordAccountsForMatching: false },
+            })
+
+            const registerSpy = vi
+                .spyOn(ctx.mockDefinitionService, 'registerUniqueValuesFromRecordManagedAccounts')
+                .mockImplementation(async (accounts) => accounts.length)
+
+            await ctx.fusionService.initializeManagedAccountProcessing()
+            const result = await ctx.fusionService.processRecordUniqueRegistration()
+
+            expect(registerSpy).toHaveBeenCalledTimes(2)
+            expect(registerSpy.mock.calls[0][0]).toHaveLength(4_096)
+            expect(registerSpy.mock.calls[1][0]).toHaveLength(1)
+            expect(result.registered).toBe(totalAccounts)
+            expect(workQueue.size).toBe(0)
+        })
+
+        it('Correlated account sweep streams correlated accounts in bounded chunks', async () => {
+            const totalAccounts = 4_097
+            const workQueue = new Map<string, Account>(
+                Array.from({ length: totalAccounts }, (_, i) => {
+                    const nativeIdentity = `native-corr-${i}`
+                    const key = `source-a-id::${nativeIdentity}`
+                    return [
+                        key,
+                        {
+                            id: `acct-corr-${i}`,
+                            nativeIdentity,
+                            name: `Correlated Account ${i}`,
+                            sourceId: 'source-a-id',
+                            sourceName: 'Source A',
+                            identityId: `id-${i}`,
+                            attributes: {},
+                            uncorrelated: false,
+                        } as Account,
+                    ]
+                })
+            )
+            vi.spyOn(ctx.mockSources, 'managedAccountsById', 'get').mockReturnValue(workQueue)
+            vi.spyOn(ctx.mockSources, 'managedAccountsByIdentityId', 'get').mockReturnValue(new Map())
+            ;(ctx.fusionService as any).run.sourcesByName.set('Source A', {
+                id: 'source-a-id',
+                name: 'Source A',
+                sourceType: 'authoritative',
+                config: {},
+            })
+
+            const processedKeys: string[] = []
+            const processSpy = vi
+                .spyOn(ctx.fusionService, 'processManagedAccount')
+                .mockImplementation(async (account) => {
+                    const key = `${account.sourceId}::${account.nativeIdentity}`
+                    processedKeys.push(key)
+                    ctx.run.claimAccount(key, account.identityId)
+                })
+            const detailSpy = vi.spyOn(ctx.mockLog, 'detail')
+
+            await ctx.fusionService.initializeManagedAccountProcessing()
+            await ctx.fusionService.processCorrelatedManagedAccounts()
+
+            expect(processSpy).toHaveBeenCalledTimes(totalAccounts)
+            expect(processedKeys).toHaveLength(totalAccounts)
+            expect(workQueue.size).toBe(0)
+            expect(detailSpy).toHaveBeenCalledWith(
+                expect.objectContaining({ action: 'correlated account sweep complete', count: totalAccounts })
+            )
+        })
+
         it('Saved Match flag scores the record', async () => {
             const mockManagedAccount = {
                 nativeIdentity: 'internal-default-1',

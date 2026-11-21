@@ -963,41 +963,69 @@ export class FusionService {
         })
     }
 
+    /**
+     * Correlated account sweep: streams remaining `uncorrelated === false` managed accounts in
+     * bounded chunks (`4,096` accounts per chunk) before uncorrelated scoring begins so V8 heap
+     * stays bounded. Orphan correlated accounts (correlated on the source but absent from any
+     * loaded Fusion account) are registered as non-matches in the identity-linked Fusion account
+     * map here, so they are immediately visible as deferred-match candidates during uncorrelated scoring.
+     */
     private async runCorrelatedAccountSweep(map: Map<string, Account>): Promise<void> {
-        // Correlated account sweep: resolve all correlated managed accounts before uncorrelated scoring begins.
-        // Orphan correlated accounts (correlated on the source but absent from any loaded Fusion account)
-        // are registered as non-matches in the identity-linked Fusion account map here, so they are immediately visible
-        // as deferred-match candidates when uncorrelated accounts are scored in the uncorrelated scoring sweep.
-        const correlatedAccounts: Account[] = []
-        await forEachIterableChunked(map.values(), (account) => {
-            if (account.uncorrelated === false) {
-                correlatedAccounts.push(account)
+        const yieldEvery = getManagedAccountEventLoopYieldEvery(this.config)
+        let yieldCounter = 0
+        let totalCorrelated = 0
+        let droppedLinked = 0
+        let chunk: Account[] = []
+
+        const flushChunk = async (currentChunk: Account[]): Promise<void> => {
+            if (totalCorrelated === 0) {
+                this.log.detail({
+                    action: 'correlated account sweep',
+                    count: map.size,
+                })
             }
-        })
-        if (correlatedAccounts.length === 0) {
+            totalCorrelated += currentChunk.length
+            await batchProcess(
+                currentChunk,
+                'Correlated managed accounts',
+                async (account) => {
+                    if (isManagedAccountLinkedInFusion(account, this.run)) {
+                        droppedLinked++
+                    }
+                    return this.processManagedAccount(account)
+                },
+                this.config,
+                this.log,
+                this.run.managedAccountProcessingBatchSize
+            )
+        }
+
+        for (const account of map.values()) {
+            if (account.uncorrelated === false) {
+                chunk.push(account)
+            }
+            if (yieldEvery > 0 && ++yieldCounter >= yieldEvery) {
+                yieldCounter = 0
+                await yieldToEventLoop()
+            }
+            if (chunk.length >= UNCORRELATED_SWEEP_CHUNK_SIZE) {
+                const currentChunk = chunk
+                chunk = []
+                await flushChunk(currentChunk)
+            }
+        }
+
+        if (chunk.length > 0) {
+            await flushChunk(chunk)
+        }
+
+        if (totalCorrelated === 0) {
             return
         }
 
         this.log.detail({
-            action: 'correlated account sweep',
-            count: correlatedAccounts.length,
-        })
-        let droppedLinked = 0
-        await batchProcess(
-            correlatedAccounts,
-            'Correlated managed accounts',
-            async (account) => {
-                if (isManagedAccountLinkedInFusion(account, this.run)) {
-                    droppedLinked++
-                }
-                return this.processManagedAccount(account)
-            },
-            this.config,
-            this.log,
-            this.run.managedAccountProcessingBatchSize
-        )
-        this.log.detail({
             action: 'correlated account sweep complete',
+            count: totalCorrelated,
             droppedLinked,
             remaining: map.size,
         })
@@ -1586,53 +1614,98 @@ export class FusionService {
     /** Correlated account sweep: resolve linked/correlated managed accounts before uncorrelated scoring. */
 
     /**
-     * Bulk-register unique attribute values for record sources with match disabled.
-     * Removes processed accounts from the managed-account work queue.
+     * Bulk-register unique attribute values for record sources with match disabled, streaming
+     * eligible accounts in bounded `4,096`-account chunks and claiming each chunk from the work
+     * queue before advancing. Short-circuits without scanning `managedAccountsById` when no
+     * configured `SourceType.Record` source has Match scoring disabled.
      */
     public async processRecordUniqueRegistration(): Promise<{ registered: number }> {
         this.ensureManagedAccountProcessingInitialized()
+
+        let hasMatchDisabledRecordSource = false
+        for (const sourceInfo of this.run.sourcesByName.values()) {
+            if (
+                sourceInfo.sourceType === SourceType.Record &&
+                !isRecordMatchingEnabledForSource(sourceInfo.name, this.run.sourcesByName)
+            ) {
+                hasMatchDisabledRecordSource = true
+                break
+            }
+        }
+        if (!hasMatchDisabledRecordSource) {
+            return { registered: 0 }
+        }
+
         const map = this.run.managedAccountsById
-        const eligible: Account[] = []
+        const totalQueueSize = map.size
+        const yieldEvery = getManagedAccountEventLoopYieldEvery(this.config)
+        let yieldCounter = 0
+        let totalProcessed = 0
+        let totalRegistered = 0
+        let chunk: Account[] = []
+
+        const flushChunk = async (currentChunk: Account[]): Promise<void> => {
+            if (totalProcessed === 0) {
+                this.log.detail({
+                    action: 'registering unique attribute values',
+                    count: totalQueueSize,
+                })
+            }
+            const chunkOffset = totalProcessed
+            const registered = await this.definitionService.registerUniqueValuesFromRecordManagedAccounts(
+                currentChunk,
+                this.mappingService,
+                this.run,
+                {
+                    onProgress: (done, total) =>
+                        this.log.setProgress(
+                            chunkOffset + done,
+                            Math.max(chunkOffset + total, totalQueueSize),
+                            'registered'
+                        ),
+                }
+            )
+            for (const account of currentChunk) {
+                const key = getManagedAccountKeyFromAccount(account)
+                if (key) {
+                    this.run.claimAccount(key, account.identityId)
+                }
+            }
+            totalProcessed += currentChunk.length
+            totalRegistered += registered
+        }
 
         for (const account of map.values()) {
+            if (yieldEvery > 0 && ++yieldCounter >= yieldEvery) {
+                yieldCounter = 0
+                await yieldToEventLoop()
+            }
             if (!account.sourceName) continue
             const sourceInfo = this.run.sourcesByName.get(account.sourceName)
             if (sourceInfo?.sourceType !== SourceType.Record) continue
             if (isRecordMatchingEnabledForSource(account.sourceName, this.run.sourcesByName)) continue
-            eligible.push(account)
+            chunk.push(account)
+            if (chunk.length >= UNCORRELATED_SWEEP_CHUNK_SIZE) {
+                const currentChunk = chunk
+                chunk = []
+                await flushChunk(currentChunk)
+            }
         }
 
-        if (eligible.length === 0) {
+        if (chunk.length > 0) {
+            await flushChunk(chunk)
+        }
+
+        if (totalProcessed === 0) {
             return { registered: 0 }
         }
 
-        this.log.detail({
-            action: 'registering unique attribute values',
-            count: eligible.length,
-        })
-
-        const registered = await this.definitionService.registerUniqueValuesFromRecordManagedAccounts(
-            eligible,
-            this.mappingService,
-            this.run,
-            {
-                onProgress: (done, total) => this.log.setProgress(done, total, 'registered'),
-            }
-        )
-
-        for (const account of eligible) {
-            const key = getManagedAccountKeyFromAccount(account)
-            if (key) {
-                this.run.claimAccount(key, account.identityId)
-            }
-        }
-
-        this.log.recordEvent('recordUniqueRegistered', { count: registered })
+        this.log.recordEvent('recordUniqueRegistered', { count: totalRegistered })
         this.log.detail({
             action: 'record unique registration complete',
-            registered,
+            registered: totalRegistered,
         })
-        return { registered }
+        return { registered: totalRegistered }
     }
 
     public async processCorrelatedManagedAccounts(): Promise<void> {

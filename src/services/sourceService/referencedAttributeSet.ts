@@ -118,16 +118,12 @@ function createAttributeBagPruner(referencedAttributeSet: ReadonlySet<string>): 
 
     return (attributes: Record<string, unknown>): Record<string, unknown> => {
         const keptKeys: string[] = []
-        let hasUnreferenced = false
         for (const key in attributes) {
             if (!Object.prototype.hasOwnProperty.call(attributes, key)) continue
             if (referencedAttributeSet.has(key)) {
                 keptKeys.push(key)
-            } else {
-                hasUnreferenced = true
             }
         }
-        if (!hasUnreferenced) return attributes
 
         const factory = getShapeFactory(keptKeys)
         if (factory) {
@@ -169,10 +165,10 @@ function getAttributeBagPruner(referencedAttributeSet: ReadonlySet<string>): Att
 
 /**
  * Attribute pruning: drops a managed source account's `attributes` entries that are not
- * in the referenced attribute set. Replaces the account's attribute bag using a shared
- * object-literal hidden class rather than keyed stores or in-place deletes, so large API
- * response objects can be collected without turning bags into high-overhead dictionary-mode
- * objects. Top-level system fields are never pruned here.
+ * in the referenced attribute set. Always rebuilds the account's attribute bag using a
+ * shared object-literal hidden class and short-string interner (even when every key is
+ * referenced) so repeated values are deduplicated and raw HTTP response objects can be
+ * collected immediately. Top-level system fields are never pruned here.
  */
 export function pruneManagedAccountAttributes(
     account: Account,

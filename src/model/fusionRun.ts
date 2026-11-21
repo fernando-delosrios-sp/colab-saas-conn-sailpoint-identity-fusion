@@ -28,14 +28,19 @@ export type ManagedAccountInfo = {
     isMachine?: boolean
 }
 
+/**
+ * Builds lightweight inventory metadata for a managed account.
+ * Omits ISC shadow `identityId` when `account.uncorrelated === true`.
+ */
 export function toManagedAccountInfo(account: Account): ManagedAccountInfo {
+    const effectiveIdentityId = account.uncorrelated === true ? undefined : account.identityId
     return {
         id: account.id ?? '',
         name: account.name ?? '',
         sourceName: account.sourceName ?? '',
         sourceId: account.sourceId,
         nativeIdentity: account.nativeIdentity,
-        identityId: account.identityId,
+        ...(effectiveIdentityId !== undefined ? { identityId: effectiveIdentityId } : {}),
         ...(account.isMachine === true ? { isMachine: true } : {}),
     }
 }
@@ -43,11 +48,12 @@ export function toManagedAccountInfo(account: Account): ManagedAccountInfo {
 /**
  * Attribute body kept after a managed account leaves the Match work queue.
  * Shares the original `attributes` object and drops unused payload such as the
- * nested identity document.
+ * nested identity document and ISC shadow `identityId` on uncorrelated accounts.
  */
 function toRetainedAccount(account: Account): Account {
     const legacySource = (account as Account & { source?: { id?: string; name?: string | null } }).source
     const sourceId = account.sourceId || legacySource?.id
+    const effectiveIdentityId = account.uncorrelated === true ? undefined : account.identityId
     return {
         id: account.id,
         name: account.name,
@@ -57,7 +63,7 @@ function toRetainedAccount(account: Account): Account {
         attributes: account.attributes,
         disabled: account.disabled,
         modified: account.modified,
-        identityId: account.identityId,
+        ...(effectiveIdentityId !== undefined ? { identityId: effectiveIdentityId } : {}),
         ...(account.isMachine === true ? { isMachine: true } : {}),
     } as Account
 }
@@ -289,17 +295,23 @@ export class FusionRun {
         }
     }
 
+    /**
+     * Registers a managed account in the work queue, inventory, and (when correlated)
+     * the identity-to-account index. Uncorrelated accounts (`uncorrelated === true`)
+     * never index their ISC shadow `identityId`.
+     */
     setManagedAccount(accountKey: string, account: Account): void {
         this.managedAccountsById.set(accountKey, account)
         this.managedAccountInventory.set(accountKey, toManagedAccountInfo(account))
-        if (account.identityId) {
+        const effectiveIdentityId = account.uncorrelated === true ? undefined : account.identityId
+        if (effectiveIdentityId) {
             if (this.managedAccountsByIdentityId instanceof CompactStringSetMap) {
-                this.managedAccountsByIdentityId.addKey(account.identityId, accountKey)
+                this.managedAccountsByIdentityId.addKey(effectiveIdentityId, accountKey)
             } else {
-                let idSet = this.managedAccountsByIdentityId.get(account.identityId)
+                let idSet = this.managedAccountsByIdentityId.get(effectiveIdentityId)
                 if (!idSet) {
                     idSet = new Set()
-                    this.managedAccountsByIdentityId.set(account.identityId, idSet)
+                    this.managedAccountsByIdentityId.set(effectiveIdentityId, idSet)
                 }
                 idSet.add(accountKey)
             }

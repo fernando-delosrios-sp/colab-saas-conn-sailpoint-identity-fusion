@@ -84,6 +84,47 @@ describe('CompressedBlockMap', () => {
         expect(map.size).toBe(10)
     })
 
+    it('Draining all keys in one sealed block releases that block immediately', () => {
+        const map = new CompressedBlockMap<Account>({
+            inHeapLimit: 0,
+            blockSize: 2,
+            lruCapacity: 4,
+        })
+
+        for (let i = 0; i < 6; i++) {
+            map.set(`k-${i}`, makeAccount(i))
+        }
+        // 3 sealed blocks: [k-0, k-1], [k-2, k-3], [k-4, k-5]
+        expect(map.sealedBlockCount).toBe(3)
+        expect(map.get('k-0')?.id).toBe('id-0')
+        expect(map.get('k-2')?.id).toBe('id-2')
+        expect(map.cacheSize).toBe(2)
+
+        const sealedBlocks = (map as any).sealedBlocks as Buffer[]
+        expect(sealedBlocks[0].byteLength).toBeGreaterThan(0)
+        expect(sealedBlocks[1].byteLength).toBeGreaterThan(0)
+
+        // Delete every key in block 0 while later blocks still hold live keys
+        expect(map.delete('k-0')).toBe(true)
+        expect(sealedBlocks[0].byteLength).toBeGreaterThan(0)
+        expect(map.delete('k-1')).toBe(true)
+
+        expect(sealedBlocks[0].byteLength).toBe(0)
+        expect(map.cacheSize).toBe(1)
+        expect(sealedBlocks[1].byteLength).toBeGreaterThan(0)
+        expect(map.get('k-2')?.id).toBe('id-2')
+        expect(map.get('k-4')?.id).toBe('id-4')
+        expect(Array.from(map.keys())).toEqual(['k-2', 'k-3', 'k-4', 'k-5'])
+
+        // Overwriting every key in block 1 also releases block 1 immediately
+        map.set('k-2', makeAccount(200))
+        map.set('k-3', makeAccount(300))
+        expect(sealedBlocks[1].byteLength).toBe(0)
+        expect(map.get('k-2')?.id).toBe('id-200')
+        expect(map.get('k-3')?.id).toBe('id-300')
+        expect(map.get('k-5')?.id).toBe('id-5')
+    })
+
     it('Releases sealed blocks, pending buffers, and LRU cache on delete-to-empty and clear', () => {
         const map = new CompressedBlockMap<Account>({
             inHeapLimit: 1,

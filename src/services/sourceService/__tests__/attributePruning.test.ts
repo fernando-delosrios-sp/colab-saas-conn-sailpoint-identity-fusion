@@ -193,13 +193,21 @@ describe('pruneManagedAccountAttributes', () => {
         expect(attributes).toEqual({ unreferenced: 'drop', email: 'keep@example.com' })
     })
 
-    it('keeps the same attribute bag when nothing is dropped', () => {
-        const attributes = { email: 'keep@example.com', lastName: 'Doe' }
-        const account = makeAccount(attributes)
+    it('Attribute bag is rebuilt and interned even when all keys are referenced', () => {
+        const set = new Set(['email', 'lastName', 'other'])
+        const attributes1 = { email: 'keep@example.com', lastName: 'Doe' }
+        const attributes2 = { email: 'keep@example.com', lastName: `${'Do'}${'e'}` }
+        const account1 = makeAccount(attributes1)
+        const account2 = makeAccount(attributes2, { id: 'isc-acct-2', nativeIdentity: 'native-2' })
 
-        const pruned = pruneManagedAccountAttributes(account, new Set(['email', 'lastName', 'other']))
+        const pruned1 = pruneManagedAccountAttributes(account1, set)
+        const pruned2 = pruneManagedAccountAttributes(account2, set)
 
-        expect(pruned.attributes).toBe(attributes)
+        expect(pruned1.attributes).toEqual({ email: 'keep@example.com', lastName: 'Doe' })
+        expect(pruned1.attributes).not.toBe(attributes1)
+        expect(pruned2.attributes).toEqual({ email: 'keep@example.com', lastName: 'Doe' })
+        expect(pruned2.attributes).not.toBe(attributes2)
+        expect((pruned2.attributes as any).lastName).toBe((pruned1.attributes as any).lastName)
     })
 
     it('keeps an unmapped attribute whose name matches a Fusion schema attribute (implicit Map merge parity)', () => {
@@ -331,6 +339,48 @@ describe('fetchManagedAccounts pruning at Bulk ingest', () => {
         expect((registered as any).features).toBeUndefined()
         expect((registered as any).description).toBeUndefined()
         expect((registered as any).recommendation).toBeUndefined()
+    })
+
+    it('Bulk ingest omits shadow identity fields on uncorrelated accounts and modified on Record sources', async () => {
+        const referencedAttributeSet = buildReferencedAttributeSet(baseConfig, schemaAttributeNames)
+        const authUncorrelated = makeAccount(
+            { lastName: 'Doe' },
+            {
+                uncorrelated: true,
+                identityId: 'shadow-id',
+                identity: { id: 'shadow-id', name: 'Shadow', type: 'IDENTITY' },
+                modified: '2026-01-01T00:00:00.000Z',
+            }
+        )
+        const { deps: authDeps, run: authRun } = makeFetcherDeps([authUncorrelated], { referencedAttributeSet })
+        await fetchManagedAccounts(authDeps)
+
+        const authStored = authRun.managedAccountsById.values().next().value as Account
+        expect(authStored.identityId).toBeUndefined()
+        expect(authStored.identity).toBeUndefined()
+        expect(authStored.modified).toBe('2026-01-01T00:00:00.000Z')
+        expect(authRun.managedAccountsByIdentityId.has('shadow-id')).toBe(false)
+
+        const recordUncorrelated = makeAccount(
+            { lastName: 'Smith' },
+            {
+                id: 'isc-rec-1',
+                nativeIdentity: 'rec-1',
+                uncorrelated: true,
+                identityId: 'shadow-rec-id',
+                identity: { id: 'shadow-rec-id', name: 'Shadow Rec', type: 'IDENTITY' },
+                modified: '2026-01-01T00:00:00.000Z',
+            }
+        )
+        const { deps: recDeps, run: recRun } = makeFetcherDeps([recordUncorrelated], { referencedAttributeSet })
+        recDeps.managedSources[0].sourceType = SourceType.Record
+        await fetchManagedAccounts(recDeps)
+
+        const recStored = recRun.managedAccountsById.values().next().value as Account
+        expect(recStored.identityId).toBeUndefined()
+        expect(recStored.identity).toBeUndefined()
+        expect(recStored.modified).toBeUndefined()
+        expect(recRun.managedAccountsByIdentityId.has('shadow-rec-id')).toBe(false)
     })
 
     it('yields across skipped machine accounts and stops immediately when abortSignal aborts', async () => {
