@@ -235,7 +235,11 @@ export class CompressedBlockMap<V> extends Map<string, V> {
         this.blockLiveCounts[blockIndex] = (this.blockLiveCounts[blockIndex] ?? 0) + 1
         if (this.pending.length >= this.blockSize) {
             const compressed = deflateRawSync(Buffer.from(JSON.stringify(this.pending), 'utf8'), { level: 1 })
-            this.sealedBlocks.push(compressed)
+            // Copy out of zlib's 64 KiB output slab into an exact-sized unpooled Buffer so
+            // sealed blocks do not pin unused backing ArrayBuffer memory across large runs.
+            const trimmed = Buffer.allocUnsafeSlow(compressed.byteLength)
+            compressed.copy(trimmed)
+            this.sealedBlocks.push(trimmed)
             this.pending = []
         }
         return slot

@@ -126,7 +126,7 @@ export class CandidateRegistry {
         this.summaryLogged = true
         const { total, persisted, bySource, skipped } = this.diagnostics()
         this.deps.log?.info(
-            `[deferred-diag] registry total=${total} persisted=${persisted} bySource=${JSON.stringify(bySource)} ` +
+            `[candidate-registry] total=${total} persisted=${persisted} bySource=${JSON.stringify(bySource)} ` +
                 `skipped=${JSON.stringify(skipped)} ` +
                 `knownSources=${JSON.stringify(
                     Array.from(this.deps.sourcesByName.entries()).map(([name, info]) => ({
@@ -190,5 +190,3 @@ export class CandidateRegistry {
         return coerceBoolean(info.config.deferredMatching) ?? true
     }
 }
-
-

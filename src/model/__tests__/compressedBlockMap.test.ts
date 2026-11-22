@@ -212,4 +212,22 @@ describe('CompressedBlockMap', () => {
         expect(map.internalPartitions.size).toBe(0)
         expect(map.size).toBe(0)
     })
+
+    it('Sealed blocks trim backing ArrayBuffers to exact compressed byte length', () => {
+        const map = new CompressedBlockMap<Account>({
+            inHeapLimit: 0,
+            blockSize: 16,
+        })
+
+        for (let i = 0; i < 32; i++) {
+            map.set(`k-${i}`, makeAccount(i))
+        }
+
+        const sealedBlocks = (map as unknown as { sealedBlocks: Buffer[] }).sealedBlocks
+        expect(sealedBlocks).toHaveLength(2)
+        for (const block of sealedBlocks) {
+            expect(block.byteLength).toBeGreaterThan(0)
+            expect(block.buffer.byteLength).toBe(block.byteLength)
+        }
+    })
 })

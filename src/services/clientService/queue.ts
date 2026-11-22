@@ -116,31 +116,49 @@ export class ApiQueue {
         }
 
         return new Promise<T>((resolve, reject) => {
-            item.resolve = resolve
-            item.reject = reject
+            const queueKey = this.config.enablePriority ? item.priority : QueuePriority.MEDIUM
+            const removeFromQueue = (): boolean => {
+                const subQueue = this.queues.get(queueKey)!
+                const index = subQueue.indexOf(item)
+                if (index === -1) return false
+                subQueue.splice(index, 1)
+                this.stats.queueLength = this.totalQueueLength()
+                return true
+            }
+
+            const onAbort = (): void => {
+                if (removeFromQueue()) {
+                    item.reject(options.abortSignal!.reason ?? new Error('Aborted'))
+                }
+            }
+
+            const cleanup = (): void => {
+                options.abortSignal?.removeEventListener('abort', onAbort)
+                item.resolve = () => {}
+                item.reject = () => {}
+            }
+
+            item.resolve = (value: T) => {
+                cleanup()
+                resolve(value)
+            }
+            item.reject = (error: unknown) => {
+                cleanup()
+                reject(error)
+            }
 
             this.enqueueItem(item)
 
             // Handle pre-flight abort
             if (options.abortSignal?.aborted) {
-                const subQueue = this.queues.get(item.priority)!
-                const idx = subQueue.indexOf(item)
-                if (idx !== -1) subQueue.splice(idx, 1)
-                this.stats.queueLength = this.totalQueueLength()
+                removeFromQueue()
                 item.reject(options.abortSignal.reason ?? new Error('Aborted'))
                 return
             }
 
-            // Handle abort while queued
-            options.abortSignal?.addEventListener('abort', () => {
-                const subQueue = this.queues.get(item.priority)!
-                const index = subQueue.indexOf(item)
-                if (index !== -1) {
-                    subQueue.splice(index, 1)
-                    this.stats.queueLength = this.totalQueueLength()
-                    item.reject(options.abortSignal!.reason ?? new Error('Aborted'))
-                }
-            })
+            // Handle abort while queued; detached on settle so long-lived AbortSignals
+            // (and AbortSignal.any dependents) cannot retain the settled Promise result.
+            options.abortSignal?.addEventListener('abort', onAbort, { once: true })
 
             this.stats.queueLength = this.totalQueueLength()
 
@@ -388,5 +406,3 @@ export class ApiQueue {
         return new Promise((resolve) => setTimeout(resolve, ms))
     }
 }
-
-

@@ -188,7 +188,7 @@ async function scoreIdentityPhase(
     const pendingDeferred: ManagedAccountAnalysisContext[] = []
     const maxCandidatesForForm = resolveFusionMaxCandidatesForForm(config.fusionMaxCandidatesForForm)
     const scoringConcurrency = Math.max(1, Math.min(batchSize, getScoringMaxConcurrency(config)))
-    const diag = { identityMatched: 0, deferredDisabled: 0, deferredPending: 0 }
+    const diag = { identityMatched: 0, nonMatch: 0, peerQueued: 0 }
 
     for (let i = 0; i < accounts.length; i += batchSize) {
         const batch = accounts.slice(i, i + batchSize)
@@ -204,19 +204,19 @@ async function scoreIdentityPhase(
                 diag.identityMatched++
                 identityResults.push({ analysis, resolution: 'identity-match' })
             } else if (isDeferredMatchingEnabledForSource(account.sourceName ?? undefined, run.sourcesByName)) {
-                diag.deferredPending++
+                diag.peerQueued++
                 pendingDeferred.push(analysis)
             } else {
-                diag.deferredDisabled++
+                diag.nonMatch++
                 identityResults.push({ analysis, resolution: 'non-match' })
             }
         }
         await yieldToEventLoop()
     }
 
-    log.info(
-        `[deferred-diag] identityPhase scored=${accounts.length} identityMatched=${diag.identityMatched} ` +
-            `deferredDisabled=${diag.deferredDisabled} deferredPending=${diag.deferredPending}`
+    log.debug(
+        `[match-sweep] identityPhase scored=${accounts.length} identityMatched=${diag.identityMatched} ` +
+            `nonMatch=${diag.nonMatch} peerQueued=${diag.peerQueued}`
     )
 
     return { identityResults, pendingDeferred }
@@ -582,10 +582,10 @@ export class MatchOutcomeDispatcher {
             diag.nonMatch += result.diag.nonMatch
         }
 
-        this.deps.log.info(
-            `[deferred-diag] drain pending=${pending.length} sources=${bySource.size} poolQueries=${diag.poolQueries} ` +
+        this.deps.log.debug(
+            `[match-sweep] peerDrain pending=${pending.length} sources=${bySource.size} poolQueries=${diag.poolQueries} ` +
                 `avgPoolSize=${diag.poolQueries > 0 ? (diag.poolSizeTotal / diag.poolQueries).toFixed(1) : 'n/a'} ` +
-                `emptyPools=${diag.emptyPools} deferredMatched=${diag.deferredMatched} nonMatch=${diag.nonMatch}`
+                `emptyPools=${diag.emptyPools} peerMatched=${diag.deferredMatched} nonMatch=${diag.nonMatch}`
         )
 
         return { scored, resolved }
