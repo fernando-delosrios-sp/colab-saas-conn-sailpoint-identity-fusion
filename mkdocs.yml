@@ -59,6 +59,7 @@ nav:
                 - Troubleshooting: use-guides/validation-and-troubleshooting/troubleshooting.md
           - Deployment:
                 - Migrating from Identity Fusion v1: use-guides/deployment/migrating-from-identity-fusion-v1.md
+                - Two-stage identifier reconciliation: use-guides/deployment/two-stage-identifier-reconciliation.md
     - Configuration:
           - Configuration reference: configuration/index.md
           - Connection Settings: configuration/connection.md

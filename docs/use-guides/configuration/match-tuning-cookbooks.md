@@ -103,6 +103,32 @@ For algorithm and threshold detail, see [Tuning matching algorithms](tuning-matc
 
 ---
 
+## Cookbook 4: Two-stage identifier reconciliation
+
+**Goal:** Onboard authoritative joiners against a massive historical ID archive without generating enterprise IDs on the primary Fusion source. A second Fusion connector assigns `personId` from uncorrelated archive rows or mints a new value; both connectors share the same Internal Record dump and run in a repeated loop.
+
+### Cookbook 4 — deployment settings
+
+| Setting | Reconciliation stage | Identifier stage |
+| --- | --- | --- |
+| ISC source name (example) | `Campus Reconciliation Fusion` | `Campus Identifier Fusion` |
+| Fusion **Authoritative** | **Yes** (umbrella) | **No** (side-car) |
+| Authoritative HR | **On** | **Off** |
+| Reconciliation Fusion as managed source | N/A | **On** (filter: missing `personId`) |
+| Internal Record archive | **Records**, Internal, Match **on** | Same dump, Match **on** |
+| Unique `personId` definition | **Absent** | **Present** ([ID carryover](../deployment/two-stage-identifier-reconciliation.md#id-carryover-expression)) |
+
+### Cookbook 4 — validation
+
+1. Batch HR on Reconciliation using **Aggregation batch size** when the archive is large.
+2. After Reconciliation, confirm joiners without a correlated archive match have blank `personId`.
+3. Run Identifier; grep logs for Unique Define / `personId` assignment.
+4. Re-run Reconciliation; confirm one Fusion account per person and IDs persisted.
+
+**Full walkthrough (diagrams, correlated vs uncorrelated records, cycle):** [Two-stage identifier reconciliation](../deployment/two-stage-identifier-reconciliation.md)
+
+---
+
 ## Related references
 
 - [Getting started — Choose your path](../../getting-started/index.md#choose-your-path)
