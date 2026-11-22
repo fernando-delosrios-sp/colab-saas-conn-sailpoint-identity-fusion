@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="333" viewBox="0 0 1200 520" role="img" aria-label="Two-stage Identity Fusion cycle between Fusion Core and Fusion IDs">
+  <defs>
+    <filter id="cardShadow" x="-4%" y="-6%" width="108%" height="116%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.07"/>
+    </filter>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#1d4ed8"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#047857"/>
+    </marker>
+  </defs>
+
+  <!-- Clean background -->
+  <rect width="1200" height="520" fill="#f8fafc"/>
+
+  <!-- Subtle outer frame -->
+  <rect x="24" y="24" width="1152" height="472" rx="20" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+
+  <!-- Left Card: Fusion Core -->
+  <g filter="url(#cardShadow)">
+    <rect x="64" y="92" width="380" height="316" rx="16" fill="#ffffff" stroke="#bfdbfe" stroke-width="2"/>
+    <path d="M 64 108 Q 64 92 80 92 L 428 92 Q 444 92 444 108 L 444 166 L 64 166 Z" fill="#eff6ff"/>
+    <line x1="64" y1="166" x2="444" y2="166" stroke="#dbeafe" stroke-width="1.5"/>
+  </g>
+  <text x="92" y="122" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2" fill="#1d4ed8">STAGE 1 · AUTHORITATIVE</text>
+  <text x="92" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#0f172a">Fusion Core</text>
+
+  <!-- Fusion Core functions -->
+  <circle cx="96" cy="206" r="4" fill="#1d4ed8"/>
+  <text x="112" y="211" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1e293b">Ingests authoritative accounts</text>
+  <text x="112" y="232" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.5" fill="#64748b">Processes joiners &amp; correlated records</text>
+
+  <circle cx="96" cy="272" r="4" fill="#1d4ed8"/>
+  <text x="112" y="277" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1e293b">Manages identity lifecycle</text>
+  <text x="112" y="298" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.5" fill="#64748b">Assigns staging state until ID arrives</text>
+
+  <circle cx="96" cy="338" r="4" fill="#1d4ed8"/>
+  <text x="112" y="343" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1e293b">Persists absorbed IDs</text>
+  <text x="112" y="364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.5" fill="#64748b">Promotes to active; does not generate IDs</text>
+
+  <!-- Right Card: Fusion IDs -->
+  <g filter="url(#cardShadow)">
+    <rect x="756" y="92" width="380" height="316" rx="16" fill="#ffffff" stroke="#a7f3d0" stroke-width="2"/>
+    <path d="M 756 108 Q 756 92 772 92 L 1120 92 Q 1136 92 1136 108 L 1136 166 L 756 166 Z" fill="#ecfdf5"/>
+    <line x1="756" y1="166" x2="1136" y2="166" stroke="#d1fae5" stroke-width="1.5"/>
+  </g>
+  <text x="784" y="122" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.2" fill="#047857">STAGE 2 · HISTORICAL RECORD RECONCILIATION</text>
+  <text x="784" y="150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="24" font-weight="700" fill="#0f172a">Fusion IDs</text>
+
+  <!-- Fusion IDs functions -->
+  <circle cx="788" cy="206" r="4" fill="#047857"/>
+  <text x="804" y="211" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1e293b">Scopes accounts missing an ID</text>
+  <text x="804" y="232" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.5" fill="#64748b">Reads only un-ID'd Fusion Core accounts</text>
+
+  <circle cx="788" cy="272" r="4" fill="#047857"/>
+  <text x="804" y="277" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1e293b">Matches historical records</text>
+  <text x="804" y="298" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.5" fill="#64748b">Compares against uncorrelated archive</text>
+
+  <circle cx="788" cy="338" r="4" fill="#047857"/>
+  <text x="804" y="343" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#1e293b">Reuses or generates unique ID</text>
+  <text x="804" y="364" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.5" fill="#64748b">Carries matched record ID or creates new</text>
+
+  <!-- Top Flow: Fusion Core -> Fusion IDs -->
+  <rect x="488" y="106" width="224" height="44" rx="22" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.2"/>
+  <text x="600" y="125" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#1e40af">1. Accounts without ID</text>
+  <text x="600" y="142" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.5" fill="#3b82f6">Minimal set sent for ID lookup</text>
+
+  <path d="M 456 196 Q 600 156 742 196" fill="none" stroke="#1d4ed8" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowBlue)"/>
+
+  <!-- Center Cycle Badge -->
+  <rect x="525" y="232" width="150" height="32" rx="16" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="600" y="253" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="12" font-weight="700" letter-spacing="0.6" fill="#475569">CONSTANT CYCLE</text>
+
+  <!-- Bottom Flow: Fusion IDs -> Fusion Core -->
+  <path d="M 744 304 Q 600 344 458 304" fill="none" stroke="#047857" stroke-width="3" stroke-linecap="round" marker-end="url(#arrowGreen)"/>
+
+  <rect x="480" y="350" width="240" height="44" rx="22" fill="#ecfdf5" stroke="#a7f3d0" stroke-width="1.2"/>
+  <text x="600" y="369" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#065f46">2. IDs absorbed by Core</text>
+  <text x="600" y="386" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="11.5" fill="#059669">Staging ID accounts drop off next run</text>
+
+  <!-- Succinct footer -->
+  <text x="600" y="458" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="500" fill="#475569">
+    Each pass shrinks the staging queue: Fusion Core persists returned IDs and drops processed accounts from Fusion IDs.
+  </text>
+</svg>

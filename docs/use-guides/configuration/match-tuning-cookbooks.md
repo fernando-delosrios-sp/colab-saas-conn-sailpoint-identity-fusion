@@ -103,29 +103,29 @@ For algorithm and threshold detail, see [Tuning matching algorithms](tuning-matc
 
 ---
 
-## Cookbook 4: Two-stage identifier reconciliation
+## Cookbook 4: Two-stage historical record reconciliation
 
-**Goal:** Onboard authoritative joiners against a massive historical ID archive without generating enterprise IDs on the primary Fusion source. A second Fusion connector assigns `personId` from uncorrelated archive rows or mints a new value; both connectors share the same Internal Record dump and run in a repeated loop.
+**Goal:** Onboard authoritative joiners against a massive **historical record archive** without generating enterprise IDs on Fusion Core. Fusion IDs matches joiners still missing `personId` to **uncorrelated** archive rows, reuses a record ID when Match succeeds, or mints a new value; both connectors share the same Internal Record dump and run in a **constant Core → IDs → Core** loop.
 
 ### Cookbook 4 — deployment settings
 
-| Setting | Reconciliation stage | Identifier stage |
+| Setting | Fusion Core (stage 1) | Fusion IDs (stage 2) |
 | --- | --- | --- |
-| ISC source name (example) | `Campus Reconciliation Fusion` | `Campus Identifier Fusion` |
+| ISC source name (example) | `Campus Fusion Core` | `Campus Fusion IDs` |
 | Fusion **Authoritative** | **Yes** (umbrella) | **No** (side-car) |
 | Authoritative HR | **On** | **Off** |
-| Reconciliation Fusion as managed source | N/A | **On** (filter: missing `personId`) |
+| Fusion Core as managed source | N/A | **On** (filter: missing `personId`) |
 | Internal Record archive | **Records**, Internal, Match **on** | Same dump, Match **on** |
-| Unique `personId` definition | **Absent** | **Present** ([ID carryover](../deployment/two-stage-identifier-reconciliation.md#id-carryover-expression)) |
+| Unique `personId` definition | **Absent** | **Present** ([ID carryover](../deployment/two-stage-historical-record-reconciliation.md#id-carryover-expression)) |
 
 ### Cookbook 4 — validation
 
-1. Batch HR on Reconciliation using **Aggregation batch size** when the archive is large.
-2. After Reconciliation, confirm joiners without a correlated archive match have blank `personId`.
-3. Run Identifier; grep logs for Unique Define / `personId` assignment.
-4. Re-run Reconciliation; confirm one Fusion account per person and IDs persisted.
+1. Batch HR on Fusion Core using **Aggregation batch size** when the archive is large.
+2. After Core, confirm joiners without a **correlated** archive match have blank `personId`.
+3. Run Fusion IDs; grep logs for Unique Define / `personId` from a record or new value.
+4. Re-run Fusion Core; confirm one Fusion account per person and IDs persisted.
 
-**Full walkthrough (diagrams, correlated vs uncorrelated records, cycle):** [Two-stage identifier reconciliation](../deployment/two-stage-identifier-reconciliation.md)
+**Full walkthrough (cycle diagram, correlated vs uncorrelated records):** [Two-stage historical record reconciliation](../deployment/two-stage-historical-record-reconciliation.md)
 
 ---
 

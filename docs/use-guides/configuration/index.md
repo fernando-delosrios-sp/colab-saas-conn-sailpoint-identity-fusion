@@ -19,7 +19,7 @@ Topic guides for Identity Fusion NG connector settings. Each guide covers **one 
 | **Tune correlation after Match** | [Managing correlation](managing-correlation.md) | [Match flow reference](../../reference/match-flow.md) |
 | **Pick algorithms and tune scores** | [Tuning matching algorithms](tuning-matching-algorithms.md) | [Match tuning cookbooks](match-tuning-cookbooks.md) |
 | **Follow a worked deployment example** | [Match tuning cookbooks](match-tuning-cookbooks.md) | [Analyze changes with dry-run](../operation/analyze-with-dry-run.md) |
-| **Reconcile joiners against a historical ID archive (two Fusion sources)** | [Two-stage identifier reconciliation](../deployment/two-stage-identifier-reconciliation.md) | [Records customizer](records-customizer.md) · [Match tuning cookbooks — Cookbook 4](match-tuning-cookbooks.md#cookbook-4-two-stage-identifier-reconciliation) |
+| **Reconcile joiners against a historical record archive (two Fusion sources)** | [Two-stage historical record reconciliation](../deployment/two-stage-historical-record-reconciliation.md) | [Records customizer](records-customizer.md) · [Match tuning cookbooks — Cookbook 4](match-tuning-cookbooks.md#cookbook-4-two-stage-historical-record-reconciliation) |
 
 ---
 

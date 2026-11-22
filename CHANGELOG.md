@@ -24,7 +24,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 ### 📚 Documentation
 
 - **Internal Record source configuration guides** — Updated `docs/glossary.md`, `docs/use-guides/configuration/records-customizer.md`, `docs/use-guides/configuration/source-types.md`, and `docs/use-guides/configuration/configuring-sources-and-scope.md` for the **Internal** toggle and removal of the Match prompt from customizer packaging.
-- **Two-stage identifier reconciliation** — Added `docs/use-guides/deployment/two-stage-identifier-reconciliation.md` (diagrams, ID carryover expression, correlated vs uncorrelated archive rows), Cookbook 4 in `match-tuning-cookbooks.md`, and navigation links from getting started and configuration guides.
+- **Two-stage historical record reconciliation** — Deployment guide at `docs/use-guides/deployment/two-stage-historical-record-reconciliation.md` (cycle diagram, Fusion Core / Fusion IDs roles, correlated vs uncorrelated archive rows, ID carryover expression), Cookbook 4 in `match-tuning-cookbooks.md`, and navigation links from getting started and configuration guides. The former `two-stage-identifier-reconciliation.md` URL remains as a redirect stub.
 
 ---
 
