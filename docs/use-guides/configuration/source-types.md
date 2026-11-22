@@ -7,7 +7,7 @@ Each managed source in **Source Settings** has a **Source type** that controls h
 **Prerequisites:** [Configuring sources and scope](configuring-sources-and-scope.md) — scope, umbrella vs side-car, and aggregation.
 
 !!! note "Didactic guide"
-    This page explains **how and when** to pick a source type. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
+This page explains **how and when** to pick a source type. For field keys, types, defaults, and constraints, see the linked **Configuration reference**.
 
 ## Overview
 
@@ -30,11 +30,11 @@ flowchart TD
     M -.-> N([Optional: disable on managed source])
 ```
 
-| Source type | Creates identities? | Emits Fusion accounts? | Typical deployment |
-| --- | --- | --- | --- |
-| **Authoritative accounts** (default) | When Fusion is authoritative and no match | Yes | HR, AD, SaaS apps in umbrella Match |
-| **Records** | No | Only when Match links to existing identity | Username / employee-ID generation pools |
-| **Orphan accounts** | Never | Only when Match links to existing identity | Supplemental directories for Match only |
+| Source type                          | Creates identities?                       | Emits Fusion accounts?                     | Typical deployment                      |
+| ------------------------------------ | ----------------------------------------- | ------------------------------------------ | --------------------------------------- |
+| **Authoritative accounts** (default) | When Fusion is authoritative and no match | Yes                                        | HR, AD, SaaS apps in umbrella Match     |
+| **Records**                          | No                                        | Only when Match links to existing identity | Username / employee-ID generation pools |
+| **Orphan accounts**                  | Never                                     | Only when Match links to existing identity | Supplemental directories for Match only |
 
 ## Authoritative accounts
 
@@ -58,12 +58,12 @@ The default type for managed sources that contribute to identity lifecycle decis
 
 **Additional options:**
 
-| Option | Purpose |
-| --- | --- |
+| Option                          | Purpose                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Deferred candidate matching** | When enabled, compares non-matched accounts to other deferred candidates from the **same source in the same run**. Defers identity creation when the best match is another deferred candidate. Never cross-source. Disable when one person may appear as multiple accounts in a single aggregation and each should be evaluated independently. |
 
 !!! warning "Reviewers required for manual review"
-    Match scoring runs when **Enable automatic merge** is on, or when **Enable manual review** is on with valid reviewers. When manual review is off or reviewers are missing, borderline scores register as non-matched. Configure **global reviewers** or **per-source reviewer entitlements** when you need manual review for partial matches. See [Managing reviewers](managing-reviewers.md).
+Match scoring runs when **Enable automatic merge** is on, or when **Enable manual review** is on with valid reviewers. When manual review is off or reviewers are missing, borderline scores register as non-matched. Configure **global reviewers** or **per-source reviewer entitlements** when you need manual review for partial matches. See [Managing reviewers](managing-reviewers.md).
 
 ## Records
 
@@ -82,17 +82,17 @@ Register unique attribute values **without** emitting Fusion accounts for non-ma
 
 **Typical use cases:**
 
-| Use case | Example |
-| --- | --- |
-| Username pool | Generate and reserve usernames from an Internal Record source before HR onboarding |
-| Employee number registry | Register IDs globally to prevent collisions across aggregations |
-| Pre-Match dedup check | Keep Match on to find duplicates before registering a unique value |
+| Use case                 | Example                                                                            |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| Username pool            | Generate and reserve usernames from an Internal Record source before HR onboarding |
+| Employee number registry | Register IDs globally to prevent collisions across aggregations                    |
+| Pre-Match dedup check    | Keep Match on to find duplicates before registering a unique value                 |
 
 **Deployment note:** Records sources usually sit in **side-car** deployments (Fusion non-authoritative). Pair with an authoritative HR source when Match should link records to real identities.
 
 ### Internal Record sources
 
-An **Internal Record source** is a Record source packaged with the Records Customizer and named in the Internal Record configuration. It is not selected by a Source Settings file field, and Identity Security Cloud is not queried for its accounts. Include record accounts in Match and the Accounts JMESPath filter are the values saved for that dump.
+An **Internal Record source** is a Record source packaged with the Records Customizer, named in the Internal Record configuration, and enabled in Source Settings with **Source type** set to **Records** and **Internal** toggled on. Identity Security Cloud is not queried for its accounts. **Include record accounts in Match** and other Record controls come from Source Settings.
 
 The dump is a headered CSV. Account ID and Account Name are columns chosen while packaging. Reports keep the Record label and add an **INTERNAL** badge. Those accounts have no ISC account link. See [Records Customizer](records-customizer.md).
 
@@ -127,23 +127,23 @@ When enabled, triggers a background `POST /accounts/{id}/disable` on the managed
 
 **Typical use cases:**
 
-| Use case | Example |
-| --- | --- |
-| Contractor directory | Match contractors to employees; disable stale contractor accounts with no match |
-| Legacy system cleanup | Find orphan accounts that correspond to active identities; disable the rest |
-| Match-only enrichment | Add attributes from a read-only source without identity creation risk |
+| Use case              | Example                                                                         |
+| --------------------- | ------------------------------------------------------------------------------- |
+| Contractor directory  | Match contractors to employees; disable stale contractor accounts with no match |
+| Legacy system cleanup | Find orphan accounts that correspond to active identities; disable the rest     |
+| Match-only enrichment | Add attributes from a read-only source without identity creation risk           |
 
 **Deployment note:** Orphan sources are almost always used in **side-car** mode. Fusion must **not** be authoritative for identity creation from that source — by design, orphan non-matches never create identities.
 
 ## Choosing a source type
 
-| Goal | Source type | Fusion authoritative? |
-| --- | --- | --- |
-| Full Match with identity creation | Authoritative accounts | Yes (umbrella) |
-| Multi-source deduplication | Authoritative accounts (2+) | Yes |
-| Unique ID generation only | Records | Usually no (side-car) |
-| Supplemental Match data | Orphan | No (side-car) |
-| Map/Define enrichment only | Authoritative or Records | No (side-car) |
+| Goal                              | Source type                 | Fusion authoritative? |
+| --------------------------------- | --------------------------- | --------------------- |
+| Full Match with identity creation | Authoritative accounts      | Yes (umbrella)        |
+| Multi-source deduplication        | Authoritative accounts (2+) | Yes                   |
+| Unique ID generation only         | Records                     | Usually no (side-car) |
+| Supplemental Match data           | Orphan                      | No (side-car)         |
+| Map/Define enrichment only        | Authoritative or Records    | No (side-car)         |
 
 ## Combining types in one Fusion source
 
@@ -169,10 +169,9 @@ Configure scope and aggregation per source in [Configuring sources and scope](co
 
 ## Related guides
 
-| Topic | Guide |
-| --- | --- |
-| Scope, umbrella vs side-car, aggregation | [Configuring sources and scope](configuring-sources-and-scope.md) |
-| Correlation after Match | [Managing correlation](managing-correlation.md) |
-| Match thresholds and review | [Matching identities](matching-identities.md) |
-| Status and reviewer entitlements | [Entitlement list](../../operations/entitlement-list.md) · [Managing reviewers](managing-reviewers.md) |
-
+| Topic                                    | Guide                                                                                                  |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Scope, umbrella vs side-car, aggregation | [Configuring sources and scope](configuring-sources-and-scope.md)                                      |
+| Correlation after Match                  | [Managing correlation](managing-correlation.md)                                                        |
+| Match thresholds and review              | [Matching identities](matching-identities.md)                                                          |
+| Status and reviewer entitlements         | [Entitlement list](../../operations/entitlement-list.md) · [Managing reviewers](managing-reviewers.md) |

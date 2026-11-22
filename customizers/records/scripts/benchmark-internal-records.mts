@@ -80,7 +80,6 @@ async function measure(reader: string, fixture: string): Promise<Measurement> {
                 {
                     fileName: sourceName,
                     sourceName: sourceName.replace(/\.csv$/i, ''),
-                    includeRecordAccountsInMatch: false,
                     accountJmespathFilter: '',
                     accountIdField: inferred.headers[0],
                     accountNameField: inferred.headers[1] ?? inferred.headers[0],
@@ -143,7 +142,11 @@ function runChild(reader: string, fixture: string): Measurement {
     if (result.status !== 0) {
         throw new Error(result.stderr || result.stdout || `benchmark reader ${reader} failed`)
     }
-    const line = result.stdout.trim().split('\n').filter((entry) => entry.startsWith('{')).at(-1)
+    const line = result.stdout
+        .trim()
+        .split('\n')
+        .filter((entry) => entry.startsWith('{'))
+        .at(-1)
     if (!line) throw new Error(`benchmark reader ${reader} produced no measurement`)
     return JSON.parse(line) as Measurement
 }

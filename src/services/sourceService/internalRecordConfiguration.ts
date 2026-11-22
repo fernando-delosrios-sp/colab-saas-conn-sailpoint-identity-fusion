@@ -16,7 +16,6 @@ export interface InternalRecordSchemaField {
 export interface InternalRecordConfigurationEntry {
     fileName: string
     sourceName: string
-    includeRecordAccountsInMatch: boolean
     accountJmespathFilter: string
     accountIdField: string
     accountNameField: string
@@ -31,7 +30,6 @@ export interface InternalRecordConfiguration {
 /** Answers an interactive pack collects for one dump. */
 interface InternalRecordPromptAnswers {
     sourceName: string
-    includeRecordAccountsInMatch: boolean
     accountJmespathFilter: string
     accountIdField: string
     accountNameField: string

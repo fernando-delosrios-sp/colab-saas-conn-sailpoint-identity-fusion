@@ -1282,7 +1282,9 @@ describe('SourceService.setMachineAccountOwnerIdentity', () => {
             throwOnError: true,
         })
         expect(client.machineAccountsApi.updateMachineAccount.mock.calls[0]).toHaveLength(1)
-        expect(JSON.stringify(client.machineAccountsApi.updateMachineAccount.mock.calls[0][0])).not.toContain('identityId')
+        expect(JSON.stringify(client.machineAccountsApi.updateMachineAccount.mock.calls[0][0])).not.toContain(
+            'identityId'
+        )
         expect(log.error).not.toHaveBeenCalled()
     })
 
@@ -1321,9 +1323,7 @@ describe('SourceService.setMachineAccountOwnerIdentity', () => {
 
         await expect(service.setMachineAccountOwnerIdentity(target, 'identity-9')).resolves.toBeUndefined()
 
-        expect(log.error).toHaveBeenCalledWith(
-            'Failed to set owner identity for machine account "machine-1": boom'
-        )
+        expect(log.error).toHaveBeenCalledWith('Failed to set owner identity for machine account "machine-1": boom')
         expect(client.machineAccountsApi.listMachineAccounts).not.toHaveBeenCalled()
     })
 
@@ -1392,19 +1392,17 @@ describe('SourceService batch aggregation cumulative count monotonicity', () => 
     it('Scenario: Run collects fewer accounts than previously recorded high-water mark', async () => {
         const { service } = createService({ accountLimit: 50 }, { batchCumulativeCount: { 'HR Source': 100 } })
         let requestedLimit: number | undefined
-        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(async function* (
-            _sourceId,
-            _abortSignal,
-            limit
-        ) {
-            requestedLimit = limit
-            const accounts = Array.from({ length: 80 }, (_, i) => ({
-                id: `acc-${i}`,
-                sourceId: 'managed-source-id',
-                nativeIdentity: `user-${i}`,
-            }))
-            yield accounts as any
-        })
+        vi.spyOn(service, 'fetchAccountsBySourceIdGenerator').mockImplementation(
+            async function* (_sourceId, _abortSignal, limit) {
+                requestedLimit = limit
+                const accounts = Array.from({ length: 80 }, (_, i) => ({
+                    id: `acc-${i}`,
+                    sourceId: 'managed-source-id',
+                    nativeIdentity: `user-${i}`,
+                }))
+                yield accounts as any
+            }
+        )
 
         await service.fetchManagedAccounts()
 
@@ -1531,7 +1529,6 @@ describe('SourceService.listSourceSchemas', () => {
             internalRecord: {
                 fileName: 'ACMaint Database.csv',
                 sourceName: 'ACMaint Database',
-                includeRecordAccountsInMatch: false,
                 accountJmespathFilter: '',
                 accountIdField: 'EMPLID',
                 accountNameField: 'NAME',
@@ -1636,4 +1633,3 @@ describe('SourceService.listSourceSchemas', () => {
         expect(Array.from(service.fusionAccountValues())).toEqual([])
     })
 })
-

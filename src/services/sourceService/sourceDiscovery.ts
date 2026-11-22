@@ -39,43 +39,47 @@ export interface SourceDiscoveryDeps {
 }
 
 /**
- * Add each packaged Internal Record configuration entry as a Record source.
- * A name that matches a configured source fails setup. A configured source with no
- * packaged entry of the same name keeps its Identity Security Cloud feed.
+ * Resolve configured enabled Record sources with `internal: true` from the packaged
+ * Internal Record configuration and manifest. Packaged entries without a matching
+ * enabled `Record` + `internal: true` source in Source Settings are ignored.
  */
-function appendInternalRecordSources(deps: SourceDiscoveryDeps, resolvedSources: SourceInfo[]): void {
+function resolveInternalRecordSources(
+    deps: SourceDiscoveryDeps,
+    internalConfigs: SourceConfig[],
+    resolvedSources: SourceInfo[]
+): void {
+    if (internalConfigs.length === 0) return
     const directory = deps.internalRecordsDir
-    if (!directory) return
-    const configuration = loadPackagedInternalRecordConfiguration(directory)
-    if (!configuration || configuration.sources.length === 0) return
-    const manifest = loadInternalRecordManifest(directory)
-    const configuredNames = new Set(deps.state.sources.map((source) => source.name))
-    for (const entry of configuration.sources) {
-        if (configuredNames.has(entry.sourceName)) {
+    const configuration = directory ? loadPackagedInternalRecordConfiguration(directory) : undefined
+    const manifest = directory ? loadInternalRecordManifest(directory) : undefined
+    const entriesByName = new Map((configuration?.sources ?? []).map((entry) => [entry.sourceName, entry]))
+
+    for (const sourceConfig of internalConfigs) {
+        const entry = entriesByName.get(sourceConfig.name)
+        if (!entry) {
             throw new InternalRecordFormatError(
-                `Internal Record source "${entry.sourceName}" matches configured source "${entry.sourceName}"`
+                `Internal Record source "${sourceConfig.name}" has no packaged Internal Record configuration`
             )
         }
-        if (!findInternalRecordSource(manifest, entry.fileName)) {
+        if (!manifest || !findInternalRecordSource(manifest, entry.fileName)) {
             throw new InternalRecordFormatError(internalPackageMessage(entry.fileName))
         }
-        const filter = entry.accountJmespathFilter.trim()
+        const filter = (sourceConfig.accountJmespathFilter ?? entry.accountJmespathFilter ?? '').trim()
         resolvedSources.push({
             id: internalRecordSourceId(entry.fileName),
-            name: entry.sourceName,
+            name: sourceConfig.name,
             isManaged: true,
             sourceType: SourceType.Record,
             internalProvenance: true,
             internalRecord: entry,
             config: {
-                name: entry.sourceName,
+                ...sourceConfig,
                 sourceType: SourceType.Record,
-                includeRecordAccountsForMatching: entry.includeRecordAccountsInMatch,
                 ...(filter.length > 0 ? { accountJmespathFilter: filter } : {}),
             },
         })
     }
-    FusionAccount.includeRecordSources(configuration.sources.map((entry) => entry.sourceName))
+    FusionAccount.includeRecordSources(internalConfigs.map((source) => source.name))
 }
 
 /**
@@ -101,8 +105,13 @@ export async function fetchAllSources(deps: SourceDiscoveryDeps, requireFusionSo
 
     const apiSourcesByName = new Map(apiSources.map((s) => [s.name!, s]))
     const resolvedSources: SourceInfo[] = []
+    const internalConfigs: SourceConfig[] = []
 
     for (const sourceConfig of state.sources) {
+        if (sourceConfig.sourceType === SourceType.Record && sourceConfig.internal === true) {
+            internalConfigs.push(sourceConfig)
+            continue
+        }
         const apiSource = apiSourcesByName.get(sourceConfig.name)
         assert(
             apiSource,
@@ -117,7 +126,7 @@ export async function fetchAllSources(deps: SourceDiscoveryDeps, requireFusionSo
         })
     }
 
-    appendInternalRecordSources(deps, resolvedSources)
+    resolveInternalRecordSources(deps, internalConfigs, resolvedSources)
 
     const fusionSource = apiSources.find(
         (x) => (x.connectorAttributes as BaseConfig).spConnectorInstanceId === state.spConnectorInstanceId

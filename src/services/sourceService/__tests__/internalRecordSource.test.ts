@@ -1,7 +1,7 @@
 import * as fs from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { SourceType } from '../../../model/config'
+import { SourceType, type SourceConfig } from '../../../model/config'
 import { FusionAccount } from '../../../model/fusionAccount'
 import { FusionRun } from '../../../model/fusionRun'
 import { readSettings } from '../../../data/config/settings/sourcesSettings'
@@ -18,7 +18,6 @@ function entry(
     return {
         fileName,
         sourceName,
-        includeRecordAccountsInMatch: overrides.includeRecordAccountsInMatch ?? false,
         accountJmespathFilter: overrides.accountJmespathFilter ?? '',
         accountIdField: overrides.accountIdField ?? 'id',
         accountNameField: overrides.accountNameField ?? 'name',
@@ -71,7 +70,7 @@ describe('Internal Record sources', () => {
         return path.join(outputDir, INTERNAL_RECORD_DIRECTORY)
     }
 
-    function discoveryState(sources: Array<{ name: string; sourceType?: SourceType }>) {
+    function discoveryState(sources: SourceConfig[]) {
         return {
             sources,
             spConnectorInstanceId: 'instance-1',
@@ -97,7 +96,7 @@ describe('Internal Record sources', () => {
 
     it('Packaged configuration becomes an Internal Record source', async () => {
         const directory = await packageDump('id,name,department,AFFILS\nh-1,Ada,Engineering,staff\n', {
-            sources: [entry('Sample Records.csv', 'Sample Records', { includeRecordAccountsInMatch: true })],
+            sources: [entry('Sample Records.csv', 'Sample Records')],
         })
         const run = new FusionRun()
         const call = iscClient([])
@@ -106,7 +105,14 @@ describe('Internal Record sources', () => {
             client: call as any,
             run,
             internalRecordsDir: directory,
-            state: discoveryState([]),
+            state: discoveryState([
+                {
+                    name: 'Sample Records',
+                    sourceType: SourceType.Record,
+                    internal: true,
+                    includeRecordAccountsForMatching: true,
+                },
+            ]),
         })
 
         const internal = run.sourcesByName.get('Sample Records')
@@ -119,17 +125,29 @@ describe('Internal Record sources', () => {
         expect(call.call).toHaveBeenCalledTimes(1)
     })
 
-    it('Shared name fails setup', async () => {
+    it('Unconfigured or disabled packaged dump is ignored', async () => {
         const directory = await packageDump('id,name,department,AFFILS\nh-1,Ada,Engineering,staff\n', {
             sources: [entry('Sample Records.csv', 'Sample Records')],
         })
+        const run = new FusionRun()
+        await fetchAllSources({
+            log: { debug: vi.fn(), warn: vi.fn() } as any,
+            client: iscClient([]) as any,
+            run,
+            internalRecordsDir: directory,
+            state: discoveryState([]),
+        })
+
+        expect(run.sourcesByName.get('Sample Records')).toBeUndefined()
+    })
+
+    it('Configured internal Record source missing from customizer package fails setup', async () => {
         await expect(
             fetchAllSources({
                 log: { debug: vi.fn(), warn: vi.fn() } as any,
-                client: iscClient([{ id: 'wd-1', name: 'Sample Records' }]) as any,
+                client: iscClient([]) as any,
                 run: new FusionRun(),
-                internalRecordsDir: directory,
-                state: discoveryState([{ name: 'Sample Records', sourceType: SourceType.Authoritative }]),
+                state: discoveryState([{ name: 'Sample Records', sourceType: SourceType.Record, internal: true }]),
             })
         ).rejects.toThrow(/Sample Records/)
     })
@@ -144,7 +162,10 @@ describe('Internal Record sources', () => {
             client: iscClient([{ id: 'wd-1', name: 'Workday', connectorAttributes: {} }]) as any,
             run,
             internalRecordsDir: directory,
-            state: discoveryState([{ name: 'Workday', sourceType: SourceType.Authoritative }]),
+            state: discoveryState([
+                { name: 'Workday', sourceType: SourceType.Authoritative },
+                { name: 'Sample Records', sourceType: SourceType.Record, internal: true },
+            ]),
         })
 
         const workday = run.sourcesByName.get('Workday')
@@ -163,7 +184,10 @@ describe('Internal Record sources', () => {
         const configuration: InternalRecordConfiguration = {
             sources: [entry('Sample Records.csv', 'Sample Records')],
         }
-        fs.writeFileSync(path.join(directory, 'internal-record-configuration.json'), `${JSON.stringify(configuration)}\n`)
+        fs.writeFileSync(
+            path.join(directory, 'internal-record-configuration.json'),
+            `${JSON.stringify(configuration)}\n`
+        )
 
         await expect(
             fetchAllSources({
@@ -171,7 +195,7 @@ describe('Internal Record sources', () => {
                 client: iscClient([]) as any,
                 run: new FusionRun(),
                 internalRecordsDir: directory,
-                state: discoveryState([]),
+                state: discoveryState([{ name: 'Sample Records', sourceType: SourceType.Record, internal: true }]),
             })
         ).rejects.toThrow(/Sample Records\.csv/)
     })
@@ -195,7 +219,7 @@ describe('Internal Record sources', () => {
             client: iscClient([]) as any,
             run,
             internalRecordsDir: directory,
-            state: discoveryState([]),
+            state: discoveryState([{ name: 'Sample Records', sourceType: SourceType.Record, internal: true }]),
         })
         const source = run.sourcesByName.get('Sample Records')!
         await fetchManagedAccounts({
@@ -235,7 +259,7 @@ describe('Internal Record sources', () => {
             client: iscClient([]) as any,
             run,
             internalRecordsDir: directory,
-            state: discoveryState([]),
+            state: discoveryState([{ name: 'Sample Records', sourceType: SourceType.Record, internal: true }]),
         })
         await fetchManagedAccounts({
             log: {

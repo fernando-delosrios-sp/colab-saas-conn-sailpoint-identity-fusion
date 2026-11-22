@@ -89,7 +89,6 @@ export async function packInternalRecords(options: PackInternalRecordsOptions): 
         const entry: InternalRecordConfigurationEntry = {
             fileName,
             sourceName: answers.sourceName,
-            includeRecordAccountsInMatch: answers.includeRecordAccountsInMatch,
             accountJmespathFilter: answers.accountJmespathFilter,
             accountIdField: answers.accountIdField,
             accountNameField: answers.accountNameField,
@@ -144,7 +143,6 @@ export function createCliInternalRecordPrompter(): InternalRecordPrompter {
             const defaultSourceName = context.fileName.replace(/\.csv$/i, '')
             const sourceNameAnswer = (await rl.question(`Source name [${defaultSourceName}]: `)).trim()
             const sourceName = sourceNameAnswer.length > 0 ? sourceNameAnswer : defaultSourceName
-            const matchAnswer = (await rl.question('Include record accounts in Match? [y/n]: ')).trim().toLowerCase()
             const accountJmespathFilter = (await rl.question('Accounts JMESPath filter: ')).trim()
             const accountIdField = (await rl.question('Account ID field: ')).trim()
             const accountNameField = (await rl.question('Account Name field: ')).trim()
@@ -163,7 +161,6 @@ export function createCliInternalRecordPrompter(): InternalRecordPrompter {
             }
             return {
                 sourceName,
-                includeRecordAccountsInMatch: matchAnswer === 'y' || matchAnswer === 'yes',
                 accountJmespathFilter,
                 accountIdField,
                 accountNameField,

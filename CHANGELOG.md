@@ -1,9 +1,31 @@
 <!-- markdownlint-disable MD024 -->
+
 # Changelog
 
 All notable changes to **Identity Fusion NG** — the ISC connector for Map → Define → Match identity fusion, scenario recording/replay, and supporting tooling.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
+
+## 2026-11-22 · v2.2.0
+
+### ⚠️ Breaking Changes
+
+- **Internal Record sources require Source Settings configuration** — Packaged Internal Record sources in the Records Customizer are no longer auto-registered unconditionally. An Internal Record source is accounted for only when Source Settings contains an enabled `Records` source with **Internal** toggled on (`internal: true`) whose name matches the packaged configuration. Unconfigured, disabled, or non-internal packaged dumps are ignored, and an enabled `Records` source with **Internal** on that has no matching packaged configuration or manifest fails setup before Fetch.
+    - **Migration**: Add each active Internal Record source to Source Settings with **Source type** set to **Records**, toggle **Internal** on, and configure **Include record accounts in Match** in Source Settings.
+
+### ✨ New Features
+
+- **Internal toggle on Record sources** — Added an **Internal** toggle (`internal`, default off) with explanatory help text to `Records` sources in `connector-spec.json` and `sourcesSettings.ts` to load accounts from a matching packaged Records Customizer dump instead of Identity Security Cloud.
+
+### 🔧 Improvements
+
+- **Removed Match setting from Records Customizer setup** — Removed `includeRecordAccountsInMatch` from `InternalRecordConfigurationEntry`, `packInternalRecords`, the interactive CLI prompter (`createCliInternalRecordPrompter`), and `customizers/records/internal-record-configuration.json`. Match participation for Internal Record sources is now controlled solely by **Include record accounts in Match** in Source Settings.
+
+### 📚 Documentation
+
+- **Internal Record source configuration guides** — Updated `docs/glossary.md`, `docs/use-guides/configuration/records-customizer.md`, `docs/use-guides/configuration/source-types.md`, and `docs/use-guides/configuration/configuring-sources-and-scope.md` for the **Internal** toggle and removal of the Match prompt from customizer packaging.
+
+---
 
 ## 2026-11-21 · v2.2.0
 
@@ -64,10 +86,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 ### ⚠️ Breaking Changes
 
 - **Internal Record sources come from the package** — Packaging each `records/*.csv` saves the source name, Internal Record schema, Include record accounts in Match, Accounts JMESPath filter, Account ID, and Account Name in `internal-record-configuration.json`. The connector reads that package. It no longer reads an internal-record file from Source Settings, and the dump no longer needs a `nativeIdentity` column. A field starts multi-valued when a cell contains an unquoted semicolon; the saved flag is what aggregation uses. An empty Account Name falls back to the Account ID. Packaging fails when two dumps share a source name. Setup fails before Fetch when an Internal Record source name matches a configured source.
-  - **Migration:** Run an interactive pack, commit `internal-record-configuration.json`, upload the new customizer zip, and remove any Source Settings internal-record file value. A non-interactive pack fails until every dump has a saved entry.
+    - **Migration:** Run an interactive pack, commit `internal-record-configuration.json`, upload the new customizer zip, and remove any Source Settings internal-record file value. A non-interactive pack fails until every dump has a saved entry.
 
 - **Reserved-value indexes are removed** — `values/` is no longer compiled, and the Customizer Value Store is gone. A unique value is reserved when record registration stores it from an account, including an Internal Record account. A bare list of usernames no longer reserves those usernames. The per-base collision error names a managed-source or Internal Record value instead of a customizer index.
-  - **Migration:** Replace each reserved-value list with an Internal-record dump that carries those values on a unique attribute, then pack that dump. An older customizer that shipped only `.bin` indexes stops reserving values until that dump is uploaded.
+    - **Migration:** Replace each reserved-value list with an Internal-record dump that carries those values on a unique attribute, then pack that dump. An older customizer that shipped only `.bin` indexes stops reserving values until that dump is uploaded.
 
 ---
 
@@ -76,7 +98,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates u
 ### ⚠️ Breaking Changes
 
 - **Per base value counter** — A unique attribute can turn on **Per base value counter?** (`counterPerBase`) when **Use incremental counter?** is already on. Each base value then keeps its own sequence, so one expression can produce `ab1`, `ab2`, `bb1`, and `ab3`. The base value is the expression rendered with `$counter` empty, after trim, case, spaces, and normalize, then cut so a configured maximum length still has room for **Minimum counter digits**. The last issued number is stored in `connectorAttributes.fusionState` under that readable base value. The option defaults to off. Existing definitions that leave it off keep one counter for the attribute, including raising that counter from a kept value's trailing digits.
-  - **Migration:** An incremental expression must reference `$counter`, `${counter}`, `$!counter`, or `$!{counter}`. A `$UUID` reference does not count. An expression that omits the counter now fails at startup instead of retrying until **Maximum attempts**. Turning **Per base value counter?** on or off against saved state of the other shape fails until you switch the option back or reset Fusion state. With the option and a maximum length both on, a counter wider than **Minimum counter digits** ends the operation; raise **Minimum counter digits**. A per-base value that is already registered ends the operation and does not try the next number. Compare `$counter` with zero (`#if($counter == 0)`) when the first value should omit the counter.
+    - **Migration:** An incremental expression must reference `$counter`, `${counter}`, `$!counter`, or `$!{counter}`. A `$UUID` reference does not count. An expression that omits the counter now fails at startup instead of retrying until **Maximum attempts**. Turning **Per base value counter?** on or off against saved state of the other shape fails until you switch the option back or reset Fusion state. With the option and a maximum length both on, a counter wider than **Minimum counter digits** ends the operation; raise **Minimum counter digits**. A per-base value that is already registered ends the operation and does not try the next number. Compare `$counter` with zero (`#if($counter == 0)`) when the first value should omit the counter.
 
 ### 📚 Documentation
 

@@ -22,6 +22,7 @@ export const runtimeDefaults = {
         correlationMode: 'none' as const,
         deferredMatching: true,
         includeRecordAccountsForMatching: true,
+        internal: false,
         disableNonMatchingAccounts: false,
         orphanProcessingMode: OrphanProcessingMode.Assignment,
     },
@@ -71,6 +72,7 @@ export function readSettings(raw: Record<string, unknown>): SourcesSection {
                 includeRecordAccountsForMatching:
                     extractBoolean(sourceConfig, 'includeRecordAccountsForMatching') ??
                     runtimeDefaults.source.includeRecordAccountsForMatching,
+                internal: extractBoolean(sourceConfig, 'internal') ?? runtimeDefaults.source.internal,
                 disableNonMatchingAccounts:
                     extractBoolean(sourceConfig, 'disableNonMatchingAccounts') ??
                     runtimeDefaults.source.disableNonMatchingAccounts,

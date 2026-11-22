@@ -31,7 +31,6 @@ function configurationFor(
             {
                 fileName,
                 sourceName: overrides.sourceName ?? 'Internal Records',
-                includeRecordAccountsInMatch: false,
                 accountJmespathFilter: overrides.accountJmespathFilter ?? '',
                 accountIdField: overrides.accountIdField ?? headers[0],
                 accountNameField: overrides.accountNameField ?? headers[1] ?? headers[0],
@@ -195,7 +194,6 @@ describe('internal-record dumps', () => {
             {
                 fileName: 'notes.csv',
                 sourceName: 'Notes',
-                includeRecordAccountsInMatch: false,
                 accountJmespathFilter: '',
                 accountIdField: 'id',
                 accountNameField: 'NOTES',
@@ -215,7 +213,6 @@ describe('internal-record dumps', () => {
         const entry = {
             fileName: 'people.csv',
             sourceName: 'People',
-            includeRecordAccountsInMatch: false,
             accountJmespathFilter: '',
             accountIdField: 'id',
             accountNameField: 'name',

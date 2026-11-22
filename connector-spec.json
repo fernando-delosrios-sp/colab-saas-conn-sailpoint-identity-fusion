@@ -184,6 +184,16 @@
                                             ]
                                         },
                                         {
+                                            "key": "internal",
+                                            "label": "Internal",
+                                            "type": "toggle",
+                                            "required": false,
+                                            "value": "false",
+                                            "parentKey": "sourceType",
+                                            "parentValue": "record",
+                                            "helpKey": "Enable to load accounts for this Record source from a matching packaged Records Customizer dump instead of Identity Security Cloud."
+                                        },
+                                        {
                                             "key": "orphanProcessingMode",
                                             "label": "Orphan processing mode",
                                             "type": "radio",
@@ -238,6 +248,8 @@
                                             "label": "Accounts API filter",
                                             "type": "text",
                                             "required": false,
+                                            "parentKey": "internal",
+                                            "parentValue": "false",
                                             "helpKey": "Server-side ISC account filter sent to the Accounts API (filters parameter)."
                                         },
                                         {
@@ -252,6 +264,8 @@
                                             "label": "Aggregation batch size",
                                             "type": "number",
                                             "required": false,
+                                            "parentKey": "internal",
+                                            "parentValue": "false",
                                             "helpKey": "Onboarding only: cap the managed accounts processed per run for a large, static set. Not for regular operation — the cumulative limit assumes accounts are not added or removed between runs."
                                         }
                                     ]

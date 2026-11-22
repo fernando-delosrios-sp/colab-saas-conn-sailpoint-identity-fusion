@@ -23,7 +23,7 @@ describe('ubiquitous-language glossary: Internal Record packaging', () => {
         expect(entry).toMatch(/saved packaging decisions/)
         expect(entry).toMatch(/source name/)
         expect(entry).toMatch(/Internal Record schema/)
-        expect(entry).toMatch(/Include record accounts in Match/)
+        expect(entry).not.toMatch(/Include record accounts in Match/)
         expect(entry).toMatch(/Accounts JMESPath filter/)
     })
 

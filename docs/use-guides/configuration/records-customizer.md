@@ -11,11 +11,12 @@ This page explains how to prepare dumps, save the Internal Record configuration,
 
 ## When to use the Records Customizer
 
-| Need                                                                                  | What to do                                                                        |
-| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Accounts that should follow the Record path without an Identity Security Cloud source | Put a headered CSV in `records/` and pack it                                      |
-| A username or employee number that must stay reserved                                 | Put that value on an account in the dump, on the unique attribute                 |
-| Match, filtering, Account ID, and Account Name                                        | Confirm them while packaging. They are saved in the Internal Record configuration |
+| Need                                                                                  | What to do                                                                                                    |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Accounts that should follow the Record path without an Identity Security Cloud source | Put a headered CSV in `records/` and pack it                                                                  |
+| A username or employee number that must stay reserved                                 | Put that value on an account in the dump, on the unique attribute                                             |
+| Filtering, Account ID, and Account Name                                               | Confirm them while packaging. They are saved in the Internal Record configuration                             |
+| Enablement and Match behavior                                                         | Configure **Source type: Records**, **Internal**, and **Include record accounts in Match** in Source Settings |
 
 A bare list of usernames no longer reserves those usernames. Replace each old `values/*.csv` list with an Internal-record dump that carries the values on a unique attribute, then pack that dump.
 
@@ -58,7 +59,6 @@ npm run pack-zip
 On an interactive terminal, each `records/*.csv` that has no saved entry prompts for:
 
 - Source name (Enter uses the file name without `.csv`)
-- Include record accounts in Match
 - Accounts JMESPath filter
 - Account ID field
 - Account Name field
@@ -78,10 +78,10 @@ The deployable zip includes the Internal Record configuration, the manifest, and
 ### 3. Deploy to Identity Security Cloud
 
 1. Upload the customizer zip to the Identity Fusion customizer slot.
-2. Remove any **Internal record file** value left in Source Settings from an older package. That field is no longer read.
+2. In Source Settings, add a source with the exact saved **Source name**, set **Source type** to **Records**, toggle **Internal** on, and set **Include record accounts in Match** as needed. Remove any **Internal record file** value left from an older package.
 3. Run an account aggregation.
 
-Do not give an Internal Record source the same name as a configured source. Setup fails before Fetch and names that source. A configured source with a different name still comes from Identity Security Cloud.
+Packaged dumps without a matching enabled **Records** source with **Internal** toggled on in Source Settings are ignored. Enabling **Internal** on a **Records** source that has no matching packaged dump fails setup before Fetch.
 
 ---
 
@@ -89,7 +89,7 @@ Do not give an Internal Record source the same name as a configured source. Setu
 
 `beforeStdAccountList` returns the directory that holds the Internal Record configuration, manifest, and shards. It does not return a unique-value index directory.
 
-Each saved entry becomes an Internal Record source with Record type and internal provenance. Include record accounts in Match and the Accounts JMESPath filter come from that entry. An empty filter accepts every row. The Account ID field becomes `nativeIdentity`. The Account Name field becomes the account name, and an empty name falls back to the Account ID. A multi-valued field is split on unquoted semicolons into a list of strings. A quoted semicolon stays inside one list entry. A field saved as single-valued keeps an unquoted semicolon inside the string.
+Each enabled **Records** source with **Internal** toggled on resolves its matching packaged entry with Record type and internal provenance. **Include record accounts in Match** and **Accounts JMESPath filter** come from Source Settings (falling back to any saved filter in the package when unset in Source Settings). An empty filter accepts every row. The Account ID field becomes `nativeIdentity`. The Account Name field becomes the account name, and an empty name falls back to the Account ID. A multi-valued field is split on unquoted semicolons into a list of strings. A quoted semicolon stays inside one list entry. A field saved as single-valued keeps an unquoted semicolon inside the string.
 
 Match on follows the Record Match path. Match off registers mapped unique attributes and does not score. An unmatched record does not create a Fusion account.
 

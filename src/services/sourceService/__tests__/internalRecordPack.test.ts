@@ -27,7 +27,6 @@ describe('Internal Record configuration pack', () => {
         fs.writeFileSync(path.join(recordsDir, 'Sample Records.csv'), 'id,name\na1,Ada\n')
         const prompt = vi.fn(async () => ({
             sourceName: 'Sample Records',
-            includeRecordAccountsInMatch: true,
             accountJmespathFilter: 'accounts[?attributes.name == `Ada`]',
             accountIdField: 'id',
             accountNameField: 'name',
@@ -49,7 +48,6 @@ describe('Internal Record configuration pack', () => {
         expect(saved.sources[0]).toMatchObject({
             fileName: 'Sample Records.csv',
             sourceName: 'Sample Records',
-            includeRecordAccountsInMatch: true,
             accountIdField: 'id',
             accountNameField: 'name',
         })

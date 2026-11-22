@@ -255,6 +255,11 @@ export interface SourceConfig {
      * attribute registration (for example reserving third-party identifiers).
      */
     includeRecordAccountsForMatching?: boolean
+    /**
+     * Record sources only: when true, accounts are loaded from a matching Internal Record source
+     * packaged in the Records Customizer instead of Identity Security Cloud. Default false.
+     */
+    internal?: boolean
 }
 
 /** Configuration for all managed sources and aggregation behavior. */
