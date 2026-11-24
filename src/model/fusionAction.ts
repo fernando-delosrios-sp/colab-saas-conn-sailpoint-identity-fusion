@@ -8,5 +8,6 @@
  */
 export enum FusionAction {
     Correlated = 'correlated',
+    Reset = 'reset',
     ReviewerPrefix = 'reviewer:',
 }

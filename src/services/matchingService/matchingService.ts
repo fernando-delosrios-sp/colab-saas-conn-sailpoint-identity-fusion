@@ -1058,11 +1058,14 @@ export class MatchingService {
         const identityDisplayName = trimStr(fusionIdentity.identityDisplayName) ?? ''
         if (identityDisplayName) return identityDisplayName
 
-        const identityId = trimStr(fusionIdentity.identityId) ?? ''
-        if (identityId) return identityId
+        const aliasLabel = trimStr(fusionIdentity.identityAlias) ?? ''
+        if (aliasLabel) return aliasLabel
 
-        const fallback = trimStr(fusionIdentity.managedKeyOrUndefined) ?? ''
-        return fallback || 'Unknown'
+        const sourceTitle = trimStr(fusionIdentity.name) ?? ''
+        if (sourceTitle) return sourceTitle
+
+        const uid = trimStr(fusionIdentity.managedAccountId ?? fusionIdentity.identityId) ?? ''
+        return uid || 'Unknown'
     }
 
     /**

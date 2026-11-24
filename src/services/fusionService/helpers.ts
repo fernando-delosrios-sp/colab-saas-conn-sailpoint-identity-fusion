@@ -110,7 +110,8 @@ function fusionReportDeferredMatchCandidateFields(
     const id = trimStr(match.identityId) ?? ''
     return {
         accountId: id || undefined,
-        accountName: match.identityName,
+        accountName:
+            trimStr(match.identityName) || trimStr(match.attributes?.displayName) || id || undefined,
     }
 }
 
@@ -138,16 +139,23 @@ export function buildDeferredMatchReportRows(
     urlContext: UrlContext,
     sources: SourceService
 ): FusionReportMatch[] {
-    return anchorDeferredMatchesForReview(fusionAccount, run, maxCandidates).map((match) => ({
-        ...fusionReportDeferredMatchCandidateFields(match),
-        identityName: match.identityName,
-        identityId: match.fusionIdentity?.identityId,
-        identityUrl: resolveDeferredMatchCandidateUrl(match, urlContext, sources),
-        isMatch: true,
-        candidateType: MatchCandidateType.Deferred,
-        exact: isExactAttributeMatchScores(match.scores),
-        scores: mapScoreReportsForFusionReport(match.scores),
-    }))
+    return anchorDeferredMatchesForReview(fusionAccount, run, maxCandidates).map((match) => {
+        const fields = fusionReportDeferredMatchCandidateFields(match)
+        const identityId = trimStr(match.fusionIdentity?.identityId) ?? undefined
+        const identityName =
+            fields.accountName || trimStr(match.identityName) || identityId || 'Unknown'
+
+        return {
+            ...fields,
+            identityName,
+            identityId,
+            identityUrl: resolveDeferredMatchCandidateUrl(match, urlContext, sources),
+            isMatch: true,
+            candidateType: MatchCandidateType.Deferred,
+            exact: isExactAttributeMatchScores(match.scores),
+            scores: mapScoreReportsForFusionReport(match.scores),
+        }
+    })
 }
 
 export function getFusionReportAccountLabel(fusionAccount: FusionAccount): string {

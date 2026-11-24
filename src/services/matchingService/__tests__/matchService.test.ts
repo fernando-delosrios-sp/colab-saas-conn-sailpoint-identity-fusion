@@ -1177,6 +1177,25 @@ describe('MatchingService', () => {
             expect(viaRecord.fusionMatchesRaw[0].scores).toEqual(viaIdentity.fusionMatchesRaw[0].scores)
         })
 
+        it('uses the managed account name for deferred FusionAccount candidates in match labels', async () => {
+            const service = new MatchingService(
+                { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,
+                mockLog
+            )
+            const deferredCandidate = FusionAccount.fromManagedAccount({
+                sourceId: '1989a9dcfebe4c38b1e75c62290851b4',
+                nativeIdentity: 'MEL0011',
+                name: 'nadia.petrova',
+                attributes: { employeeId: 'E999' },
+            } as any)
+            const managed = managedWith({ employeeId: 'E999' })
+
+            await service.scoreFusionAccount(managed, [deferredCandidate], MatchCandidateType.Deferred)
+
+            const [match] = managed.fusionMatchesRaw
+            expect(match.identityName).toBe('nadia.petrova')
+        })
+
         it('keeps the Fusion identity reference and attributes when the candidate is a FusionAccount', async () => {
             const service = new MatchingService(
                 { matchingConfigs: [binaryRule], fusionManualReviewScore: 80 } as any,

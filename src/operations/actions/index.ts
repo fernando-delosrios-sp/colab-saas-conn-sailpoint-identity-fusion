@@ -5,6 +5,8 @@ import { reportAction } from './reportAction'
 import { fusionAction } from './fusionAction'
 import { correlateAction } from './correlateAction'
 import { reviewerAction } from './reviewerAction'
+import { resetAction } from './resetAction'
+import { FusionAction } from '../../model/fusionAction'
 import { ActionChange } from './types'
 
 
@@ -18,6 +20,7 @@ const ACTION_HANDLERS: Record<
     correlated: correlateAction,
     correlate: correlateAction,
     reviewer: reviewerAction,
+    [FusionAction.Reset]: resetAction,
 }
 
 /**

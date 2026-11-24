@@ -831,7 +831,11 @@ export class DefinitionService {
                 return
             }
 
-            if (hasValue && isFusionIdentityAttribute && isExistingIdentity) {
+            if (
+                hasValue &&
+                ((isFusionIdentityAttribute && isExistingIdentity) ||
+                    (isFusionDisplayAttribute && isExistingFusionAccount))
+            ) {
                 this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
                 return
             }

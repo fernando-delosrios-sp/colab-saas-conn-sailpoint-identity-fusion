@@ -405,6 +405,36 @@ describe('DefinitionService.refreshUniqueAttributes preservation', () => {
         expect(account.attributes.UID).not.toBe('old-value')
     })
 
+    it('preserves fusionDisplayAttribute on existing Fusion accounts even when needsReset is true', async () => {
+        const service = createService([
+            {
+                name: 'name',
+                expression: '$account.schema.name [$account.source.name]',
+                useIncrementalCounter: false,
+                digits: 1,
+            },
+        ])
+
+        const account = FusionAccount.fromFusionAccount({
+            id: 'NG000147',
+            identity: 'NG000147',
+            name: 'barrett.cline',
+            sourceId: 'fusion-src',
+            sourceName: 'Identity Fusion NG',
+            attributes: {
+                id: 'NG000147',
+                name: 'barrett.cline',
+                originSource: 'OrangeHRM',
+                originAccount: 'orange-src::705',
+            },
+        } as any)
+        account.setNeedsReset(true)
+
+        await service.refreshUniqueAttributes(account)
+
+        expect(account.attributes.name).toBe('barrett.cline')
+    })
+
     it('Refresh unique register does not enter unique lock', async () => {
         const uniqueLocks = { withLock: vi.fn((_key: string, fn: () => Promise<any>) => fn()) } as any
         const config = {

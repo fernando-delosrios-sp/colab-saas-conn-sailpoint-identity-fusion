@@ -6,6 +6,19 @@ All notable changes to **Identity Fusion NG** — the ISC connector for Map → 
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Dates use ISO 8601.
 
+## 2026-11-23 · v2.2.0
+
+### 🔧 Improvements
+
+- **Move unique-attribute reset to the `reset` action entitlement** — `accountEnable` now rebuilds with `ATTR_OPS_REFRESH` and `refreshBlankUniqueAttributes` (matching `accountDisable`) without triggering a global Fusion account pre-process or resetting populated unique values. Full unique-attribute regeneration (`ATTR_OPS_RESET`) is now triggered explicitly by adding the `reset` action entitlement (`actions: ['reset']`).
+
+### 🐛 Fixes
+
+- **Deferred match labels in Fusion reports** — Fusion and aggregation reports now show the deferred candidate’s account name (for example `nadia.petrova`) instead of the composite managed account key in match headers and links. Matching uses the same display-label chain as other report rows.
+- **Preserve Fusion account `name` during unique-attribute reset** — `DefinitionService.processUniqueDefinition` now guards `fusionDisplayAttribute` (`name`) alongside `fusionIdentityAttribute` (`id`) on existing Fusion accounts when `needsReset` is `true`, preventing `name` from being overwritten with `<name> [<source>]` during reset.
+
+---
+
 ## 2026-11-22 · v2.2.0
 
 ### ⚠️ Breaking Changes

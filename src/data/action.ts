@@ -5,4 +5,9 @@ export const actions: EntitlementSource[] = [
     { id: 'report', name: 'Fusion report', description: 'Generate a Fusion report (Match preview)' },
     { id: 'fusion', name: 'Fusion account', description: 'Create a fusion account' },
     { id: FusionAction.Correlated, name: 'Correlated', description: 'Correlate missing source accounts' },
+    {
+        id: FusionAction.Reset,
+        name: 'Reset',
+        description: 'Reset and regenerate unique attributes for the Fusion account',
+    },
 ]

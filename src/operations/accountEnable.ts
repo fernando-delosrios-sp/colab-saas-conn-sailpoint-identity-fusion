@@ -1,27 +1,22 @@
 import { ConnectorError, StdAccountEnableInput } from '@sailpoint/connector-sdk'
 import { ServiceRegistry } from '../services/serviceRegistry'
 import { rebuildFusionAccount } from './helpers/rebuildFusionAccount'
+import { refreshBlankUniqueAttributes } from './helpers/refreshBlankUniqueAttributes'
 import { assert } from '../utils/assert'
-import { ATTR_OPS_RESET } from '../services/definitionService/types'
+import { ATTR_OPS_REFRESH } from '../services/definitionService/types'
 
 /**
  * Account enable operation - Re-enables a previously disabled fusion account.
  *
- * Enabling triggers a full unique attribute reset (`resetDefinition: true`).
- * All unique attribute values (e.g. usernames, generated IDs) are unregistered
- * and regenerated to guarantee collision-free values. Use regular unique attribute
- * schemas to define changeable attributes that should be refreshed on
- * enable/disable cycles. The nativeIdentity and account name are never changed
- * (see {@link processNormalDefinition} and {@link processUniqueDefinition}).
- *
- * Unlike disable, enable requires pre-processing all fusion accounts to collect
- * unique attribute values before rebuilding, since re-enabling may require
- * reassigning unique identifiers that were released during disable.
+ * Enabling does **not** reset unique attribute definitions (`resetDefinition: false`).
+ * Existing unique values are preserved during enable; only blank unique attributes
+ * are calculated. Full unique attribute regeneration is triggered explicitly via the
+ * `reset` action entitlement.
  *
  * Processing Flow:
  * 1. SETUP: Load sources and schema
- * 2. PRE-PROCESS: Fetch and pre-process all fusion accounts to collect unique values
- * 3. REBUILD: Reconstruct the target fusion account with refreshed and reset attributes
+ * 2. REBUILD: Reconstruct the target fusion account with refreshed mapped and generated attributes
+ * 3. UNIQUE: Calculate blank unique attributes without resetting populated values
  * 4. ENABLE: Mark the fusion account as enabled
  * 5. OUTPUT: Generate and return the updated ISC account representation
  *
@@ -37,21 +32,12 @@ export const accountEnable = async (serviceRegistry: ServiceRegistry, input: Std
         const timer = log.timer()
 
         log.stepStart('load-sources-schema')
-        await definition.initializeCounters()
         await sources.fetchAllSources()
         await schemas.setFusionAccountSchema(input.schema)
         log.stepEnd('load-sources-schema')
 
-        log.stepStart('preprocess-fusion-accounts')
-        await sources.fetchFusionAccounts()
-        definition.registerUniqueValuesFromManagedSourceAccounts(sources.fusionAccounts)
-        const preProcessOp = log.track('FusionService.preProcessFusionAccounts')
-        const preProcessedAccounts = await fusion.preProcessFusionAccounts()
-        preProcessOp.done({ count: preProcessedAccounts.length })
-        log.stepEnd('preprocess-fusion-accounts', { count: preProcessedAccounts.length })
-
         log.stepStart('rebuild-fusion-account')
-        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_RESET, {
+        const fusionAccount = await rebuildFusionAccount(input.identity, ATTR_OPS_REFRESH, {
             fusion,
             identities,
             sources,
@@ -59,9 +45,11 @@ export const accountEnable = async (serviceRegistry: ServiceRegistry, input: Std
         })
         assert(fusionAccount, `Fusion account not found for identity: ${input.identity}`)
         log.debug(`Found fusion account: ${fusionAccount.name || fusionAccount.managedKey}`)
-
-        await definition.refreshUniqueAttributes(fusionAccount)
         log.stepEnd('rebuild-fusion-account')
+
+        log.stepStart('refresh-unique-attributes')
+        await refreshBlankUniqueAttributes(fusionAccount, { definition, sources, log }, false)
+        log.stepEnd('refresh-unique-attributes')
 
         log.stepStart('enable-fusion-account')
         fusionAccount.enable()

@@ -24,6 +24,7 @@ function createRegistry() {
 
     const definition = registry.definition as any
     definition.initializeCounters = vi.fn().mockResolvedValue(undefined)
+    definition.hasMissingUniqueAttribute = vi.fn().mockReturnValue(true)
     definition.registerUniqueValuesFromManagedSourceAccounts = vi.fn()
     definition.refreshUniqueAttributes = vi.fn().mockResolvedValue(undefined)
 
@@ -51,7 +52,7 @@ describe('accountEnable', () => {
         vi.clearAllMocks()
     })
 
-    it('pre-processes unique attributes and enables account', async () => {
+    it('enables a fusion account with REFRESH and without global pre-process', async () => {
         const registry = createRegistry()
         registry.fusion.getISCAccount.mockResolvedValue({ id: 'isc-enabled' })
         const fusionAccount = { managedKey: 'fusion-1', enable: vi.fn() }
@@ -59,15 +60,13 @@ describe('accountEnable', () => {
 
         await accountEnable(registry, { identity: 'fusion-1', schema: { attributes: [] } } as any)
 
-        expect(registry.definition.initializeCounters).toHaveBeenCalledTimes(1)
-        expect(registry.sources.fetchFusionAccounts).toHaveBeenCalledTimes(1)
-        expect(registry.definition.registerUniqueValuesFromManagedSourceAccounts).toHaveBeenCalledWith(
-            registry.sources.fusionAccounts
-        )
-        expect(registry.fusion.preProcessFusionAccounts).toHaveBeenCalledTimes(1)
+        expect(registry.sources.fetchAllSources).toHaveBeenCalledTimes(1)
+        expect(registry.sources.fetchFusionAccounts).not.toHaveBeenCalled()
+        expect(registry.fusion.preProcessFusionAccounts).not.toHaveBeenCalled()
+        expect(registry.definition.registerUniqueValuesFromManagedSourceAccounts).not.toHaveBeenCalled()
         expect(rebuildFusionAccount).toHaveBeenCalledWith(
             'fusion-1',
-            expect.any(Object),
+            expect.objectContaining({ refreshMapping: true, refreshDefinition: true, resetDefinition: false }),
             expect.objectContaining({
                 fusion: expect.any(Object),
                 identities: expect.any(Object),

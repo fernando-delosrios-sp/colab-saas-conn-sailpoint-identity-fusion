@@ -1,4 +1,5 @@
 import { FusionAccount } from '../../model/account'
+import { trimStr } from '../../utils/safeRead'
 import {
     buildIdentityConflictWarningsFromMap,
     buildMinimalFusionReportAccount,
@@ -73,9 +74,13 @@ function mapFusionMatchToReportCandidate(
         state.fusionAutoMergeScore !== undefined &&
         score >= state.fusionAutoMergeScore
 
+    const fields = fusionReportMatchCandidateAccountFields(match)
+    const identityName =
+        fields.accountName || trimStr(match.identityName) || trimStr(match.identityId) || 'Unknown'
+
     return {
-        ...fusionReportMatchCandidateAccountFields(match),
-        identityName: match.identityName,
+        ...fields,
+        identityName,
         identityId: match.identityId,
         identityUrl: state.urlContext.identity(match.identityId),
         isMatch: true,

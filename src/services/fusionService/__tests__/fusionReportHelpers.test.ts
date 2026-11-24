@@ -1,3 +1,4 @@
+import { vi } from 'vitest'
 import {
     mapScoreReportsForFusionReport,
     getFusionIdentityConflictTrackingKey,
@@ -6,7 +7,10 @@ import {
     buildMinimalFusionReportAccount,
     buildIdentityConflictWarningsFromMap,
     buildFusionReportMatchesForReviewEmail,
+    buildDeferredMatchReportRows,
 } from '../helpers'
+import { FusionRun } from '../../../model/fusionRun'
+import { MatchCandidateType } from '../../matchingService/types'
 import { UrlContext } from '../../../utils/url'
 import { SourceType } from '../../../model/config'
 
@@ -193,6 +197,42 @@ describe('fusionReportHelpers', () => {
 
             expect(matches[0].identityName).toBe('Michael Eckert')
             expect(matches[0].scores?.[0]).toMatchObject({ attribute: 'firstname', score: 92 })
+        })
+    })
+
+    describe('buildDeferredMatchReportRows', () => {
+        const urlContext = {
+            identity: vi.fn(() => 'identity-url'),
+            accountManagement: vi.fn(() => 'account-url'),
+        } as UrlContext
+
+        it('uses fusion account name when match identityName is a composite managed key', () => {
+            const anchor = {
+                managedKey: '1989a9dcfebe4c38b1e75c62290851b4::MEL0011',
+                managedKeyOrUndefined: '1989a9dcfebe4c38b1e75c62290851b4::MEL0011',
+                name: 'nadia.petrova',
+                sourceName: 'MelonHRM',
+                fusionMatches: [],
+            } as any
+            const run = new FusionRun({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any)
+            run.registerFinalizedDeferredCandidate(anchor)
+            const fusionAccount = {
+                sourceName: 'MelonHRM',
+                fusionMatches: [
+                    {
+                        candidateType: MatchCandidateType.Deferred,
+                        identityName: '1989a9dcfebe4c38b1e75c62290851b4::MEL0011',
+                        fusionIdentity: anchor,
+                        scores: [],
+                    },
+                ],
+            } as any
+            const sources = { resolveIscAccountIdForManagedKey: vi.fn(() => undefined) } as any
+
+            const rows = buildDeferredMatchReportRows(fusionAccount, run, 5, urlContext, sources)
+
+            expect(rows[0].identityName).toBe('nadia.petrova')
+            expect(rows[0].accountName).toBe('nadia.petrova')
         })
     })
 
