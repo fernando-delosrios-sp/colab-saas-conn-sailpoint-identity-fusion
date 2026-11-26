@@ -3,13 +3,14 @@ import { FusionAccount } from '../../model/account'
 import { ATTR_OPS_RESET } from '../../services/definitionService/types'
 import { ServiceRegistry } from '../../services/serviceRegistry'
 import { assert } from '../../utils/assert'
+import { isValidAttributeValue } from '../../utils/attributes'
 import { rebuildFusionAccount } from '../helpers/rebuildFusionAccount'
 import { ActionChange } from './types'
 
 /**
  * Reset action handler — pre-processes all Fusion accounts to register existing
  * unique values, rebuilds the target Fusion account with `ATTR_OPS_RESET`, and
- * regenerates changeable unique attributes while preserving `nativeIdentity` and `name`.
+ * regenerates changeable unique attributes while preserving account ID and account name.
  */
 export const resetAction = async (
     fusionAccount: FusionAccount,
@@ -18,9 +19,16 @@ export const resetAction = async (
 ): Promise<void> => {
     if (change.op !== AttributeChangeOp.Add) return
 
-    const { log, fusion, sources, definition, identities } = serviceRegistry
+    const { log, fusion, sources, definition, identities, schemas } = serviceRegistry
     const targetIdentity = fusionAccount.managedKey
     assert(targetIdentity, 'Fusion account identity is required for reset')
+
+    const preservedAttributes: Record<string, unknown> = {}
+    for (const attrName of [schemas?.fusionIdentityAttribute, schemas?.fusionDisplayAttribute]) {
+        if (attrName && isValidAttributeValue(fusionAccount.attributes[attrName])) {
+            preservedAttributes[attrName] = fusionAccount.attributes[attrName]
+        }
+    }
 
     await definition.initializeCounters()
     await sources.fetchFusionAccounts()
@@ -42,5 +50,5 @@ export const resetAction = async (
             delete fusionAccount.attributes[key]
         }
     }
-    Object.assign(fusionAccount.attributes, rebuilt.attributes)
+    Object.assign(fusionAccount.attributes, rebuilt.attributes, preservedAttributes)
 }

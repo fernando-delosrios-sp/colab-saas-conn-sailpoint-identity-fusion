@@ -290,9 +290,8 @@ export class DefinitionService {
         if (attributeName !== fusionDisplayAttribute) return false
         if (!this.shouldApplyDisplayAttributeOverride(fusionAccount)) return false
         const hasExistingValue = isValidAttributeValue(fusionAccount.attributes[attributeName])
-        const canResetDisplay = fusionAccount.needsReset
         const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
-        if (hasExistingValue && !canResetDisplay && isExistingFusionAccount) {
+        if (hasExistingValue && isExistingFusionAccount) {
             return true
         }
 
@@ -816,7 +815,6 @@ export class DefinitionService {
         const isFusionIdentityAttribute = name === fusionIdentityAttribute
         const isFusionDisplayAttribute = name === fusionDisplayAttribute
         const isExistingFusionAccount = this.isExistingFusionAccount(fusionAccount)
-        const isExistingIdentity = isExistingFusionAccount && fusionAccount.isIdentity
 
         const prevIsUnique = context.isUnique
         context.isUnique = (value: unknown) => this.isUniqueTemplateValue(definition, value, context)
@@ -831,11 +829,7 @@ export class DefinitionService {
                 return
             }
 
-            if (
-                hasValue &&
-                ((isFusionIdentityAttribute && isExistingIdentity) ||
-                    (isFusionDisplayAttribute && isExistingFusionAccount))
-            ) {
+            if (hasValue && isExistingFusionAccount && (isFusionIdentityAttribute || isFusionDisplayAttribute)) {
                 this.getUniqueValues(name).add(String(fusionAccount.attributes[name]))
                 return
             }

@@ -28,6 +28,7 @@ function createRegistry() {
         sources,
         definition,
         identities: {},
+        schemas: { fusionIdentityAttribute: 'id', fusionDisplayAttribute: 'name' },
     } as any
 }
 
@@ -78,5 +79,35 @@ describe('resetAction', () => {
         expect(registry.definition.initializeCounters).not.toHaveBeenCalled()
         expect(registry.sources.fetchFusionAccounts).not.toHaveBeenCalled()
         expect(rebuildFusionAccount).not.toHaveBeenCalled()
+    })
+
+    it('preserves existing fusionIdentityAttribute and fusionDisplayAttribute even if rebuild alters them', async () => {
+        const registry = createRegistry()
+        registry.schemas = { fusionIdentityAttribute: 'accountId', fusionDisplayAttribute: 'accountName' }
+        const fusionAccount = {
+            managedKey: 'NG000147',
+            attributes: {
+                accountId: 'NG000147',
+                accountName: 'barrett.cline',
+                username: 'barrett.cline',
+            },
+        } as any
+        const rebuilt = {
+            managedKey: 'NG000147',
+            attributes: {
+                accountId: 'CHANGED-ID',
+                accountName: 'changed.name',
+                username: 'barrett.cline2',
+            },
+        }
+        ;(rebuildFusionAccount as Mock).mockResolvedValue(rebuilt)
+
+        await resetAction(fusionAccount, { op: AttributeChangeOp.Add, value: 'reset' }, registry)
+
+        expect(fusionAccount.attributes).toEqual({
+            accountId: 'NG000147',
+            accountName: 'barrett.cline',
+            username: 'barrett.cline2',
+        })
     })
 })

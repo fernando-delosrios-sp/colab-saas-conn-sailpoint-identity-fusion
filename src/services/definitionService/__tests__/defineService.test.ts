@@ -270,6 +270,35 @@ describe('DefinitionService.applyDisplayAttributeOverride', () => {
         expect(acc.attributeBag.current['name']).toBe('Mapped Display Name')
     })
 
+    it('preserves persisted fusion display values on existing correlated Fusion accounts even when needsReset is true', () => {
+        const service = new DefinitionService(config, mockSchemas, mockLog, mockLocks)
+        const acc = FusionAccount.fromFusionAccount({
+            nativeIdentity: 'fusion-native-1',
+            name: 'Persisted Name',
+            sourceName: 'Identity Fusion NG',
+            uncorrelated: false,
+            identityId: 'identity-1',
+            attributes: {
+                id: 'fusion-native-1',
+                name: 'Persisted Display Name',
+                identityId: 'identity-1',
+                originSource: 'Identities',
+                originAccount: 'identity-1',
+            },
+        } as any)
+        acc.addIdentityLayer({
+            id: 'identity-1',
+            name: 'new.login',
+            displayName: 'New Identity Alias',
+            attributes: { displayName: 'New Identity Alias' },
+        } as any)
+        acc.setNeedsReset(true)
+
+        expect(acc.isIdentity).toBe(true)
+        service.applyDisplayAttributeOverride(acc)
+        expect(acc.attributeBag.current['name']).toBe('Persisted Display Name')
+    })
+
 })
 
 
@@ -433,6 +462,36 @@ describe('DefinitionService.refreshUniqueAttributes preservation', () => {
         await service.refreshUniqueAttributes(account)
 
         expect(account.attributes.name).toBe('barrett.cline')
+    })
+
+    it('preserves fusionIdentityAttribute on non-identity existing Fusion accounts even when needsReset is true', async () => {
+        const service = createService([
+            {
+                name: 'id',
+                expression: 'NEW-$counter',
+                useIncrementalCounter: false,
+                digits: 1,
+            },
+        ])
+
+        const account = FusionAccount.fromFusionAccount({
+            id: 'NG000147',
+            identity: 'NG000147',
+            name: 'barrett.cline',
+            sourceId: 'fusion-src',
+            sourceName: 'Identity Fusion NG',
+            uncorrelated: true,
+            attributes: {
+                id: 'NG000147',
+                name: 'barrett.cline',
+                statuses: ['uncorrelated'],
+            },
+        } as any)
+        account.setNeedsReset(true)
+
+        await service.refreshUniqueAttributes(account)
+
+        expect(account.attributes.id).toBe('NG000147')
     })
 
     it('Refresh unique register does not enter unique lock', async () => {
@@ -1437,7 +1496,7 @@ describe('DefinitionService live collection state in Velocity context', () => {
 
     it('Reset regenerates a unique value from live collection state', async () => {
         const service = createService({
-            uniqueAttributeDefinitions: [{ name: 'id', expression: REVIEWER_GATED_ID }],
+            uniqueAttributeDefinitions: [{ name: 'UID', expression: REVIEWER_GATED_ID }],
         })
         const acc = FusionAccount.fromFusionAccount({
             nativeIdentity: 'fusion-native-1',
@@ -1445,6 +1504,7 @@ describe('DefinitionService live collection state in Velocity context', () => {
             sourceName: 'Identity Fusion NG',
             attributes: {
                 id: 'old-id',
+                UID: 'old-uid',
                 name: 'Persisted Reviewer',
                 statuses: [StatusEntitlement.Reviewer],
             },
@@ -1453,8 +1513,9 @@ describe('DefinitionService live collection state in Velocity context', () => {
 
         await service.refreshUniqueAttributes(acc)
 
-        expect(acc.attributes.id).toMatch(UUID_PATTERN)
-        expect(acc.attributes.id).not.toBe('old-id')
+        expect(acc.attributes.UID).toMatch(UUID_PATTERN)
+        expect(acc.attributes.UID).not.toBe('old-uid')
+        expect(acc.attributes.id).toBe('old-id')
     })
 
     it('Reviews with no pending forms render as an empty list', async () => {
